@@ -36,13 +36,17 @@ import AcademicReports from '../pages/SchoolManager/AcademicReports';
 import TeacherMonitoring from '../pages/SchoolManager/TeacherMonitoring';
 import DepartmentManagement from '../pages/SchoolManager/DepartmentManagement';
 import SecretaryMonitoring from '../pages/SchoolManager/SecretaryMonitoring';
+import SchoolManagerSettings from '../pages/SchoolManager/SchoolManagerSettings';
 
 // Secretary Pages
 import SecretaryLayout from '../components/SecretaryLayout';
 import SecretaryDashboard from '../pages/Secretary/SecretaryDashboard';
 import StudentAdmissions from '../pages/Secretary/StudentAdmissions';
 import GuardianLinking from '../pages/Secretary/GuardianLinking';
-import AdminSupport from '../pages/Secretary/AdminSupport';
+import SecretaryAttendance from '../pages/Secretary/SecretaryAttendance';
+import SecretaryCommunication from '../pages/Secretary/SecretaryCommunication';
+import SecretarySettings from '../pages/Secretary/SecretarySettings';
+
 
 // Student Pages
 import StudentLayout from '../pages/Student/StudentLayout';
@@ -56,6 +60,14 @@ import GuardianLayout from '../components/GuardianLayout';
 import GuardianDashboard from '../pages/Guardian/GuardianDashboard';
 import ChildrenMonitoring from '../pages/Guardian/ChildrenMonitoring';
 import GuardianCommunication from '../pages/Guardian/Communication';
+
+// Teacher Pages
+import TeacherLayout from '../components/TeacherLayout';
+import TeacherDashboard from '../pages/Teacher/TeacherDashboard';
+import ClassManagement from '../pages/Teacher/ClassManagement';
+import Assessments from '../pages/Teacher/Assessments';
+import LessonPlans from '../pages/Teacher/LessonPlans';
+import TeacherCommunication from '../pages/Teacher/Communication';
 
 const AppRoutes = () => {
     return (
@@ -108,6 +120,7 @@ const AppRoutes = () => {
                     <Route path="teachers" element={<TeacherMonitoring />} />
                     <Route path="departments" element={<DepartmentManagement />} />
                     <Route path="secretaries" element={<SecretaryMonitoring />} />
+                    <Route path="settings" element={<SchoolManagerSettings />} />
                 </Route>
             </Route>
 
@@ -118,7 +131,9 @@ const AppRoutes = () => {
                     <Route path="dashboard" element={<SecretaryDashboard />} />
                     <Route path="admissions" element={<StudentAdmissions />} />
                     <Route path="guardians" element={<GuardianLinking />} />
-                    <Route path="admin-support" element={<AdminSupport />} />
+                    <Route path="attendance" element={<SecretaryAttendance />} />
+                    <Route path="communication" element={<SecretaryCommunication />} />
+                    <Route path="settings" element={<SecretarySettings />} />
                 </Route>
             </Route>
 
@@ -141,6 +156,18 @@ const AppRoutes = () => {
                     <Route path="dashboard" element={<GuardianDashboard />} />
                     <Route path="monitoring" element={<ChildrenMonitoring />} />
                     <Route path="communication" element={<GuardianCommunication />} />
+                </Route>
+            </Route>
+
+            {/* Protected Routes - Teacher */}
+            <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'TEACHER']} />}>
+                <Route path="/teacher" element={<TeacherLayout />}>
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<TeacherDashboard />} />
+                    <Route path="classes" element={<ClassManagement />} />
+                    <Route path="assessments" element={<Assessments />} />
+                    <Route path="lesson-plans" element={<LessonPlans />} />
+                    <Route path="communication" element={<TeacherCommunication />} />
                 </Route>
             </Route>
 

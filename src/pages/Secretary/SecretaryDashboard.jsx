@@ -5,9 +5,9 @@ import './Secretary.css';
 const SecretaryDashboard = () => {
     // Mock Data for Quick Stats
     const stats = [
-        { label: 'Total Students', value: '1,234', icon: Users, color: '#4F46E5', bgColor: '#EEF2FF' },
-        { label: 'New Applications', value: '45', icon: FileText, color: '#F59E0B', bgColor: '#FEF3C7' },
-        { label: 'Pending Tasks', value: '12', icon: Clock, color: '#EF4444', bgColor: '#FEE2E2' },
+        { label: 'Total Students', value: '1,234', icon: Users, color: '#4F46E5', bgColor: '#EEF2FF', link: '/secretary/admissions' },
+        { label: 'Unread Messages', value: '3', icon: FileText, color: '#F59E0B', bgColor: '#FEF3C7', link: '/secretary/communication' },
+        { label: 'Absent Today', value: '12', icon: Clock, color: '#EF4444', bgColor: '#FEE2E2', link: '/secretary/attendance' },
     ];
 
     const pendingTasks = [
@@ -33,7 +33,11 @@ const SecretaryDashboard = () => {
             {/* Quick Stats Grid */}
             <div className="secretary-stats-grid">
                 {stats.map((stat, index) => (
-                    <div key={index} className="stat-card">
+                    <div
+                        key={index}
+                        className="stat-card cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => window.location.href = stat.link}
+                    >
                         <div
                             className="stat-icon-wrapper"
                             style={{ backgroundColor: stat.bgColor, color: stat.color }}

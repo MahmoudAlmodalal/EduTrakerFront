@@ -21,11 +21,11 @@ const SchoolManagerLayout = () => {
         { path: '/school-manager/teachers', label: 'Teachers', icon: UserCheck },
         { path: '/school-manager/departments', label: 'Departments', icon: Briefcase },
         { path: '/school-manager/secretaries', label: 'Secretaries', icon: Users },
+        { path: '/school-manager/settings', label: 'Settings', icon: Settings },
     ];
 
     return (
         <div className="school-manager-layout">
-            {/* Sidebar */}
             <aside className="school-manager-sidebar">
                 <div className="school-manager-brand">
                     <GraduationCap size={32} />
@@ -55,7 +55,6 @@ const SchoolManagerLayout = () => {
                 </div>
             </aside>
 
-            {/* Main Content */}
             <main className="school-manager-main">
                 <Outlet />
             </main>

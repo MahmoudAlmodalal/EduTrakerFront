@@ -16,8 +16,9 @@ const SecretaryLayout = () => {
         { path: '/secretary/dashboard', label: 'Overview', icon: LayoutDashboard },
         { path: '/secretary/admissions', label: 'Admissions', icon: UserPlus },
         { path: '/secretary/guardians', label: 'Guardians', icon: Users },
-        { path: '/secretary/admin-support', label: 'Admin Support', icon: Shield },
-        // { path: '/secretary/settings', label: 'Settings', icon: Settings }, // Optional, based on reqs
+        { path: '/secretary/attendance', label: 'Attendance', icon: FileText },
+        { path: '/secretary/communication', label: 'Communication', icon: FileText },
+        { path: '/secretary/settings', label: 'Settings', icon: Settings },
     ];
 
     return (

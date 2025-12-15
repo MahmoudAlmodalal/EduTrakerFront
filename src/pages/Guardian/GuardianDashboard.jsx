@@ -1,6 +1,6 @@
 import React from 'react';
 import './Guardian.css';
-import { Bell, Calendar, TrendingUp, AlertCircle, BookOpen } from 'lucide-react';
+import { Bell, Calendar, TrendingUp } from 'lucide-react';
 
 const GuardianDashboard = () => {
     // Mock Data
@@ -23,22 +23,22 @@ const GuardianDashboard = () => {
 
     return (
         <div className="guardian-dashboard">
-            <h1 style={{ marginBottom: '2rem', color: '#1e293b' }}>Dashboard Overview</h1>
+            <h1 className="guardian-page-title">Dashboard Overview</h1>
 
             <div className="guardian-dashboard-grid">
                 {/* Children Summary */}
                 <div className="guardian-card">
-                    <h3>
-                        <span>Children Overview</span>
+                    <div className="guardian-card-header">
+                        <h3>Children Overview</h3>
                         <TrendingUp size={20} color="#4f46e5" />
-                    </h3>
+                    </div>
                     <div className="children-list">
                         {children.map(child => (
                             <div key={child.id} className="child-summary-item">
                                 <div className="child-avatar">{child.name.charAt(0)}</div>
                                 <div>
-                                    <div style={{ fontWeight: '600', color: '#1e293b' }}>{child.name}</div>
-                                    <div style={{ fontSize: '0.875rem', color: '#64748b' }}>{child.grade} • GPA: {child.gpa}</div>
+                                    <div className="child-name">{child.name}</div>
+                                    <div className="child-details">{child.grade} • GPA: {child.gpa}</div>
                                 </div>
                             </div>
                         ))}
@@ -47,15 +47,15 @@ const GuardianDashboard = () => {
 
                 {/* Notifications */}
                 <div className="guardian-card">
-                    <h3>
-                        <span>Recent Notifications</span>
+                    <div className="guardian-card-header">
+                        <h3>Recent Notifications</h3>
                         <Bell size={20} color="#f59e0b" />
-                    </h3>
+                    </div>
                     <div className="notifications-list">
                         {notifications.map(notif => (
                             <div key={notif.id} className={`notification-item ${notif.type}`}>
-                                <div style={{ fontWeight: '600', fontSize: '0.9rem', marginBottom: '0.25rem' }}>{notif.title}</div>
-                                <div style={{ fontSize: '0.85rem', color: '#475569' }}>{notif.message}</div>
+                                <div className="notification-title">{notif.title}</div>
+                                <div className="notification-message">{notif.message}</div>
                             </div>
                         ))}
                     </div>
@@ -63,20 +63,20 @@ const GuardianDashboard = () => {
 
                 {/* Important Dates */}
                 <div className="guardian-card">
-                    <h3>
-                        <span>Upcoming Events</span>
+                    <div className="guardian-card-header">
+                        <h3>Upcoming Events</h3>
                         <Calendar size={20} color="#3b82f6" />
-                    </h3>
+                    </div>
                     <div className="events-list">
                         {upcomingEvents.map(event => (
-                            <div key={event.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #f1f5f9' }}>
-                                <div style={{ background: '#eff6ff', padding: '0.5rem', borderRadius: '0.5rem', color: '#3b82f6', textAlign: 'center', minWidth: '50px' }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{event.date.split(' ')[0]}</div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 'bold' }}>{event.date.split(' ')[1].replace(',', '')}</div>
+                            <div key={event.id} className="event-item">
+                                <div className="event-date-box">
+                                    <div className="event-month">{event.date.split(' ')[0]}</div>
+                                    <div className="event-day">{event.date.split(' ')[1].replace(',', '')}</div>
                                 </div>
                                 <div>
-                                    <div style={{ fontWeight: '600', color: '#334155' }}>{event.title}</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>For: {event.child}</div>
+                                    <div className="event-title">{event.title}</div>
+                                    <div className="event-child">For: {event.child}</div>
                                 </div>
                             </div>
                         ))}

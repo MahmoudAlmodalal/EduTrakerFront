@@ -32,21 +32,15 @@ const ChildrenMonitoring = () => {
 
     return (
         <div className="guardian-monitoring">
-            <h1 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Children Monitoring</h1>
+            <h1 className="guardian-page-title">Children Monitoring</h1>
 
             {/* Child Selector */}
-            <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem' }}>
+            <div className="child-selector">
                 {children.map(child => (
                     <button
                         key={child.id}
                         onClick={() => setSelectedChild(child.id)}
-                        className={`btn-primary`}
-                        style={{
-                            background: selectedChild === child.id ? '#4f46e5' : 'white',
-                            color: selectedChild === child.id ? 'white' : '#64748b',
-                            border: '1px solid #e2e8f0',
-                            boxShadow: 'none'
-                        }}
+                        className={`child-selector-btn ${selectedChild === child.id ? 'active' : ''}`}
                     >
                         {child.name}
                     </button>
@@ -54,54 +48,24 @@ const ChildrenMonitoring = () => {
             </div>
 
             {/* Tabs */}
-            <div className="tabs" style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
+            <div className="tabs-header">
                 <button
                     onClick={() => setActiveTab('results')}
-                    style={{
-                        padding: '0.75rem 1rem',
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: activeTab === 'results' ? '2px solid #4f46e5' : '2px solid transparent',
-                        color: activeTab === 'results' ? '#4f46e5' : '#64748b',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                    }}
+                    className={`tab-btn ${activeTab === 'results' ? 'active' : ''}`}
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FileText size={18} /> Results
-                    </div>
+                    <FileText size={18} /> Results
                 </button>
                 <button
                     onClick={() => setActiveTab('attendance')}
-                    style={{
-                        padding: '0.75rem 1rem',
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: activeTab === 'attendance' ? '2px solid #4f46e5' : '2px solid transparent',
-                        color: activeTab === 'attendance' ? '#4f46e5' : '#64748b',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                    }}
+                    className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`}
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <UserCheck size={18} /> Attendance
-                    </div>
+                    <UserCheck size={18} /> Attendance
                 </button>
                 <button
                     onClick={() => setActiveTab('behavior')}
-                    style={{
-                        padding: '0.75rem 1rem',
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: activeTab === 'behavior' ? '2px solid #4f46e5' : '2px solid transparent',
-                        color: activeTab === 'behavior' ? '#4f46e5' : '#64748b',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                    }}
+                    className={`tab-btn ${activeTab === 'behavior' ? 'active' : ''}`}
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <AlertTriangle size={18} /> Behavior
-                    </div>
+                    <AlertTriangle size={18} /> Behavior
                 </button>
             </div>
 
@@ -123,7 +87,7 @@ const ChildrenMonitoring = () => {
                                     <td>{res.subject}</td>
                                     <td>{res.type}</td>
                                     <td>{res.date}</td>
-                                    <td><span style={{ fontWeight: 'bold', color: '#1e293b' }}>{res.score}</span></td>
+                                    <td><span className="score-badge">{res.score}</span></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -144,14 +108,7 @@ const ChildrenMonitoring = () => {
                                 <tr key={att.id}>
                                     <td>{att.date}</td>
                                     <td>
-                                        <span style={{
-                                            padding: '0.25rem 0.75rem',
-                                            borderRadius: '999px',
-                                            fontSize: '0.85rem',
-                                            fontWeight: '500',
-                                            backgroundColor: att.status === 'Present' ? '#dcfce7' : att.status === 'Absent' ? '#fee2e2' : '#fef9c3',
-                                            color: att.status === 'Present' ? '#166534' : att.status === 'Absent' ? '#991b1b' : '#854d0e'
-                                        }}>
+                                        <span className={`status-badge ${att.status.toLowerCase()}`}>
                                             {att.status}
                                         </span>
                                     </td>
@@ -176,10 +133,7 @@ const ChildrenMonitoring = () => {
                                 <tr key={beh.id}>
                                     <td>{beh.date}</td>
                                     <td>
-                                        <span style={{
-                                            color: beh.type === 'Positive' ? '#166534' : '#991b1b',
-                                            fontWeight: '600'
-                                        }}>
+                                        <span className={`status-badge ${beh.type.toLowerCase()}`}>
                                             {beh.type}
                                         </span>
                                     </td>

@@ -101,12 +101,43 @@ const TeacherMonitoring = () => {
 
 // Sub-components
 const TeacherDirectory = () => {
-    const teachers = [
+    const [teachers, setTeachers] = useState([
         { id: 1, name: 'John Smith', subject: 'Mathematics', role: 'Teacher', status: 'Active' },
         { id: 2, name: 'Sarah Johnson', subject: 'Science', role: 'Head of Dept', status: 'Active' },
         { id: 3, name: 'Michael Brown', subject: 'English', role: 'Teacher', status: 'On Leave' },
         { id: 4, name: 'Emily Davis', subject: 'History', role: 'Teacher', status: 'Active' },
-    ];
+    ]);
+
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [currentTeacher, setCurrentTeacher] = useState(null);
+    const [formData, setFormData] = useState({ name: '', subject: '', role: 'Teacher', status: 'Active' });
+
+    const openModal = (teacher = null) => {
+        if (teacher) {
+            setCurrentTeacher(teacher);
+            setFormData({ name: teacher.name, subject: teacher.subject, role: teacher.role, status: teacher.status });
+        } else {
+            setCurrentTeacher(null);
+            setFormData({ name: '', subject: '', role: 'Teacher', status: 'Active' });
+        }
+        setIsModalOpen(true);
+    };
+
+    const handleSave = (e) => {
+        e.preventDefault();
+        if (currentTeacher) {
+            setTeachers(teachers.map(t => t.id === currentTeacher.id ? { ...t, ...formData } : t));
+        } else {
+            setTeachers([...teachers, { id: teachers.length + 1, ...formData }]);
+        }
+        setIsModalOpen(false);
+    };
+
+    const handleDelete = (id) => {
+        if (window.confirm('Are you sure you want to delete this teacher?')) {
+            setTeachers(teachers.filter(t => t.id !== id));
+        }
+    };
 
     return (
         <div className="management-card">
@@ -124,7 +155,7 @@ const TeacherDirectory = () => {
                         }}
                     />
                 </div>
-                <button className="btn-primary">
+                <button className="btn-primary" onClick={() => openModal()}>
                     <Plus size={18} />
                     Add Teacher
                 </button>
@@ -151,14 +182,77 @@ const TeacherDirectory = () => {
                                 </span>
                             </td>
                             <td>
-                                <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px' }}>
-                                    <MoreVertical size={18} color="var(--color-text-muted)" />
-                                </button>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button onClick={() => openModal(teacher)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>Edit</button>
+                                    <button onClick={() => handleDelete(teacher.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>Delete</button>
+                                </div>
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            {/* Modal */}
+            {isModalOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '400px',
+                        border: '1px solid var(--color-border)'
+                    }}>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>{currentTeacher ? 'Edit Teacher' : 'Add Teacher'}</h2>
+                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Full Name</label>
+                                <input
+                                    required
+                                    value={formData.name}
+                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Subject</label>
+                                <input
+                                    required
+                                    value={formData.subject}
+                                    onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Role</label>
+                                <select
+                                    value={formData.role}
+                                    onChange={e => setFormData({ ...formData, role: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                >
+                                    <option value="Teacher">Teacher</option>
+                                    <option value="Head of Dept">Head of Dept</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Status</label>
+                                <select
+                                    value={formData.status}
+                                    onChange={e => setFormData({ ...formData, status: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                >
+                                    <option value="Active">Active</option>
+                                    <option value="On Leave">On Leave</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
+                                <button type="submit" className="btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -249,8 +343,8 @@ const ActivityLogs = () => {
                             </td>
                             <td>
                                 <span className={`status-badge ${log.speed === 'Fast' ? 'status-active' :
-                                        log.speed === 'Slow' ? 'status-inactive' : // Reusing inactive for warning-ish look or defined another
-                                            ''
+                                    log.speed === 'Slow' ? 'status-inactive' : // Reusing inactive for warning-ish look or defined another
+                                        ''
                                     }`}
                                     style={{
                                         backgroundColor: log.speed === 'Fast' ? '#dcfce7' : log.speed === 'Slow' ? '#fee2e2' : '#f1f5f9',

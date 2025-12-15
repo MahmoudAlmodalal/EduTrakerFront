@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { LayoutDashboard, Users, Briefcase, Activity, Settings, HelpCircle, School, GraduationCap, ClipboardList, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, Activity, Settings, HelpCircle, School, GraduationCap, ClipboardList, MessageSquare, Calendar, FileText, UserCheck, Layers } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 const Sidebar = ({ isOpen }) => {
@@ -20,6 +20,14 @@ const Sidebar = ({ isOpen }) => {
             { path: '/super-admin/settings', label: t('nav.settings'), icon: Settings },
             { path: '/super-admin/support', label: t('nav.support'), icon: HelpCircle },
             { path: '/super-admin/activity', label: t('nav.activity'), icon: ClipboardList },
+        ],
+        SCHOOL_MANAGER: [
+            { path: '/school-manager', label: t('school.nav.dashboard'), icon: LayoutDashboard },
+            { path: '/school-manager/configuration', label: t('school.nav.configuration'), icon: Calendar },
+            { path: '/school-manager/reports', label: t('school.nav.reports'), icon: FileText },
+            { path: '/school-manager/teachers', label: t('school.nav.teachers'), icon: GraduationCap },
+            { path: '/school-manager/departments', label: t('school.nav.departments'), icon: Layers },
+            { path: '/school-manager/secretaries', label: t('school.nav.secretaries'), icon: UserCheck },
         ],
         // Workstream Manager and others will go here
     };

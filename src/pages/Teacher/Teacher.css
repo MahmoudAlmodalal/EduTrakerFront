@@ -1,0 +1,82 @@
+.teacher-layout {
+    display: flex;
+    height: 100vh;
+    background-color: var(--bg-primary);
+}
+
+.teacher-sidebar {
+    width: 260px;
+    background-color: white;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+
+.teacher-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 2.5rem;
+    padding-left: 0.5rem;
+}
+
+.teacher-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.teacher-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.teacher-nav-item:hover {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.teacher-nav-item.active {
+    background-color: var(--primary-light);
+    color: var(--primary-color);
+}
+
+.teacher-main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    background-color: var(--bg-secondary);
+}
+
+/* Page Header Styles */
+.teacher-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.tenant-header-title h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.teacher-page-subtitle {
+    color: var(--text-secondary);
+}
