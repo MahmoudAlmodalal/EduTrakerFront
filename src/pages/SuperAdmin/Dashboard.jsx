@@ -1,25 +1,31 @@
 import React from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { Users, School, Briefcase, TrendingUp } from 'lucide-react';
+import { Users, School, Briefcase, TrendingUp, Bell } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     LineChart, Line, PieChart, Pie, Cell
 } from 'recharts';
 import styles from './Dashboard.module.css';
 
-const StatCard = ({ title, value, change, icon: Icon, color, changeText }) => (
+const StatCard = ({ title, value, change, icon: Icon, color, changeText, isNotification }) => (
     <div className={styles.statCard}>
         <div className={styles.statHeader}>
             <span className={styles.statTitle}>{title}</span>
             <div className={`${styles.iconWrapper} ${styles[color]}`}>
-                <Icon size={20} />
+                {typeof Icon === 'string' && Icon === 'Bell' ? <Bell size={20} /> : <Icon size={20} />}
             </div>
         </div>
         <div className={styles.statBody}>
             <span className={styles.statValue}>{value}</span>
-            <span className={`${styles.statChange} ${change >= 0 ? styles.positive : styles.negative}`}>
-                {change > 0 ? '+' : ''}{change}% {changeText}
-            </span>
+            {!isNotification ? (
+                <span className={`${styles.statChange} ${change >= 0 ? styles.positive : styles.negative}`}>
+                    {change > 0 ? '+' : ''}{change}% {changeText}
+                </span>
+            ) : (
+                <span className={styles.statChange} style={{ color: 'var(--color-text-muted)' }}>
+                    {t('dashboard.stats.unread')}
+                </span>
+            )}
         </div>
     </div>
 );
@@ -32,7 +38,7 @@ const Dashboard = () => {
         { title: t('dashboard.stats.workstreams'), value: '12', change: 4.5, icon: Briefcase, color: 'blue' },
         { title: t('dashboard.stats.schools'), value: '148', change: 12.3, icon: School, color: 'green' },
         { title: t('dashboard.stats.users'), value: '24,592', change: 8.1, icon: Users, color: 'purple' },
-        { title: t('dashboard.stats.growth'), value: '18%', change: -2.4, icon: TrendingUp, color: 'orange' },
+        { title: t('dashboard.stats.notifications'), value: '5', change: 0, icon: 'Bell', color: 'orange', isNotification: true }, // Using generic icon logic below
     ];
 
     // Mock Data for Charts

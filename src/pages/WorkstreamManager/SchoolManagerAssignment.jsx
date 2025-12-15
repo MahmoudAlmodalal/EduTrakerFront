@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { UserPlus, Search, Shield, School, Mail, Trash2 } from 'lucide-react';
+import { UserPlus, Search, Shield, School, Mail, Trash2, Edit, X } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './Workstream.css';
 
 const SchoolManagerAssignment = () => {
+    const { t } = useTheme();
     const [showAssignForm, setShowAssignForm] = useState(false);
     const [managers, setManagers] = useState([
         { id: 1, name: 'Seymour Skinner', email: 'skinner@springfield.edu', school: 'Springfield Elementary', status: 'Assigned' },
@@ -10,7 +12,8 @@ const SchoolManagerAssignment = () => {
         { id: 3, name: 'Edna Krabappel', email: 'krabappel@springfield.edu', school: 'Springfield Elementary', status: 'Assigned' },
     ]);
 
-    const [newManager, setNewManager] = useState({ name: '', email: '', schoolId: '' });
+    const [newManager, setNewManager] = useState({ name: '', email: '', schoolId: '', isEditing: false, id: null });
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Mock Schools for dropdown
     const schools = [
@@ -23,51 +26,93 @@ const SchoolManagerAssignment = () => {
         e.preventDefault();
         const schoolName = schools.find(s => s.id === parseInt(newManager.schoolId))?.name || 'Unassigned';
 
-        const manager = {
-            id: managers.length + 1,
-            name: newManager.name,
-            email: newManager.email,
-            school: schoolName,
-            status: newManager.schoolId ? 'Assigned' : 'Available'
-        };
+        if (newManager.isEditing) {
+            setManagers(managers.map(manager =>
+                manager.id === newManager.id
+                    ? {
+                        ...manager,
+                        name: newManager.name,
+                        email: newManager.email,
+                        school: schoolName,
+                        status: newManager.schoolId ? 'Assigned' : 'Available'
+                    }
+                    : manager
+            ));
+        } else {
+            const manager = {
+                id: managers.length + 1,
+                name: newManager.name,
+                email: newManager.email,
+                school: schoolName,
+                status: newManager.schoolId ? 'Assigned' : 'Available'
+            };
+            setManagers([manager, ...managers]);
+        }
 
-        setManagers([manager, ...managers]);
-        setNewManager({ name: '', email: '', schoolId: '' });
+        setNewManager({ name: '', email: '', schoolId: '', isEditing: false, id: null });
         setShowAssignForm(false);
     };
+
+    const handleDeleteManager = (id) => {
+        if (window.confirm(t('workstream.assignments.confirmDelete'))) {
+            setManagers(managers.filter(m => m.id !== id));
+        }
+    };
+
+    const handleEditManager = (id) => {
+        const manager = managers.find(m => m.id === id);
+        if (manager) {
+            // Find school ID from name for the dropdown
+            const foundSchool = schools.find(s => s.name === manager.school);
+            setNewManager({
+                name: manager.name,
+                email: manager.email,
+                schoolId: foundSchool ? foundSchool.id : '',
+                isEditing: true,
+                id: manager.id
+            });
+            setShowAssignForm(true);
+        }
+    };
+
+    const filteredManagers = managers.filter(manager =>
+        manager.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        manager.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        manager.school.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return (
         <div className="workstream-dashboard">
             <div className="workstream-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h1 className="workstream-title">School Manager Assignments</h1>
-                        <p className="workstream-subtitle">Appoint and manage leaders for your schools.</p>
+                        <h1 className="workstream-title">{t('workstream.assignments.title')}</h1>
+                        <p className="workstream-subtitle">{t('workstream.assignments.subtitle')}</p>
                     </div>
                     <button className="btn-primary" onClick={() => setShowAssignForm(true)}>
                         <UserPlus size={20} />
-                        New Manager
+                        {t('users.create')}
                     </button>
                 </div>
             </div>
 
             {showAssignForm && (
                 <div className="management-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
-                    <h3 className="chart-title" style={{ marginBottom: '1rem' }}>Appoint New School Manager</h3>
+                    <h3 className="chart-title" style={{ marginBottom: '1rem' }}>{newManager.isEditing ? t('workstream.assignments.form.editTitle') : t('workstream.assignments.form.createTitle')}</h3>
                     <form onSubmit={handleAssignManager} style={{ display: 'grid', gap: '1rem', maxWidth: '500px' }}>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Full Name</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.managerName')}</label>
                             <input
                                 type="text"
                                 required
                                 value={newManager.name}
                                 onChange={(e) => setNewManager({ ...newManager, name: e.target.value })}
                                 style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder="Manager's Name"
+                                placeholder={t('workstream.assignments.form.managerName')}
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Email Address</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.email')}</label>
                             <input
                                 type="email"
                                 required
@@ -78,23 +123,26 @@ const SchoolManagerAssignment = () => {
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Assign to School</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.assignTo')}</label>
                             <select
                                 value={newManager.schoolId}
                                 onChange={(e) => setNewManager({ ...newManager, schoolId: e.target.value })}
                                 style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'white' }}
                             >
-                                <option value="">Select a School (Optional)</option>
+                                <option value="">{t('workstream.assignments.form.selectSchool')}</option>
                                 {schools.map(school => (
                                     <option key={school.id} value={school.id}>{school.name}</option>
                                 ))}
                             </select>
                         </div>
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                            <button type="submit" className="btn-primary">Create & Assign</button>
+                            <button type="submit" className="btn-primary">{newManager.isEditing ? t('workstream.assignments.updateBtn') : t('workstream.assignments.assignBtn')}</button>
                             <button
                                 type="button"
-                                onClick={() => setShowAssignForm(false)}
+                                onClick={() => {
+                                    setShowAssignForm(false);
+                                    setNewManager({ name: '', email: '', schoolId: '', isEditing: false, id: null });
+                                }}
                                 style={{
                                     padding: '0.5rem 1rem',
                                     borderRadius: '0.375rem',
@@ -103,7 +151,7 @@ const SchoolManagerAssignment = () => {
                                     cursor: 'pointer'
                                 }}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                         </div>
                     </form>
@@ -116,7 +164,9 @@ const SchoolManagerAssignment = () => {
                         <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                         <input
                             type="text"
-                            placeholder="Search managers..."
+                            placeholder={t('workstream.assignments.searchPlaceholder')}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
                                 width: '100%',
                                 padding: '0.5rem 0.5rem 0.5rem 2.5rem',
@@ -130,14 +180,14 @@ const SchoolManagerAssignment = () => {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Manager</th>
-                            <th>Assigned School</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>{t('workstream.assignments.table.manager')}</th>
+                            <th>{t('workstream.assignments.table.assignedSchool')}</th>
+                            <th>{t('workstream.assignments.table.status')}</th>
+                            <th>{t('workstream.assignments.table.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {managers.map((manager) => (
+                        {filteredManagers.map((manager) => (
                             <tr key={manager.id}>
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -166,9 +216,22 @@ const SchoolManagerAssignment = () => {
                                     </span>
                                 </td>
                                 <td>
-                                    <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}>
-                                        <Trash2 size={18} />
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button
+                                            onClick={() => handleEditManager(manager.id)}
+                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-primary)' }}
+                                            title="Edit Manager"
+                                        >
+                                            <Edit size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteManager(manager.id)}
+                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
+                                            title="Remove Manager"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

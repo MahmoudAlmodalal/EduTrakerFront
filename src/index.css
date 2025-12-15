@@ -61,33 +61,34 @@
 
 [data-theme='dark'] {
   /* Brand Colors */
-  --color-primary: #60a5fa;
-  /* Blue 400 - Softer blue */
-  --color-primary-hover: #93c5fd;
-  --color-primary-light: rgba(59, 130, 246, 0.15);
-  /* Lower opacity for softer highlights */
+  --color-primary: #3b82f6;
+  /* Blue 500 - Standard blue is better for eyes than high-contrast neon */
+  --color-primary-hover: #60a5fa;
+  --color-primary-light: rgba(37, 99, 235, 0.2);
 
-  --color-secondary: #0f172a;
-  /* Slate 900 */
-  --color-secondary-hover: #1e293b;
+  --color-secondary: #1e293b;
+  /* Slate 800 */
+  --color-secondary-hover: #334155;
 
-  /* Semantic Colors - slightly adjusted for dark mode visibility */
-  --color-success: #34d399;
-  --color-warning: #fbbf24;
-  --color-error: #f87171;
-  --color-info: #60a5fa;
+  /* Semantic Colors */
+  --color-success: #10b981;
+  /* Green 500 - softer than 400 */
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
 
   /* Neutrals */
-  --color-bg-body: #0b1120;
+  --color-bg-body: #111827;
+  /* Gray 900 (less blue, more neutral neutral) */
   /* Darker, richer background (almost black blue) */
   --color-bg-surface: #1e293b;
   /* Slate 800 - Standard surface */
-  --color-text-main: #e2e8f0;
-  /* Slate 200 - Slightly softer than pure white */
-  --color-text-muted: #94a3b8;
-  /* Slate 400 */
-  --color-border: #334155;
-  /* Slate 700 - reduced contrast for borders */
+  --color-text-main: #e5e7eb;
+  /* Gray 200 - Soft white */
+  --color-text-muted: #9ca3af;
+  /* Gray 400 */
+  --color-border: rgba(51, 65, 85, 0.5);
+  /* Slate 700 with opacity - Very subtle for comfort */
 
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
@@ -133,5 +134,39 @@ a:hover {
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 var(--spacing-4);
+
+  /* Global RTL Layout Fixes */
+  [dir="rtl"] #app-sidebar {
+    right: 0 !important;
+    left: auto !important;
+  }
+
+  [dir="ltr"] #app-sidebar {
+    left: 0 !important;
+    right: auto !important;
+  }
+
+  /* Fix transform direction for closed state */
+  [dir="rtl"] #app-sidebar.closed {
+    transform: translateX(100%) !important;
+  }
+
+  /* Main Content Adjustment */
+  [dir="rtl"] main {
+    /* Ensure main content doesn't overlap if margin-inline-start fails */
+    /* This is tricky because the class is hashed.
+     Let's rely on MainLayout module using margin-inline-start which is standard.
+  */
+  }
+
+  /* We target the CSS Module clases by partial matching or generic selectors if needed,
+   but since we can't easily target hashed classes, we rely on the component using ID or attribute.
+   However, better approach: The Sidebar component applies `Sidebar_sidebar__...` class.
+   Does it support a custom className? No.
+   BUT, `Sidebar.jsx` uses `styles.sidebar`.
+   Wait, if I remove it from Module, how do I target it globally?
+   I CANNOT effectively target the hashed class from global CSS without an ID or stable class.
+   
+   PLAN CHANGE: I will add `id="app-sidebar"` to Sidebar.jsx and target that ID in index.css.
+*/
 }

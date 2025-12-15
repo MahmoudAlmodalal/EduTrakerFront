@@ -1,13 +1,16 @@
 import React from 'react';
 import { School, Users, GraduationCap, TrendingUp, TrendingDown } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './Workstream.css';
 
 const WorkstreamDashboard = () => {
+    const { t } = useTheme();
+
     // Mock Data
     const stats = [
-        { title: 'Total Schools', value: '12', icon: School, trend: '+2 this month', trendUp: true },
-        { title: 'Total Students', value: '3,450', icon: GraduationCap, trend: '+150 this month', trendUp: true },
-        { title: 'Total Teachers', value: '245', icon: Users, trend: '-3 this month', trendUp: false },
+        { title: t('workstream.dashboard.totalSchools'), value: '12', icon: School, trend: '+2 this month', trendUp: true },
+        { title: t('workstream.dashboard.totalStudents'), value: '3,450', icon: GraduationCap, trend: '+150 this month', trendUp: true },
+        { title: t('workstream.dashboard.totalTeachers'), value: '245', icon: Users, trend: '-3 this month', trendUp: false },
     ];
 
     const schoolPerformance = [
@@ -22,8 +25,8 @@ const WorkstreamDashboard = () => {
     return (
         <div className="workstream-dashboard">
             <div className="workstream-header">
-                <h1 className="workstream-title">Workstream Overview</h1>
-                <p className="workstream-subtitle">Welcome back, Manager. Here's what's happening in your cluster.</p>
+                <h1 className="workstream-title">{t('workstream.dashboard.title')}</h1>
+                <p className="workstream-subtitle">{t('workstream.dashboard.subtitle')}</p>
             </div>
 
             {/* Stats Cards */}
@@ -50,7 +53,7 @@ const WorkstreamDashboard = () => {
                 {/* Academic Performance Chart */}
                 <div className="chart-card">
                     <div className="chart-header">
-                        <h3 className="chart-title">Academic Performance by School</h3>
+                        <h3 className="chart-title">{t('workstream.dashboard.academicPerformance')}</h3>
                     </div>
                     <div className="css-chart-container">
                         {schoolPerformance.map((school, index) => (
@@ -69,7 +72,7 @@ const WorkstreamDashboard = () => {
                 {/* Enrollment Trends (Mocked Dual Bar) */}
                 <div className="chart-card">
                     <div className="chart-header">
-                        <h3 className="chart-title">Enrollment vs. Graduation</h3>
+                        <h3 className="chart-title">{t('workstream.dashboard.enrollmentTrends')}</h3>
                     </div>
                     <div className="css-chart-container">
                         {[1, 2, 3, 4, 5].map((item) => (

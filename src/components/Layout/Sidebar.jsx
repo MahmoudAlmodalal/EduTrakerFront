@@ -27,7 +27,7 @@ const Sidebar = ({ isOpen }) => {
     const currentLinks = links[role] || links.SUPER_ADMIN; // Fallback to Super Admin for dev if role missing
 
     return (
-        <aside className={`${styles.sidebar} ${isOpen ? styles.open : styles.closed}`}>
+        <aside id="app-sidebar" className={`${styles.sidebar} ${isOpen ? styles.open : styles.closed}`}>
             <div className={styles.logo}>
                 <div className={styles.logoIcon}>ET</div>
                 <span className={styles.logoText}>{t('app.name')}</span>

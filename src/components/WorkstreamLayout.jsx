@@ -6,17 +6,23 @@ import {
     Users,
     FileBarChart,
     Settings,
+    MessageSquare,
     LogOut
 } from 'lucide-react';
 import '../pages/WorkstreamManager/Workstream.css';
 
+import { useTheme } from '../context/ThemeContext';
+
 const WorkstreamLayout = () => {
+    const { t } = useTheme();
+
     const navItems = [
-        { path: '/workstream/dashboard', label: 'Overview', icon: LayoutDashboard },
-        { path: '/workstream/schools', label: 'My Schools', icon: School },
-        { path: '/workstream/assignments', label: 'Assignments', icon: Users },
-        { path: '/workstream/reports', label: 'Reports', icon: FileBarChart },
-        { path: '/workstream/settings', label: 'Settings', icon: Settings },
+        { path: '/workstream/dashboard', label: t('workstream.nav.dashboard'), icon: LayoutDashboard },
+        { path: '/workstream/schools', label: t('workstream.nav.schools'), icon: School },
+        { path: '/workstream/assignments', label: t('workstream.nav.assignments'), icon: Users },
+        { path: '/workstream/reports', label: t('workstream.nav.reports'), icon: FileBarChart },
+        { path: '/workstream/communication', label: t('workstream.nav.communication'), icon: MessageSquare },
+        { path: '/workstream/settings', label: t('workstream.nav.settings'), icon: Settings },
     ];
 
     return (
@@ -25,7 +31,7 @@ const WorkstreamLayout = () => {
             <aside className="workstream-sidebar">
                 <div className="workstream-brand">
                     <School size={32} />
-                    <span>EduTraker</span>
+                    <span>{t('app.name')}</span>
                 </div>
 
                 <nav className="workstream-nav">
@@ -46,7 +52,7 @@ const WorkstreamLayout = () => {
                 <div style={{ marginTop: 'auto' }}>
                     <button className="workstream-nav-item" style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}>
                         <LogOut size={20} />
-                        <span>Logout</span>
+                        <span>{t('header.logout')}</span>
                     </button>
                 </div>
             </aside>

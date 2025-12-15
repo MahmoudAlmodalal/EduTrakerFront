@@ -26,6 +26,7 @@ import SchoolManagerAssignment from '../pages/WorkstreamManager/SchoolManagerAss
 
 import WorkstreamSettings from '../pages/WorkstreamManager/WorkstreamSettings';
 import WorkstreamReports from '../pages/WorkstreamManager/WorkstreamReports';
+import WorkstreamCommunication from '../pages/WorkstreamManager/WorkstreamCommunication';
 
 // School Manager Pages
 import SchoolManagerLayout from '../components/SchoolManagerLayout';
@@ -92,6 +93,7 @@ const AppRoutes = () => {
                     <Route path="schools" element={<SchoolManagement />} />
                     <Route path="assignments" element={<SchoolManagerAssignment />} />
                     <Route path="reports" element={<WorkstreamReports />} />
+                    <Route path="communication" element={<WorkstreamCommunication />} />
                     <Route path="settings" element={<WorkstreamSettings />} />
                 </Route>
             </Route>

@@ -1,8 +1,11 @@
 import React from 'react';
 import { Calendar, Users, BookOpen, AlertCircle, FileText, Download } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './Workstream.css';
 
 const WorkstreamReports = () => {
+    const { t } = useTheme();
+
     const attendanceData = [
         { school: 'Springfield Elementary', attendance: 92, absent: 8 },
         { school: 'Shelbyville High', attendance: 88, absent: 12 },
@@ -18,15 +21,15 @@ const WorkstreamReports = () => {
     return (
         <div className="workstream-dashboard">
             <div className="workstream-header">
-                <h1 className="workstream-title">Workstream Reports</h1>
-                <p className="workstream-subtitle">Aggregated insights on attendance and resource utilization.</p>
+                <h1 className="workstream-title">{t('workstream.reports.title')}</h1>
+                <p className="workstream-subtitle">{t('workstream.reports.subtitle')}</p>
             </div>
 
             {/* Report Summary Cards */}
             <div className="stats-grid">
                 <div className="stat-card">
                     <div className="stat-header">
-                        <span className="stat-title">Avg Attendance</span>
+                        <span className="stat-title">{t('workstream.reports.avgAttendance')}</span>
                         <div className="stat-icon" style={{ backgroundColor: '#d1fae5', color: '#059669' }}>
                             <Calendar size={20} />
                         </div>
@@ -38,7 +41,7 @@ const WorkstreamReports = () => {
                 </div>
                 <div className="stat-card">
                     <div className="stat-header">
-                        <span className="stat-title">Teacher Ratio</span>
+                        <span className="stat-title">{t('workstream.reports.teacherRatio')}</span>
                         <div className="stat-icon" style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}>
                             <Users size={20} />
                         </div>
@@ -50,7 +53,7 @@ const WorkstreamReports = () => {
                 </div>
                 <div className="stat-card">
                     <div className="stat-header">
-                        <span className="stat-title">Classroom Usage</span>
+                        <span className="stat-title">{t('workstream.reports.classroomUsage')}</span>
                         <div className="stat-icon" style={{ backgroundColor: '#e0e7ff', color: '#4f46e5' }}>
                             <BookOpen size={20} />
                         </div>
@@ -66,7 +69,7 @@ const WorkstreamReports = () => {
                 {/* Attendance Report Table */}
                 <div className="chart-card">
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <h3 className="chart-title">Daily Attendance Report</h3>
+                        <h3 className="chart-title">{t('workstream.reports.monthlyAttendance')}</h3>
                         <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}>
                             <Download size={18} />
                         </button>
@@ -74,10 +77,10 @@ const WorkstreamReports = () => {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>School</th>
-                                <th>Present %</th>
-                                <th>Absent %</th>
-                                <th>Status</th>
+                                <th>{t('workstream.reports.table.school')}</th>
+                                <th>{t('workstream.reports.table.present')}</th>
+                                <th>{t('workstream.reports.table.absent')}</th>
+                                <th>{t('workstream.schools.table.status')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -88,9 +91,9 @@ const WorkstreamReports = () => {
                                     <td style={{ color: 'var(--color-error)' }}>{data.absent}%</td>
                                     <td>
                                         {data.attendance >= 90 ? (
-                                            <span className="status-badge status-active">Optimal</span>
+                                            <span className="status-badge status-active">{t('workstream.reports.status.optimal')}</span>
                                         ) : (
-                                            <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#d97706' }}>Attention</span>
+                                            <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#d97706' }}>{t('workstream.reports.status.attention')}</span>
                                         )}
                                     </td>
                                 </tr>
@@ -102,7 +105,7 @@ const WorkstreamReports = () => {
                 {/* Resource Utilization */}
                 <div className="chart-card">
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <h3 className="chart-title">Resource Utilization</h3>
+                        <h3 className="chart-title">{t('workstream.reports.resourceUtilization')}</h3>
                         <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}>
                             <Download size={18} />
                         </button>
@@ -110,9 +113,9 @@ const WorkstreamReports = () => {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>School</th>
-                                <th>Teach/Class</th>
-                                <th>Utilization</th>
+                                <th>{t('workstream.reports.table.school')}</th>
+                                <th>{t('workstream.reports.table.teachClass')}</th>
+                                <th>{t('workstream.reports.table.utilization')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -134,7 +137,7 @@ const WorkstreamReports = () => {
                                         </div>
                                         {data.utilization > 100 && (
                                             <div style={{ fontSize: '0.75rem', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                                                <AlertCircle size={12} /> Over Capacity
+                                                <AlertCircle size={12} /> {t('workstream.reports.status.overCapacity')}
                                             </div>
                                         )}
                                     </td>
