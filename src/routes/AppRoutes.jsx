@@ -68,6 +68,7 @@ import ClassManagement from '../pages/Teacher/ClassManagement';
 import Assessments from '../pages/Teacher/Assessments';
 import LessonPlans from '../pages/Teacher/LessonPlans';
 import TeacherCommunication from '../pages/Teacher/Communication';
+import TeacherSettings from '../pages/Teacher/TeacherSettings';
 
 const AppRoutes = () => {
     return (
@@ -168,6 +169,7 @@ const AppRoutes = () => {
                     <Route path="assessments" element={<Assessments />} />
                     <Route path="lesson-plans" element={<LessonPlans />} />
                     <Route path="communication" element={<TeacherCommunication />} />
+                    <Route path="settings" element={<TeacherSettings />} />
                 </Route>
             </Route>
 
