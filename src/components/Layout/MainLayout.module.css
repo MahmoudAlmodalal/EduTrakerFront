@@ -1,0 +1,33 @@
+.layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--color-bg-body);
+}
+
+.mainContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    transition: margin-inline-start var(--transition-normal);
+    /* Sidebar width is handled in Sidebar component, but we push content here */
+    margin-inline-start: 260px;
+    /* Match sidebar width */
+}
+
+.mainContent.expanded {
+    margin-inline-start: 0;
+    /* Or a mini sidebar width if we support that */
+}
+
+/* Mobile responsive adjustments will be added here */
+@media (max-width: 768px) {
+    .mainContent {
+        margin-inline-start: 0;
+    }
+}
+
+.contentArea {
+    padding: var(--spacing-6);
+    flex: 1;
+    overflow-y: auto;
+}
