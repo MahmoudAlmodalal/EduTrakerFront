@@ -7,28 +7,31 @@ import {
 } from 'recharts';
 import styles from './Dashboard.module.css';
 
-const StatCard = ({ title, value, change, icon: Icon, color, changeText, isNotification }) => (
-    <div className={styles.statCard}>
-        <div className={styles.statHeader}>
-            <span className={styles.statTitle}>{title}</span>
-            <div className={`${styles.iconWrapper} ${styles[color]}`}>
-                {typeof Icon === 'string' && Icon === 'Bell' ? <Bell size={20} /> : <Icon size={20} />}
+const StatCard = ({ title, value, change, icon: Icon, color, changeText, isNotification }) => {
+    const { t } = useTheme();
+    return (
+        <div className={styles.statCard}>
+            <div className={styles.statHeader}>
+                <span className={styles.statTitle}>{title}</span>
+                <div className={`${styles.iconWrapper} ${styles[color]}`}>
+                    {typeof Icon === 'string' && Icon === 'Bell' ? <Bell size={20} /> : <Icon size={20} />}
+                </div>
+            </div>
+            <div className={styles.statBody}>
+                <span className={styles.statValue}>{value}</span>
+                {!isNotification ? (
+                    <span className={`${styles.statChange} ${change >= 0 ? styles.positive : styles.negative}`}>
+                        {change > 0 ? '+' : ''}{change}% {changeText}
+                    </span>
+                ) : (
+                    <span className={styles.statChange} style={{ color: 'var(--color-text-muted)' }}>
+                        {t('dashboard.stats.unread')}
+                    </span>
+                )}
             </div>
         </div>
-        <div className={styles.statBody}>
-            <span className={styles.statValue}>{value}</span>
-            {!isNotification ? (
-                <span className={`${styles.statChange} ${change >= 0 ? styles.positive : styles.negative}`}>
-                    {change > 0 ? '+' : ''}{change}% {changeText}
-                </span>
-            ) : (
-                <span className={styles.statChange} style={{ color: 'var(--color-text-muted)' }}>
-                    {t('dashboard.stats.unread')}
-                </span>
-            )}
-        </div>
-    </div>
-);
+    );
+};
 
 const Dashboard = () => {
     const { t } = useTheme();

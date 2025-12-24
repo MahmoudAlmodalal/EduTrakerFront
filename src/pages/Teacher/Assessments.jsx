@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { FileText, Plus, Save, Send, Users, Trash2 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 const Assessments = () => {
+    const { t } = useTheme();
     const [activeTab, setActiveTab] = useState('gradebook'); // 'create', 'gradebook'
     const [selectedClass, setSelectedClass] = useState('Grade 10-A');
     const [selectedAssessment, setSelectedAssessment] = useState('Midterm Exam');
@@ -42,14 +44,10 @@ const Assessments = () => {
             ...newAssessment
         };
         setAssessments([...assessments, assessment]);
-        setSelectedAssessment(newAssessment.title); // Select the new assessment
+        setSelectedAssessment(newAssessment.title);
         setActiveTab('gradebook');
-        // Reset form
         setNewAssessment({ title: '', type: 'Homework', date: '', points: '', description: '' });
-
-        // Reset grades for new assessment (mock logic)
         setGrades(grades.map(s => ({ ...s, grade: '', status: 'Pending', feedback: '' })));
-
         alert(`Assessment "${assessment.title}" created successfully!`);
     };
 
@@ -81,119 +79,141 @@ const Assessments = () => {
     };
 
     return (
-        <div className="p-6 space-y-6">
-            <header className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="space-y-6 animate-fade-in">
+            {/* Header */}
+            <header className="page-header">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Assessments & Gradebook</h1>
-                    <p className="text-gray-600">Create tests and manage student grades.</p>
+                    <h1 className="page-title">{t('teacher.assessments.title')}</h1>
+                    <p className="page-subtitle">{t('teacher.assessments.subtitle')}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="action-group" style={{ gap: '0.5rem' }}>
                     <button
                         onClick={() => setActiveTab('gradebook')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'gradebook'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
+                        style={{
+                            padding: '0.625rem 1.25rem',
+                            borderRadius: '0.5rem',
+                            fontWeight: '600',
+                            fontSize: '0.875rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            border: activeTab === 'gradebook' ? 'none' : '1px solid var(--teacher-border)',
+                            backgroundColor: activeTab === 'gradebook' ? 'var(--teacher-primary)' : 'var(--teacher-surface)',
+                            color: activeTab === 'gradebook' ? 'white' : 'var(--teacher-text-main)'
+                        }}
                     >
-                        Gradebook
+                        {t('teacher.assessments.gradebook')}
                     </button>
                     <button
                         onClick={() => setActiveTab('create')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'create'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
+                        style={{
+                            padding: '0.625rem 1.25rem',
+                            borderRadius: '0.5rem',
+                            fontWeight: '600',
+                            fontSize: '0.875rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            border: activeTab === 'create' ? 'none' : '1px solid var(--teacher-border)',
+                            backgroundColor: activeTab === 'create' ? 'var(--teacher-primary)' : 'var(--teacher-surface)',
+                            color: activeTab === 'create' ? 'white' : 'var(--teacher-text-main)'
+                        }}
                     >
-                        + Create Assessment
+                        <Plus size={18} />
+                        {t('teacher.assessments.createAssessment')}
                     </button>
                 </div>
             </header>
 
             {activeTab === 'create' && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl mx-auto">
-                    <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <Plus size={20} className="text-blue-600" />
-                        Create New Assessment
+                <div className="glass-panel" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+                    <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <Plus size={20} style={{ color: 'var(--teacher-primary)' }} />
+                        {t('teacher.assessments.createNew')}
                     </h2>
-                    <form className="space-y-4" onSubmit={handleCreateAssessment}>
-                        <div className="grid grid-cols-2 gap-4">
+                    <form className="space-y-6" onSubmit={handleCreateAssessment}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.assessments.assessmentTitle')}</label>
                                 <input
                                     type="text"
                                     required
                                     value={newAssessment.title}
                                     onChange={(e) => setNewAssessment({ ...newAssessment, title: e.target.value })}
                                     placeholder="e.g. Algebra Quiz 1"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    className="teacher-input w-full"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                                <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.assessments.type')}</label>
                                 <select
                                     value={newAssessment.type}
                                     onChange={(e) => setNewAssessment({ ...newAssessment, type: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    className="teacher-select w-full"
                                 >
-                                    {assessmentTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    {assessmentTypes.map(type => <option key={type} value={type}>{type}</option>)}
                                 </select>
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                                <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.assessments.dueDate')}</label>
                                 <input
                                     type="date"
                                     required
                                     value={newAssessment.date}
                                     onChange={(e) => setNewAssessment({ ...newAssessment, date: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    className="teacher-input w-full"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Points</label>
+                                <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.assessments.totalPoints')}</label>
                                 <input
                                     type="number"
                                     required
                                     value={newAssessment.points}
                                     onChange={(e) => setNewAssessment({ ...newAssessment, points: e.target.value })}
                                     placeholder="100"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    className="teacher-input w-full"
                                 />
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Description / Instructions</label>
+                            <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.assessments.description')}</label>
                             <textarea
                                 rows="3"
                                 value={newAssessment.description}
                                 onChange={(e) => setNewAssessment({ ...newAssessment, description: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                className="teacher-input w-full"
                             ></textarea>
                         </div>
                         <div className="flex justify-end gap-3 pt-4">
-                            <button type="button" onClick={() => setActiveTab('gradebook')} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                            <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Create Assessment</button>
+                            <button type="button" onClick={() => setActiveTab('gradebook')} className="icon-btn" style={{ width: 'auto', padding: '0.625rem 1.25rem' }}>{t('teacher.assessments.cancel')}</button>
+                            <button type="submit" className="btn-primary">{t('teacher.assessments.createAssessment')}</button>
                         </div>
                     </form>
                 </div>
             )}
 
             {activeTab === 'gradebook' && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex gap-3">
+                <div className="glass-panel">
+                    <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--teacher-border)', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                        <div className="filter-bar">
                             <select
                                 value={selectedClass}
                                 onChange={(e) => setSelectedClass(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                className="teacher-select"
                             >
                                 {classes.map(cls => <option key={cls} value={cls}>{cls}</option>)}
                             </select>
                             <select
                                 value={selectedAssessment}
                                 onChange={(e) => setSelectedAssessment(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                className="teacher-select"
                             >
                                 {assessments.map(a => <option key={a.id} value={a.title}>{a.title}</option>)}
                             </select>
@@ -201,52 +221,53 @@ const Assessments = () => {
                         <div className="flex gap-2">
                             <button
                                 onClick={handlePublishResults}
-                                className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors border border-green-200"
+                                className="icon-btn success"
+                                style={{ width: 'auto', padding: '0.5rem 1rem', gap: '0.5rem', color: '#15803D', borderColor: '#15803D', backgroundColor: '#F0FDF4' }}
                             >
                                 <Send size={18} />
-                                Publish Results
+                                {t('teacher.assessments.publishResults')}
                             </button>
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 text-gray-600 font-medium text-sm">
+                    <div className="table-container">
+                        <table className="teacher-table">
+                            <thead>
                                 <tr>
-                                    <th className="px-6 py-4">Student Name</th>
-                                    <th className="px-6 py-4">Grade (pts)</th>
-                                    <th className="px-6 py-4">Feedback (Optional)</th>
-                                    <th className="px-6 py-4">Status</th>
+                                    <th>{t('teacher.classes.studentName')}</th>
+                                    <th>{t('teacher.assessments.grade')}</th>
+                                    <th>{t('teacher.assessments.feedback')}</th>
+                                    <th>{t('teacher.classes.status')}</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody>
                                 {grades.map((student) => (
-                                    <tr key={student.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-gray-800">{student.name}</td>
-                                        <td className="px-6 py-4">
+                                    <tr key={student.id}>
+                                        <td className="font-bold text-slate-800">{student.name}</td>
+                                        <td>
                                             <input
                                                 type="number"
                                                 value={student.grade}
                                                 onChange={(e) => handleGradeChange(student.id, e.target.value)}
-                                                className="w-20 px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white text-center"
+                                                className="teacher-input"
+                                                style={{ width: '80px', textAlign: 'center' }}
                                                 placeholder="0-100"
                                             />
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td>
                                             <input
                                                 type="text"
                                                 value={student.feedback || ''}
                                                 onChange={(e) => handleFeedbackChange(student.id, e.target.value)}
                                                 placeholder="Add comment..."
-                                                className="w-full max-w-xs px-3 py-1 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-blue-400"
+                                                className="teacher-input"
+                                                style={{ width: '100%', maxWidth: '300px' }}
                                             />
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${student.status === 'Graded'
-                                                ? 'bg-blue-100 text-blue-800'
-                                                : 'bg-gray-100 text-gray-800'
+                                        <td>
+                                            <span className={`status-badge ${student.status === 'Graded' ? 'info' : 'neutral'
                                                 }`}>
-                                                {student.status}
+                                                {student.status === 'Graded' ? t('teacher.assessments.graded') : student.status}
                                             </span>
                                         </td>
                                     </tr>

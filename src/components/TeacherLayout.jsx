@@ -7,24 +7,31 @@ import {
     FileText,
     MessageSquare,
     LogOut,
-    GraduationCap
+    GraduationCap,
+    Settings
 } from 'lucide-react';
-import '../pages/Teacher/Teacher.css'; // Will create this css file next
+import { useTheme } from '../context/ThemeContext';
+import '../pages/Teacher/Teacher.css';
 
 const TeacherLayout = () => {
+    const { t } = useTheme();
+
     const navItems = [
-        { path: '/teacher/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { path: '/teacher/classes', label: 'Class Management', icon: Users },
-        { path: '/teacher/assessments', label: 'Assessments', icon: FileText },
-        { path: '/teacher/lesson-plans', label: 'Lesson Plans', icon: BookOpen },
-        { path: '/teacher/communication', label: 'Communication', icon: MessageSquare },
+        { path: '/teacher/dashboard', label: t('teacher.nav.dashboard'), icon: LayoutDashboard },
+        { path: '/teacher/classes', label: t('teacher.nav.classes'), icon: Users },
+        { path: '/teacher/assessments', label: t('teacher.nav.assessments'), icon: FileText },
+        { path: '/teacher/lesson-plans', label: t('teacher.nav.lessonPlans'), icon: BookOpen },
+        { path: '/teacher/communication', label: t('teacher.nav.communication'), icon: MessageSquare },
+        { path: '/teacher/settings', label: t('teacher.nav.settings'), icon: Settings },
     ];
 
     return (
         <div className="teacher-layout">
             <aside className="teacher-sidebar">
-                <div className="teacher-brand">
-                    <GraduationCap size={32} />
+                <div className="teacher-brand mb-6">
+                    <div className="teacher-brand-icon">
+                        <GraduationCap size={32} />
+                    </div>
                     <span>EduTraker</span>
                 </div>
 
@@ -37,17 +44,27 @@ const TeacherLayout = () => {
                                 `teacher-nav-item ${isActive ? 'active' : ''}`
                             }
                         >
-                            <item.icon size={20} />
+                            <item.icon size={22} strokeWidth={1.5} />
                             <span>{item.label}</span>
                         </NavLink>
                     ))}
                 </nav>
 
-                <div style={{ marginTop: 'auto' }}>
-                    <button className="teacher-nav-item" style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}>
-                        <LogOut size={20} />
-                        <span>Logout</span>
+                <div className="teacher-logout-section">
+                    <button className="teacher-nav-item teacher-logout-btn">
+                        <LogOut size={22} strokeWidth={1.5} />
+                        <span>{t('header.logout')}</span>
                     </button>
+
+                    <div className="teacher-profile">
+                        <div className="teacher-avatar">
+                            TC
+                        </div>
+                        <div className="teacher-profile-info">
+                            <p className="teacher-profile-name">Mr. Teacher</p>
+                            <p className="teacher-profile-email">teacher@edutraker.com</p>
+                        </div>
+                    </div>
                 </div>
             </aside>
 
