@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Search, Filter, FileText, Upload, Download, Check, X, UserPlus, Users } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './Secretary.css';
 import '../WorkstreamManager/Workstream.css';
 
 const StudentAdmissions = () => {
+    const { t } = useTheme();
     const [activeTab, setActiveTab] = useState('applications');
 
     // Mock Data
@@ -342,8 +344,8 @@ const StudentAdmissions = () => {
     return (
         <div className="secretary-dashboard">
             <header className="secretary-header">
-                <h1>Student Registration & Admissions</h1>
-                <p>Manage new applications, enroll students, and handle documents.</p>
+                <h1>{t('secretary.admissions.title')}</h1>
+                <p>{t('secretary.admissions.subtitle')}</p>
             </header>
 
             <div className="secretary-tabs">
@@ -353,7 +355,7 @@ const StudentAdmissions = () => {
                 >
                     <div className="tab-content">
                         <FileText size={18} />
-                        New Applications
+                        {t('secretary.admissions.newApplications')}
                         <span className="tab-badge">3</span>
                     </div>
                 </button>
@@ -363,7 +365,7 @@ const StudentAdmissions = () => {
                 >
                     <div className="tab-content">
                         <UserPlus size={18} />
-                        Add New Student
+                        {t('secretary.admissions.addStudent')}
                     </div>
                 </button>
                 <button
@@ -372,7 +374,7 @@ const StudentAdmissions = () => {
                 >
                     <div className="tab-content">
                         <Users size={18} />
-                        Class Assignment
+                        {t('secretary.admissions.classAssignment')}
                     </div>
                 </button>
                 <button
@@ -381,7 +383,7 @@ const StudentAdmissions = () => {
                 >
                     <div className="tab-content">
                         <Upload size={18} />
-                        Manage Student Files
+                        {t('secretary.admissions.manageFiles')}
                     </div>
                 </button>
             </div>

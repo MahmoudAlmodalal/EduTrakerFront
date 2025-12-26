@@ -1,13 +1,16 @@
 import React from 'react';
 import { Users, FileText, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './Secretary.css';
 
 const SecretaryDashboard = () => {
+    const { t } = useTheme();
+
     // Mock Data for Quick Stats
     const stats = [
-        { label: 'Total Students', value: '1,234', icon: Users, color: '#4F46E5', bgColor: '#EEF2FF', link: '/secretary/admissions' },
-        { label: 'Unread Messages', value: '3', icon: FileText, color: '#F59E0B', bgColor: '#FEF3C7', link: '/secretary/communication' },
-        { label: 'Absent Today', value: '12', icon: Clock, color: '#EF4444', bgColor: '#FEE2E2', link: '/secretary/attendance' },
+        { labelKey: 'secretary.dashboard.totalStudents', value: '1,234', icon: Users, color: '#4F46E5', bgColor: '#EEF2FF', link: '/secretary/admissions' },
+        { labelKey: 'secretary.dashboard.unreadMessages', value: '3', icon: FileText, color: '#F59E0B', bgColor: '#FEF3C7', link: '/secretary/communication' },
+        { labelKey: 'secretary.dashboard.absentToday', value: '12', icon: Clock, color: '#EF4444', bgColor: '#FEE2E2', link: '/secretary/attendance' },
     ];
 
     const pendingTasks = [
@@ -26,8 +29,8 @@ const SecretaryDashboard = () => {
     return (
         <div className="secretary-dashboard">
             <header className="secretary-header">
-                <h1>Secretary Dashboard</h1>
-                <p>Welcome back! Here's what's happening today.</p>
+                <h1>{t('secretary.dashboard.title')}</h1>
+                <p>{t('secretary.dashboard.welcome')}</p>
             </header>
 
             {/* Quick Stats Grid */}
@@ -45,7 +48,7 @@ const SecretaryDashboard = () => {
                             <stat.icon size={24} />
                         </div>
                         <div className="stat-content">
-                            <p>{stat.label}</p>
+                            <p>{t(stat.labelKey)}</p>
                             <h3>{stat.value}</h3>
                         </div>
                     </div>
@@ -56,8 +59,8 @@ const SecretaryDashboard = () => {
                 {/* Pending Tasks Widget */}
                 <div className="widget-card">
                     <div className="widget-header">
-                        <h2>Pending Tasks</h2>
-                        <button className="view-all-btn">View All</button>
+                        <h2>{t('secretary.dashboard.pendingTasks')}</h2>
+                        <button className="view-all-btn">{t('secretary.dashboard.viewAll')}</button>
                     </div>
                     <div className="widget-body">
                         {pendingTasks.map((task) => (
@@ -79,7 +82,7 @@ const SecretaryDashboard = () => {
                 {/* Events Calendar Widget */}
                 <div className="widget-card">
                     <div className="widget-header">
-                        <h2>Upcoming Events</h2>
+                        <h2>{t('secretary.dashboard.upcomingEvents')}</h2>
                         <CalendarIcon size={20} color="#9ca3af" />
                     </div>
                     <div className="widget-body">

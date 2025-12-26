@@ -54,12 +54,14 @@ import StudentDashboard from '../pages/Student/Dashboard/StudentDashboard';
 import StudentSubjects from '../pages/Student/Subjects/StudentSubjects';
 import StudentResults from '../pages/Student/Results/StudentResults';
 import StudentAttendance from '../pages/Student/Attendance/StudentAttendance';
+import StudentSettings from '../pages/Student/Settings/StudentSettings';
 
 // Guardian Pages
 import GuardianLayout from '../components/GuardianLayout';
 import GuardianDashboard from '../pages/Guardian/GuardianDashboard';
 import ChildrenMonitoring from '../pages/Guardian/ChildrenMonitoring';
 import GuardianCommunication from '../pages/Guardian/Communication';
+import GuardianSettings from '../pages/Guardian/GuardianSettings';
 
 // Teacher Pages
 import TeacherLayout from '../components/TeacherLayout';
@@ -146,6 +148,7 @@ const AppRoutes = () => {
                     <Route path="subjects" element={<StudentSubjects />} />
                     <Route path="results" element={<StudentResults />} />
                     <Route path="attendance" element={<StudentAttendance />} />
+                    <Route path="settings" element={<StudentSettings />} />
                 </Route>
             </Route>
 
@@ -157,6 +160,7 @@ const AppRoutes = () => {
                     <Route path="dashboard" element={<GuardianDashboard />} />
                     <Route path="monitoring" element={<ChildrenMonitoring />} />
                     <Route path="communication" element={<GuardianCommunication />} />
+                    <Route path="settings" element={<GuardianSettings />} />
                 </Route>
             </Route>
 

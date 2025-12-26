@@ -1,8 +1,11 @@
 import React from 'react';
 import './Guardian.css';
 import { Bell, Calendar, TrendingUp } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 const GuardianDashboard = () => {
+    const { t } = useTheme();
+
     // Mock Data
     const children = [
         { id: 1, name: "Ahmed", grade: "5th Grade", gpa: "3.8" },
@@ -23,13 +26,13 @@ const GuardianDashboard = () => {
 
     return (
         <div className="guardian-dashboard">
-            <h1 className="guardian-page-title">Dashboard Overview</h1>
+            <h1 className="guardian-page-title">{t('guardian.dashboard.title')}</h1>
 
             <div className="guardian-dashboard-grid">
                 {/* Children Summary */}
                 <div className="guardian-card">
                     <div className="guardian-card-header">
-                        <h3>Children Overview</h3>
+                        <h3>{t('guardian.dashboard.childrenOverview')}</h3>
                         <TrendingUp size={20} color="#4f46e5" />
                     </div>
                     <div className="children-list">
@@ -38,7 +41,7 @@ const GuardianDashboard = () => {
                                 <div className="child-avatar">{child.name.charAt(0)}</div>
                                 <div>
                                     <div className="child-name">{child.name}</div>
-                                    <div className="child-details">{child.grade} • GPA: {child.gpa}</div>
+                                    <div className="child-details">{child.grade} • {t('guardian.dashboard.gpa')}: {child.gpa}</div>
                                 </div>
                             </div>
                         ))}
@@ -48,7 +51,7 @@ const GuardianDashboard = () => {
                 {/* Notifications */}
                 <div className="guardian-card">
                     <div className="guardian-card-header">
-                        <h3>Recent Notifications</h3>
+                        <h3>{t('guardian.dashboard.recentNotifications')}</h3>
                         <Bell size={20} color="#f59e0b" />
                     </div>
                     <div className="notifications-list">
@@ -64,7 +67,7 @@ const GuardianDashboard = () => {
                 {/* Important Dates */}
                 <div className="guardian-card">
                     <div className="guardian-card-header">
-                        <h3>Upcoming Events</h3>
+                        <h3>{t('guardian.dashboard.upcomingEvents')}</h3>
                         <Calendar size={20} color="#3b82f6" />
                     </div>
                     <div className="events-list">
@@ -76,7 +79,7 @@ const GuardianDashboard = () => {
                                 </div>
                                 <div>
                                     <div className="event-title">{event.title}</div>
-                                    <div className="event-child">For: {event.child}</div>
+                                    <div className="event-child">{t('guardian.dashboard.for')}: {event.child}</div>
                                 </div>
                             </div>
                         ))}
@@ -88,3 +91,4 @@ const GuardianDashboard = () => {
 };
 
 export default GuardianDashboard;
+

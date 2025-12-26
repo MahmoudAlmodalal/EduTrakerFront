@@ -1,8 +1,11 @@
 import React from 'react';
-import { Award, TrendingUp, BarChart2, AlertCircle } from 'lucide-react';
+import { Award, TrendingUp, BarChart2 } from 'lucide-react';
+import { useTheme } from '../../../context/ThemeContext';
 import '../../Student/Student.css';
 
 const StudentResults = () => {
+    const { t } = useTheme();
+
     // Mock Result Data
     const results = [
         {
@@ -47,8 +50,8 @@ const StudentResults = () => {
     return (
         <div className="student-results">
             <header className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-800">Academic Results</h1>
-                <p className="text-slate-500">Track your grades and performance across all subjects.</p>
+                <h1 className="text-2xl font-bold text-slate-800">{t('student.results.title')}</h1>
+                <p className="text-slate-500">{t('student.results.subtitle')}</p>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -59,7 +62,7 @@ const StudentResults = () => {
                     </div>
                     <div>
                         <div className="text-3xl font-bold text-slate-800">3.8</div>
-                        <div className="text-sm text-slate-500">Current GPA</div>
+                        <div className="text-sm text-slate-500">{t('student.results.currentGPA')}</div>
                     </div>
                 </div>
 
@@ -69,7 +72,7 @@ const StudentResults = () => {
                     </div>
                     <div>
                         <div className="text-3xl font-bold text-slate-800">Top 10%</div>
-                        <div className="text-sm text-slate-500">Class Ranking</div>
+                        <div className="text-sm text-slate-500">{t('student.results.classRanking')}</div>
                     </div>
                 </div>
 
@@ -79,7 +82,7 @@ const StudentResults = () => {
                     </div>
                     <div>
                         <div className="text-3xl font-bold text-slate-800">92%</div>
-                        <div className="text-sm text-slate-500">Overall Success Rate</div>
+                        <div className="text-sm text-slate-500">{t('student.results.overallSuccessRate')}</div>
                     </div>
                 </div>
             </div>
@@ -91,13 +94,13 @@ const StudentResults = () => {
                             <div>
                                 <h3 className="text-xl font-bold text-slate-800">{result.subject}</h3>
                                 <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
-                                    Current Grade: <span className="font-bold text-blue-600">{result.finalGrade}%</span>
-                                    {result.trend === 'up' && <span className="text-green-500 text-xs flex items-center bg-green-50 px-1.5 py-0.5 rounded">Trending Up <TrendingUp size={12} className="ml-1" /></span>}
-                                    {result.trend === 'down' && <span className="text-red-500 text-xs flex items-center bg-red-50 px-1.5 py-0.5 rounded">Trending Down <TrendingUp size={12} className="ml-1 rotate-180" /></span>}
+                                    {t('student.results.currentGrade')}: <span className="font-bold text-blue-600">{result.finalGrade}%</span>
+                                    {result.trend === 'up' && <span className="text-green-500 text-xs flex items-center bg-green-50 px-1.5 py-0.5 rounded">{t('student.results.trendingUp')} <TrendingUp size={12} className="ml-1" /></span>}
+                                    {result.trend === 'down' && <span className="text-red-500 text-xs flex items-center bg-red-50 px-1.5 py-0.5 rounded">{t('student.results.trendingDown')} <TrendingUp size={12} className="ml-1 rotate-180" /></span>}
                                 </div>
                             </div>
                             <div className="hidden md:block">
-                                <span className="text-xs text-slate-400">Class Average Comparison</span>
+                                <span className="text-xs text-slate-400">{t('student.results.classAverageComparison')}</span>
                                 <div className="w-48 h-2 bg-slate-200 rounded-full mt-1 relative">
                                     {/* Class Average Marker */}
                                     <div
@@ -118,11 +121,11 @@ const StudentResults = () => {
                             <table className="w-full text-left text-sm text-slate-600">
                                 <thead className="bg-slate-50 border-b border-slate-100">
                                     <tr>
-                                        <th className="p-4 font-semibold">Assessment</th>
-                                        <th className="p-4 font-semibold">Date</th>
-                                        <th className="p-4 font-semibold">Score</th>
-                                        <th className="p-4 font-semibold">Average</th>
-                                        <th className="p-4 font-semibold">Status</th>
+                                        <th className="p-4 font-semibold">{t('student.results.assessment')}</th>
+                                        <th className="p-4 font-semibold">{t('student.results.date')}</th>
+                                        <th className="p-4 font-semibold">{t('student.results.score')}</th>
+                                        <th className="p-4 font-semibold">{t('student.results.average')}</th>
+                                        <th className="p-4 font-semibold">{t('student.results.status')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -141,11 +144,11 @@ const StudentResults = () => {
                                             <td className="p-4">
                                                 {assessment.grade < assessment.average ? (
                                                     <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded inline-flex items-center gap-1">
-                                                        Below Avg
+                                                        {t('student.results.belowAvg')}
                                                     </span>
                                                 ) : (
                                                     <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded inline-flex items-center gap-1">
-                                                        Above Avg
+                                                        {t('student.results.aboveAvg')}
                                                     </span>
                                                 )}
                                             </td>

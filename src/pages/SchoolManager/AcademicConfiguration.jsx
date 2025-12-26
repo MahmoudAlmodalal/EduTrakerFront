@@ -9,9 +9,11 @@ import {
     CheckCircle,
     Search
 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './SchoolManager.css';
 
 const AcademicConfiguration = () => {
+    const { t } = useTheme();
     const [activeTab, setActiveTab] = useState('subjects');
 
     // Mock Data for Tabs
@@ -44,8 +46,8 @@ const AcademicConfiguration = () => {
     return (
         <div className="academic-config-page">
             <div className="school-manager-header">
-                <h1 className="school-manager-title">Academic Configuration</h1>
-                <p className="school-manager-subtitle">Manage academic year settings, allocations, and scheduling.</p>
+                <h1 className="school-manager-title">{t('school.config.title')}</h1>
+                <p className="school-manager-subtitle">{t('school.config.subtitle')}</p>
             </div>
 
             {/* Tabs */}
@@ -280,7 +282,7 @@ const TeacherAllocation = ({ allocations: initialAllocations }) => {
                                     </select>
                                 ) : (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--color-bg-body)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--color-text-main)' }}>
                                             {item.teacher.charAt(0)}
                                         </div>
                                         {item.teacher}
@@ -332,7 +334,7 @@ const TimetableGenerator = () => {
                         <Calendar size={18} />
                         {isGenerated ? 'Regenerate Timetable' : 'Generate Timetable'}
                     </button>
-                    <button style={{ padding: '0.5rem 1rem', border: '1px solid var(--color-border)', borderRadius: '0.375rem', background: 'white', cursor: 'pointer' }}>
+                    <button style={{ padding: '0.5rem 1rem', border: '1px solid var(--color-border)', borderRadius: '0.375rem', background: 'var(--color-bg-surface)', cursor: 'pointer', color: 'var(--color-text-main)' }}>
                         View Constraints
                     </button>
                 </div>
@@ -344,7 +346,7 @@ const TimetableGenerator = () => {
                 </div>
                 <div className="p-6" style={{ padding: '1.5rem', overflowX: 'auto' }}>
                     {!isGenerated ? (
-                        <div style={{ background: '#f8fafc', padding: '2rem', borderRadius: '0.5rem', border: '2px dashed #cbd5e1', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div style={{ background: 'var(--color-bg-body)', padding: '2rem', borderRadius: '0.5rem', border: '2px dashed var(--color-border)', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             Timetable not yet generated. Click "Generate Timetable" to start.
                         </div>
                     ) : (

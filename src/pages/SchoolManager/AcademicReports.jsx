@@ -18,9 +18,11 @@ import {
     LineChart,
     Line
 } from 'recharts';
+import { useTheme } from '../../context/ThemeContext';
 import './SchoolManager.css';
 
 const AcademicReports = () => {
+    const { t } = useTheme();
     const [activeTab, setActiveTab] = useState('performance');
 
     const renderTabContent = () => {
@@ -41,12 +43,12 @@ const AcademicReports = () => {
             <div className="school-manager-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h1 className="school-manager-title">Academic Reports</h1>
-                        <p className="school-manager-subtitle">Detailed insights into student and class performance.</p>
+                        <h1 className="school-manager-title">{t('school.reports.title')}</h1>
+                        <p className="school-manager-subtitle">{t('school.reports.subtitle')}</p>
                     </div>
-                    <button className="btn-primary" style={{ background: 'white', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}>
+                    <button className="btn-primary" style={{ background: 'var(--color-bg-surface)', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}>
                         <Download size={18} />
-                        Export All Reports
+                        {t('school.reports.exportAll')}
                     </button>
                 </div>
             </div>
@@ -169,8 +171,8 @@ const StudentPerformance = () => {
                             <td style={{ fontWeight: 'bold' }}>{std.gpa}</td>
                             <td>
                                 <span className={`status-badge ${std.status === 'At Risk' ? 'status-inactive' :
-                                        std.status === 'Top Performer' || std.status === 'Excellent' ? 'status-active' :
-                                            ''
+                                    std.status === 'Top Performer' || std.status === 'Excellent' ? 'status-active' :
+                                        ''
                                     }`} style={{
                                         backgroundColor: std.status === 'At Risk' ? '#fee2e2' : std.status === 'Top Performer' ? '#dcfce7' : '#f1f5f9',
                                         color: std.status === 'At Risk' ? '#991b1b' : std.status === 'Top Performer' ? '#166534' : '#475569'

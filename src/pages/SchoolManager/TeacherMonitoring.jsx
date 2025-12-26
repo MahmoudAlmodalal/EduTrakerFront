@@ -9,29 +9,31 @@ import {
     Plus,
     MoreVertical
 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './SchoolManager.css';
 
 const TeacherMonitoring = () => {
+    const { t } = useTheme();
     const [activeTab, setActiveTab] = useState('directory');
 
     const renderTabContent = () => {
         switch (activeTab) {
             case 'directory':
-                return <TeacherDirectory />;
+                return <TeacherDirectory t={t} />;
             case 'performance':
-                return <PerformanceEvaluation />;
+                return <PerformanceEvaluation t={t} />;
             case 'activity':
-                return <ActivityLogs />;
+                return <ActivityLogs t={t} />;
             default:
-                return <TeacherDirectory />;
+                return <TeacherDirectory t={t} />;
         }
     };
 
     return (
         <div className="teacher-monitoring-page">
             <div className="school-manager-header">
-                <h1 className="school-manager-title">Teacher Monitoring</h1>
-                <p className="school-manager-subtitle">Manage staff, evaluate performance, and track activity.</p>
+                <h1 className="school-manager-title">{t('school.teachers.title')}</h1>
+                <p className="school-manager-subtitle">{t('school.teachers.subtitle')}</p>
             </div>
 
             {/* Tabs */}
@@ -51,7 +53,7 @@ const TeacherMonitoring = () => {
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Users size={18} />
-                        Teacher Directory
+                        {t('school.teachers.directory')}
                     </div>
                 </button>
                 <button
@@ -69,7 +71,7 @@ const TeacherMonitoring = () => {
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Star size={18} />
-                        Performance Evaluation
+                        {t('school.teachers.performance')}
                     </div>
                 </button>
                 <button
@@ -87,7 +89,7 @@ const TeacherMonitoring = () => {
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Activity size={18} />
-                        Activity Logs
+                        {t('school.teachers.activityLog')}
                     </div>
                 </button>
             </div>
@@ -100,7 +102,7 @@ const TeacherMonitoring = () => {
 };
 
 // Sub-components
-const TeacherDirectory = () => {
+const TeacherDirectory = ({ t }) => {
     const [teachers, setTeachers] = useState([
         { id: 1, name: 'John Smith', subject: 'Mathematics', role: 'Teacher', status: 'Active' },
         { id: 2, name: 'Sarah Johnson', subject: 'Science', role: 'Head of Dept', status: 'Active' },
@@ -157,17 +159,17 @@ const TeacherDirectory = () => {
                 </div>
                 <button className="btn-primary" onClick={() => openModal()}>
                     <Plus size={18} />
-                    Add Teacher
+                    {t('school.teachers.addTeacher')}
                 </button>
             </div>
             <table className="data-table">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Subject</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th>{t('school.teachers.name')}</th>
+                        <th>{t('school.teachers.subjects')}</th>
+                        <th>{t('school.teachers.department')}</th>
+                        <th>{t('school.teachers.status')}</th>
+                        <th>{t('school.teachers.actions')}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -183,8 +185,8 @@ const TeacherDirectory = () => {
                             </td>
                             <td>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button onClick={() => openModal(teacher)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>Edit</button>
-                                    <button onClick={() => handleDelete(teacher.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>Delete</button>
+                                    <button onClick={() => openModal(teacher)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{t('school.teachers.edit')}</button>
+                                    <button onClick={() => handleDelete(teacher.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>{t('school.teachers.delete')}</button>
                                 </div>
                             </td>
                         </tr>
@@ -257,7 +259,7 @@ const TeacherDirectory = () => {
     );
 };
 
-const PerformanceEvaluation = () => {
+const PerformanceEvaluation = ({ t }) => {
     const evaluations = [
         { id: 1, name: 'John Smith', rating: 4.8, comments: 'Excellent engagement with students.', date: '2023-11-15' },
         { id: 2, name: 'Sarah Johnson', rating: 4.9, comments: 'Consistently high teaching standards.', date: '2023-11-10' },
@@ -303,7 +305,7 @@ const PerformanceEvaluation = () => {
     );
 };
 
-const ActivityLogs = () => {
+const ActivityLogs = ({ t }) => {
     const activity = [
         { id: 1, name: 'John Smith', action: 'Graded Assignment: Math Homework', time: '2 hours ago', speed: 'Fast' },
         { id: 2, name: 'Sarah Johnson', action: 'Uploaded Lesson Plan: Photosynthesis', time: '4 hours ago', speed: 'Normal' },

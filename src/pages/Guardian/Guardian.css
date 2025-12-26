@@ -1,75 +1,123 @@
-/* Guardian Dashboard Styles */
+/**
+ * Guardian Dashboard Styles
+ * Enhanced with Global Design System
+ */
+
+@import '../../styles/global-design.css';
 
 .guardian-layout {
     display: flex;
     min-height: 100vh;
-    background-color: #f8fafc;
+    background: var(--color-bg-body);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .guardian-sidebar {
-    width: 260px;
-    background-color: #ffffff;
-    border-right: 1px solid #e2e8f0;
+    width: 280px;
+    background: var(--color-bg-surface);
+    border-right: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
-    padding: 1.5rem;
+    padding: var(--spacing-6);
     position: fixed;
     height: 100vh;
-    z-index: 10;
+    z-index: var(--z-fixed);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.02);
+}
+
+[dir="rtl"] .guardian-sidebar {
+    left: auto;
+    right: 0;
+    border-right: none;
+    border-left: 1px solid var(--color-border);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.02);
 }
 
 .guardian-brand {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding-bottom: 2rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #e2e8f0;
-    color: #4f46e5;
-    font-weight: 700;
-    font-size: 1.25rem;
+    gap: var(--spacing-3);
+    padding-bottom: var(--spacing-6);
+    margin-bottom: var(--spacing-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.guardian-brand-text {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-extrabold);
+    letter-spacing: -0.025em;
+    background: linear-gradient(135deg, var(--color-text-main) 0%, var(--color-primary) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .guardian-nav {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--spacing-2);
+    flex: 1;
 }
 
 .guardian-nav-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    color: #64748b;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3) var(--spacing-4);
+    border-radius: var(--radius-lg);
+    color: var(--color-text-muted);
     text-decoration: none;
-    transition: all 0.2s ease;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-sm);
+    transition: all var(--transition-bounce);
 }
 
 .guardian-nav-item:hover {
-    background-color: #f1f5f9;
-    color: #0f172a;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    transform: translateX(4px);
+}
+
+[dir="rtl"] .guardian-nav-item:hover {
+    transform: translateX(-4px);
 }
 
 .guardian-nav-item.active {
-    background-color: #eff6ff;
-    color: #4f46e5;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+    color: white;
+    box-shadow: var(--shadow-md), var(--shadow-glow);
+}
+
+.guardian-nav-item.active:hover {
+    transform: none;
 }
 
 .guardian-main {
     flex: 1;
-    margin-left: 260px;
-    padding: 2rem;
-    max-width: 1600px;
+    margin-left: 280px;
+    padding: var(--spacing-8);
+    background-image:
+        radial-gradient(circle at top right, rgba(79, 70, 229, 0.03), transparent 40%),
+        radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.03), transparent 40%);
+}
+
+[dir="rtl"] .guardian-main {
+    margin-left: 0;
+    margin-right: 280px;
+}
+
+@media (max-width: 1024px) {
+    .guardian-main {
+        padding: var(--spacing-6);
+    }
 }
 
 .guardian-page-title {
-    margin-bottom: 2rem;
-    color: #1e293b;
-    font-size: 1.875rem;
-    font-weight: 700;
+    margin-bottom: var(--spacing-8);
+    color: var(--color-text-main);
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-extrabold);
+    letter-spacing: -0.025em;
 }
 
 /* Dashboard Cards */
@@ -451,4 +499,209 @@
 .btn-full {
     width: 100%;
     justify-content: center;
+}
+
+/* ========== DARK MODE SUPPORT ========== */
+[data-theme='dark'] .guardian-layout {
+    background-color: var(--color-bg-body);
+}
+
+[data-theme='dark'] .guardian-sidebar {
+    background-color: var(--color-bg-surface);
+    border-right-color: var(--color-border);
+}
+
+[data-theme='dark'] .guardian-brand {
+    border-bottom-color: var(--color-border);
+}
+
+[data-theme='dark'] .guardian-nav-item {
+    color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .guardian-nav-item:hover {
+    background-color: var(--color-bg-body);
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .guardian-nav-item.active {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+[data-theme='dark'] .guardian-page-title {
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .guardian-card {
+    background: var(--color-bg-surface);
+    border-color: var(--color-border);
+}
+
+[data-theme='dark'] .guardian-card-header h3 {
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .child-summary-item {
+    background: var(--color-bg-body);
+}
+
+[data-theme='dark'] .child-summary-item:hover {
+    background: var(--color-border);
+}
+
+[data-theme='dark'] .child-name {
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .child-details {
+    color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .notification-item {
+    background: var(--color-bg-body);
+}
+
+[data-theme='dark'] .notification-title {
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .notification-message {
+    color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .event-item {
+    border-bottom-color: var(--color-border);
+}
+
+[data-theme='dark'] .event-date-box {
+    background: var(--color-primary-light);
+}
+
+[data-theme='dark'] .event-title {
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .event-child {
+    color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .child-selector-btn {
+    background: var(--color-bg-surface);
+    color: var(--color-text-muted);
+    border-color: var(--color-border);
+}
+
+[data-theme='dark'] .tabs-header {
+    border-bottom-color: var(--color-border);
+}
+
+[data-theme='dark'] .tab-btn {
+    color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .tab-btn:hover,
+[data-theme='dark'] .tab-btn.active {
+    color: var(--color-primary);
+}
+
+/* Guardian Tables Dark Mode */
+[data-theme='dark'] .guardian-table th {
+    background: var(--color-bg-body);
+    color: var(--color-text-muted);
+    border-bottom-color: var(--color-border);
+}
+
+[data-theme='dark'] .guardian-table td {
+    color: var(--color-text-main);
+    border-bottom-color: var(--color-border);
+}
+
+[data-theme='dark'] .score-badge {
+    color: var(--color-text-main);
+}
+
+/* Status Badges Dark Mode */
+[data-theme='dark'] .status-badge.present,
+[data-theme='dark'] .status-badge.approved,
+[data-theme='dark'] .status-badge.positive {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+}
+
+[data-theme='dark'] .status-badge.absent,
+[data-theme='dark'] .status-badge.rejected,
+[data-theme='dark'] .status-badge.negative {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+}
+
+[data-theme='dark'] .status-badge.late,
+[data-theme='dark'] .status-badge.pending,
+[data-theme='dark'] .status-badge.warning {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+}
+
+/* Communication Dark Mode */
+[data-theme='dark'] .message-thread {
+    border-color: var(--color-border);
+}
+
+[data-theme='dark'] .message-thread:hover {
+    background: var(--color-bg-body);
+}
+
+[data-theme='dark'] .message-sender {
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .message-date {
+    color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .message-subject {
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .message-preview {
+    color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .meeting-request-item {
+    background: var(--color-bg-body);
+    border-color: var(--color-border);
+}
+
+[data-theme='dark'] .meeting-with {
+    color: var(--color-text-main);
+}
+
+[data-theme='dark'] .meeting-date {
+    color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .section-subtitle {
+    color: var(--color-text-muted);
+}
+
+/* RTL Support for Guardian */
+[dir="rtl"] .guardian-sidebar {
+    left: auto;
+    right: 0;
+    border-right: none;
+    border-left: 1px solid #e2e8f0;
+}
+
+[dir="rtl"][data-theme='dark'] .guardian-sidebar {
+    border-left-color: var(--color-border);
+}
+
+[dir="rtl"] .guardian-main {
+    margin-left: 0;
+    margin-right: 260px;
+}
+
+[dir="rtl"] .guardian-table th {
+    text-align: right;
 }

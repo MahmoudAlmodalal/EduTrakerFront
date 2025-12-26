@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Calendar, Search, Filter, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './Secretary.css';
 
 const SecretaryAttendance = () => {
+    const { t } = useTheme();
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedClass, setSelectedClass] = useState('1-A');
 
@@ -25,11 +27,21 @@ const SecretaryAttendance = () => {
         }
     };
 
+    const getStatusTranslation = (status) => {
+        switch (status) {
+            case 'Present': return t('secretary.attendance.present');
+            case 'Absent': return t('secretary.attendance.absent');
+            case 'Late': return t('secretary.attendance.late');
+            case 'Excused': return t('secretary.attendance.excused');
+            default: return status;
+        }
+    };
+
     return (
         <div className="secretary-dashboard">
             <header className="secretary-header">
-                <h1>Student Attendance</h1>
-                <p>Monitor daily attendance and manage records.</p>
+                <h1>{t('secretary.attendance.title')}</h1>
+                <p>{t('secretary.attendance.subtitle')}</p>
             </header>
 
             <div className="management-card">
@@ -60,7 +72,7 @@ const SecretaryAttendance = () => {
                         <Search size={18} className="search-icon" />
                         <input
                             type="text"
-                            placeholder="Search student..."
+                            placeholder={t('secretary.attendance.searchStudent')}
                             className="search-input"
                         />
                     </div>
@@ -70,10 +82,10 @@ const SecretaryAttendance = () => {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>Student Name</th>
-                                <th>Arrival Time</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th>{t('secretary.attendance.studentName')}</th>
+                                <th>{t('secretary.attendance.arrivalTime')}</th>
+                                <th>{t('secretary.attendance.status')}</th>
+                                <th>{t('secretary.attendance.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -83,18 +95,18 @@ const SecretaryAttendance = () => {
                                     <td className="text-gray-500">{student.time}</td>
                                     <td>
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(student.status)}`}>
-                                            {student.status}
+                                            {getStatusTranslation(student.status)}
                                         </span>
                                     </td>
                                     <td>
                                         <div className="flex gap-2">
-                                            <button className="btn-icon" title="Mark Present">
+                                            <button className="btn-icon" title={t('secretary.attendance.markPresent')}>
                                                 <CheckCircle size={18} className="text-green-600" />
                                             </button>
-                                            <button className="btn-icon" title="Mark Absent">
+                                            <button className="btn-icon" title={t('secretary.attendance.markAbsent')}>
                                                 <XCircle size={18} className="text-red-600" />
                                             </button>
-                                            <button className="btn-icon" title="Mark Late">
+                                            <button className="btn-icon" title={t('secretary.attendance.markLate')}>
                                                 <Clock size={18} className="text-orange-600" />
                                             </button>
                                         </div>

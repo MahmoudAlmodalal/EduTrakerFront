@@ -8,9 +8,11 @@ import {
     Edit,
     Trash
 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './SchoolManager.css';
 
 const DepartmentManagement = () => {
+    const { t } = useTheme();
     // Mock Data
     const [departments, setDepartments] = useState([
         { id: 1, name: 'Science', head: 'Sarah Johnson', members: 8 },
@@ -53,8 +55,8 @@ const DepartmentManagement = () => {
     return (
         <div className="department-management-page">
             <div className="school-manager-header">
-                <h1 className="school-manager-title">Department Management</h1>
-                <p className="school-manager-subtitle">Organize academic departments and assign leadership.</p>
+                <h1 className="school-manager-title">{t('school.departments.title')}</h1>
+                <p className="school-manager-subtitle">{t('school.departments.subtitle')}</p>
             </div>
 
             <div className="management-card">
@@ -74,17 +76,17 @@ const DepartmentManagement = () => {
                     </div>
                     <button className="btn-primary" onClick={() => openModal()}>
                         <Plus size={18} />
-                        Create Department
+                        {t('school.departments.addDepartment')}
                     </button>
                 </div>
 
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Department Name</th>
-                            <th>Head of Department</th>
-                            <th>Teachers</th>
-                            <th>Actions</th>
+                            <th>{t('school.departments.name')}</th>
+                            <th>{t('school.departments.head')}</th>
+                            <th>{t('school.departments.teachers')}</th>
+                            <th>{t('school.departments.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>

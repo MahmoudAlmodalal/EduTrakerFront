@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Send, Plus, MessageSquare, Search } from 'lucide-react';
-// Assuming we might not have the same ThemeContext or Button component available or user wants sticking to Secretary styling but Admin Layout.
-// However, the user said "like admin". Admin uses 'styles from ./Dashboard.module.css' and custom Button.
-// I will try to replicate the layout using inline styles or Secretary.css classes to avoid dependency hell if those components aren't easily shared or adapted.
-// I will use the same structure: Header, Sidebar (Search + Tabs + List), Content Area.
+import { useTheme } from '../../context/ThemeContext';
 
 const SecretaryCommunication = () => {
+    const { t } = useTheme();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState('internal');
     const [selectedMessage, setSelectedMessage] = useState(null);
@@ -48,30 +46,30 @@ const SecretaryCommunication = () => {
         <div className="secretary-dashboard" style={{ height: 'calc(100vh - 64px)', paddingBottom: 0 }}>
             <header className="secretary-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1>Communication Center</h1>
-                    <p>Manage messages and announcements.</p>
+                    <h1>{t('secretary.communication.title')}</h1>
+                    <p>{t('secretary.communication.subtitle')}</p>
                 </div>
                 <button className="btn-primary">
                     <Plus size={18} style={{ marginRight: '8px' }} />
-                    New Message
+                    {t('secretary.communication.compose')}
                 </button>
             </header>
 
             <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '1.5rem', height: 'calc(100% - 120px)' }}>
                 {/* Sidebar / List */}
-                <div className="message-sidebar" style={{ background: 'white', borderRadius: '0.5rem', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+                <div className="message-sidebar" style={{ background: 'var(--sec-surface)', borderRadius: '0.5rem', border: '1px solid var(--sec-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--sec-border)' }}>
                         <div className="search-wrapper" style={{ marginBottom: '1rem', width: '100%', maxWidth: 'none' }}>
                             <Search size={16} className="search-icon" />
                             <input
                                 type="text"
-                                placeholder={activeTab === 'notifications' ? "Search notifications..." : "Search messages..."}
+                                placeholder={activeTab === 'notifications' ? t('secretary.communication.searchMessages') : t('secretary.communication.searchMessages')}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="search-input"
                             />
                         </div>
-                        <div style={{ display: 'flex', gap: '0.25rem', padding: '0.25rem', background: '#f9fafb', borderRadius: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.25rem', padding: '0.25rem', background: 'var(--sec-border)', borderRadius: '0.5rem' }}>
                             {['internal', 'external', 'notifications'].map(tab => (
                                 <button
                                     key={tab}
@@ -81,16 +79,17 @@ const SecretaryCommunication = () => {
                                         padding: '0.5rem',
                                         fontSize: '0.75rem',
                                         borderRadius: '0.375rem',
-                                        background: activeTab === tab ? 'white' : 'transparent',
-                                        color: activeTab === tab ? '#2563eb' : '#6b7280',
-                                        border: activeTab === tab ? '1px solid #e5e7eb' : 'none',
+                                        background: activeTab === tab ? 'var(--sec-surface)' : 'transparent',
+                                        color: activeTab === tab ? 'var(--sec-primary)' : 'var(--sec-text-muted)',
+                                        border: activeTab === tab ? '1px solid var(--sec-border)' : 'none',
                                         cursor: 'pointer',
                                         fontWeight: 600,
                                         textTransform: 'capitalize',
                                         boxShadow: activeTab === tab ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                                     }}
                                 >
-                                    {tab}
+                                    {tab === 'internal' ? t('secretary.communication.messages') :
+                                        tab === 'notifications' ? t('secretary.communication.notifications') : tab}
                                 </button>
                             ))}
                         </div>
@@ -108,17 +107,17 @@ const SecretaryCommunication = () => {
                                     onClick={() => handleNotificationClick(notif)}
                                     style={{
                                         padding: '1rem',
-                                        borderBottom: '1px solid #f3f4f6',
+                                        borderBottom: '1px solid var(--sec-border)',
                                         cursor: 'pointer',
-                                        background: notif.read ? 'white' : '#f9fafb',
-                                        borderLeft: notif.read ? 'none' : '4px solid #2563eb'
+                                        background: notif.read ? 'var(--sec-surface)' : 'var(--sec-border)',
+                                        borderLeft: notif.read ? 'none' : '4px solid var(--sec-primary)'
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1f2937' }}>{notif.title}</span>
-                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{notif.time}</span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--sec-text-main)' }}>{notif.title}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--sec-text-muted)' }}>{notif.time}</span>
                                     </div>
-                                    <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{notif.message}</div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--sec-text-muted)' }}>{notif.message}</div>
                                 </div>
                             ))
                         ) : (
@@ -128,23 +127,23 @@ const SecretaryCommunication = () => {
                                     onClick={() => handleMessageClick(msg)}
                                     style={{
                                         padding: '1rem',
-                                        borderBottom: '1px solid #f3f4f6',
+                                        borderBottom: '1px solid var(--sec-border)',
                                         cursor: 'pointer',
-                                        background: selectedMessage?.id === msg.id ? '#f0f9ff' : (msg.read ? 'white' : '#f9fafb'),
-                                        borderLeft: !msg.read ? '4px solid #2563eb' : (selectedMessage?.id === msg.id ? '4px solid #e5e7eb' : 'none')
+                                        background: selectedMessage?.id === msg.id ? 'rgba(79, 70, 229, 0.1)' : (msg.read ? 'var(--sec-surface)' : 'var(--sec-border)'),
+                                        borderLeft: !msg.read ? '4px solid var(--sec-primary)' : (selectedMessage?.id === msg.id ? '4px solid var(--sec-border)' : 'none')
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                        <span style={{ fontWeight: msg.read ? 400 : 700, fontSize: '0.9rem', color: '#1f2937' }}>
+                                        <span style={{ fontWeight: msg.read ? 400 : 700, fontSize: '0.9rem', color: 'var(--sec-text-main)' }}>
                                             {msg.sender.split('(')[0]}
                                         </span>
-                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{msg.date}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--sec-text-muted)' }}>{msg.date}</span>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: '#2563eb', marginBottom: '0.25rem' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--sec-primary)', marginBottom: '0.25rem' }}>
                                         {msg.role}
                                     </div>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: msg.read ? 400 : 600, color: '#1f2937', marginBottom: '0.25rem' }}>{msg.subject}</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: msg.read ? 400 : 600, color: 'var(--sec-text-main)', marginBottom: '0.25rem' }}>{msg.subject}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--sec-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {msg.preview}
                                     </div>
                                 </div>
@@ -154,28 +153,28 @@ const SecretaryCommunication = () => {
                 </div>
 
                 {/* Content Area */}
-                <div className="message-content" style={{ background: 'white', borderRadius: '0.5rem', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+                <div className="message-content" style={{ background: 'var(--sec-surface)', borderRadius: '0.5rem', border: '1px solid var(--sec-border)', display: 'flex', flexDirection: 'column' }}>
                     {activeTab === 'notifications' ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', marginTop: '3rem' }}>
+                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--sec-text-muted)', marginTop: '3rem' }}>
                             <MessageSquare size={48} style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
-                            <h3>Notification Center</h3>
+                            <h3 style={{ color: 'var(--sec-text-main)' }}>Notification Center</h3>
                             <p>Here you can view all your system alerts and notifications.</p>
                         </div>
                     ) : selectedMessage ? (
                         <>
-                            <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
+                            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--sec-border)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div>
-                                        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.5rem' }}>
+                                        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--sec-text-main)', marginBottom: '0.5rem' }}>
                                             {selectedMessage.subject}
                                         </h2>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: '#64748b', fontSize: '1.2rem' }}>
+                                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--sec-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: 'var(--sec-text-muted)', fontSize: '1.2rem' }}>
                                                 {selectedMessage.sender.charAt(0)}
                                             </div>
                                             <div>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1f2937' }}>{selectedMessage.sender}</div>
-                                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>to me &bull; {selectedMessage.date}</div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--sec-text-main)' }}>{selectedMessage.sender}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--sec-text-muted)' }}>to me &bull; {selectedMessage.date}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -183,27 +182,27 @@ const SecretaryCommunication = () => {
                             </div>
 
                             <div style={{ padding: '2rem', flex: 1, overflowY: 'auto' }}>
-                                <p style={{ color: '#374151', lineHeight: '1.8', whiteSpace: 'pre-line' }}>
+                                <p style={{ color: 'var(--sec-text-main)', lineHeight: '1.8', whiteSpace: 'pre-line' }}>
                                     {selectedMessage.content}
                                 </p>
                             </div>
 
-                            <div style={{ padding: '1rem', borderTop: '1px solid #e5e7eb', background: '#f9fafb', borderBottomLeftRadius: '0.5rem', borderBottomRightRadius: '0.5rem' }}>
+                            <div style={{ padding: '1rem', borderTop: '1px solid var(--sec-border)', background: 'var(--sec-border)', borderBottomLeftRadius: '0.5rem', borderBottomRightRadius: '0.5rem' }}>
                                 <div style={{ display: 'flex', gap: '1rem' }}>
                                     <input
                                         type="text"
-                                        placeholder="Type your reply..."
-                                        style={{ flex: 1, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid #d1d5db', background: 'white' }}
+                                        placeholder={t('secretary.communication.typeMessage')}
+                                        style={{ flex: 1, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--sec-border)', background: 'var(--sec-surface)', color: 'var(--sec-text-main)' }}
                                     />
                                     <button className="btn-primary">
                                         <Send size={18} style={{ marginRight: '8px' }} />
-                                        Send
+                                        {t('secretary.communication.sendMessage')}
                                     </button>
                                 </div>
                             </div>
                         </>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--sec-text-muted)' }}>
                             <MessageSquare size={64} style={{ marginBottom: '1rem', opacity: 0.3 }} />
                             <p style={{ fontSize: '1.1rem' }}>Select a message to view details</p>
                         </div>

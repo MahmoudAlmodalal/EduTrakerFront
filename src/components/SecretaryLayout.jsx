@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     UserPlus,
@@ -9,17 +9,28 @@ import {
     LogOut,
     Shield
 } from 'lucide-react';
-import '../pages/WorkstreamManager/Workstream.css'; // Reusing Workstream styles for consistency
+import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import '../pages/WorkstreamManager/Workstream.css';
 
 const SecretaryLayout = () => {
+    const { t } = useTheme();
+    const { logout } = useAuth();
+    const navigate = useNavigate();
+
     const navItems = [
-        { path: '/secretary/dashboard', label: 'Overview', icon: LayoutDashboard },
-        { path: '/secretary/admissions', label: 'Admissions', icon: UserPlus },
-        { path: '/secretary/guardians', label: 'Guardians', icon: Users },
-        { path: '/secretary/attendance', label: 'Attendance', icon: FileText },
-        { path: '/secretary/communication', label: 'Communication', icon: FileText },
-        { path: '/secretary/settings', label: 'Settings', icon: Settings },
+        { path: '/secretary/dashboard', labelKey: 'secretary.nav.overview', icon: LayoutDashboard },
+        { path: '/secretary/admissions', labelKey: 'secretary.nav.admissions', icon: UserPlus },
+        { path: '/secretary/guardians', labelKey: 'secretary.nav.guardians', icon: Users },
+        { path: '/secretary/attendance', labelKey: 'secretary.nav.attendance', icon: FileText },
+        { path: '/secretary/communication', labelKey: 'secretary.nav.communication', icon: FileText },
+        { path: '/secretary/settings', labelKey: 'secretary.nav.settings', icon: Settings },
     ];
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
 
     return (
         <div className="workstream-layout">
@@ -27,7 +38,7 @@ const SecretaryLayout = () => {
             <aside className="workstream-sidebar">
                 <div className="workstream-brand">
                     <Shield size={32} />
-                    <span>EduTraker</span>
+                    <span>{t('app.name') || 'EduTraker'}</span>
                 </div>
 
                 <nav className="workstream-nav">
@@ -40,15 +51,19 @@ const SecretaryLayout = () => {
                             }
                         >
                             <item.icon size={20} />
-                            <span>{item.label}</span>
+                            <span>{t(item.labelKey)}</span>
                         </NavLink>
                     ))}
                 </nav>
 
                 <div style={{ marginTop: 'auto' }}>
-                    <button className="workstream-nav-item" style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                    <button
+                        className="workstream-nav-item"
+                        style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                        onClick={handleLogout}
+                    >
                         <LogOut size={20} />
-                        <span>Logout</span>
+                        <span>{t('auth.logout') || 'Logout'}</span>
                     </button>
                 </div>
             </aside>

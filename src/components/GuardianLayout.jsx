@@ -4,16 +4,21 @@ import {
     LayoutDashboard,
     Users, // For Children Monitoring
     MessageSquare, // For Communication
+    Settings, // For Settings
     LogOut,
     ShieldCheck // Guardian Icon/Brand
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 import '../pages/Guardian/Guardian.css';
 
 const GuardianLayout = () => {
+    const { t } = useTheme();
+
     const navItems = [
-        { path: '/guardian/dashboard', label: 'Overview', icon: LayoutDashboard },
-        { path: '/guardian/monitoring', label: 'Children Monitoring', icon: Users },
-        { path: '/guardian/communication', label: 'Communication', icon: MessageSquare },
+        { path: '/guardian/dashboard', labelKey: 'guardian.nav.dashboard', icon: LayoutDashboard },
+        { path: '/guardian/monitoring', labelKey: 'guardian.nav.monitoring', icon: Users },
+        { path: '/guardian/communication', labelKey: 'guardian.nav.communication', icon: MessageSquare },
+        { path: '/guardian/settings', labelKey: 'guardian.nav.settings', icon: Settings },
     ];
 
     return (
@@ -22,12 +27,12 @@ const GuardianLayout = () => {
             <aside className="guardian-sidebar">
                 <div className="guardian-brand">
                     <ShieldCheck size={32} />
-                    <span>EduTraker</span>
+                    <span>{t('app.name')}</span>
                 </div>
 
-                <div className="user-profile" style={{ marginBottom: '2rem', padding: '1rem', background: '#f8fafc', borderRadius: '0.5rem' }}>
-                    <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Welcome,</div>
-                    <div style={{ fontWeight: '600', color: '#0f172a' }}>Guardian Name</div>
+                <div className="user-profile" style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--color-bg-body)', borderRadius: '0.5rem' }}>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>{t('header.welcome') || 'Welcome,'}</div>
+                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{t('auth.role.guardian')}</div>
                 </div>
 
                 <nav className="guardian-nav">
@@ -40,7 +45,7 @@ const GuardianLayout = () => {
                             }
                         >
                             <item.icon size={20} />
-                            <span>{item.label}</span>
+                            <span>{t(item.labelKey)}</span>
                         </NavLink>
                     ))}
                 </nav>
@@ -48,7 +53,7 @@ const GuardianLayout = () => {
                 <div style={{ marginTop: 'auto' }}>
                     <button className="guardian-nav-item" style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}>
                         <LogOut size={20} />
-                        <span>Logout</span>
+                        <span>{t('header.logout')}</span>
                     </button>
                 </div>
             </aside>
@@ -62,3 +67,4 @@ const GuardianLayout = () => {
 };
 
 export default GuardianLayout;
+

@@ -1,18 +1,36 @@
-/* School Manager Premium Styles */
+/**
+ * School Manager Premium Styles
+ * Enhanced with Global Design System
+ */
+
+@import '../../styles/global-design.css';
+
+/* Role-specific variable aliases for compatibility */
 :root {
-    --sm-primary: #4f46e5;
-    --sm-primary-light: #eef2ff;
-    --sm-secondary: #0ea5e9;
-    --sm-bg-main: #f8fafc;
-    --sm-bg-surface: #ffffff;
-    --sm-text-main: #0f172a;
-    --sm-text-muted: #64748b;
-    --sm-border: #e2e8f0;
-    --sm-shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    --sm-shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
-    --sm-radius-xl: 1rem;
-    --sm-radius-lg: 0.75rem;
-    --sm-radius-md: 0.5rem;
+    --sm-primary: var(--color-primary);
+    --sm-primary-light: var(--color-primary-light);
+    --sm-secondary: var(--color-secondary);
+    --sm-bg-main: var(--color-bg-body);
+    --sm-bg-surface: var(--color-bg-surface);
+    --sm-text-main: var(--color-text-main);
+    --sm-text-muted: var(--color-text-muted);
+    --sm-border: var(--color-border);
+    --sm-shadow-soft: var(--shadow-sm);
+    --sm-shadow-card: var(--shadow-md);
+    --sm-radius-xl: var(--radius-xl);
+    --sm-radius-lg: var(--radius-lg);
+    --sm-radius-md: var(--radius-md);
+}
+
+[data-theme='dark'] {
+    --sm-bg-main: var(--color-bg-body);
+    --sm-bg-surface: var(--color-bg-surface);
+    --sm-text-main: var(--color-text-main);
+    --sm-text-muted: var(--color-text-muted);
+    --sm-border: var(--color-border);
+    --sm-shadow-soft: var(--shadow-sm);
+    --sm-shadow-card: var(--shadow-md);
+    --sm-primary-light: var(--color-primary-light);
 }
 
 [data-theme='dark'] {
@@ -29,32 +47,48 @@
 .school-manager-layout {
     display: flex;
     min-height: 100vh;
-    background-color: var(--sm-bg-main);
+    background: var(--sm-bg-main);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 /* Premium Sidebar */
 .school-manager-sidebar {
-    width: 260px;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    width: 280px;
+    background: linear-gradient(180deg, var(--sm-bg-surface) 0%, var(--sm-bg-main) 100%);
     border-right: 1px solid var(--sm-border);
     display: flex;
     flex-direction: column;
-    padding: 1.5rem;
+    padding: var(--spacing-6);
     position: fixed;
     height: 100vh;
     top: 0;
     left: 0;
-    z-index: 50;
+    z-index: var(--z-fixed);
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.02);
+}
+
+[dir="rtl"] .school-manager-sidebar {
+    left: auto;
+    right: 0;
+    border-right: none;
+    border-left: 1px solid var(--sm-border);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.02);
+}
+
+[data-theme='dark'] .school-manager-sidebar {
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+}
+
+[dir="rtl"][data-theme='dark'] .school-manager-sidebar {
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
 }
 
 .school-manager-brand {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 2.5rem;
-    padding: 0 0.5rem;
+    gap: var(--spacing-3);
+    padding: 0 var(--spacing-3);
+    margin-bottom: var(--spacing-8);
 }
 
 .school-manager-brand svg {
@@ -63,8 +97,8 @@
 }
 
 .school-manager-brand span {
-    font-size: 1.5rem;
-    font-weight: 800;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-extrabold);
     background: linear-gradient(135deg, var(--sm-text-main) 0%, var(--sm-primary) 100%);
     -webkit-background-clip: text;
     background-clip: text;
@@ -75,59 +109,82 @@
 .school-manager-nav {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--spacing-2);
+    flex: 1;
 }
 
 .school-manager-nav-item {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.875rem 1rem;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3) var(--spacing-4);
     border-radius: var(--sm-radius-lg);
     color: var(--sm-text-muted);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-weight: 500;
     text-decoration: none;
+    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-sm);
+    transition: all var(--transition-bounce);
     position: relative;
     overflow: hidden;
 }
 
 .school-manager-nav-item:hover {
-    background-color: var(--sm-primary-light);
+    background: var(--sm-primary-light);
     color: var(--sm-primary);
     transform: translateX(4px);
 }
 
+[dir="rtl"] .school-manager-nav-item:hover {
+    transform: translateX(-4px);
+}
+
 .school-manager-nav-item.active {
-    background: linear-gradient(135deg, var(--sm-primary) 0%, var(--sm-secondary) 100%);
+    background: linear-gradient(135deg, var(--sm-primary), var(--sm-secondary));
     color: white;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    box-shadow: var(--shadow-md), var(--shadow-glow);
+}
+
+.school-manager-nav-item.active:hover {
+    transform: none;
 }
 
 /* Main Content Area */
 .school-manager-main {
     flex: 1;
-    margin-left: 260px;
-    padding: var(--spacing-6, 1.5rem);
-    max-width: 100%;
+    margin-left: 280px;
+    padding: var(--spacing-8);
+    background-image:
+        radial-gradient(circle at top right, rgba(79, 70, 229, 0.03), transparent 40%),
+        radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.03), transparent 40%);
+}
+
+[dir="rtl"] .school-manager-main {
+    margin-left: 0;
+    margin-right: 280px;
+}
+
+@media (max-width: 1024px) {
+    .school-manager-main {
+        padding: var(--spacing-6);
+    }
 }
 
 /* Page Header Styling */
 .sm-page-header {
-    margin-bottom: 2.5rem;
+    margin-bottom: var(--spacing-8);
 }
 
 .sm-page-title {
-    font-size: 2rem;
-    font-weight: 800;
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-extrabold);
     color: var(--sm-text-main);
-    letter-spacing: -0.03em;
-    margin-bottom: 0.5rem;
+    letter-spacing: -0.025em;
+    margin-bottom: var(--spacing-2);
 }
 
 .sm-page-subtitle {
     color: var(--sm-text-muted);
-    font-size: 1rem;
+    font-size: var(--font-size-base);
 }
 
 /* Utility Classes */
@@ -142,4 +199,90 @@
 .card-premium:hover {
     transform: translateY(-2px);
     box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.08);
+}
+
+/* RTL Support for School Manager */
+[dir="rtl"] .school-manager-sidebar {
+    left: auto;
+    right: 0;
+    border-right: none;
+    border-left: 1px solid var(--sm-border);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.02);
+}
+
+[dir="rtl"] .school-manager-main {
+    margin-left: 0;
+    margin-right: 260px;
+}
+
+[dir="rtl"] .school-manager-nav-item:hover {
+    transform: translateX(-4px);
+}
+
+/* Dark Mode Overrides for School Manager */
+[data-theme='dark'] .school-manager-sidebar {
+    background: linear-gradient(180deg, var(--sm-bg-surface) 0%, var(--sm-bg-main) 100%);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .card-premium {
+    border: 1px solid var(--sm-border);
+}
+
+[data-theme='dark'] .card-premium:hover {
+    box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Dark mode for inputs, selects */
+[data-theme='dark'] input,
+[data-theme='dark'] select,
+[data-theme='dark'] textarea {
+    background-color: var(--sm-bg-surface) !important;
+    color: var(--sm-text-main) !important;
+    border-color: var(--sm-border) !important;
+}
+
+/* Dark mode for management cards */
+[data-theme='dark'] .management-card {
+    background-color: var(--sm-bg-surface);
+    border-color: var(--sm-border);
+}
+
+/* Dark mode for data tables */
+[data-theme='dark'] .data-table th,
+[data-theme='dark'] .data-table td {
+    color: var(--sm-text-main);
+    border-color: var(--sm-border);
+}
+
+[data-theme='dark'] .data-table th {
+    background-color: var(--sm-bg-main);
+}
+
+[data-theme='dark'] .data-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Dark mode for chart titles */
+[data-theme='dark'] .chart-title {
+    color: var(--sm-text-main);
+}
+
+/* Dark mode for school manager titles */
+[data-theme='dark'] .school-manager-title {
+    color: var(--sm-text-main);
+}
+
+[data-theme='dark'] .school-manager-subtitle {
+    color: var(--sm-text-muted);
+}
+
+/* Dark mode for placeholder/empty states */
+[data-theme='dark'] .management-card div[style*="background: #f8fafc"] {
+    background: var(--sm-bg-main) !important;
+}
+
+/* Dark mode for status badges in school manager */
+[data-theme='dark'] .status-badge {
+    color: var(--sm-text-main);
 }

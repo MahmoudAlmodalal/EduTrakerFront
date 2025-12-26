@@ -10,9 +10,11 @@ import {
     CheckCircle,
     XCircle
 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './SchoolManager.css';
 
 const SecretaryMonitoring = () => {
+    const { t } = useTheme();
     // Mock Data
     const [secretaries, setSecretaries] = useState([
         { id: 1, name: 'Jessica Pearson', email: 'j.pearson@school.edu', phone: '+1 555-0123', status: 'Active', joined: '2022-08-15' },
@@ -56,8 +58,8 @@ const SecretaryMonitoring = () => {
     return (
         <div className="secretary-monitoring-page">
             <div className="school-manager-header">
-                <h1 className="school-manager-title">Secretary Monitoring</h1>
-                <p className="school-manager-subtitle">Manage administrative staff and secretary access.</p>
+                <h1 className="school-manager-title">{t('school.secretaries.title')}</h1>
+                <p className="school-manager-subtitle">{t('school.secretaries.subtitle')}</p>
             </div>
 
             <div className="management-card">
@@ -77,18 +79,18 @@ const SecretaryMonitoring = () => {
                     </div>
                     <button className="btn-primary" onClick={() => openModal()}>
                         <Plus size={18} />
-                        Add Secretary
+                        {t('school.secretaries.addSecretary')}
                     </button>
                 </div>
 
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Contact Info</th>
-                            <th>Status</th>
-                            <th>Date Joined</th>
-                            <th>Actions</th>
+                            <th>{t('school.secretaries.name')}</th>
+                            <th>{t('school.secretaries.email')}</th>
+                            <th>{t('school.secretaries.status')}</th>
+                            <th>{t('student.attendance.date')}</th>
+                            <th>{t('school.secretaries.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -124,10 +126,10 @@ const SecretaryMonitoring = () => {
                                 <td>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                         <button onClick={() => openModal(sec)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>
-                                            Edit
+                                            {t('school.secretaries.edit')}
                                         </button>
                                         <button onClick={() => handleDelete(sec.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>
-                                            Delete
+                                            {t('school.secretaries.delete')}
                                         </button>
                                     </div>
                                 </td>

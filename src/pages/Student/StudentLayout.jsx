@@ -5,17 +5,22 @@ import {
     BookOpen,
     GraduationCap,
     CalendarCheck,
+    Settings,
     LogOut,
     UserCircle
 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './Student.css';
 
 const StudentLayout = () => {
+    const { t } = useTheme();
+
     const navItems = [
-        { path: '/student/dashboard', label: 'Overview', icon: LayoutDashboard },
-        { path: '/student/subjects', label: 'Subjects', icon: BookOpen },
-        { path: '/student/results', label: 'Academic Results', icon: GraduationCap },
-        { path: '/student/attendance', label: 'Attendance', icon: CalendarCheck },
+        { path: '/student/dashboard', labelKey: 'student.nav.dashboard', icon: LayoutDashboard },
+        { path: '/student/subjects', labelKey: 'student.nav.subjects', icon: BookOpen },
+        { path: '/student/results', labelKey: 'student.nav.results', icon: GraduationCap },
+        { path: '/student/attendance', labelKey: 'student.nav.attendance', icon: CalendarCheck },
+        { path: '/student/settings', labelKey: 'student.nav.settings', icon: Settings },
     ];
 
     return (
@@ -24,7 +29,7 @@ const StudentLayout = () => {
             <aside className="student-sidebar">
                 <div className="student-brand">
                     <UserCircle size={32} className="text-blue-600" />
-                    <span>Student Portal</span>
+                    <span>{t('app.name')}</span>
                 </div>
 
                 <nav className="student-nav">
@@ -37,7 +42,7 @@ const StudentLayout = () => {
                             }
                         >
                             <item.icon size={20} />
-                            <span>{item.label}</span>
+                            <span>{t(item.labelKey)}</span>
                         </NavLink>
                     ))}
                 </nav>
@@ -45,7 +50,7 @@ const StudentLayout = () => {
                 <div style={{ marginTop: 'auto', padding: '1rem' }}>
                     <button className="student-nav-item" style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}>
                         <LogOut size={20} />
-                        <span>Logout</span>
+                        <span>{t('header.logout')}</span>
                     </button>
                 </div>
             </aside>
@@ -59,3 +64,4 @@ const StudentLayout = () => {
 };
 
 export default StudentLayout;
+

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import './Guardian.css';
 import { FileText, UserCheck, AlertTriangle } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 const ChildrenMonitoring = () => {
+    const { t } = useTheme();
     const [selectedChild, setSelectedChild] = useState(1);
     const [activeTab, setActiveTab] = useState('results');
 
@@ -19,20 +21,20 @@ const ChildrenMonitoring = () => {
     ];
 
     const attendance = [
-        { id: 1, date: "2023-10-12", status: "Absent", reason: "Sick Request" },
-        { id: 2, date: "2023-10-11", status: "Present", reason: "-" },
-        { id: 3, date: "2023-10-10", status: "Present", reason: "-" },
-        { id: 4, date: "2023-10-09", status: "Late", reason: "Traffic" }
+        { id: 1, date: "2023-10-12", statusKey: "absent", reason: "Sick Request" },
+        { id: 2, date: "2023-10-11", statusKey: "present", reason: "-" },
+        { id: 3, date: "2023-10-10", statusKey: "present", reason: "-" },
+        { id: 4, date: "2023-10-09", statusKey: "late", reason: "Traffic" }
     ];
 
     const behavior = [
-        { id: 1, date: "2023-10-01", type: "Positive", comment: "Helped a classmate." },
-        { id: 2, date: "2023-09-25", type: "Negative", comment: "Talking during class." }
+        { id: 1, date: "2023-10-01", typeKey: "positive", comment: "Helped a classmate." },
+        { id: 2, date: "2023-09-25", typeKey: "negative", comment: "Talking during class." }
     ];
 
     return (
         <div className="guardian-monitoring">
-            <h1 className="guardian-page-title">Children Monitoring</h1>
+            <h1 className="guardian-page-title">{t('guardian.monitoring.title')}</h1>
 
             {/* Child Selector */}
             <div className="child-selector">
@@ -53,19 +55,19 @@ const ChildrenMonitoring = () => {
                     onClick={() => setActiveTab('results')}
                     className={`tab-btn ${activeTab === 'results' ? 'active' : ''}`}
                 >
-                    <FileText size={18} /> Results
+                    <FileText size={18} /> {t('guardian.monitoring.results')}
                 </button>
                 <button
                     onClick={() => setActiveTab('attendance')}
                     className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`}
                 >
-                    <UserCheck size={18} /> Attendance
+                    <UserCheck size={18} /> {t('guardian.monitoring.attendance')}
                 </button>
                 <button
                     onClick={() => setActiveTab('behavior')}
                     className={`tab-btn ${activeTab === 'behavior' ? 'active' : ''}`}
                 >
-                    <AlertTriangle size={18} /> Behavior
+                    <AlertTriangle size={18} /> {t('guardian.monitoring.behavior')}
                 </button>
             </div>
 
@@ -75,10 +77,10 @@ const ChildrenMonitoring = () => {
                     <table className="guardian-table">
                         <thead>
                             <tr>
-                                <th>Subject</th>
-                                <th>Type</th>
-                                <th>Date</th>
-                                <th>Score</th>
+                                <th>{t('guardian.monitoring.subject')}</th>
+                                <th>{t('guardian.monitoring.type')}</th>
+                                <th>{t('guardian.monitoring.date')}</th>
+                                <th>{t('guardian.monitoring.score')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -98,9 +100,9 @@ const ChildrenMonitoring = () => {
                     <table className="guardian-table">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Status</th>
-                                <th>Reason/Note</th>
+                                <th>{t('guardian.monitoring.date')}</th>
+                                <th>{t('guardian.monitoring.status')}</th>
+                                <th>{t('guardian.monitoring.reason')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -108,8 +110,8 @@ const ChildrenMonitoring = () => {
                                 <tr key={att.id}>
                                     <td>{att.date}</td>
                                     <td>
-                                        <span className={`status-badge ${att.status.toLowerCase()}`}>
-                                            {att.status}
+                                        <span className={`status-badge ${att.statusKey}`}>
+                                            {t(`guardian.monitoring.${att.statusKey}`)}
                                         </span>
                                     </td>
                                     <td>{att.reason}</td>
@@ -123,9 +125,9 @@ const ChildrenMonitoring = () => {
                     <table className="guardian-table">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Type</th>
-                                <th>Comment</th>
+                                <th>{t('guardian.monitoring.date')}</th>
+                                <th>{t('guardian.monitoring.type')}</th>
+                                <th>{t('guardian.monitoring.comment')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -133,8 +135,8 @@ const ChildrenMonitoring = () => {
                                 <tr key={beh.id}>
                                     <td>{beh.date}</td>
                                     <td>
-                                        <span className={`status-badge ${beh.type.toLowerCase()}`}>
-                                            {beh.type}
+                                        <span className={`status-badge ${beh.typeKey}`}>
+                                            {t(`guardian.monitoring.${beh.typeKey}`)}
                                         </span>
                                     </td>
                                     <td>{beh.comment}</td>
@@ -149,3 +151,4 @@ const ChildrenMonitoring = () => {
 };
 
 export default ChildrenMonitoring;
+

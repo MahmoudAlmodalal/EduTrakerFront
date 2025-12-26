@@ -1,35 +1,34 @@
+/**
+ * EduTraker Teacher Dashboard Styles
+ * Enhanced with Global Design System
+ * 
+ * This role already has premium styling, now integrated with global design system
+ */
+
+@import '../../styles/global-design.css';
+
+/* Teacher-specific variable overrides - maintain existing premium aesthetic */
 :root {
     /* Premium Color Palette */
-    --teacher-primary: #4F46E5;
-    /* Indigo 600 */
-    --teacher-primary-light: #EEF2FF;
-    /* Indigo 50 */
-    --teacher-secondary: #0EA5E9;
-    /* Sky 500 */
-    --teacher-accent: #8B5CF6;
-    /* Violet 500 */
-    --teacher-bg: #F0F4F8;
-    /* Cooler Slate */
-    --teacher-surface: rgba(255, 255, 255, 0.85);
-    --teacher-text-main: #1E293B;
-    /* Slate 900 */
-    --teacher-text-muted: #64748B;
-    /* Slate 500 */
-    --teacher-border: #E2E8F0;
-    /* Slate 200 */
-    --teacher-success: #10B981;
-    /* Emerald 500 */
-    --teacher-warning: #F59E0B;
-    /* Amber 500 */
-    --teacher-danger: #EF4444;
-    /* Red 500 */
+    --teacher-primary: var(--color-primary);
+    --teacher-primary-light: var(--color-primary-light);
+    --teacher-secondary: var(--color-secondary);
+    --teacher-accent: var(--color-accent);
+    --teacher-bg: var(--color-bg-body);
+    --teacher-surface: var(--color-bg-surface);
+    --teacher-text-main: var(--color-text-main);
+    --teacher-text-muted: var(--color-text-muted);
+    --teacher-border: var(--color-border);
+    --teacher-success: var(--color-success);
+    --teacher-warning: var(--color-warning);
+    --teacher-danger: var(--color-danger);
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-glow: none;
-    --glass-border: 1px solid var(--teacher-border);
+    /* Use global shadows */
+    --shadow-sm: var(--shadow-sm);
+    --shadow-md: var(--shadow-md);
+    --shadow-lg: var(--shadow-lg);
+    --shadow-glow: var(--shadow-glow);
+    --glass-border: 1px solid var(--color-border);
 }
 
 /* Dark Mode Variables */

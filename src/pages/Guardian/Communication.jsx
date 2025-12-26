@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import './Guardian.css';
 import { Plus, Calendar } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 const Communication = () => {
+    const { t } = useTheme();
     const [activeTab, setActiveTab] = useState('teachers');
 
     // Mock Messages
@@ -16,28 +18,22 @@ const Communication = () => {
     ];
 
     const meetings = [
-        { id: 1, with: "Mrs. Johnson (Principal)", status: "Pending", date: "Requested for Nov 05" },
-        { id: 2, with: "Mr. Smith", status: "Approved", date: "Oct 20 at 10:00 AM" }
+        { id: 1, with: "Mrs. Johnson (Principal)", statusKey: "pending", date: "Requested for Nov 05" },
+        { id: 2, with: "Mr. Smith", statusKey: "approved", date: "Oct 20 at 10:00 AM" }
     ];
-
-    const getStatusClass = (status) => {
-        if (status === 'Approved') return 'approved';
-        if (status === 'Pending') return 'pending';
-        return '';
-    };
 
     return (
         <div className="guardian-communication">
-            <h1 className="guardian-page-title">Communication Center</h1>
+            <h1 className="guardian-page-title">{t('guardian.communication.title')}</h1>
 
             <div className="guardian-dashboard-grid">
                 {/* Messages Section */}
                 <div className="guardian-card" style={{ gridColumn: 'span 2' }}>
                     <div className="communication-header">
                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Messages</h3>
+                            <h3 style={{ margin: 0 }}>{t('guardian.communication.messages')}</h3>
                             <button className="btn-primary">
-                                <Plus size={16} /> New Message
+                                <Plus size={16} /> {t('guardian.communication.newMessage')}
                             </button>
                         </div>
                     </div>
@@ -47,13 +43,13 @@ const Communication = () => {
                             onClick={() => setActiveTab('teachers')}
                             className={`tab-btn ${activeTab === 'teachers' ? 'active' : ''}`}
                         >
-                            Teachers
+                            {t('guardian.communication.teachers')}
                         </button>
                         <button
                             onClick={() => setActiveTab('admin')}
                             className={`tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
                         >
-                            Administration
+                            {t('guardian.communication.administration')}
                         </button>
                     </div>
 
@@ -76,26 +72,26 @@ const Communication = () => {
                 {/* Meeting Requests Section */}
                 <div className="guardian-card">
                     <div className="guardian-card-header">
-                        <h3>Meeting Requests</h3>
+                        <h3>{t('guardian.communication.meetingRequests')}</h3>
                         <Calendar size={20} color="#4f46e5" />
                     </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
-                        <h4 className="section-subtitle">Your Requests</h4>
+                        <h4 className="section-subtitle">{t('guardian.communication.yourRequests')}</h4>
                         {meetings.map(meeting => (
                             <div key={meeting.id} className="meeting-request-item">
                                 <div className="meeting-with">{meeting.with}</div>
                                 <div className="meeting-details">
                                     <span className="meeting-date">{meeting.date}</span>
-                                    <span className={`status-badge ${getStatusClass(meeting.status)}`}>
-                                        {meeting.status}
+                                    <span className={`status-badge ${meeting.statusKey}`}>
+                                        {t(`guardian.communication.${meeting.statusKey}`)}
                                     </span>
                                 </div>
                             </div>
                         ))}
                     </div>
 
-                    <button className="btn-primary btn-full" style={{ width: '100%' }}>Request New Meeting</button>
+                    <button className="btn-primary btn-full" style={{ width: '100%' }}>{t('guardian.communication.requestNewMeeting')}</button>
                 </div>
             </div>
         </div>
@@ -103,3 +99,4 @@ const Communication = () => {
 };
 
 export default Communication;
+

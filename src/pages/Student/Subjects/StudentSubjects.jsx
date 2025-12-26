@@ -1,8 +1,29 @@
 import React, { useState } from 'react';
-import { Book, FileText, Upload, ChevronRight, X, Download, File } from 'lucide-react';
+import { Book, FileText, Upload, ChevronRight, Download } from 'lucide-react';
+import { useTheme } from '../../../context/ThemeContext';
 import '../../Student/Student.css';
 
+// Sub-component helper
+const CheckCircleIcon = ({ size, className }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+    >
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>
+);
+
 const StudentSubjects = () => {
+    const { t } = useTheme();
     const [selectedSubject, setSelectedSubject] = useState(null);
 
     // Mock Data
@@ -18,8 +39,8 @@ const StudentSubjects = () => {
                 { id: 2, title: 'Calculus Cheat Sheet', type: 'resource', date: '2025-01-12' },
             ],
             assignments: [
-                { id: 1, title: 'Homework 3', due: '2025-12-15', status: 'pending' },
-                { id: 2, title: 'Midterm Project', due: '2025-12-20', status: 'pending' },
+                { id: 1, title: 'Homework 3', due: '2025-12-15', statusKey: 'pending' },
+                { id: 2, title: 'Midterm Project', due: '2025-12-20', statusKey: 'pending' },
             ]
         },
         {
@@ -32,7 +53,7 @@ const StudentSubjects = () => {
                 { id: 1, title: 'Newton Laws Notes', type: 'lecture', date: '2025-01-11' },
             ],
             assignments: [
-                { id: 1, title: 'Lab Report', due: '2025-12-18', status: 'submitted' },
+                { id: 1, title: 'Lab Report', due: '2025-12-18', statusKey: 'submitted' },
             ]
         },
         {
@@ -63,24 +84,24 @@ const StudentSubjects = () => {
                     className="flex items-center text-slate-500 hover:text-blue-600 transition-colors"
                 >
                     <ChevronRight className="rotate-180" size={20} />
-                    Back to Subjects
+                    {t('student.subjects.backToSubjects')}
                 </button>
 
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <div className="flex justify-between items-start mb-6">
                         <div>
                             <h1 className="text-3xl font-bold text-slate-800 mb-2">{selectedSubject.name}</h1>
-                            <p className="text-slate-500 text-lg">Instructor: {selectedSubject.teacher}</p>
+                            <p className="text-slate-500 text-lg">{t('student.subjects.instructor')}: {selectedSubject.teacher}</p>
                         </div>
                         <div className="text-right">
-                            <div className="text-sm font-medium text-slate-500 mb-1">Course Progress</div>
+                            <div className="text-sm font-medium text-slate-500 mb-1">{t('student.subjects.courseProgress')}</div>
                             <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-blue-600 rounded-full"
                                     style={{ width: `${selectedSubject.progress}%` }}
                                 ></div>
                             </div>
-                            <div className="text-xs text-slate-500 mt-1">{selectedSubject.progress}% Complete</div>
+                            <div className="text-xs text-slate-500 mt-1">{selectedSubject.progress}% {t('student.subjects.complete')}</div>
                         </div>
                     </div>
 
@@ -89,7 +110,7 @@ const StudentSubjects = () => {
                         <div>
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                                 <Book size={20} className="text-blue-500" />
-                                Course Materials
+                                {t('student.subjects.courseMaterials')}
                             </h3>
                             <div className="space-y-3">
                                 {selectedSubject.materials.length > 0 ? selectedSubject.materials.map((material) => (
@@ -108,7 +129,7 @@ const StudentSubjects = () => {
                                         </button>
                                     </div>
                                 )) : (
-                                    <div className="text-slate-500 italic text-sm">No materials uploaded yet.</div>
+                                    <div className="text-slate-500 italic text-sm">{t('student.subjects.noMaterials')}</div>
                                 )}
                             </div>
                         </div>
@@ -117,38 +138,38 @@ const StudentSubjects = () => {
                         <div>
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                                 <Upload size={20} className="text-orange-500" />
-                                Assignments & Submissions
+                                {t('student.subjects.assignmentsSubmissions')}
                             </h3>
                             <div className="space-y-3">
                                 {selectedSubject.assignments.length > 0 ? selectedSubject.assignments.map((assignment) => (
                                     <div key={assignment.id} className="p-4 bg-slate-50 rounded-lg border border-slate-100">
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="font-medium text-slate-800">{assignment.title}</div>
-                                            {assignment.status === 'submitted' ? (
-                                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">Submitted</span>
+                                            {assignment.statusKey === 'submitted' ? (
+                                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">{t('student.subjects.submitted')}</span>
                                             ) : (
-                                                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full font-medium">Pending</span>
+                                                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full font-medium">{t('student.subjects.pending')}</span>
                                             )}
                                         </div>
-                                        <div className="text-xs text-slate-500 mb-3">Due Date: {assignment.due}</div>
+                                        <div className="text-xs text-slate-500 mb-3">{t('student.subjects.dueDate')}: {assignment.due}</div>
 
-                                        {assignment.status !== 'submitted' && (
+                                        {assignment.statusKey !== 'submitted' && (
                                             <div className="flex gap-2">
                                                 <button className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors flex items-center justify-center gap-2">
                                                     <Upload size={14} />
-                                                    Upload Work
+                                                    {t('student.subjects.uploadWork')}
                                                 </button>
                                             </div>
                                         )}
-                                        {assignment.status === 'submitted' && (
+                                        {assignment.statusKey === 'submitted' && (
                                             <div className="text-xs text-green-600 flex items-center gap-1">
-                                                <CheckCircle size={12} />
-                                                File uploaded successfully
+                                                <CheckCircleIcon size={12} />
+                                                {t('student.subjects.fileUploaded')}
                                             </div>
                                         )}
                                     </div>
                                 )) : (
-                                    <div className="text-slate-500 italic text-sm">No active assignments.</div>
+                                    <div className="text-slate-500 italic text-sm">{t('student.subjects.noAssignments')}</div>
                                 )}
                             </div>
                         </div>
@@ -161,8 +182,8 @@ const StudentSubjects = () => {
     return (
         <div className="student-subjects">
             <header className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-800">My Subjects</h1>
-                <p className="text-slate-500">Access your course materials and assignments.</p>
+                <h1 className="text-2xl font-bold text-slate-800">{t('student.subjects.title')}</h1>
+                <p className="text-slate-500">{t('student.subjects.subtitle')}</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -177,7 +198,7 @@ const StudentSubjects = () => {
                                 <Book size={24} />
                             </div>
                             <div className="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-1 rounded">
-                                {subject.materials.length} Resources
+                                {subject.materials.length} {t('student.subjects.resources')}
                             </div>
                         </div>
                         <h3 className="text-lg font-bold text-slate-800 mb-1">{subject.name}</h3>
@@ -191,7 +212,7 @@ const StudentSubjects = () => {
                         </div>
 
                         <div className="flex items-center text-sm text-blue-600 font-medium group-hover:translate-x-1 transition-transform">
-                            View Details <ChevronRight size={16} />
+                            {t('student.subjects.viewDetails')} <ChevronRight size={16} />
                         </div>
                     </div>
                 ))}
@@ -199,24 +220,5 @@ const StudentSubjects = () => {
         </div>
     );
 };
-
-// Sub-component helper
-const CheckCircle = ({ size, className }) => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={className}
-    >
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-    </svg>
-);
 
 export default StudentSubjects;

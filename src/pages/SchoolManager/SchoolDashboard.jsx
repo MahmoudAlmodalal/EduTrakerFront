@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import styles from './SchoolDashboard.module.css';
 
-const StatCard = ({ title, value, change, icon: Icon, color, isPositive }) => (
+const StatCard = ({ title, value, change, icon: Icon, color, isPositive, fromLastMonthText }) => (
     <div className={styles.statCard}>
         <div className={styles.statHeader}>
             <span className={styles.statTitle}>{title}</span>
@@ -21,21 +21,27 @@ const StatCard = ({ title, value, change, icon: Icon, color, isPositive }) => (
                 <span className={isPositive ? styles.positive : styles.negative}>
                     {isPositive ? '+' : ''}{change}%
                 </span>
-                <span style={{ color: '#94a3b8', marginLeft: '4px' }}>from last month</span>
+                <span style={{ color: 'var(--color-text-muted)', marginLeft: '4px' }}>{fromLastMonthText}</span>
             </span>
         </div>
     </div>
 );
 
 const SchoolDashboard = () => {
-    const { t } = useTheme();
+    const { t, theme } = useTheme();
+
+    const isDark = theme === 'dark';
+    const textMuted = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? '#334155' : '#e2e8f0';
+    const tooltipBg = isDark ? '#1e293b' : '#ffffff';
 
     // Mock Data
+    const fromLastMonth = t('school.dashboard.fromLastMonth');
     const stats = [
-        { title: t('school.dashboard.totalStudents'), value: '1,250', change: 5.2, icon: Users, color: 'blue', isPositive: true },
-        { title: t('school.dashboard.totalTeachers'), value: '85', change: 2.1, icon: GraduationCap, color: 'green', isPositive: true },
-        { title: t('school.dashboard.totalClasses'), value: '42', change: 0, icon: BookOpen, color: 'purple', isPositive: true },
-        { title: t('school.dashboard.attendance'), value: '96%', change: -1.5, icon: UserCheck, color: 'orange', isPositive: false },
+        { title: t('school.dashboard.totalStudents'), value: '1,250', change: 5.2, icon: Users, color: 'blue', isPositive: true, fromLastMonthText: fromLastMonth },
+        { title: t('school.dashboard.totalTeachers'), value: '85', change: 2.1, icon: GraduationCap, color: 'green', isPositive: true, fromLastMonthText: fromLastMonth },
+        { title: t('school.dashboard.totalClasses'), value: '42', change: 0, icon: BookOpen, color: 'purple', isPositive: true, fromLastMonthText: fromLastMonth },
+        { title: t('school.dashboard.attendance'), value: '96%', change: -1.5, icon: UserCheck, color: 'orange', isPositive: false, fromLastMonthText: fromLastMonth },
     ];
 
     const gradeData = [
@@ -73,23 +79,23 @@ const SchoolDashboard = () => {
                         <div className={styles.chartContainer}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={gradeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                                     <XAxis
                                         dataKey="name"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: '#64748b', fontSize: 12 }}
+                                        tick={{ fill: textMuted, fontSize: 12 }}
                                         dy={10}
                                     />
                                     <YAxis
                                         axisLine={false}
                                         tickLine={false}
                                         domain={[0, 100]}
-                                        tick={{ fill: '#64748b', fontSize: 12 }}
+                                        tick={{ fill: textMuted, fontSize: 12 }}
                                     />
                                     <Tooltip
-                                        cursor={{ fill: '#f1f5f9' }}
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                                        cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9' }}
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', background: tooltipBg, color: isDark ? '#f8fafc' : '#0f172a' }}
                                     />
                                     <Bar dataKey="avg" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={50} />
                                 </BarChart>
@@ -117,7 +123,7 @@ const SchoolDashboard = () => {
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', background: tooltipBg, color: isDark ? '#f8fafc' : '#0f172a' }}
                                     />
                                 </PieChart>
                             </ResponsiveContainer>

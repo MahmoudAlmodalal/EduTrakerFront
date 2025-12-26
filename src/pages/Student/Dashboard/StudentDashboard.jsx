@@ -1,14 +1,17 @@
 import React from 'react';
 import { Clock, AlertCircle, CheckCircle, Calendar } from 'lucide-react';
+import { useTheme } from '../../../context/ThemeContext';
 import '../../Student/Student.css';
 
 const StudentDashboard = () => {
+    const { t } = useTheme();
+
     // Mock Data
     const todaySchedule = [
-        { id: 1, time: '08:00 - 09:30', subject: 'Mathematics', room: 'Room 101', status: 'completed' },
-        { id: 2, time: '09:45 - 11:15', subject: 'Physics', room: 'Lab 2', status: 'current' },
-        { id: 3, time: '11:45 - 13:15', subject: 'Chemistry', room: 'Lab 1', status: 'upcoming' },
-        { id: 4, time: '13:30 - 15:00', subject: 'English', room: 'Room 203', status: 'upcoming' },
+        { id: 1, time: '08:00 - 09:30', subject: 'Mathematics', room: 'Room 101', statusKey: 'done' },
+        { id: 2, time: '09:45 - 11:15', subject: 'Physics', room: 'Lab 2', statusKey: 'now' },
+        { id: 3, time: '11:45 - 13:15', subject: 'Chemistry', room: 'Lab 1', statusKey: 'upcoming' },
+        { id: 4, time: '13:30 - 15:00', subject: 'English', room: 'Room 203', statusKey: 'upcoming' },
     ];
 
     const assignments = [
@@ -23,11 +26,20 @@ const StudentDashboard = () => {
         warning: false
     };
 
+    const getStatusClass = (statusKey) => {
+        switch (statusKey) {
+            case 'done': return 'text-green-700 bg-green-100';
+            case 'now': return 'text-blue-700 bg-blue-100';
+            case 'upcoming': return 'text-slate-600 bg-slate-100';
+            default: return 'text-slate-600 bg-slate-100';
+        }
+    };
+
     return (
         <div className="student-dashboard">
             <header className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-800">Welcome back, Student!</h1>
-                <p className="text-slate-500">Here's what's happening today.</p>
+                <h1 className="text-2xl font-bold text-slate-800">{t('student.dashboard.welcome')}</h1>
+                <p className="text-slate-500">{t('student.dashboard.subtitle')}</p>
             </header>
 
             <div className="student-dashboard-grid">
@@ -37,22 +49,22 @@ const StudentDashboard = () => {
                     <div className="card-header">
                         <h2 className="card-title flex items-center gap-2">
                             <Clock size={20} className="text-blue-600" />
-                            Daily Schedule
+                            {t('student.dashboard.dailySchedule')}
                         </h2>
                         <span className="text-sm text-slate-500">{new Date().toLocaleDateString()}</span>
                     </div>
                     <div className="space-y-4">
                         {todaySchedule.map((classItem) => (
-                            <div key={classItem.id} className={`flex items-center p-3 rounded-lg border ${classItem.status === 'current' ? 'border-blue-200 bg-blue-50' : 'border-slate-100'}`}>
+                            <div key={classItem.id} className={`flex items-center p-3 rounded-lg border ${classItem.statusKey === 'now' ? 'border-blue-200 bg-blue-50' : 'border-slate-100'}`}>
                                 <div className="w-24 font-medium text-slate-700">{classItem.time}</div>
                                 <div className="flex-1">
                                     <div className="font-semibold text-slate-800">{classItem.subject}</div>
                                     <div className="text-sm text-slate-500">{classItem.room}</div>
                                 </div>
                                 <div>
-                                    {classItem.status === 'completed' && <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">Done</span>}
-                                    {classItem.status === 'current' && <span className="px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-100 rounded-full">Now</span>}
-                                    {classItem.status === 'upcoming' && <span className="px-2 py-1 text-xs font-semibold text-slate-600 bg-slate-100 rounded-full">Upcoming</span>}
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusClass(classItem.statusKey)}`}>
+                                        {t(`student.dashboard.${classItem.statusKey}`)}
+                                    </span>
                                 </div>
                             </div>
                         ))}
@@ -67,24 +79,24 @@ const StudentDashboard = () => {
                         <div className="card-header">
                             <h2 className="card-title flex items-center gap-2">
                                 <Calendar size={20} className={attendanceStats.warning ? 'text-red-600' : 'text-slate-600'} />
-                                Attendance
+                                {t('student.dashboard.attendance')}
                             </h2>
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="text-center">
                                 <div className="text-3xl font-bold text-slate-800">{attendanceStats.present}%</div>
-                                <div className="text-xs text-slate-500">Attendance</div>
+                                <div className="text-xs text-slate-500">{t('student.dashboard.attendance')}</div>
                             </div>
                             <div className="h-10 w-px bg-slate-200"></div>
                             <div className="text-center">
                                 <div className="text-3xl font-bold text-slate-800">{attendanceStats.absent}%</div>
-                                <div className="text-xs text-slate-500">Absence</div>
+                                <div className="text-xs text-slate-500">{t('student.dashboard.absence')}</div>
                             </div>
                         </div>
                         {attendanceStats.absent > 15 && (
                             <div className="mt-4 flex items-start gap-2 text-sm text-red-600 bg-red-100 p-2 rounded">
                                 <AlertCircle size={16} className="mt-0.5" />
-                                <span>High absence rate warning! Please contact administration.</span>
+                                <span>{t('student.dashboard.highAbsenceWarning')}</span>
                             </div>
                         )}
                     </div>
@@ -94,7 +106,7 @@ const StudentDashboard = () => {
                         <div className="card-header">
                             <h2 className="card-title flex items-center gap-2">
                                 <CheckCircle size={20} className="text-orange-600" />
-                                Assignments
+                                {t('student.dashboard.assignments')}
                             </h2>
                         </div>
                         <div className="space-y-3">
@@ -107,7 +119,7 @@ const StudentDashboard = () => {
                                     <div className="flex justify-between items-center mt-1 text-xs">
                                         <span className="text-slate-500">{assignment.subject}</span>
                                         <span className={`font-medium ${assignment.status === 'urgent' ? 'text-red-600' : 'text-slate-600'}`}>
-                                            Due: {assignment.due}
+                                            {t('student.dashboard.due')}: {assignment.due}
                                         </span>
                                     </div>
                                 </div>
