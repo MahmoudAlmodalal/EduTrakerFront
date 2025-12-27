@@ -55,6 +55,7 @@ import StudentSubjects from '../pages/Student/Subjects/StudentSubjects';
 import StudentResults from '../pages/Student/Results/StudentResults';
 import StudentAttendance from '../pages/Student/Attendance/StudentAttendance';
 import StudentSettings from '../pages/Student/Settings/StudentSettings';
+import StudentCommunication from '../pages/Student/Communication/StudentCommunication';
 
 // Guardian Pages
 import GuardianLayout from '../components/GuardianLayout';
@@ -148,6 +149,7 @@ const AppRoutes = () => {
                     <Route path="subjects" element={<StudentSubjects />} />
                     <Route path="results" element={<StudentResults />} />
                     <Route path="attendance" element={<StudentAttendance />} />
+                    <Route path="communication" element={<StudentCommunication />} />
                     <Route path="settings" element={<StudentSettings />} />
                 </Route>
             </Route>

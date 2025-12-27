@@ -1,0 +1,314 @@
+/**
+ * Unified Role Layout Styles
+ * Works for all roles with CSS custom properties for theming
+ */
+
+/* ==================== Layout Structure ==================== */
+.role-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--color-bg-body, #f5f7fa);
+}
+
+.role-layout-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    color: var(--color-text-main, #1a1a2e);
+    background-color: var(--color-bg-body, #f5f7fa);
+}
+
+/* ==================== Sidebar ==================== */
+.role-sidebar {
+    width: 260px;
+    min-height: 100vh;
+    background: linear-gradient(180deg,
+            var(--color-primary, #4f46e5) 0%,
+            var(--color-primary-dark, #3730a3) 100%);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    transition: transform 0.3s ease;
+}
+
+[dir="rtl"] .role-sidebar {
+    left: auto;
+    right: 0;
+}
+
+/* ==================== Brand ==================== */
+.role-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 2rem;
+    color: white;
+}
+
+.role-brand-icon {
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+}
+
+.role-brand-text {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* ==================== Navigation ==================== */
+.role-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    flex: 1;
+}
+
+.role-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+}
+
+[dir="rtl"] .role-nav-item {
+    text-align: right;
+}
+
+.role-nav-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    transform: translateX(4px);
+}
+
+[dir="rtl"] .role-nav-item:hover {
+    transform: translateX(-4px);
+}
+
+.role-nav-item.active {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.role-nav-item svg {
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.role-nav-item.active svg {
+    opacity: 1;
+}
+
+/* ==================== Logout Section ==================== */
+.role-logout-section {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.role-logout-btn {
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 1rem;
+}
+
+.role-logout-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fecaca;
+}
+
+/* ==================== User Profile ==================== */
+.role-profile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+}
+
+.role-avatar {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
+    color: var(--color-primary, #4f46e5);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+}
+
+.role-profile-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.role-profile-name {
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.role-profile-email {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.75rem;
+    margin: 0.125rem 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ==================== Main Content ==================== */
+.role-main {
+    flex: 1;
+    margin-left: 260px;
+    min-height: 100vh;
+    background-color: var(--color-bg-body, #f5f7fa);
+}
+
+[dir="rtl"] .role-main {
+    margin-left: 0;
+    margin-right: 260px;
+}
+
+.role-content {
+    padding: 2rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+/* ==================== Responsive ==================== */
+@media (max-width: 1024px) {
+    .role-sidebar {
+        width: 240px;
+    }
+
+    .role-main {
+        margin-left: 240px;
+    }
+
+    [dir="rtl"] .role-main {
+        margin-left: 0;
+        margin-right: 240px;
+    }
+}
+
+@media (max-width: 768px) {
+    .role-sidebar {
+        transform: translateX(-100%);
+        width: 280px;
+    }
+
+    [dir="rtl"] .role-sidebar {
+        transform: translateX(100%);
+    }
+
+    .role-sidebar.open {
+        transform: translateX(0);
+    }
+
+    .role-main {
+        margin-left: 0;
+    }
+
+    [dir="rtl"] .role-main {
+        margin-right: 0;
+    }
+
+    .role-content {
+        padding: 1rem;
+    }
+}
+
+/* ==================== Dark Mode ==================== */
+[data-theme="dark"] .role-layout {
+    background-color: var(--color-bg-body, #0f0f23);
+}
+
+[data-theme="dark"] .role-sidebar {
+    background: linear-gradient(180deg,
+            var(--color-primary-dark, #1e1b4b) 0%,
+            var(--color-bg-surface, #1a1a2e) 100%);
+}
+
+[data-theme="dark"] .role-main {
+    background-color: var(--color-bg-body, #0f0f23);
+}
+
+/* ==================== Role-Specific Accent Colors ==================== */
+[data-role="SUPER_ADMIN"] .role-sidebar {
+    background: linear-gradient(180deg, #4f46e5 0%, #3730a3 100%);
+}
+
+[data-role="TEACHER"] .role-sidebar {
+    background: linear-gradient(180deg, #059669 0%, #047857 100%);
+}
+
+[data-role="STUDENT"] .role-sidebar {
+    background: linear-gradient(180deg, #0891b2 0%, #0e7490 100%);
+}
+
+[data-role="GUARDIAN"] .role-sidebar {
+    background: linear-gradient(180deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+[data-role="SECRETARY"] .role-sidebar {
+    background: linear-gradient(180deg, #d97706 0%, #b45309 100%);
+}
+
+[data-role="SCHOOL_MANAGER"] .role-sidebar {
+    background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%);
+}
+
+[data-role="WORKSTREAM_MANAGER"] .role-sidebar {
+    background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+}
+
+/* ==================== Animations ==================== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.role-content>* {
+    animation: fadeIn 0.3s ease-out;
+}

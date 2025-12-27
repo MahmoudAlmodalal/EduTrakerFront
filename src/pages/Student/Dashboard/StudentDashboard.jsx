@@ -1,134 +1,479 @@
 import React from 'react';
-import { Clock, AlertCircle, CheckCircle, Calendar } from 'lucide-react';
+import {
+    Clock,
+    AlertCircle,
+    Calendar,
+    BookOpen,
+    TrendingUp,
+    Award,
+    CheckCircle,
+    Target,
+    Zap
+} from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
-import '../../Student/Student.css';
+import '../Student.css';
 
 const StudentDashboard = () => {
     const { t } = useTheme();
 
     // Mock Data
     const todaySchedule = [
-        { id: 1, time: '08:00 - 09:30', subject: 'Mathematics', room: 'Room 101', statusKey: 'done' },
-        { id: 2, time: '09:45 - 11:15', subject: 'Physics', room: 'Lab 2', statusKey: 'now' },
-        { id: 3, time: '11:45 - 13:15', subject: 'Chemistry', room: 'Lab 1', statusKey: 'upcoming' },
-        { id: 4, time: '13:30 - 15:00', subject: 'English', room: 'Room 203', statusKey: 'upcoming' },
+        { id: 1, time: '08:00', subject: 'Mathematics', room: 'Room 101', teacher: 'Dr. Smith', status: 'done' },
+        { id: 2, time: '09:45', subject: 'Physics', room: 'Lab 2', teacher: 'Prof. Johnson', status: 'now' },
+        { id: 3, time: '11:45', subject: 'Chemistry', room: 'Lab 1', teacher: 'Ms. Williams', status: 'upcoming' },
+        { id: 4, time: '13:30', subject: 'English', room: 'Room 203', teacher: 'Mr. Davis', status: 'upcoming' },
     ];
 
     const assignments = [
-        { id: 1, title: 'Calculus Homework 3', subject: 'Mathematics', due: 'Today', status: 'urgent' },
-        { id: 2, title: 'Physics Lab Report', subject: 'Physics', due: 'Tomorrow', status: 'pending' },
-        { id: 3, title: 'Essay Draft', subject: 'English', due: 'In 3 days', status: 'pending' },
+        { id: 1, title: 'Calculus Homework 3', subject: 'Mathematics', due: 'Today', status: 'urgent', progress: 75 },
+        { id: 2, title: 'Physics Lab Report', subject: 'Physics', due: 'Tomorrow', status: 'pending', progress: 30 },
+        { id: 3, title: 'Essay Draft', subject: 'English', due: 'In 3 days', status: 'pending', progress: 0 },
     ];
 
-    const attendanceStats = {
-        present: 92,
-        absent: 8,
-        warning: false
+    const stats = {
+        attendance: 92,
+        gpa: 3.8,
+        completedTasks: 24,
+        rank: 'Top 10%'
     };
 
-    const getStatusClass = (statusKey) => {
-        switch (statusKey) {
-            case 'done': return 'text-green-700 bg-green-100';
-            case 'now': return 'text-blue-700 bg-blue-100';
-            case 'upcoming': return 'text-slate-600 bg-slate-100';
-            default: return 'text-slate-600 bg-slate-100';
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case 'done':
+                return <span className="status-badge status-done"><CheckCircle size={12} /> Completed</span>;
+            case 'now':
+                return <span className="status-badge status-now"><Zap size={12} /> In Progress</span>;
+            case 'upcoming':
+                return <span className="status-badge status-upcoming"><Clock size={12} /> Upcoming</span>;
+            default:
+                return null;
         }
     };
 
     return (
         <div className="student-dashboard">
-            <header className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-800">{t('student.dashboard.welcome')}</h1>
-                <p className="text-slate-500">{t('student.dashboard.subtitle')}</p>
+            {/* Welcome Header */}
+            <header className="dashboard-header">
+                <div className="dashboard-header-content">
+                    <h1 className="dashboard-title">
+                        {t('student.dashboard.welcome') || 'Welcome back'}, <span className="text-gradient">Student!</span>
+                    </h1>
+                    <p className="dashboard-subtitle">
+                        {t('student.dashboard.subtitle') || "Here's what's happening with your studies today."}
+                    </p>
+                </div>
+                <div className="dashboard-date">
+                    <Calendar size={18} />
+                    <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+                </div>
             </header>
 
-            <div className="student-dashboard-grid">
+            {/* Stats Cards */}
+            <div className="stat-cards-row">
+                <div className="stat-card-premium">
+                    <div className="stat-card-icon">
+                        <Calendar size={24} />
+                    </div>
+                    <div className="stat-card-content">
+                        <h3>{stats.attendance}%</h3>
+                        <p>{t('student.dashboard.attendance') || 'Attendance'}</p>
+                    </div>
+                </div>
+                <div className="stat-card-premium">
+                    <div className="stat-card-icon" style={{ background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }}>
+                        <Award size={24} />
+                    </div>
+                    <div className="stat-card-content">
+                        <h3>{stats.gpa}</h3>
+                        <p>Current GPA</p>
+                    </div>
+                </div>
+                <div className="stat-card-premium">
+                    <div className="stat-card-icon" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' }}>
+                        <Target size={24} />
+                    </div>
+                    <div className="stat-card-content">
+                        <h3>{stats.completedTasks}</h3>
+                        <p>Tasks Done</p>
+                    </div>
+                </div>
+                <div className="stat-card-premium">
+                    <div className="stat-card-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)' }}>
+                        <TrendingUp size={24} />
+                    </div>
+                    <div className="stat-card-content">
+                        <h3>{stats.rank}</h3>
+                        <p>Class Rank</p>
+                    </div>
+                </div>
+            </div>
 
+            {/* Main Grid */}
+            <div className="student-dashboard-grid">
                 {/* Daily Schedule */}
                 <div className="dashboard-card" style={{ gridColumn: 'span 2' }}>
                     <div className="card-header">
-                        <h2 className="card-title flex items-center gap-2">
-                            <Clock size={20} className="text-blue-600" />
-                            {t('student.dashboard.dailySchedule')}
+                        <h2 className="card-title">
+                            <Clock size={20} />
+                            {t('student.dashboard.dailySchedule') || "Today's Schedule"}
                         </h2>
-                        <span className="text-sm text-slate-500">{new Date().toLocaleDateString()}</span>
+                        <span className="card-badge">4 Classes</span>
                     </div>
-                    <div className="space-y-4">
-                        {todaySchedule.map((classItem) => (
-                            <div key={classItem.id} className={`flex items-center p-3 rounded-lg border ${classItem.statusKey === 'now' ? 'border-blue-200 bg-blue-50' : 'border-slate-100'}`}>
-                                <div className="w-24 font-medium text-slate-700">{classItem.time}</div>
-                                <div className="flex-1">
-                                    <div className="font-semibold text-slate-800">{classItem.subject}</div>
-                                    <div className="text-sm text-slate-500">{classItem.room}</div>
+                    <div className="schedule-list">
+                        {todaySchedule.map((item) => (
+                            <div key={item.id} className={`schedule-item ${item.status === 'now' ? 'current' : ''}`}>
+                                <div className="schedule-time">
+                                    <span className="schedule-time-text">{item.time}</span>
                                 </div>
-                                <div>
-                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusClass(classItem.statusKey)}`}>
-                                        {t(`student.dashboard.${classItem.statusKey}`)}
-                                    </span>
+                                <div className="schedule-details">
+                                    <div className="schedule-subject">{item.subject}</div>
+                                    <div className="schedule-meta">
+                                        {item.teacher} • {item.room}
+                                    </div>
                                 </div>
+                                {getStatusBadge(item.status)}
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Right Column Stack */}
-                <div className="space-y-6">
-
-                    {/* Attendance Alert */}
-                    <div className={`dashboard-card ${attendanceStats.warning ? 'bg-red-50 border-red-100' : 'bg-white'}`}>
+                {/* Side Column */}
+                <div className="dashboard-side-column">
+                    {/* Attendance Widget */}
+                    <div className="dashboard-card attendance-widget">
                         <div className="card-header">
-                            <h2 className="card-title flex items-center gap-2">
-                                <Calendar size={20} className={attendanceStats.warning ? 'text-red-600' : 'text-slate-600'} />
-                                {t('student.dashboard.attendance')}
+                            <h2 className="card-title">
+                                <Calendar size={20} />
+                                {t('student.dashboard.attendance') || 'Attendance'}
                             </h2>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-slate-800">{attendanceStats.present}%</div>
-                                <div className="text-xs text-slate-500">{t('student.dashboard.attendance')}</div>
-                            </div>
-                            <div className="h-10 w-px bg-slate-200"></div>
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-slate-800">{attendanceStats.absent}%</div>
-                                <div className="text-xs text-slate-500">{t('student.dashboard.absence')}</div>
+                        <div className="attendance-ring-container">
+                            <div className="attendance-ring">
+                                <svg viewBox="0 0 100 100">
+                                    <circle
+                                        cx="50" cy="50" r="40"
+                                        fill="none"
+                                        stroke="#e0f2fe"
+                                        strokeWidth="10"
+                                    />
+                                    <circle
+                                        cx="50" cy="50" r="40"
+                                        fill="none"
+                                        stroke="url(#gradient)"
+                                        strokeWidth="10"
+                                        strokeLinecap="round"
+                                        strokeDasharray={`${stats.attendance * 2.51} 251`}
+                                        transform="rotate(-90 50 50)"
+                                    />
+                                    <defs>
+                                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stopColor="#0891b2" />
+                                            <stop offset="100%" stopColor="#06b6d4" />
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                <div className="attendance-ring-value">
+                                    <span className="attendance-percentage">{stats.attendance}%</span>
+                                    <span className="attendance-label">Present</span>
+                                </div>
                             </div>
                         </div>
-                        {attendanceStats.absent > 15 && (
-                            <div className="mt-4 flex items-start gap-2 text-sm text-red-600 bg-red-100 p-2 rounded">
-                                <AlertCircle size={16} className="mt-0.5" />
-                                <span>{t('student.dashboard.highAbsenceWarning')}</span>
+                        <div className="attendance-stats">
+                            <div className="attendance-stat">
+                                <span className="attendance-stat-value text-success">184</span>
+                                <span className="attendance-stat-label">Days Present</span>
                             </div>
-                        )}
+                            <div className="attendance-stat">
+                                <span className="attendance-stat-value text-danger">16</span>
+                                <span className="attendance-stat-label">Days Absent</span>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Assignments */}
                     <div className="dashboard-card">
                         <div className="card-header">
-                            <h2 className="card-title flex items-center gap-2">
-                                <CheckCircle size={20} className="text-orange-600" />
-                                {t('student.dashboard.assignments')}
+                            <h2 className="card-title">
+                                <BookOpen size={20} />
+                                {t('student.dashboard.assignments') || 'Pending Tasks'}
                             </h2>
+                            <span className="card-badge urgent">{assignments.filter(a => a.status === 'urgent').length} Urgent</span>
                         </div>
-                        <div className="space-y-3">
+                        <div className="assignment-list">
                             {assignments.map((assignment) => (
-                                <div key={assignment.id} className="p-3 bg-slate-50 rounded border border-slate-100">
-                                    <div className="flex justify-between items-start">
-                                        <div className="font-medium text-slate-800">{assignment.title}</div>
-                                        {assignment.status === 'urgent' && <AlertCircle size={16} className="text-red-500" />}
+                                <div key={assignment.id} className={`assignment-item ${assignment.status === 'urgent' ? 'urgent' : ''}`}>
+                                    <div className="assignment-header">
+                                        <div className="assignment-title">{assignment.title}</div>
+                                        {assignment.status === 'urgent' && <AlertCircle size={16} className="text-danger" />}
                                     </div>
-                                    <div className="flex justify-between items-center mt-1 text-xs">
-                                        <span className="text-slate-500">{assignment.subject}</span>
-                                        <span className={`font-medium ${assignment.status === 'urgent' ? 'text-red-600' : 'text-slate-600'}`}>
-                                            {t('student.dashboard.due')}: {assignment.due}
+                                    <div className="assignment-meta">
+                                        <span>{assignment.subject}</span>
+                                        <span className={`assignment-due ${assignment.status === 'urgent' ? 'urgent' : ''}`}>
+                                            Due: {assignment.due}
                                         </span>
+                                    </div>
+                                    <div className="assignment-progress">
+                                        <div className="progress-bar">
+                                            <div className="progress-fill" style={{ width: `${assignment.progress}%` }}></div>
+                                        </div>
+                                        <span className="progress-text">{assignment.progress}%</span>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
-
                 </div>
             </div>
+
+            {/* Additional Styles for Dashboard-specific components */}
+            <style>{`
+                .dashboard-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 2rem;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                }
+                
+                .dashboard-title {
+                    font-size: 1.875rem;
+                    font-weight: 700;
+                    color: var(--color-text-main, #0f172a);
+                    margin: 0 0 0.5rem;
+                }
+                
+                .text-gradient {
+                    background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                }
+                
+                .dashboard-subtitle {
+                    color: var(--color-text-muted, #64748b);
+                    font-size: 1rem;
+                    margin: 0;
+                }
+                
+                .dashboard-date {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.625rem 1rem;
+                    background: white;
+                    border-radius: 12px;
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    color: var(--color-text-main, #334155);
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+                }
+                
+                .card-badge {
+                    padding: 0.375rem 0.75rem;
+                    background: #e0f2fe;
+                    color: #0891b2;
+                    border-radius: 20px;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                }
+                
+                .card-badge.urgent {
+                    background: #fef2f2;
+                    color: #dc2626;
+                }
+                
+                .status-badge {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    padding: 0.375rem 0.75rem;
+                    border-radius: 20px;
+                    font-size: 0.6875rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.03em;
+                }
+                
+                .status-done {
+                    background: #dcfce7;
+                    color: #16a34a;
+                }
+                
+                .status-now {
+                    background: linear-gradient(135deg, rgba(8, 145, 178, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+                    color: #0891b2;
+                    animation: pulse 2s infinite;
+                }
+                
+                .status-upcoming {
+                    background: #f1f5f9;
+                    color: #64748b;
+                }
+                
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.7; }
+                }
+                
+                .schedule-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                }
+                
+                .dashboard-side-column {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+                
+                .attendance-ring-container {
+                    display: flex;
+                    justify-content: center;
+                    padding: 1rem 0;
+                }
+                
+                .attendance-ring {
+                    position: relative;
+                    width: 140px;
+                    height: 140px;
+                }
+                
+                .attendance-ring svg {
+                    width: 100%;
+                    height: 100%;
+                }
+                
+                .attendance-ring-value {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    text-align: center;
+                }
+                
+                .attendance-percentage {
+                    display: block;
+                    font-size: 1.5rem;
+                    font-weight: 700;
+                    color: var(--color-text-main, #0f172a);
+                }
+                
+                .attendance-label {
+                    font-size: 0.75rem;
+                    color: var(--color-text-muted, #64748b);
+                }
+                
+                .attendance-stats {
+                    display: flex;
+                    justify-content: center;
+                    gap: 2rem;
+                    padding-top: 0.5rem;
+                }
+                
+                .attendance-stat {
+                    text-align: center;
+                }
+                
+                .attendance-stat-value {
+                    display: block;
+                    font-size: 1.25rem;
+                    font-weight: 700;
+                }
+                
+                .attendance-stat-value.text-success { color: #16a34a; }
+                .attendance-stat-value.text-danger { color: #dc2626; }
+                
+                .attendance-stat-label {
+                    font-size: 0.6875rem;
+                    color: var(--color-text-muted, #64748b);
+                    text-transform: uppercase;
+                    letter-spacing: 0.03em;
+                }
+                
+                .assignment-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+                
+                .assignment-item {
+                    padding: 1rem;
+                    background: #f8fafc;
+                    border-radius: 12px;
+                    border: 1px solid transparent;
+                    transition: all 0.2s ease;
+                }
+                
+                .assignment-item:hover {
+                    border-color: #0891b2;
+                    background: #f0f9ff;
+                }
+                
+                .assignment-item.urgent {
+                    border-left: 3px solid #dc2626;
+                }
+                
+                .assignment-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 0.5rem;
+                }
+                
+                .assignment-title {
+                    font-weight: 600;
+                    font-size: 0.9375rem;
+                    color: var(--color-text-main, #1e293b);
+                }
+                
+                .assignment-meta {
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 0.75rem;
+                    color: var(--color-text-muted, #64748b);
+                    margin-bottom: 0.75rem;
+                }
+                
+                .assignment-due.urgent {
+                    color: #dc2626;
+                    font-weight: 600;
+                }
+                
+                .assignment-progress {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                }
+                
+                .assignment-progress .progress-bar {
+                    flex: 1;
+                    height: 6px;
+                }
+                
+                .progress-text {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: var(--color-text-muted, #64748b);
+                    min-width: 32px;
+                }
+                
+                .text-danger { color: #dc2626; }
+                
+                [data-theme="dark"] .dashboard-date {
+                    background: #1e293b;
+                }
+                
+                [data-theme="dark"] .assignment-item {
+                    background: rgba(30, 41, 59, 0.6);
+                }
+                
+                [data-theme="dark"] .dashboard-title,
+                [data-theme="dark"] .attendance-percentage {
+                    color: #f1f5f9;
+                }
+            `}</style>
         </div>
     );
 };
