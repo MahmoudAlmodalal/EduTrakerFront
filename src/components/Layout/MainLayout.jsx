@@ -13,11 +13,13 @@ const MainLayout = () => {
 
     return (
         <div className={styles.layout}>
-            <Sidebar isOpen={isSidebarOpen} />
+            <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
             <div className={`${styles.mainContent} ${isSidebarOpen ? '' : styles.expanded}`}>
                 <Header toggleSidebar={toggleSidebar} />
                 <main className={styles.contentArea}>
-                    <Outlet />
+                    <div className="fade-in">
+                        <Outlet />
+                    </div>
                 </main>
             </div>
         </div>

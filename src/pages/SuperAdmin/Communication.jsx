@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { Send, Plus, MessageSquare, Users, Search } from 'lucide-react';
-import Button from '../../components/UI/Button';
+import Button from '../../components/ui/Button';
 import styles from './Dashboard.module.css';
 
 const Communication = () => {

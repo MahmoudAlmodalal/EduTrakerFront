@@ -2,11 +2,26 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { LayoutDashboard, Users, Briefcase, Activity, Settings, HelpCircle, School, GraduationCap, ClipboardList, MessageSquare, Calendar, FileText, UserCheck, Layers } from 'lucide-react';
+import {
+    LayoutDashboard,
+    Users,
+    Briefcase,
+    Activity,
+    Settings,
+    HelpCircle,
+    GraduationCap,
+    ClipboardList,
+    MessageSquare,
+    Calendar,
+    FileText,
+    UserCheck,
+    Layers,
+    LogOut
+} from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 const Sidebar = ({ isOpen }) => {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const { t } = useTheme();
     const role = user?.role;
 
@@ -29,16 +44,17 @@ const Sidebar = ({ isOpen }) => {
             { path: '/school-manager/departments', label: t('school.nav.departments'), icon: Layers },
             { path: '/school-manager/secretaries', label: t('school.nav.secretaries'), icon: UserCheck },
         ],
-        // Workstream Manager and others will go here
     };
 
-    const currentLinks = links[role] || links.SUPER_ADMIN; // Fallback to Super Admin for dev if role missing
+    const currentLinks = links[role] || links.SUPER_ADMIN;
 
     return (
-        <aside id="app-sidebar" className={`${styles.sidebar} ${isOpen ? styles.open : styles.closed}`}>
+        <aside id="app-sidebar" className={`${styles.sidebar} ${!isOpen ? styles.closed : ''}`}>
             <div className={styles.logo}>
-                <div className={styles.logoIcon}>ET</div>
-                <span className={styles.logoText}>{t('app.name')}</span>
+                <div className={styles.logoIcon}>
+                    <GraduationCap size={24} />
+                </div>
+                <span className={styles.logoText}>{t('app.name') || 'EduTraker'}</span>
             </div>
 
             <nav className={styles.nav}>
@@ -48,7 +64,7 @@ const Sidebar = ({ isOpen }) => {
                             <NavLink
                                 to={link.path}
                                 className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-                                end={link.path === '/super-admin' || link.path === '/workstream-manager'} // Exact match for root
+                                end={link.path === '/super-admin' || link.path === '/school-manager'}
                             >
                                 <link.icon size={20} />
                                 <span className={styles.linkText}>{link.label}</span>
@@ -65,6 +81,14 @@ const Sidebar = ({ isOpen }) => {
                         <span className={styles.userName}>{user?.name || 'User'}</span>
                         <span className={styles.userRole}>{role?.replace('_', ' ') || 'Guest'}</span>
                     </div>
+                    <button
+                        onClick={logout}
+                        className={styles.logoutBtn}
+                        title={t('auth.logout')}
+                        style={{ color: 'var(--color-text-light)', cursor: 'pointer', background: 'none', border: 'none', marginLeft: 'auto', display: 'flex', alignItems: 'center' }}
+                    >
+                        <LogOut size={18} />
+                    </button>
                 </div>
             </div>
         </aside>

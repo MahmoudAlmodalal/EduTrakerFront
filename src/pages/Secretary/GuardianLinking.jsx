@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Link as LinkIcon, MoreVertical, Shield, UserCheck, AlertCircle } from 'lucide-react';
-import Modal from '../../components/UI/Modal';
+import Modal from '../../components/ui/Modal';
 import { useTheme } from '../../context/ThemeContext';
 import './Secretary.css';
 import '../WorkstreamManager/Workstream.css';

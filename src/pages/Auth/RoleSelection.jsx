@@ -7,7 +7,8 @@ import {
     Briefcase,
     GraduationCap,
     Users,
-    UserCheck
+    UserCheck,
+    ArrowRight
 } from 'lucide-react';
 import styles from './RoleSelection.module.css';
 
@@ -15,40 +16,36 @@ const RoleSelection = () => {
     const roles = [
         {
             id: 'education',
-            title: 'Education',
+            title: 'Education & Learning',
             items: [
-                { path: '/login/student', label: 'Student', icon: <GraduationCap />, desc: 'Access your courses and results' },
-                { path: '/login/teacher', label: 'Teacher', icon: <BookOpen />, desc: 'Manage classes and grades' },
-                { path: '/login/guardian', label: 'Guardian', icon: <Users />, desc: 'Monitor student progress' },
+                { path: '/login/student', label: 'Student', icon: <GraduationCap size={28} />, desc: 'Access your personalized learning portal, courses, and tracks.' },
+                { path: '/login/teacher', label: 'Teacher', icon: <BookOpen size={28} />, desc: 'Manage your classes, assessments, and student performance.' },
+                { path: '/login/guardian', label: 'Guardian', icon: <Users size={28} />, desc: 'Stay connected with your child\'s academic journey and alerts.' },
             ]
         },
         {
             id: 'administration',
-            title: 'Administration',
+            title: 'School Management',
             items: [
-                { path: '/login/school-manager', label: 'School Manager', icon: <School />, desc: 'Manage school operations' },
-                { path: '/login/secretary', label: 'Secretary', icon: <UserCheck />, desc: 'Admissions and records' },
-                { path: '/login/workstream-manager', label: 'Workstream Mgr', icon: <Briefcase />, desc: 'Manage school network' },
-                { path: '/login/super-admin', label: 'Super Admin', icon: <ShieldAlert />, desc: 'System configuration' },
+                { path: '/login/school-manager', label: 'School Manager', icon: <School size={28} />, desc: 'Oversee school operations, staff, and overall performance.' },
+                { path: '/login/secretary', label: 'Secretary', icon: <UserCheck size={28} />, desc: 'Handle admissions, records, and student documentation.' },
+                { path: '/login/workstream-manager', label: 'Workstream Mgr', icon: <Briefcase size={28} />, desc: 'Manage school networks, workstreams, and configurations.' },
+                { path: '/login/super-admin', label: 'Super Admin', icon: <ShieldAlert size={28} />, desc: 'Global system settings, security, and infrastructure.' },
             ]
         }
     ];
 
     return (
         <div className={styles.container}>
-            <div className={styles.card}>
-                <h1 className={styles.title}>Welcome to EduTraker</h1>
+            <div className={styles.contentWrapper}>
+                <header className={styles.header}>
+                    <h1 className={styles.title}>EduTraker</h1>
+                    <p className={styles.subtitle}>Select your portal to continue</p>
+                </header>
 
                 {roles.map((group) => (
-                    <div key={group.id} style={{ marginBottom: '2rem' }}>
-                        <h2 style={{
-                            textAlign: 'left',
-                            fontSize: '1.2rem',
-                            color: '#6b7280',
-                            marginBottom: '1rem',
-                            borderBottom: '1px solid #e5e7eb',
-                            paddingBottom: '0.5rem'
-                        }}>
+                    <section key={group.id} className={styles.section}>
+                        <h2 className={styles.sectionTitle}>
                             {group.title}
                         </h2>
                         <div className={styles.grid}>
@@ -60,7 +57,7 @@ const RoleSelection = () => {
                                 </Link>
                             ))}
                         </div>
-                    </div>
+                    </section>
                 ))}
             </div>
         </div>

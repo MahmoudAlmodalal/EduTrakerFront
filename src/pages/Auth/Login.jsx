@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import Button from '../../components/ui/Button';
+import { GraduationCap, Mail, Lock } from 'lucide-react';
 import styles from './Login.module.css';
 
 const Login = ({ role }) => {
@@ -27,22 +29,15 @@ const Login = ({ role }) => {
         e.preventDefault();
         setError('');
 
-        // Mock Login Logic
-        // For testing, we allow simple check. In real app, API would handle this.
         let isValid = false;
 
         if (role) {
-            // Strict check for the demo using the default email for that role
-            // OR generic admin backdoor
             if (email === currentRole.defaultEmail && password === role.toLowerCase()) {
                 isValid = true;
             } else if (email === 'admin@edutraker.com' && password === 'admin') {
-                // Backdoor for easier testing? Maybe restrict this.
-                // For now let's stick to role credentials or existing admin
                 isValid = true;
             }
         } else {
-            // Fallback for generic login if accessed directly without role (shouldn't happen with new routing)
             if (email === 'admin@edutraker.com' && password === 'admin') {
                 isValid = true;
             }
@@ -61,49 +56,63 @@ const Login = ({ role }) => {
 
     return (
         <div className={styles.container}>
-            <div className={styles.card}>
-                <div className={styles.header}>
-                    <h1 className={styles.title}>EduTraker</h1>
-                    <p className={styles.subtitle}>{displayTitle}</p>
+            <div className={styles.loginWrapper}>
+                <div className={styles.card}>
+                    <div className={styles.header}>
+                        <div className={styles.logo}>
+                            <div className={styles.logoIcon}>
+                                <GraduationCap size={24} />
+                            </div>
+                            <h1 className={styles.title}>EduTraker</h1>
+                        </div>
+                        <p className={styles.subtitle}>{displayTitle}</p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className={styles.form}>
+                        {error && <div className={styles.error}>{error}</div>}
+
+                        <div className={styles.inputGroup}>
+                            <label className={styles.label} htmlFor="email">{t('auth.email')}</label>
+                            <input
+                                id="email"
+                                type="email"
+                                className={styles.input}
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder={currentRole?.defaultEmail || "name@company.com"}
+                                required
+                            />
+                        </div>
+
+                        <div className={styles.inputGroup}>
+                            <label className={styles.label} htmlFor="password">{t('auth.password')}</label>
+                            <input
+                                id="password"
+                                type="password"
+                                className={styles.input}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
+
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            size="large"
+                            style={{ marginTop: '0.5rem' }}
+                        >
+                            {t('auth.signInBtn')}
+                        </Button>
+
+                        <div className={styles.footer}>
+                            <a href="/login" className={styles.backLink}>
+                                {t('auth.backToSelection')}
+                            </a>
+                        </div>
+                    </form>
                 </div>
-
-                <form onSubmit={handleSubmit} className={styles.form}>
-                    {error && <div className={styles.error}>{error}</div>}
-
-                    <div className={styles.inputGroup}>
-                        <label htmlFor="email">{t('auth.email')}</label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder={currentRole?.defaultEmail || "name@company.com"}
-                            required
-                        />
-                    </div>
-
-                    <div className={styles.inputGroup}>
-                        <label htmlFor="password">{t('auth.password')}</label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                        />
-                    </div>
-
-                    <button type="submit" className={styles.button}>
-                        {t('auth.signInBtn')}
-                    </button>
-
-                    <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-                        <a href="/login" style={{ color: '#6b7280', fontSize: '0.875rem', textDecoration: 'none' }}>
-                            {t('auth.backToSelection')}
-                        </a>
-                    </div>
-                </form>
             </div>
         </div>
     );

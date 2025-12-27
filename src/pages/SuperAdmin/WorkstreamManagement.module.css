@@ -1,7 +1,8 @@
 .container {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-6);
+    gap: var(--spacing-8);
+    animation: fadeIn 0.5s ease-out;
 }
 
 .header {
@@ -10,92 +11,167 @@
     align-items: center;
 }
 
+.titleSection {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+}
+
 .title {
-    font-size: var(--font-size-2xl);
-    font-weight: 700;
+    font-size: var(--font-size-3xl);
+    font-weight: 800;
     color: var(--color-text-main);
+    letter-spacing: -0.025em;
+}
+
+.subtitle {
+    font-size: var(--font-size-base);
+    color: var(--color-text-muted);
 }
 
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     gap: var(--spacing-6);
 }
 
 .card {
     background: var(--color-bg-surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--color-border);
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--color-border-subtle);
+    transition: all var(--transition-normal);
     display: flex;
     flex-direction: column;
-    transition: transform var(--transition-normal);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
 }
 
 .card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--color-primary-subtle);
 }
 
 .cardHeader {
-    padding: var(--spacing-4) var(--spacing-6);
-    border-bottom: 1px solid var(--color-border);
+    padding: var(--spacing-6) var(--spacing-6) var(--spacing-4);
+    background: linear-gradient(to bottom, var(--slate-50), transparent);
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+}
+
+.workstreamInfo {
+    display: flex;
+    flex-direction: column;
 }
 
 .cardTitle {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: 2px;
 }
 
-.statusBadge {
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
+.locationLabel {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
     font-weight: 500;
 }
 
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 .statusBadge.active {
-    background-color: rgba(16, 185, 129, 0.2);
+    background-color: var(--color-success-light);
     color: var(--color-success);
 }
 
 .statusBadge.inactive {
-    background-color: rgba(107, 114, 128, 0.2);
-    color: var(--color-text-muted);
+    background-color: var(--slate-100);
+    color: var(--slate-500);
 }
 
 .cardBody {
-    padding: var(--spacing-4) var(--spacing-6);
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-3);
+    padding: var(--spacing-4) var(--spacing-6) var(--spacing-6);
     flex: 1;
 }
 
-.statRow {
+.statsContainer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-4);
+    margin-top: var(--spacing-2);
+}
+
+.statItem {
+    background-color: var(--slate-50);
+    padding: var(--spacing-4);
+    border-radius: var(--radius-xl);
     display: flex;
-    justify-content: space-between;
-    font-size: var(--font-size-sm);
+    flex-direction: column;
+    gap: var(--spacing-1);
+    border: 1px solid var(--color-border-subtle);
 }
 
 .statLabel {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
     color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
 }
 
 .statValue {
+    font-size: var(--font-size-xl);
+    font-weight: 800;
+    color: var(--color-text-main);
+}
+
+.managerSection {
+    margin-top: var(--spacing-6);
+    padding-top: var(--spacing-4);
+    border-top: 1px solid var(--color-border-subtle);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+}
+
+.managerAvatar {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: var(--font-size-xs);
+}
+
+.managerName {
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--color-text-main);
 }
 
 .cardFooter {
     padding: var(--spacing-4) var(--spacing-6);
-    border-top: 1px solid var(--color-border);
+    background-color: var(--slate-50);
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: flex-end;
+    border-top: 1px solid var(--color-border-subtle);
 }
 
 .actions {
@@ -104,45 +180,26 @@
 }
 
 .actionBtn {
-    background: none;
-    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--color-text-muted);
-    cursor: pointer;
-    padding: 4px;
+    background: white;
+    border: 1px solid var(--color-border-subtle);
+    transition: all var(--transition-fast);
 }
 
 .actionBtn:hover {
+    background-color: var(--color-primary-light);
     color: var(--color-primary);
+    border-color: var(--color-primary-subtle);
 }
 
-/* Modal Form reuse */
-.form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-4);
-}
-
-.formGroup {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-2);
-}
-
-.formGroup label {
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-}
-
-.formGroup input,
-.formGroup select {
-    padding: var(--spacing-2);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-}
-
-.formActions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-3);
-    margin-top: var(--spacing-4);
+.actionBtn.danger:hover {
+    background-color: var(--color-error-light);
+    color: var(--color-error);
+    border-color: var(--color-error-light);
 }

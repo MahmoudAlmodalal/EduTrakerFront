@@ -1,100 +1,129 @@
 .container {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-6);
+    gap: var(--spacing-8);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-2);
 }
 
 .pageTitle {
-    font-size: var(--font-size-2xl);
-    font-weight: 700;
+    font-size: var(--font-size-3xl);
+    font-weight: 800;
     color: var(--color-text-main);
+    letter-spacing: -0.025em;
+}
+
+.subtitle {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-base);
 }
 
 .statsGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: var(--spacing-6);
 }
 
 .statCard {
     background: var(--color-bg-surface);
     padding: var(--spacing-6);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--color-border-subtle);
+    transition: all var(--transition-normal);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
     box-shadow: var(--shadow-sm);
-    border: 1px solid var(--color-border);
+}
+
+.statCard:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--color-primary-subtle);
 }
 
 .statHeader {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: var(--spacing-4);
-}
-
-.statTitle {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
+    align-items: center;
 }
 
 .iconWrapper {
-    padding: var(--spacing-2);
-    border-radius: var(--radius-md);
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-xl);
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all var(--transition-fast);
 }
 
 .iconWrapper.blue {
-    background-color: rgba(37, 99, 235, 0.1);
+    background-color: var(--color-primary-light);
     color: var(--color-primary);
 }
 
 .iconWrapper.green {
-    background-color: rgba(16, 185, 129, 0.1);
+    background-color: var(--color-success-light);
     color: var(--color-success);
 }
 
 .iconWrapper.purple {
-    background-color: rgba(147, 51, 234, 0.1);
-    color: #a855f7;
+    background-color: #f3e8ff;
+    color: #9333ea;
 }
 
 .iconWrapper.orange {
-    background-color: rgba(245, 158, 11, 0.1);
+    background-color: var(--color-warning-light);
     color: var(--color-warning);
-}
-
-.statBody {
-    display: flex;
-    flex-direction: column;
 }
 
 .statValue {
     font-size: var(--font-size-3xl);
-    font-weight: 700;
+    font-weight: 800;
     color: var(--color-text-main);
-    line-height: 1;
-    margin-bottom: var(--spacing-2);
+    letter-spacing: -0.05em;
 }
 
-.statChange {
+.statLabel {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.statFooter {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
     font-size: var(--font-size-xs);
-    font-weight: 500;
+    font-weight: 600;
 }
 
-.statChange.positive {
+.changePositive {
     color: var(--color-success);
+    display: flex;
+    align-items: center;
+    gap: 2px;
 }
 
-.statChange.negative {
+.changeNegative {
     color: var(--color-error);
+    display: flex;
+    align-items: center;
+    gap: 2px;
 }
 
 .contentGrid {
     display: grid;
-    grid-template-columns: 3fr 1fr;
-    gap: var(--spacing-6);
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-8);
 }
 
 @media (max-width: 1280px) {
@@ -103,60 +132,93 @@
     }
 }
 
-.mainChartSection {
+.chartCard {
+    background: var(--color-bg-surface);
+    padding: var(--spacing-8);
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: var(--shadow-sm);
+}
+
+.cardHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-8);
+}
+
+.cardTitle {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text-main);
+}
+
+.chartContainer {
+    height: 350px;
+    width: 100%;
+}
+
+.activityCard {
+    background: var(--color-bg-surface);
+    padding: var(--spacing-8);
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: var(--shadow-sm);
+}
+
+.activityList {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-6);
 }
 
-.secondaryCharts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-6);
-}
-
-@media (max-width: 768px) {
-    .secondaryCharts {
-        grid-template-columns: 1fr;
-    }
-}
-
-.chartCard,
-.recentActivity {
-    background: var(--color-bg-surface);
-    padding: var(--spacing-6);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--color-border);
-}
-
-.cardTitle {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
-    margin-bottom: var(--spacing-6);
-}
-
-.chartContainer {
-    height: 300px;
-    width: 100%;
-}
-
-.activityList {
-    list-style: none;
-}
-
 .activityItem {
-    padding: var(--spacing-3) 0;
-    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    gap: var(--spacing-4);
+    position: relative;
 }
 
-.activityItem:last-child {
-    border-bottom: none;
+.activityItem::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 40px;
+    bottom: -24px;
+    width: 2px;
+    background-color: var(--color-border-subtle);
+}
+
+.activityItem:last-child::before {
+    display: none;
+}
+
+.activityIcon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    background-color: var(--slate-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--slate-600);
+    flex-shrink: 0;
+    border: 2px solid var(--color-bg-surface);
+    z-index: 1;
+}
+
+.activityContent {
+    flex: 1;
+}
+
+.activityText {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-main);
+    font-weight: 500;
+    line-height: 1.4;
 }
 
 .activityTime {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
-    display: block;
-    margin-bottom: var(--spacing-1);
+    margin-top: 2px;
 }

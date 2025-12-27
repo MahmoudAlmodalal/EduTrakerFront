@@ -8,26 +8,27 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    transition: margin-inline-start var(--transition-normal);
-    /* Sidebar width is handled in Sidebar component, but we push content here */
-    margin-inline-start: 260px;
-    /* Match sidebar width */
+    transition: margin var(--transition-slow) cubic-bezier(0.4, 0, 0.2, 1);
+    margin-inline-start: 280px;
+    min-width: 0;
 }
 
 .mainContent.expanded {
     margin-inline-start: 0;
-    /* Or a mini sidebar width if we support that */
-}
-
-/* Mobile responsive adjustments will be added here */
-@media (max-width: 768px) {
-    .mainContent {
-        margin-inline-start: 0;
-    }
 }
 
 .contentArea {
-    padding: var(--spacing-6);
+    padding: var(--spacing-8);
     flex: 1;
-    overflow-y: auto;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@media (max-width: 1024px) {
+    .mainContent {
+        margin-inline-start: 0;
+    }
+
+    .contentArea {
+        padding: var(--spacing-4);
+    }
 }

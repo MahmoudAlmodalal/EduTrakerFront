@@ -1,7 +1,22 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import styles from './Dashboard.module.css'; // Reusing dashboard styles
-import Button from '../../components/UI/Button';
+import {
+    Settings,
+    User,
+    Shield,
+    Bell,
+    Globe,
+    Moon,
+    Sun,
+    Clock,
+    Mail,
+    MessageSquare,
+    Lock,
+    Save,
+    Camera
+} from 'lucide-react';
+import styles from './SystemSettings.module.css';
+import Button from '../../components/ui/Button';
 
 const SystemSettings = () => {
     const { theme, toggleTheme, language, changeLanguage, t } = useTheme();
@@ -11,32 +26,33 @@ const SystemSettings = () => {
         switch (activeTab) {
             case 'general':
                 return (
-                    <div className={styles.chartCard} style={{ background: 'var(--color-bg-surface)', borderColor: 'var(--color-border)' }}>
-                        <h2 className={styles.cardTitle} style={{ color: 'var(--color-text-main)' }}>{t('settings.general')}</h2>
-                        <form className={styles.form} style={{ maxWidth: '600px' }}>
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('settings.language')}</label>
-                                <select
-                                    value={language}
-                                    onChange={(e) => changeLanguage(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.5rem',
-                                        borderRadius: '0.375rem',
-                                        border: '1px solid var(--color-border)',
-                                        background: 'var(--color-bg-body)',
-                                        color: 'var(--color-text-main)'
-                                    }}
-                                >
-                                    <option value="en">English (الإنجليزية)</option>
-                                    <option value="ar">Arabic (العربية)</option>
-                                </select>
+                    <div className={styles.contentCard}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>{t('settings.general')}</h2>
+                            <p className={styles.cardSubtitle}>Configure global application settings and preferences</p>
+                        </div>
+
+                        <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.language')}</label>
+                                <div style={{ position: 'relative' }}>
+                                    <Globe size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+                                    <select
+                                        className={styles.select}
+                                        value={language}
+                                        onChange={(e) => changeLanguage(e.target.value)}
+                                        style={{ paddingLeft: '40px' }}
+                                    >
+                                        <option value="en">English (الإنجليزية)</option>
+                                        <option value="ar">Arabic (العربية)</option>
+                                    </select>
+                                </div>
                             </div>
 
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('settings.theme')}</label>
-                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.theme')}</label>
+                                <div className={styles.radioGroup}>
+                                    <label className={`${styles.radioItem} ${theme === 'light' ? styles.activeRadio : ''}`}>
                                         <input
                                             type="radio"
                                             name="theme"
@@ -44,9 +60,10 @@ const SystemSettings = () => {
                                             checked={theme === 'light'}
                                             onChange={() => theme === 'dark' && toggleTheme()}
                                         />
+                                        <Sun size={18} />
                                         {t('settings.lightMode')}
                                     </label>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>
+                                    <label className={`${styles.radioItem} ${theme === 'dark' ? styles.activeRadio : ''}`}>
                                         <input
                                             type="radio"
                                             name="theme"
@@ -54,114 +71,173 @@ const SystemSettings = () => {
                                             checked={theme === 'dark'}
                                             onChange={() => theme === 'light' && toggleTheme()}
                                         />
+                                        <Moon size={18} />
                                         {t('settings.darkMode')}
                                     </label>
                                 </div>
                             </div>
 
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('settings.timeZone')}</label>
-                                <select style={{
-                                    width: '100%',
-                                    padding: '0.5rem',
-                                    borderRadius: '0.375rem',
-                                    border: '1px solid var(--color-border)',
-                                    background: 'var(--color-bg-body)',
-                                    color: 'var(--color-text-main)'
-                                }}>
-                                    <option>(GMT+02:00) Jerusalem</option>
-                                    <option>(GMT+00:00) UTC</option>
-                                </select>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.timeZone')}</label>
+                                <div style={{ position: 'relative' }}>
+                                    <Clock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+                                    <select className={styles.select} style={{ paddingLeft: '40px' }}>
+                                        <option>(GMT+02:00) Jerusalem</option>
+                                        <option>(GMT+00:00) UTC</option>
+                                    </select>
+                                </div>
                             </div>
-                            <Button variant="primary">{t('settings.save')}</Button>
+
+                            <div className={styles.actions}>
+                                <Button variant="primary">
+                                    <Save size={18} style={{ marginRight: '8px' }} />
+                                    {t('settings.save')}
+                                </Button>
+                            </div>
                         </form>
                     </div>
                 );
             case 'security':
                 return (
-                    <div className={styles.chartCard} style={{ background: 'var(--color-bg-surface)', borderColor: 'var(--color-border)' }}>
-                        <h2 className={styles.cardTitle} style={{ color: 'var(--color-text-main)' }}>{t('settings.security')}</h2>
-                        <form className={styles.form} style={{ maxWidth: '600px' }}>
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('settings.minPasswordLength')}</label>
-                                <input type="number" defaultValue="8" style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', color: 'var(--color-text-main)' }} />
+                    <div className={styles.contentCard}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>{t('settings.security')}</h2>
+                            <p className={styles.cardSubtitle}>Manage system security policies and access controls</p>
+                        </div>
+
+                        <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.minPasswordLength')}</label>
+                                <input type="number" className={styles.input} defaultValue="8" />
                             </div>
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('settings.sessionTimeout')}</label>
-                                <input type="number" defaultValue="30" style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', color: 'var(--color-text-main)' }} />
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.sessionTimeout')} (minutes)</label>
+                                <input type="number" className={styles.input} defaultValue="30" />
                             </div>
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-text-main)' }}>
-                                    <input type="checkbox" defaultChecked /> {t('settings.enable2FA')}
+                            <div className={styles.formGroup}>
+                                <label className={styles.checkboxItem}>
+                                    <input type="checkbox" defaultChecked />
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontWeight: 600 }}>{t('settings.enable2FA')}</span>
+                                        <span className={styles.hint}>Require two-factor authentication for all administrators</span>
+                                    </div>
                                 </label>
                             </div>
-                            <Button variant="primary">{t('settings.updateSecurityPolicy')}</Button>
+                            <div className={styles.actions}>
+                                <Button variant="primary">
+                                    <Shield size={18} style={{ marginRight: '8px' }} />
+                                    {t('settings.updateSecurityPolicy')}
+                                </Button>
+                            </div>
                         </form>
                     </div>
                 );
             case 'communication':
                 return (
-                    <div className={styles.chartCard} style={{ background: 'var(--color-bg-surface)', borderColor: 'var(--color-border)' }}>
-                        <h2 className={styles.cardTitle} style={{ color: 'var(--color-text-main)' }}>{t('nav.communication')}</h2>
-                        <form className={styles.form} style={{ maxWidth: '600px' }}>
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--color-text-main)' }}>{t('settings.globalNotifications')}</label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--color-text-main)' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <input type="checkbox" defaultChecked /> {t('settings.enableEmailNotifications')}
+                    <div className={styles.contentCard}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>{t('nav.communication')}</h2>
+                            <p className={styles.cardSubtitle}>Configure system-wide notifications and announcements</p>
+                        </div>
+
+                        <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.globalNotifications')}</label>
+                                <div className={styles.checkboxGroup}>
+                                    <label className={styles.checkboxItem}>
+                                        <input type="checkbox" defaultChecked />
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Mail size={16} />
+                                            {t('settings.enableEmailNotifications')}
+                                        </div>
                                     </label>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <input type="checkbox" /> {t('settings.enableSMSNotifications')}
+                                    <label className={styles.checkboxItem}>
+                                        <input type="checkbox" />
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <MessageSquare size={16} />
+                                            {t('settings.enableSMSNotifications')}
+                                        </div>
                                     </label>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <input type="checkbox" defaultChecked /> {t('settings.enableInAppAlerts')}
+                                    <label className={styles.checkboxItem}>
+                                        <input type="checkbox" defaultChecked />
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Bell size={16} />
+                                            {t('settings.enableInAppAlerts')}
+                                        </div>
                                     </label>
                                 </div>
                             </div>
 
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--color-text-main)' }}>{t('settings.systemAnnouncement')}</label>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.systemAnnouncement')}</label>
                                 <textarea
+                                    className={styles.textarea}
                                     placeholder={t('settings.announcementPlaceholder')}
                                     rows="4"
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', color: 'var(--color-text-main)', resize: 'vertical' }}
                                 ></textarea>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{t('settings.announcementHint')}</p>
+                                <p className={styles.hint}>{t('settings.announcementHint')}</p>
                             </div>
 
-                            <Button variant="primary">{t('settings.saveAndBroadcast')}</Button>
+                            <div className={styles.actions}>
+                                <Button variant="primary">
+                                    <Bell size={18} style={{ marginRight: '8px' }} />
+                                    {t('settings.saveAndBroadcast')}
+                                </Button>
+                            </div>
                         </form>
                     </div>
                 );
             case 'profile':
                 return (
-                    <div className={styles.chartCard} style={{ background: 'var(--color-bg-surface)', borderColor: 'var(--color-border)' }}>
-                        <h2 className={styles.cardTitle} style={{ color: 'var(--color-text-main)' }}>{t('settings.profile')}</h2>
-                        <form className={styles.form} style={{ maxWidth: '600px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
-                                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--color-bg-body)', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 'bold', color: 'var(--color-text-muted)' }}>
-                                    SA
+                    <div className={styles.contentCard}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>{t('settings.profile')}</h2>
+                            <p className={styles.cardSubtitle}>Update your personal information and account security</p>
+                        </div>
+
+                        <div className={styles.profileSection}>
+                            <div className={styles.avatarWrapper}>
+                                <div className={styles.avatar}>SA</div>
+                                <button className={styles.avatarEditBtn} style={{ position: 'absolute', bottom: '0', right: '0', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--shadow-md)' }}>
+                                    <Camera size={16} />
+                                </button>
+                            </div>
+                            <div className={styles.profileInfo}>
+                                <Button variant="secondary" size="small">{t('settings.changeAvatar')}</Button>
+                                <p className={styles.hint}>{t('settings.avatarHint')}</p>
+                            </div>
+                        </div>
+
+                        <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.fullName')}</label>
+                                <div style={{ position: 'relative' }}>
+                                    <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+                                    <input type="text" className={styles.input} defaultValue="Super Admin" style={{ paddingLeft: '40px' }} />
                                 </div>
-                                <div>
-                                    <Button variant="secondary" size="small">{t('settings.changeAvatar')}</Button>
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>{t('settings.avatarHint')}</p>
+                            </div>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.emailAddress')}</label>
+                                <div style={{ position: 'relative' }}>
+                                    <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+                                    <input type="email" className={styles.input} defaultValue="admin@edutraker.com" style={{ paddingLeft: '40px' }} />
+                                </div>
+                            </div>
+                            <div className={styles.divider}></div>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>{t('settings.currentPassword')}</label>
+                                <div style={{ position: 'relative' }}>
+                                    <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+                                    <input type="password" className={styles.input} placeholder={t('settings.currentPasswordPlaceholder')} style={{ paddingLeft: '40px' }} />
                                 </div>
                             </div>
 
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('settings.fullName')}</label>
-                                <input type="text" defaultValue="Super Admin" style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', color: 'var(--color-text-main)' }} />
+                            <div className={styles.actions}>
+                                <Button variant="primary">
+                                    <User size={18} style={{ marginRight: '8px' }} />
+                                    {t('settings.updateProfile')}
+                                </Button>
                             </div>
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('settings.emailAddress')}</label>
-                                <input type="email" defaultValue="admin@edutraker.com" style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', color: 'var(--color-text-main)' }} />
-                            </div>
-                            <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('settings.currentPassword')}</label>
-                                <input type="password" placeholder={t('settings.currentPasswordPlaceholder')} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', color: 'var(--color-text-main)' }} />
-                            </div>
-
-                            <Button variant="primary">{t('settings.updateProfile')}</Button>
                         </form>
                     </div>
                 );
@@ -172,66 +248,48 @@ const SystemSettings = () => {
 
     return (
         <div className={styles.container}>
-            <h1 className={styles.pageTitle} style={{ color: 'var(--color-text-main)' }}>{t('settings.title')}</h1>
+            <header className={styles.header}>
+                <h1 className={styles.title}>{t('settings.title')}</h1>
+                <p className={styles.subtitle}>Manage global system preferences, security, and your personal account</p>
+            </header>
 
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+            <nav className={styles.tabsContainer}>
                 <button
                     onClick={() => setActiveTab('general')}
-                    style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.375rem',
-                        background: activeTab === 'general' ? 'var(--color-primary)' : 'var(--color-bg-surface)',
-                        color: activeTab === 'general' ? '#fff' : 'var(--color-text-main)',
-                        border: '1px solid var(--color-border)',
-                        cursor: 'pointer'
-                    }}
+                    className={`${styles.tabButton} ${activeTab === 'general' ? styles.activeTab : ''}`}
                 >
+                    <Settings size={18} />
                     {t('settings.general')}
                 </button>
                 <button
                     onClick={() => setActiveTab('profile')}
-                    style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.375rem',
-                        background: activeTab === 'profile' ? 'var(--color-primary)' : 'var(--color-bg-surface)',
-                        color: activeTab === 'profile' ? '#fff' : 'var(--color-text-main)',
-                        border: '1px solid var(--color-border)',
-                        cursor: 'pointer'
-                    }}
+                    className={`${styles.tabButton} ${activeTab === 'profile' ? styles.activeTab : ''}`}
                 >
+                    <User size={18} />
                     {t('settings.profile')}
                 </button>
                 <button
                     onClick={() => setActiveTab('security')}
-                    style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.375rem',
-                        background: activeTab === 'security' ? 'var(--color-primary)' : 'var(--color-bg-surface)',
-                        color: activeTab === 'security' ? '#fff' : 'var(--color-text-main)',
-                        border: '1px solid var(--color-border)',
-                        cursor: 'pointer'
-                    }}
+                    className={`${styles.tabButton} ${activeTab === 'security' ? styles.activeTab : ''}`}
                 >
+                    <Shield size={18} />
                     {t('settings.security')}
                 </button>
                 <button
                     onClick={() => setActiveTab('communication')}
-                    style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.375rem',
-                        background: activeTab === 'communication' ? 'var(--color-primary)' : 'var(--color-bg-surface)',
-                        color: activeTab === 'communication' ? '#fff' : 'var(--color-text-main)',
-                        border: '1px solid var(--color-border)',
-                        cursor: 'pointer'
-                    }}
+                    className={`${styles.tabButton} ${activeTab === 'communication' ? styles.activeTab : ''}`}
                 >
+                    <Bell size={18} />
                     {t('nav.communication')}
                 </button>
-            </div>
+            </nav>
 
-            {renderTabContent()}
+            <section className={styles.content}>
+                {renderTabContent()}
+            </section>
         </div>
     );
 };
 
 export default SystemSettings;
+

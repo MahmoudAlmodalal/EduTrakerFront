@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Settings, Edit, Trash2 } from 'lucide-react';
+import { Plus, Settings, Edit, Trash2, MapPin, Users, School, Layers, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import Button from '../../components/UI/Button';
-import Modal from '../../components/UI/Modal';
+import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
 import styles from './WorkstreamManagement.module.css';
 
 const WorkstreamManagement = () => {
@@ -11,16 +11,17 @@ const WorkstreamManagement = () => {
 
     // Mock Data
     const [workstreams, setWorkstreams] = useState([
-        { id: 1, name: 'Gaza North', schools: 12, users: 4500, manager: 'John Doe', status: 'Active' },
-        { id: 2, name: 'Gaza South', schools: 8, users: 3200, manager: 'Jane Smith', status: 'Active' },
-        { id: 3, name: 'Khan Younis', schools: 15, users: 5100, manager: 'Pending', status: 'Inactive' },
+        { id: 1, name: 'Gaza North', schools: 12, users: 4500, manager: 'John Doe', status: 'Active', location: 'Jabalia, Gaza North' },
+        { id: 2, name: 'Gaza South', schools: 8, users: 3200, manager: 'Jane Smith', status: 'Active', location: 'Rafah, Gaza South' },
+        { id: 3, name: 'Khan Younis', schools: 15, users: 5100, manager: 'Pending', status: 'Inactive', location: 'Khan Younis Center' },
+        { id: 4, name: 'Mid Area', schools: 10, users: 2800, manager: 'Ahmad Khalil', status: 'Active', location: 'Deir al-Balah' },
     ]);
 
     const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
     const [selectedWorkstream, setSelectedWorkstream] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [currentWorkstreamId, setCurrentWorkstreamId] = useState(null);
-    const [formData, setFormData] = useState({ name: '', quota: '', manager: '' });
+    const [formData, setFormData] = useState({ name: '', quota: '', manager: '', location: '' });
 
     const handleCreateWorkstream = (e) => {
         e.preventDefault();
@@ -28,7 +29,7 @@ const WorkstreamManagement = () => {
         if (isEditing) {
             setWorkstreams(workstreams.map(ws =>
                 ws.id === currentWorkstreamId
-                    ? { ...ws, name: formData.name, manager: formData.manager }
+                    ? { ...ws, name: formData.name, manager: formData.manager, location: formData.location }
                     : ws
             ));
         } else {
@@ -38,7 +39,8 @@ const WorkstreamManagement = () => {
                 schools: 0,
                 users: 0,
                 manager: formData.manager || 'Pending',
-                status: 'Active'
+                status: 'Active',
+                location: formData.location || 'Unknown'
             };
             setWorkstreams([...workstreams, newWorkstream]);
         }
@@ -53,7 +55,8 @@ const WorkstreamManagement = () => {
         setFormData({
             name: ws.name,
             quota: 5000,
-            manager: ws.manager !== 'Pending' ? ws.manager : ''
+            manager: ws.manager !== 'Pending' ? ws.manager : '',
+            location: ws.location || ''
         });
         setIsModalOpen(true);
     };
@@ -61,7 +64,7 @@ const WorkstreamManagement = () => {
     const resetForm = () => {
         setIsEditing(false);
         setCurrentWorkstreamId(null);
-        setFormData({ name: '', quota: '', manager: '' });
+        setFormData({ name: '', quota: '', manager: '', location: '' });
     };
 
     const openCreateModal = () => {
@@ -77,7 +80,10 @@ const WorkstreamManagement = () => {
     return (
         <div className={styles.container}>
             <div className={styles.header}>
-                <h1 className={styles.title}>{t('workstreams.title')}</h1>
+                <div className={styles.titleSection}>
+                    <h1 className={styles.title}>{t('workstreams.title')}</h1>
+                    <p className={styles.subtitle}>Configure and monitor regional workstreams and their infrastructure.</p>
+                </div>
                 <Button variant="primary" icon={Plus} onClick={openCreateModal}>
                     {t('workstreams.create')}
                 </Button>
@@ -87,32 +93,53 @@ const WorkstreamManagement = () => {
                 {workstreams.map((ws) => (
                     <div key={ws.id} className={styles.card}>
                         <div className={styles.cardHeader}>
-                            <h3 className={styles.cardTitle}>{ws.name}</h3>
+                            <div className={styles.workstreamInfo}>
+                                <h3 className={styles.cardTitle}>{ws.name}</h3>
+                                <div className={styles.locationLabel}>
+                                    <MapPin size={12} />
+                                    <span>{ws.location}</span>
+                                </div>
+                            </div>
                             <span className={`${styles.statusBadge} ${ws.status === 'Active' ? styles.active : styles.inactive}`}>
                                 {ws.status === 'Active' ? t('common.active') : t('common.inactive')}
                             </span>
                         </div>
 
                         <div className={styles.cardBody}>
-                            <div className={styles.statRow}>
-                                <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
-                                <span className={styles.statValue}>{ws.schools}</span>
+                            <div className={styles.statsContainer}>
+                                <div className={styles.statItem}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                        <School size={14} style={{ color: 'var(--color-primary)' }} />
+                                        <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
+                                    </div>
+                                    <span className={styles.statValue}>{ws.schools}</span>
+                                </div>
+                                <div className={styles.statItem}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                        <Users size={14} style={{ color: '#8b5cf6' }} />
+                                        <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
+                                    </div>
+                                    <span className={styles.statValue}>{ws.users.toLocaleString()}</span>
+                                </div>
                             </div>
-                            <div className={styles.statRow}>
-                                <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
-                                <span className={styles.statValue}>{ws.users.toLocaleString()}</span>
-                            </div>
-                            <div className={styles.statRow}>
-                                <span className={styles.statLabel}>{t('workstreams.card.manager')}</span>
-                                <span className={styles.statValue}>{ws.manager}</span>
+
+                            <div className={styles.managerSection}>
+                                <div className={styles.managerAvatar}>
+                                    {ws.manager !== 'Pending' ? ws.manager.charAt(0) : '?'}
+                                </div>
+                                <div>
+                                    <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager</p>
+                                    <p className={styles.managerName}>{ws.manager}</p>
+                                </div>
+                                <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
                             </div>
                         </div>
 
                         <div className={styles.cardFooter}>
-                            <Button variant="secondary" size="small" icon={Settings} onClick={() => openConfigModal(ws)}>{t('workstreams.config')}</Button>
                             <div className={styles.actions}>
-                                <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)}><Edit size={16} /></button>
-                                <button className={styles.actionBtn}><Trash2 size={16} /></button>
+                                <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
+                                <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
+                                <button className={`${styles.actionBtn} ${styles.danger}`} title="Delete"><Trash2 size={18} /></button>
                             </div>
                         </div>
                     </div>
@@ -121,39 +148,55 @@ const WorkstreamManagement = () => {
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? t('workstreams.modal.editTitle') : t('workstreams.modal.createTitle')}>
                 <form className={styles.form} onSubmit={handleCreateWorkstream}>
-                    <div className={styles.formGroup}>
-                        <label>{t('workstreams.form.name')}</label>
-                        <input
-                            type="text"
-                            placeholder={t('workstreams.form.namePlaceholder')}
-                            required
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        <div className={styles.formGroup}>
+                            <label>{t('workstreams.form.name')}</label>
+                            <input
+                                type="text"
+                                placeholder={t('workstreams.form.namePlaceholder')}
+                                required
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            />
+                        </div>
+                        <div className={styles.formGroup}>
+                            <label>Regional Location</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Gaza City, Center"
+                                required
+                                value={formData.location}
+                                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                            />
+                        </div>
+                        <div className={styles.formGroup}>
+                            <label>{t('workstreams.form.quota')}</label>
+                            <select
+                                required
+                                value={formData.quota}
+                                onChange={(e) => setFormData({ ...formData, quota: e.target.value })}
+                            >
+                                <option value="">Select quota limit</option>
+                                <option value="5000">5,000 Users</option>
+                                <option value="10000">10,000 Users</option>
+                                <option value="25000">25,000 Users</option>
+                            </select>
+                        </div>
+                        <div className={styles.formGroup}>
+                            <label>{t('workstreams.form.assignManager')}</label>
+                            <select
+                                value={formData.manager}
+                                onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                            >
+                                <option value="">{t('workstreams.form.selectManager')}</option>
+                                <option value="John Doe">John Doe</option>
+                                <option value="Jane Smith">Jane Smith</option>
+                                <option value="Ahmad Khalil">Ahmad Khalil</option>
+                            </select>
+                        </div>
                     </div>
-                    <div className={styles.formGroup}>
-                        <label>{t('workstreams.form.quota')}</label>
-                        <input
-                            type="number"
-                            placeholder="5000"
-                            required
-                            value={formData.quota}
-                            onChange={(e) => setFormData({ ...formData, quota: e.target.value })}
-                        />
-                    </div>
-                    <div className={styles.formGroup}>
-                        <label>{t('workstreams.form.assignManager')}</label>
-                        <select
-                            value={formData.manager}
-                            onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
-                        >
-                            <option value="">{t('workstreams.form.selectManager')}</option>
-                            <option value="John Doe">John Doe</option>
-                            <option value="Jane Smith">Jane Smith</option>
-                        </select>
-                    </div>
-                    <div className={styles.formActions}>
-                        <Button variant="secondary" onClick={() => setIsModalOpen(false)} type="button">{t('common.cancel')}</Button>
+                    <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">{t('common.cancel')}</Button>
                         <Button variant="primary" type="submit">{isEditing ? t('common.save') : t('workstreams.create')}</Button>
                     </div>
                 </form>
@@ -161,24 +204,31 @@ const WorkstreamManagement = () => {
 
             <Modal isOpen={isConfigModalOpen} onClose={() => setIsConfigModalOpen(false)} title={`${t('workstreams.config.title')}: ${selectedWorkstream?.name}`}>
                 <form className={styles.form} onSubmit={(e) => { e.preventDefault(); setIsConfigModalOpen(false); }}>
-                    <div className={styles.formGroup}>
-                        {/* Removed Max Schools Allowed as per requirement */}
-                        {/* <label>Max Schools Allowed</label>
-                        <input type="number" defaultValue="20" /> */}
-                    </div>
-                    <div className={styles.formGroup}>
-                        <label>{t('workstreams.config.maxUsers')}</label>
-                        <input type="number" defaultValue="10000" />
-                    </div>
-                    <div className={styles.formGroup}>
-                        <label>{t('workstreams.config.features')}</label>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                            <label><input type="checkbox" defaultChecked /> {t('workstreams.config.advancedReporting')}</label>
-                            <label><input type="checkbox" defaultChecked /> {t('workstreams.config.apiAccess')}</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        <div className={styles.formGroup}>
+                            <label>{t('workstreams.config.maxUsers')}</label>
+                            <input type="number" defaultValue="10000" />
+                        </div>
+                        <div className={styles.formGroup}>
+                            <label>{t('workstreams.config.features')}</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                    <input type="checkbox" defaultChecked />
+                                    <span>{t('workstreams.config.advancedReporting')}</span>
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                    <input type="checkbox" defaultChecked />
+                                    <span>{t('workstreams.config.apiAccess')}</span>
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                    <input type="checkbox" />
+                                    <span>Multi-school Analytics</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
-                    <div className={styles.formActions}>
-                        <Button variant="secondary" onClick={() => setIsConfigModalOpen(false)} type="button">{t('common.cancel')}</Button>
+                    <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
+                        <Button variant="outline" onClick={() => setIsConfigModalOpen(false)} type="button">{t('common.cancel')}</Button>
                         <Button variant="primary" type="submit">{t('common.save')}</Button>
                     </div>
                 </form>
