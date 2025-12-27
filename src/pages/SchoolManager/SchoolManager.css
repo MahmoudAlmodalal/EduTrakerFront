@@ -1,15 +1,18 @@
 /**
  * School Manager Premium Styles
- * Enhanced with Global Design System
+ * Enhanced with Modern Design System (Indigo/Purple Theme)
  */
 
 @import '../../styles/global-design.css';
 
-/* Role-specific variable aliases for compatibility */
+/* ========================================================================
+   CSS VARIABLES - School Manager Theme (Indigo/Purple)
+   ======================================================================== */
 :root {
-    --sm-primary: var(--color-primary);
-    --sm-primary-light: var(--color-primary-light);
-    --sm-secondary: var(--color-secondary);
+    --sm-primary: #4f46e5;
+    --sm-primary-dark: #4338ca;
+    --sm-primary-light: rgba(79, 70, 229, 0.1);
+    --sm-gradient: linear-gradient(135deg, #4f46e5, #8b5cf6);
     --sm-bg-main: var(--color-bg-body);
     --sm-bg-surface: var(--color-bg-surface);
     --sm-text-main: var(--color-text-main);
@@ -23,39 +26,34 @@
 }
 
 [data-theme='dark'] {
-    --sm-bg-main: var(--color-bg-body);
-    --sm-bg-surface: var(--color-bg-surface);
-    --sm-text-main: var(--color-text-main);
-    --sm-text-muted: var(--color-text-muted);
-    --sm-border: var(--color-border);
-    --sm-shadow-soft: var(--shadow-sm);
-    --sm-shadow-card: var(--shadow-md);
-    --sm-primary-light: var(--color-primary-light);
-}
-
-[data-theme='dark'] {
     --sm-bg-main: #0f172a;
     --sm-bg-surface: #1e293b;
     --sm-text-main: #f8fafc;
     --sm-text-muted: #94a3b8;
     --sm-border: #334155;
-    --sm-shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
-    --sm-shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
     --sm-primary-light: rgba(79, 70, 229, 0.2);
 }
 
+/* ========================================================================
+   LAYOUT
+   ======================================================================== */
 .school-manager-layout {
     display: flex;
     min-height: 100vh;
-    background: var(--sm-bg-main);
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f1f5f9 100%);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Premium Sidebar */
+[data-theme='dark'] .school-manager-layout {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* ========================================================================
+   SIDEBAR
+   ======================================================================== */
 .school-manager-sidebar {
     width: 280px;
-    background: linear-gradient(180deg, var(--sm-bg-surface) 0%, var(--sm-bg-main) 100%);
-    border-right: 1px solid var(--sm-border);
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
     display: flex;
     flex-direction: column;
     padding: var(--spacing-6);
@@ -64,52 +62,47 @@
     top: 0;
     left: 0;
     z-index: var(--z-fixed);
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.02);
+    box-shadow: 10px 0 40px rgba(0, 0, 0, 0.15);
 }
 
 [dir="rtl"] .school-manager-sidebar {
     left: auto;
     right: 0;
-    border-right: none;
-    border-left: 1px solid var(--sm-border);
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.02);
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
 }
 
-[data-theme='dark'] .school-manager-sidebar {
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
-}
-
-[dir="rtl"][data-theme='dark'] .school-manager-sidebar {
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
-}
-
+/* Brand Section */
 .school-manager-brand {
     display: flex;
     align-items: center;
     gap: var(--spacing-3);
-    padding: 0 var(--spacing-3);
     margin-bottom: var(--spacing-8);
+    padding: var(--spacing-4);
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(139, 92, 246, 0.1));
+    border-radius: 16px;
+    border: 1px solid rgba(79, 70, 229, 0.2);
 }
 
 .school-manager-brand svg {
-    color: var(--sm-primary);
-    filter: drop-shadow(0 2px 4px rgba(79, 70, 229, 0.3));
+    color: #8b5cf6;
+    filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.4));
 }
 
 .school-manager-brand span {
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-extrabold);
-    background: linear-gradient(135deg, var(--sm-text-main) 0%, var(--sm-primary) 100%);
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    background: linear-gradient(135deg, #a5b4fc, #c4b5fd);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: -0.025em;
 }
 
+/* Navigation */
 .school-manager-nav {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-2);
+    gap: 6px;
     flex: 1;
 }
 
@@ -117,45 +110,83 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-3);
-    padding: var(--spacing-3) var(--spacing-4);
-    border-radius: var(--sm-radius-lg);
-    color: var(--sm-text-muted);
+    padding: 0.875rem var(--spacing-4);
+    border-radius: 12px;
+    color: rgba(226, 232, 240, 0.7);
     text-decoration: none;
-    font-weight: var(--font-weight-medium);
-    font-size: var(--font-size-sm);
-    transition: all var(--transition-bounce);
+    font-weight: 500;
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
 }
 
-.school-manager-nav-item:hover {
-    background: var(--sm-primary-light);
-    color: var(--sm-primary);
-    transform: translateX(4px);
+.school-manager-nav-item::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(139, 92, 246, 0.1));
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
-[dir="rtl"] .school-manager-nav-item:hover {
-    transform: translateX(-4px);
+.school-manager-nav-item:hover {
+    color: white;
+}
+
+.school-manager-nav-item:hover::before {
+    opacity: 1;
+}
+
+.school-manager-nav-item svg,
+.school-manager-nav-item span {
+    position: relative;
+    z-index: 1;
 }
 
 .school-manager-nav-item.active {
-    background: linear-gradient(135deg, var(--sm-primary), var(--sm-secondary));
+    background: var(--sm-gradient);
     color: white;
-    box-shadow: var(--shadow-md), var(--shadow-glow);
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
 }
 
-.school-manager-nav-item.active:hover {
+.school-manager-nav-item.active::before {
+    opacity: 0;
+}
+
+.school-manager-nav-item.active::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    background: white;
+    border-radius: 4px 0 0 4px;
+}
+
+[dir="rtl"] .school-manager-nav-item.active::after {
+    right: auto;
+    left: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+[dir="rtl"] .school-manager-nav-item:hover {
     transform: none;
 }
 
-/* Main Content Area */
+/* ========================================================================
+   MAIN CONTENT
+   ======================================================================== */
 .school-manager-main {
     flex: 1;
     margin-left: 280px;
     padding: var(--spacing-8);
     background-image:
-        radial-gradient(circle at top right, rgba(79, 70, 229, 0.03), transparent 40%),
-        radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.03), transparent 40%);
+        radial-gradient(circle at top right, rgba(79, 70, 229, 0.04), transparent 40%),
+        radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.03), transparent 40%);
+    min-height: 100vh;
 }
 
 [dir="rtl"] .school-manager-main {
@@ -169,120 +200,323 @@
     }
 }
 
-/* Page Header Styling */
+/* Page Header */
 .sm-page-header {
     margin-bottom: var(--spacing-8);
 }
 
 .sm-page-title {
-    font-size: var(--font-size-3xl);
-    font-weight: var(--font-weight-extrabold);
-    color: var(--sm-text-main);
-    letter-spacing: -0.025em;
-    margin-bottom: var(--spacing-2);
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+    letter-spacing: -0.03em;
+    margin: 0 0 var(--spacing-2) 0;
+    background: linear-gradient(135deg, #0f172a, #334155);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+[data-theme='dark'] .sm-page-title {
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .sm-page-subtitle {
-    color: var(--sm-text-muted);
-    font-size: var(--font-size-base);
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    margin: 0;
 }
 
-/* Utility Classes */
+/* ========================================================================
+   PREMIUM CARDS
+   ======================================================================== */
 .card-premium {
-    background: var(--sm-bg-surface);
-    border-radius: var(--sm-radius-xl);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: var(--sm-shadow-card);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    background: var(--color-bg-surface);
+    border-radius: 20px;
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.card-premium::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--sm-gradient);
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .card-premium:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.08);
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(79, 70, 229, 0.1);
+    border-color: rgba(79, 70, 229, 0.2);
 }
 
-/* RTL Support for School Manager */
-[dir="rtl"] .school-manager-sidebar {
-    left: auto;
-    right: 0;
-    border-right: none;
-    border-left: 1px solid var(--sm-border);
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.02);
-}
-
-[dir="rtl"] .school-manager-main {
-    margin-left: 0;
-    margin-right: 260px;
-}
-
-[dir="rtl"] .school-manager-nav-item:hover {
-    transform: translateX(-4px);
-}
-
-/* Dark Mode Overrides for School Manager */
-[data-theme='dark'] .school-manager-sidebar {
-    background: linear-gradient(180deg, var(--sm-bg-surface) 0%, var(--sm-bg-main) 100%);
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+.card-premium:hover::before {
+    opacity: 1;
 }
 
 [data-theme='dark'] .card-premium {
-    border: 1px solid var(--sm-border);
+    background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(51, 65, 85, 0.5);
 }
 
 [data-theme='dark'] .card-premium:hover {
-    box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
-/* Dark mode for inputs, selects */
-[data-theme='dark'] input,
-[data-theme='dark'] select,
-[data-theme='dark'] textarea {
-    background-color: var(--sm-bg-surface) !important;
-    color: var(--sm-text-main) !important;
-    border-color: var(--sm-border) !important;
+/* ========================================================================
+   MANAGEMENT CARDS & TABLES
+   ======================================================================== */
+.management-card {
+    background: var(--color-bg-surface);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--color-border-subtle);
+    overflow: hidden;
 }
 
-/* Dark mode for management cards */
-[data-theme='dark'] .management-card {
-    background-color: var(--sm-bg-surface);
-    border-color: var(--sm-border);
+.table-header-actions {
+    padding: var(--spacing-5) var(--spacing-6);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.8), transparent);
 }
 
-/* Dark mode for data tables */
-[data-theme='dark'] .data-table th,
-[data-theme='dark'] .data-table td {
-    color: var(--sm-text-main);
-    border-color: var(--sm-border);
+[data-theme='dark'] .table-header-actions {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.5), transparent);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.data-table th {
+    background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+    padding: var(--spacing-4) var(--spacing-6);
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--color-border-subtle);
 }
 
 [data-theme='dark'] .data-table th {
-    background-color: var(--sm-bg-main);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.6));
+    color: var(--sm-text-muted);
 }
 
-[data-theme='dark'] .data-table tr:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+[dir="rtl"] .data-table th,
+[dir="rtl"] .data-table td {
+    text-align: right;
 }
 
-/* Dark mode for chart titles */
+.data-table td {
+    padding: var(--spacing-4) var(--spacing-6);
+    color: var(--color-text-main);
+    border-bottom: 1px solid var(--color-border-subtle);
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+}
+
+.data-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.data-table tbody tr:hover {
+    background: linear-gradient(90deg, rgba(79, 70, 229, 0.04), transparent);
+}
+
+.data-table tbody tr:hover td:first-child {
+    border-left: 3px solid #4f46e5;
+}
+
+[dir="rtl"] .data-table tbody tr:hover td:first-child {
+    border-left: none;
+    border-right: 3px solid #4f46e5;
+}
+
+/* ========================================================================
+   BUTTONS
+   ======================================================================== */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--sm-gradient);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    border: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
+}
+
+/* ========================================================================
+   STATUS BADGES
+   ======================================================================== */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.status-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.status-active,
+.status-badge.active {
+    background: linear-gradient(135deg, rgba(5, 150, 105, 0.1), rgba(16, 185, 129, 0.15));
+    color: #059669;
+    border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+.status-active::before,
+.status-badge.active::before {
+    background: #059669;
+    box-shadow: 0 0 8px rgba(5, 150, 105, 0.5);
+}
+
+.status-inactive,
+.status-badge.inactive {
+    background: rgba(100, 116, 139, 0.1);
+    color: #64748b;
+    border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.status-inactive::before,
+.status-badge.inactive::before {
+    background: #94a3b8;
+}
+
+[data-theme='dark'] .status-active,
+[data-theme='dark'] .status-badge.active {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+[data-theme='dark'] .status-inactive,
+[data-theme='dark'] .status-badge.inactive {
+    background: rgba(100, 116, 139, 0.2);
+    color: #94a3b8;
+}
+
+/* ========================================================================
+   CHART CARDS
+   ======================================================================== */
+.chart-card {
+    background: var(--color-bg-surface);
+    padding: var(--spacing-6);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--color-border-subtle);
+}
+
+.chart-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chart-title::before {
+    content: '';
+    width: 4px;
+    height: 20px;
+    background: var(--sm-gradient);
+    border-radius: 4px;
+}
+
+[data-theme='dark'] .chart-card {
+    background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(51, 65, 85, 0.5);
+}
+
 [data-theme='dark'] .chart-title {
     color: var(--sm-text-main);
 }
 
-/* Dark mode for school manager titles */
-[data-theme='dark'] .school-manager-title {
-    color: var(--sm-text-main);
+/* ========================================================================
+   FORM ELEMENTS
+   ======================================================================== */
+[data-theme='dark'] input,
+[data-theme='dark'] select,
+[data-theme='dark'] textarea {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+    color: var(--sm-text-main) !important;
+    border-color: rgba(51, 65, 85, 0.5) !important;
 }
 
-[data-theme='dark'] .school-manager-subtitle {
-    color: var(--sm-text-muted);
+/* ========================================================================
+   ANIMATIONS
+   ======================================================================== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-/* Dark mode for placeholder/empty states */
-[data-theme='dark'] .management-card div[style*="background: #f8fafc"] {
-    background: var(--sm-bg-main) !important;
+.school-manager-main>* {
+    animation: fadeIn 0.5s ease-out;
 }
 
-/* Dark mode for status badges in school manager */
-[data-theme='dark'] .status-badge {
-    color: var(--sm-text-main);
+/* ========================================================================
+   RESPONSIVE
+   ======================================================================== */
+@media (max-width: 768px) {
+    .school-manager-sidebar {
+        transform: translateX(-100%);
+    }
+
+    [dir="rtl"] .school-manager-sidebar {
+        transform: translateX(100%);
+    }
+
+    .school-manager-main {
+        margin-left: 0;
+        margin-right: 0;
+    }
 }

@@ -4,12 +4,12 @@ import {
     LayoutDashboard,
     Settings,
     LogOut,
-    BookOpen,
     FileBarChart,
     Users,
     Briefcase,
     UserCheck,
-    GraduationCap
+    Sparkles,
+    Bell
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +17,7 @@ import '../pages/SchoolManager/SchoolManager.css';
 
 const SchoolManagerLayout = () => {
     const { t } = useTheme();
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
 
     const navItems = [
@@ -35,14 +35,53 @@ const SchoolManagerLayout = () => {
         navigate('/login');
     };
 
+    const getInitials = () => {
+        if (user?.name) {
+            return user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+        return 'SM';
+    };
+
     return (
         <div className="school-manager-layout">
             <aside className="school-manager-sidebar">
+                {/* Brand Section */}
                 <div className="school-manager-brand">
-                    <GraduationCap size={32} />
+                    <Sparkles size={28} />
                     <span>{t('app.name')}</span>
                 </div>
 
+                {/* Quick Stats */}
+                <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginBottom: '24px'
+                }}>
+                    <div style={{
+                        flex: 1,
+                        background: 'rgba(79, 70, 229, 0.1)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        textAlign: 'center',
+                        border: '1px solid rgba(79, 70, 229, 0.2)'
+                    }}>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>156</div>
+                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Teachers</div>
+                    </div>
+                    <div style={{
+                        flex: 1,
+                        background: 'rgba(14, 165, 233, 0.1)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        textAlign: 'center',
+                        border: '1px solid rgba(14, 165, 233, 0.2)'
+                    }}>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>2.4K</div>
+                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Students</div>
+                    </div>
+                </div>
+
+                {/* Navigation */}
                 <nav className="school-manager-nav">
                     {navItems.map((item) => (
                         <NavLink
@@ -58,15 +97,97 @@ const SchoolManagerLayout = () => {
                     ))}
                 </nav>
 
-                <div style={{ marginTop: 'auto' }}>
-                    <button
-                        className="school-manager-nav-item"
-                        style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                        onClick={handleLogout}
-                    >
-                        <LogOut size={20} />
-                        <span>{t('auth.logout')}</span>
-                    </button>
+                {/* User Profile Section */}
+                <div style={{
+                    marginTop: 'auto',
+                    paddingTop: '20px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.06)'
+                }}>
+                    {/* Notification Bell */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        borderRadius: '12px',
+                        marginBottom: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                    }}>
+                        <div style={{ position: 'relative' }}>
+                            <Bell size={18} style={{ color: 'rgba(226, 232, 240, 0.7)' }} />
+                            <span style={{
+                                position: 'absolute',
+                                top: '-4px',
+                                right: '-4px',
+                                width: '8px',
+                                height: '8px',
+                                background: '#8b5cf6',
+                                borderRadius: '50%',
+                                border: '2px solid #0f172a'
+                            }}></span>
+                        </div>
+                        <span style={{ fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)' }}>5 new notifications</span>
+                    </div>
+
+                    {/* User Card */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.05)'
+                    }}>
+                        <div style={{
+                            width: '42px',
+                            height: '42px',
+                            background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontWeight: '700',
+                            fontSize: '0.875rem',
+                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
+                        }}>
+                            {getInitials()}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                color: 'white'
+                            }}>{user?.name || 'School Manager'}</div>
+                            <div style={{
+                                fontSize: '0.6875rem',
+                                color: 'rgba(148, 163, 184, 0.8)',
+                                textTransform: 'capitalize'
+                            }}>School Manager</div>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            style={{
+                                width: '36px',
+                                height: '36px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                borderRadius: '10px',
+                                color: 'rgba(148, 163, 184, 0.8)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                            title={t('auth.logout')}
+                        >
+                            <LogOut size={16} />
+                        </button>
+                    </div>
                 </div>
             </aside>
 

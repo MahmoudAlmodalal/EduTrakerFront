@@ -25,16 +25,22 @@
 }
 
 .pageTitle {
-    font-size: 2.25rem;
+    font-size: 2rem;
     font-weight: 800;
-    color: var(--sm-text-main);
+    color: var(--color-text-main);
     letter-spacing: -0.03em;
     margin: 0;
-    background: linear-gradient(135deg, var(--sm-text-main) 0%, var(--sm-primary) 100%);
+    background: linear-gradient(135deg, #0f172a, #334155);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    /* Standard property for compatibility */
+}
+
+:global([data-theme='dark']) .pageTitle {
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .statsGrid {
@@ -45,20 +51,20 @@
 }
 
 .statCard {
-    background: #ffffff;
-    border-radius: 1rem;
+    background: var(--color-bg-surface);
+    border-radius: 20px;
     padding: 1.5rem;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--color-border-subtle);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .statCard:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    border-color: var(--sm-primary-light);
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(79, 70, 229, 0.1);
+    border-color: rgba(79, 70, 229, 0.2);
 }
 
 .statCard::before {
@@ -68,7 +74,7 @@
     left: 0;
     width: 100%;
     height: 4px;
-    background: linear-gradient(90deg, var(--sm-primary), var(--sm-secondary));
+    background: linear-gradient(90deg, #4f46e5, #8b5cf6);
     opacity: 0;
     transition: opacity 0.3s ease;
 }
@@ -85,45 +91,46 @@
 }
 
 .statTitle {
-    color: var(--sm-text-muted);
-    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
 .iconWrapper {
-    padding: 0.75rem;
-    border-radius: 0.75rem;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
 }
 
-/* Icon Colors using variables to match theme but with specific tints */
 .iconWrapper.blue {
-    background-color: #eff6ff;
-    color: #3b82f6;
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    color: #2563eb;
 }
 
 .iconWrapper.green {
-    background-color: #f0fdf4;
-    color: #22c55e;
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    color: #059669;
 }
 
 .iconWrapper.purple {
-    background-color: #faf5ff;
-    color: #a855f7;
+    background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+    color: #7c3aed;
 }
 
 .iconWrapper.orange {
-    background-color: #fff7ed;
-    color: #f97316;
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    color: #d97706;
 }
 
 .statCard:hover .iconWrapper {
-    transform: scale(1.1) rotate(5deg);
+    transform: scale(1.1);
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.2);
 }
 
 .statBody {
@@ -135,24 +142,30 @@
 .statValue {
     font-size: 2.25rem;
     font-weight: 800;
-    color: var(--sm-text-main);
+    color: var(--color-text-main);
     line-height: 1;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
 }
 
 .statChange {
     display: inline-flex;
     align-items: center;
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    width: fit-content;
 }
 
 .positive {
-    color: #10b981;
+    color: #059669;
+    background: rgba(5, 150, 105, 0.1);
 }
 
 .negative {
-    color: #ef4444;
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
 }
 
 .contentGrid {
@@ -168,11 +181,11 @@
 }
 
 .chartCard {
-    background: #ffffff;
-    border-radius: 1rem;
+    background: var(--color-bg-surface);
+    border-radius: 20px;
     padding: 1.5rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    border: 1px solid var(--sm-border);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--color-border-subtle);
     height: 100%;
     min-height: 400px;
 }
@@ -180,11 +193,19 @@
 .cardTitle {
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--sm-text-main);
+    color: var(--color-text-main);
     margin-bottom: 1.5rem;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 10px;
+}
+
+.cardTitle::before {
+    content: '';
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #4f46e5, #8b5cf6);
+    border-radius: 4px;
 }
 
 .chartContainer {
@@ -194,33 +215,31 @@
 
 /* Dark Mode Overrides */
 :global([data-theme='dark']) .statCard {
-    background: var(--sm-bg-surface);
-    border-color: var(--sm-border);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(51, 65, 85, 0.5);
 }
 
 :global([data-theme='dark']) .statCard:hover {
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
 :global([data-theme='dark']) .chartCard {
-    background: var(--sm-bg-surface);
-    border-color: var(--sm-border);
+    background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(51, 65, 85, 0.5);
 }
 
-/* Dark mode icon wrapper backgrounds */
 :global([data-theme='dark']) .iconWrapper.blue {
-    background-color: rgba(59, 130, 246, 0.2);
+    background: rgba(37, 99, 235, 0.2);
 }
 
 :global([data-theme='dark']) .iconWrapper.green {
-    background-color: rgba(34, 197, 94, 0.2);
+    background: rgba(5, 150, 105, 0.2);
 }
 
 :global([data-theme='dark']) .iconWrapper.purple {
-    background-color: rgba(168, 85, 247, 0.2);
+    background: rgba(124, 58, 237, 0.2);
 }
 
 :global([data-theme='dark']) .iconWrapper.orange {
-    background-color: rgba(249, 115, 22, 0.2);
+    background: rgba(217, 119, 6, 0.2);
 }

@@ -1,31 +1,59 @@
 import React from 'react';
-import { School, Users, GraduationCap, TrendingUp, TrendingDown } from 'lucide-react';
+import { School, Users, GraduationCap, TrendingUp, TrendingDown, Activity, Award } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import './Workstream.css';
 
 const WorkstreamDashboard = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
 
     // Mock Data
     const stats = [
-        { title: t('workstream.dashboard.totalSchools'), value: '12', icon: School, trend: '+2 this month', trendUp: true },
-        { title: t('workstream.dashboard.totalStudents'), value: '3,450', icon: GraduationCap, trend: '+150 this month', trendUp: true },
-        { title: t('workstream.dashboard.totalTeachers'), value: '245', icon: Users, trend: '-3 this month', trendUp: false },
+        { title: t('workstream.dashboard.totalSchools'), value: '12', icon: School, trend: '+2 this month', trendUp: true, color: 'purple' },
+        { title: t('workstream.dashboard.totalStudents'), value: '3,450', icon: GraduationCap, trend: '+150 this month', trendUp: true, color: 'blue' },
+        { title: t('workstream.dashboard.totalTeachers'), value: '245', icon: Users, trend: '-3 this month', trendUp: false, color: 'indigo' },
+        { title: 'Avg. Performance', value: '87%', icon: Award, trend: '+5% this term', trendUp: true, color: 'green' },
     ];
 
     const schoolPerformance = [
-        { name: 'School A', score: 85 },
-        { name: 'School B', score: 92 },
-        { name: 'School C', score: 78 },
-        { name: 'School D', score: 88 },
-        { name: 'School E', score: 65 },
-        { name: 'School F', score: 95 },
+        { name: 'Al-Noor Academy', score: 92, students: 420 },
+        { name: 'Gaza Central', score: 88, students: 380 },
+        { name: 'Al-Quds School', score: 85, students: 350 },
+        { name: 'Hope Academy', score: 78, students: 290 },
+        { name: 'Al-Aqsa School', score: 95, students: 450 },
+        { name: 'Sunrise School', score: 72, students: 260 },
     ];
+
+    const recentActivity = [
+        { action: 'New teacher assigned', school: 'Al-Noor Academy', time: '2 hours ago', type: 'info' },
+        { action: 'Performance report submitted', school: 'Gaza Central', time: '5 hours ago', type: 'success' },
+        { action: 'Student enrollment approved', school: 'Hope Academy', time: '1 day ago', type: 'info' },
+        { action: 'Budget request pending', school: 'Al-Quds School', time: '2 days ago', type: 'warning' },
+    ];
+
+    const getScoreColor = (score) => {
+        if (score >= 90) return '#059669';
+        if (score >= 80) return '#0ea5e9';
+        if (score >= 70) return '#8b5cf6';
+        return '#dc2626';
+    };
+
+    const getIconStyle = (color) => {
+        const styles = {
+            purple: { background: 'linear-gradient(135deg, #ede9fe, #ddd6fe)', color: '#7c3aed' },
+            blue: { background: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', color: '#2563eb' },
+            indigo: { background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4f46e5' },
+            green: { background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#059669' }
+        };
+        return styles[color] || styles.purple;
+    };
 
     return (
         <div className="workstream-dashboard">
+            {/* Header */}
             <div className="workstream-header">
-                <h1 className="workstream-title">{t('workstream.dashboard.title')}</h1>
+                <h1 className="workstream-title">Welcome back, {user?.name?.split(' ')[0] || 'Manager'}! 👋</h1>
                 <p className="workstream-subtitle">{t('workstream.dashboard.subtitle')}</p>
             </div>
 
@@ -35,69 +63,149 @@ const WorkstreamDashboard = () => {
                     <div key={index} className="stat-card">
                         <div className="stat-header">
                             <span className="stat-title">{stat.title}</span>
-                            <div className="stat-icon">
-                                <stat.icon size={20} />
+                            <div className="stat-icon" style={getIconStyle(stat.color)}>
+                                <stat.icon size={22} />
                             </div>
                         </div>
                         <div className="stat-value">{stat.value}</div>
                         <div className="stat-trend">
-                            {stat.trendUp ? <TrendingUp size={16} className="trend-up" /> : <TrendingDown size={16} className="trend-down" />}
+                            {stat.trendUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                             <span className={stat.trendUp ? 'trend-up' : 'trend-down'}>{stat.trend}</span>
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Charts Section */}
-            <div className="charts-grid">
-                {/* Academic Performance Chart */}
+            {/* Content Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+                {/* School Performance Chart */}
                 <div className="chart-card">
                     <div className="chart-header">
                         <h3 className="chart-title">{t('workstream.dashboard.academicPerformance')}</h3>
                     </div>
-                    <div className="css-chart-container">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {schoolPerformance.map((school, index) => (
-                            <div key={index} className="css-bar-group">
-                                <div
-                                    className="css-bar"
-                                    style={{ height: `${school.score * 1.5}px` }}
-                                    data-value={`${school.score}%`}
-                                ></div>
-                                <span className="legend-item" style={{ fontSize: '10px' }}>{school.name}</span>
+                            <div key={index} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '16px',
+                                padding: '12px 16px',
+                                background: 'var(--color-bg-hover)',
+                                borderRadius: '12px',
+                                transition: 'all 0.2s ease'
+                            }}>
+                                <div style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '10px',
+                                    background: `linear-gradient(135deg, ${getScoreColor(school.score)}20, ${getScoreColor(school.score)}10)`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: getScoreColor(school.score),
+                                    fontWeight: '700',
+                                    fontSize: '0.875rem'
+                                }}>
+                                    {school.score}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '4px' }}>{school.name}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{school.students} students</div>
+                                </div>
+                                <div style={{ width: '120px' }}>
+                                    <div style={{
+                                        height: '8px',
+                                        background: 'var(--color-border-subtle)',
+                                        borderRadius: '4px',
+                                        overflow: 'hidden'
+                                    }}>
+                                        <div style={{
+                                            width: `${school.score}%`,
+                                            height: '100%',
+                                            background: `linear-gradient(90deg, ${getScoreColor(school.score)}, ${getScoreColor(school.score)}aa)`,
+                                            borderRadius: '4px',
+                                            transition: 'width 0.5s ease'
+                                        }}></div>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Enrollment Trends (Mocked Dual Bar) */}
+                {/* Recent Activity */}
                 <div className="chart-card">
                     <div className="chart-header">
-                        <h3 className="chart-title">{t('workstream.dashboard.enrollmentTrends')}</h3>
+                        <h3 className="chart-title">
+                            <Activity size={18} style={{ marginRight: '8px' }} />
+                            Recent Activity
+                        </h3>
                     </div>
-                    <div className="css-chart-container">
-                        {[1, 2, 3, 4, 5].map((item) => (
-                            <div key={item} className="css-bar-group">
-                                <div
-                                    className="css-bar"
-                                    style={{ height: `${Math.random() * 80 + 40}px`, width: '20px' }}
-                                ></div>
-                                <div
-                                    className="css-bar secondary"
-                                    style={{ height: `${Math.random() * 60 + 20}px`, width: '20px' }}
-                                ></div>
-                                <span className="legend-item" style={{ fontSize: '10px' }}>Month {item}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {recentActivity.map((activity, index) => (
+                            <div key={index} style={{
+                                display: 'flex',
+                                gap: '12px',
+                                padding: '12px',
+                                background: 'var(--color-bg-hover)',
+                                borderRadius: '12px',
+                                borderLeft: `3px solid ${activity.type === 'success' ? '#059669' :
+                                        activity.type === 'warning' ? '#8b5cf6' : '#4f46e5'
+                                    }`
+                            }}>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)', fontSize: '0.875rem', marginBottom: '4px' }}>
+                                        {activity.action}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                        {activity.school}
+                                    </div>
+                                </div>
+                                <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-light)', whiteSpace: 'nowrap' }}>
+                                    {activity.time}
+                                </div>
                             </div>
                         ))}
                     </div>
-                    <div className="chart-legend">
-                        <div className="legend-item">
-                            <div className="legend-color" style={{ backgroundColor: 'var(--color-primary)' }}></div>
-                            <span>New Enrollments</span>
-                        </div>
-                        <div className="legend-item">
-                            <div className="legend-color" style={{ backgroundColor: 'var(--color-info)' }}></div>
-                            <span>Graduates</span>
-                        </div>
+                </div>
+            </div>
+
+            {/* Enrollment Trends */}
+            <div className="chart-card" style={{ marginTop: '24px' }}>
+                <div className="chart-header">
+                    <h3 className="chart-title">{t('workstream.dashboard.enrollmentTrends')}</h3>
+                </div>
+                <div className="css-chart-container" style={{ height: '180px' }}>
+                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, index) => {
+                        const enrollment = [85, 92, 78, 95, 88, 102][index];
+                        const graduates = [45, 52, 48, 55, 62, 58][index];
+                        return (
+                            <div key={month} className="css-bar-group">
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
+                                    <div
+                                        className="css-bar"
+                                        style={{ height: `${enrollment * 1.2}px`, width: '24px' }}
+                                        data-value={enrollment}
+                                    ></div>
+                                    <div
+                                        className="css-bar secondary"
+                                        style={{ height: `${graduates * 1.2}px`, width: '24px' }}
+                                        data-value={graduates}
+                                    ></div>
+                                </div>
+                                <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', marginTop: '8px' }}>{month}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="chart-legend">
+                    <div className="legend-item">
+                        <div className="legend-color" style={{ background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)' }}></div>
+                        <span>New Enrollments</span>
+                    </div>
+                    <div className="legend-item">
+                        <div className="legend-color" style={{ background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)' }}></div>
+                        <span>Graduates</span>
                     </div>
                 </div>
             </div>

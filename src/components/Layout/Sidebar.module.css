@@ -1,6 +1,6 @@
 .sidebar {
     width: 280px;
-    background-color: var(--color-bg-sidebar);
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
     height: 100vh;
     position: fixed;
     inset-inline-start: 0;
@@ -9,7 +9,7 @@
     flex-direction: column;
     transition: transform var(--transition-slow) cubic-bezier(0.4, 0, 0.2, 1);
     z-index: var(--z-sidebar);
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 10px 0 40px rgba(0, 0, 0, 0.15);
     border: none;
 }
 
@@ -21,25 +21,39 @@
     transform: translateX(100%);
 }
 
+/* Brand Section */
 .logo {
     height: 80px;
     display: flex;
     align-items: center;
     padding: 0 var(--spacing-6);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(14, 165, 233, 0.05));
 }
 
 .logoIcon {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg, var(--color-primary), #6366f1);
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #4f46e5, #8b5cf6);
     color: white;
-    border-radius: var(--radius-lg);
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
     margin-inline-end: var(--spacing-4);
+    position: relative;
+}
+
+.logoIcon::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #4f46e5, #8b5cf6);
+    opacity: 0.3;
+    z-index: -1;
+    filter: blur(8px);
 }
 
 .logoText {
@@ -47,8 +61,13 @@
     font-size: var(--font-size-xl);
     color: white;
     letter-spacing: -0.025em;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
+/* Navigation */
 .nav {
     flex: 1;
     padding: var(--spacing-6) var(--spacing-4);
@@ -68,62 +87,118 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-1);
+    gap: 4px;
 }
 
 .link {
     display: flex;
     align-items: center;
-    padding: 0.75rem var(--spacing-4);
-    color: var(--color-text-on-sidebar);
+    padding: 0.875rem var(--spacing-4);
+    color: rgba(226, 232, 240, 0.7);
     font-weight: 500;
-    border-radius: var(--radius-lg);
-    transition: all var(--transition-fast);
+    border-radius: 12px;
+    transition: all 0.2s ease;
     gap: var(--spacing-3);
     text-decoration: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.link::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(139, 92, 246, 0.1));
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
 .link:hover {
-    background-color: rgba(255, 255, 255, 0.05);
     color: white;
-    transform: translateX(4px);
+}
+
+.link:hover::before {
+    opacity: 1;
+}
+
+.link svg {
+    position: relative;
+    z-index: 1;
+}
+
+.linkText {
+    position: relative;
+    z-index: 1;
 }
 
 [dir="rtl"] .link:hover {
-    transform: translateX(-4px);
+    transform: none;
 }
 
 .active {
-    background-color: var(--color-primary) !important;
+    background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
     color: white !important;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.3);
 }
 
+.active::before {
+    opacity: 0 !important;
+}
+
+.active::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    background: white;
+    border-radius: 4px 0 0 4px;
+}
+
+[dir="rtl"] .active::after {
+    right: auto;
+    left: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+/* User Profile Footer */
 .footer {
-    padding: var(--spacing-6) var(--spacing-4);
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    background-color: rgba(0, 0, 0, 0.2);
+    padding: var(--spacing-5) var(--spacing-4);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(8px);
 }
 
 .userProfile {
     display: flex;
     align-items: center;
     gap: var(--spacing-3);
-    padding: var(--spacing-2);
+    padding: var(--spacing-3);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+}
+
+.userProfile:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .avatar {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg, var(--slate-700), var(--slate-800));
+    width: 42px;
+    height: 42px;
+    background: linear-gradient(135deg, #4f46e5, #8b5cf6);
     color: white;
-    border-radius: var(--radius-full);
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     font-size: var(--font-size-sm);
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
 }
 
 .userInfo {
@@ -143,7 +218,34 @@
 }
 
 .userRole {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-light);
+    font-size: 0.6875rem;
+    color: rgba(148, 163, 184, 0.8);
     text-transform: capitalize;
+    font-weight: 500;
+}
+
+.logoutBtn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px;
+    color: rgba(148, 163, 184, 0.8) !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: auto;
+}
+
+.logoutBtn:hover {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+    color: #ef4444 !important;
+}
+
+[dir="rtl"] .logoutBtn {
+    margin-left: 0;
+    margin-right: auto;
 }

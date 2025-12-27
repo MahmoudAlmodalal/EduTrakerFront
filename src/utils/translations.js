@@ -765,7 +765,12 @@ export const translations = {
         'student.nav.subjects': 'Subjects',
         'student.nav.results': 'Academic Results',
         'student.nav.attendance': 'Attendance',
+        'student.nav.communication': 'Messages',
         'student.nav.settings': 'Settings',
+
+        // Student Communication
+        'student.communication.title': 'Messages',
+        'student.communication.subtitle': 'Communicate with teachers and staff',
 
         // Student Settings
         'student.settings.title': 'Settings',
@@ -908,7 +913,7 @@ export const translations = {
     },
     ar: {
         // Sidebar
-        'app.name': 'إديو تراكر',
+        'app.name': 'EduTraker',
         'nav.dashboard': 'لوحة المعلومات',
         'nav.userManagement': 'إدارة المستخدمين',
         'nav.workstreams': 'مسارات العمل',
@@ -1668,7 +1673,12 @@ export const translations = {
         'student.nav.subjects': 'المواد',
         'student.nav.results': 'النتائج الأكاديمية',
         'student.nav.attendance': 'الحضور',
+        'student.nav.communication': 'الرسائل',
         'student.nav.settings': 'الإعدادات',
+
+        // Student Communication
+        'student.communication.title': 'الرسائل',
+        'student.communication.subtitle': 'التواصل مع المعلمين والموظفين',
 
         // Student Settings
         'student.settings.title': 'الإعدادات',
