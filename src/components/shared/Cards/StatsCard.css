@@ -1,0 +1,263 @@
+/**
+ * Stats Card Styles
+ * Unified styling for statistics cards across all roles
+ */
+
+/* ==================== Stats Card Grid ==================== */
+.stats-card-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.stats-card-grid--cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.stats-card-grid--cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.stats-card-grid--cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1200px) {
+    .stats-card-grid--cols-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stats-card-grid--cols-3 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+
+    .stats-card-grid--cols-4,
+    .stats-card-grid--cols-3,
+    .stats-card-grid--cols-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==================== Stats Card ==================== */
+.stats-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--color-bg-surface, white);
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stats-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.stats-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
+}
+
+.stats-card:hover::before {
+    opacity: 1;
+}
+
+.stats-card--clickable {
+    cursor: pointer;
+}
+
+.stats-card--clickable:active {
+    transform: translateY(0);
+}
+
+/* ==================== Icon Container ==================== */
+.stats-card__icon-container {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ==================== Content ==================== */
+.stats-card__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.stats-card__title {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-text-muted, #64748b);
+    margin: 0 0 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.stats-card__value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-text-main, #1e293b);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.stats-card__footer {
+    margin-top: 0.5rem;
+}
+
+.stats-card__change {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 20px;
+    background: var(--color-bg-muted, #f1f5f9);
+    color: var(--color-text-muted, #64748b);
+}
+
+.stats-card__change--positive {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+.stats-card__change--negative {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
+.stats-card__subtitle {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted, #64748b);
+}
+
+/* ==================== Color Variants ==================== */
+/* Primary */
+.stats-card--primary .stats-card__icon-container {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(79, 70, 229, 0.08) 100%);
+    color: #4f46e5;
+}
+
+.stats-card--primary::before {
+    background: linear-gradient(90deg, #4f46e5, #6366f1);
+}
+
+/* Success */
+.stats-card--success .stats-card__icon-container {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%);
+    color: #059669;
+}
+
+.stats-card--success::before {
+    background: linear-gradient(90deg, #059669, #10b981);
+}
+
+/* Warning */
+.stats-card--warning .stats-card__icon-container {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.08) 100%);
+    color: #d97706;
+}
+
+.stats-card--warning::before {
+    background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+
+/* Danger */
+.stats-card--danger .stats-card__icon-container {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.08) 100%);
+    color: #dc2626;
+}
+
+.stats-card--danger::before {
+    background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+
+/* Info */
+.stats-card--info .stats-card__icon-container {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(14, 165, 233, 0.08) 100%);
+    color: #0284c7;
+}
+
+.stats-card--info::before {
+    background: linear-gradient(90deg, #0284c7, #0ea5e9);
+}
+
+/* ==================== Loading Skeleton ==================== */
+.stats-card--loading {
+    pointer-events: none;
+}
+
+.stats-card__skeleton {
+    background: linear-gradient(90deg,
+            var(--color-bg-muted, #f1f5f9) 25%,
+            var(--color-bg-body, #e2e8f0) 50%,
+            var(--color-bg-muted, #f1f5f9) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+}
+
+.stats-card__skeleton--icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+}
+
+.stats-card__skeleton--title {
+    width: 60%;
+    height: 14px;
+    margin-bottom: 0.5rem;
+}
+
+.stats-card__skeleton--value {
+    width: 40%;
+    height: 28px;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ==================== Dark Mode ==================== */
+[data-theme="dark"] .stats-card {
+    background: var(--color-bg-surface, #1e1e2e);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .stats-card__value {
+    color: var(--color-text-main, #f1f5f9);
+}
+
+[data-theme="dark"] .stats-card__change {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .stats-card__skeleton {
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.05) 25%,
+            rgba(255, 255, 255, 0.1) 50%,
+            rgba(255, 255, 255, 0.05) 75%);
+    background-size: 200% 100%;
+}

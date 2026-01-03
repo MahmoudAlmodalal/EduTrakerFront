@@ -1,0 +1,522 @@
+/**
+ * School Manager Premium Styles
+ * Enhanced with Modern Design System (Indigo/Purple Theme)
+ */
+
+@import '../../styles/global-design.css';
+
+/* ========================================================================
+   CSS VARIABLES - School Manager Theme (Indigo/Purple)
+   ======================================================================== */
+:root {
+    --sm-primary: #4f46e5;
+    --sm-primary-dark: #4338ca;
+    --sm-primary-light: rgba(79, 70, 229, 0.1);
+    --sm-gradient: linear-gradient(135deg, #4f46e5, #8b5cf6);
+    --sm-bg-main: var(--color-bg-body);
+    --sm-bg-surface: var(--color-bg-surface);
+    --sm-text-main: var(--color-text-main);
+    --sm-text-muted: var(--color-text-muted);
+    --sm-border: var(--color-border);
+    --sm-shadow-soft: var(--shadow-sm);
+    --sm-shadow-card: var(--shadow-md);
+    --sm-radius-xl: var(--radius-xl);
+    --sm-radius-lg: var(--radius-lg);
+    --sm-radius-md: var(--radius-md);
+}
+
+[data-theme='dark'] {
+    --sm-bg-main: #0f172a;
+    --sm-bg-surface: #1e293b;
+    --sm-text-main: #f8fafc;
+    --sm-text-muted: #94a3b8;
+    --sm-border: #334155;
+    --sm-primary-light: rgba(79, 70, 229, 0.2);
+}
+
+/* ========================================================================
+   LAYOUT
+   ======================================================================== */
+.school-manager-layout {
+    display: flex;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f1f5f9 100%);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+[data-theme='dark'] .school-manager-layout {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* ========================================================================
+   SIDEBAR
+   ======================================================================== */
+.school-manager-sidebar {
+    width: 280px;
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-6);
+    position: fixed;
+    height: 100vh;
+    top: 0;
+    left: 0;
+    z-index: var(--z-fixed);
+    box-shadow: 10px 0 40px rgba(0, 0, 0, 0.15);
+}
+
+[dir="rtl"] .school-manager-sidebar {
+    left: auto;
+    right: 0;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Brand Section */
+.school-manager-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-8);
+    padding: var(--spacing-4);
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(139, 92, 246, 0.1));
+    border-radius: 16px;
+    border: 1px solid rgba(79, 70, 229, 0.2);
+}
+
+.school-manager-brand svg {
+    color: #8b5cf6;
+    filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.4));
+}
+
+.school-manager-brand span {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    background: linear-gradient(135deg, #a5b4fc, #c4b5fd);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Navigation */
+.school-manager-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+.school-manager-nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: 0.875rem var(--spacing-4);
+    border-radius: 12px;
+    color: rgba(226, 232, 240, 0.7);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.school-manager-nav-item::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(139, 92, 246, 0.1));
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.school-manager-nav-item:hover {
+    color: white;
+}
+
+.school-manager-nav-item:hover::before {
+    opacity: 1;
+}
+
+.school-manager-nav-item svg,
+.school-manager-nav-item span {
+    position: relative;
+    z-index: 1;
+}
+
+.school-manager-nav-item.active {
+    background: var(--sm-gradient);
+    color: white;
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
+}
+
+.school-manager-nav-item.active::before {
+    opacity: 0;
+}
+
+.school-manager-nav-item.active::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    background: white;
+    border-radius: 4px 0 0 4px;
+}
+
+[dir="rtl"] .school-manager-nav-item.active::after {
+    right: auto;
+    left: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+[dir="rtl"] .school-manager-nav-item:hover {
+    transform: none;
+}
+
+/* ========================================================================
+   MAIN CONTENT
+   ======================================================================== */
+.school-manager-main {
+    flex: 1;
+    margin-left: 280px;
+    padding: var(--spacing-8);
+    background-image:
+        radial-gradient(circle at top right, rgba(79, 70, 229, 0.04), transparent 40%),
+        radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.03), transparent 40%);
+    min-height: 100vh;
+}
+
+[dir="rtl"] .school-manager-main {
+    margin-left: 0;
+    margin-right: 280px;
+}
+
+@media (max-width: 1024px) {
+    .school-manager-main {
+        padding: var(--spacing-6);
+    }
+}
+
+/* Page Header */
+.sm-page-header {
+    margin-bottom: var(--spacing-8);
+}
+
+.sm-page-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+    letter-spacing: -0.03em;
+    margin: 0 0 var(--spacing-2) 0;
+    background: linear-gradient(135deg, #0f172a, #334155);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+[data-theme='dark'] .sm-page-title {
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.sm-page-subtitle {
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    margin: 0;
+}
+
+/* ========================================================================
+   PREMIUM CARDS
+   ======================================================================== */
+.card-premium {
+    background: var(--color-bg-surface);
+    border-radius: 20px;
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.card-premium::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--sm-gradient);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.card-premium:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(79, 70, 229, 0.1);
+    border-color: rgba(79, 70, 229, 0.2);
+}
+
+.card-premium:hover::before {
+    opacity: 1;
+}
+
+[data-theme='dark'] .card-premium {
+    background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(51, 65, 85, 0.5);
+}
+
+[data-theme='dark'] .card-premium:hover {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================================================
+   MANAGEMENT CARDS & TABLES
+   ======================================================================== */
+.management-card {
+    background: var(--color-bg-surface);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--color-border-subtle);
+    overflow: hidden;
+}
+
+.table-header-actions {
+    padding: var(--spacing-5) var(--spacing-6);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.8), transparent);
+}
+
+[data-theme='dark'] .table-header-actions {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.5), transparent);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.data-table th {
+    background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+    padding: var(--spacing-4) var(--spacing-6);
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--color-border-subtle);
+}
+
+[data-theme='dark'] .data-table th {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.6));
+    color: var(--sm-text-muted);
+}
+
+[dir="rtl"] .data-table th,
+[dir="rtl"] .data-table td {
+    text-align: right;
+}
+
+.data-table td {
+    padding: var(--spacing-4) var(--spacing-6);
+    color: var(--color-text-main);
+    border-bottom: 1px solid var(--color-border-subtle);
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+}
+
+.data-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.data-table tbody tr:hover {
+    background: linear-gradient(90deg, rgba(79, 70, 229, 0.04), transparent);
+}
+
+.data-table tbody tr:hover td:first-child {
+    border-left: 3px solid #4f46e5;
+}
+
+[dir="rtl"] .data-table tbody tr:hover td:first-child {
+    border-left: none;
+    border-right: 3px solid #4f46e5;
+}
+
+/* ========================================================================
+   BUTTONS
+   ======================================================================== */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--sm-gradient);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    border: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
+}
+
+/* ========================================================================
+   STATUS BADGES
+   ======================================================================== */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.status-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.status-active,
+.status-badge.active {
+    background: linear-gradient(135deg, rgba(5, 150, 105, 0.1), rgba(16, 185, 129, 0.15));
+    color: #059669;
+    border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+.status-active::before,
+.status-badge.active::before {
+    background: #059669;
+    box-shadow: 0 0 8px rgba(5, 150, 105, 0.5);
+}
+
+.status-inactive,
+.status-badge.inactive {
+    background: rgba(100, 116, 139, 0.1);
+    color: #64748b;
+    border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.status-inactive::before,
+.status-badge.inactive::before {
+    background: #94a3b8;
+}
+
+[data-theme='dark'] .status-active,
+[data-theme='dark'] .status-badge.active {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+[data-theme='dark'] .status-inactive,
+[data-theme='dark'] .status-badge.inactive {
+    background: rgba(100, 116, 139, 0.2);
+    color: #94a3b8;
+}
+
+/* ========================================================================
+   CHART CARDS
+   ======================================================================== */
+.chart-card {
+    background: var(--color-bg-surface);
+    padding: var(--spacing-6);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--color-border-subtle);
+}
+
+.chart-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chart-title::before {
+    content: '';
+    width: 4px;
+    height: 20px;
+    background: var(--sm-gradient);
+    border-radius: 4px;
+}
+
+[data-theme='dark'] .chart-card {
+    background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(51, 65, 85, 0.5);
+}
+
+[data-theme='dark'] .chart-title {
+    color: var(--sm-text-main);
+}
+
+/* ========================================================================
+   FORM ELEMENTS
+   ======================================================================== */
+[data-theme='dark'] input,
+[data-theme='dark'] select,
+[data-theme='dark'] textarea {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+    color: var(--sm-text-main) !important;
+    border-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* ========================================================================
+   ANIMATIONS
+   ======================================================================== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.school-manager-main>* {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* ========================================================================
+   RESPONSIVE
+   ======================================================================== */
+@media (max-width: 768px) {
+    .school-manager-sidebar {
+        transform: translateX(-100%);
+    }
+
+    [dir="rtl"] .school-manager-sidebar {
+        transform: translateX(100%);
+    }
+
+    .school-manager-main {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
