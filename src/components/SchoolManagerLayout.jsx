@@ -52,28 +52,31 @@ const SchoolManagerLayout = () => {
                 </div>
 
                 {/* Quick Stats */}
-                {/* Quick Stats - Dynamic */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-                    <div style={{ flex: 1, background: 'rgba(79, 70, 229, 0.1)', borderRadius: '12px', padding: '12px', textAlign: 'center', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>
-                            {(() => {
-                                try {
-                                    const users = JSON.parse(localStorage.getItem('edutraker_users') || '[]');
-                                    const teachers = users.filter(u => u.role === 'TEACHER').length;
-                                    return teachers > 0 ? teachers : 42; // Default if empty
-                                } catch { return 42; }
-                            })()}
-                        </div>
+                <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginBottom: '24px'
+                }}>
+                    <div style={{
+                        flex: 1,
+                        background: 'rgba(79, 70, 229, 0.1)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        textAlign: 'center',
+                        border: '1px solid rgba(79, 70, 229, 0.2)'
+                    }}>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>156</div>
                         <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Teachers</div>
                     </div>
-                    <div style={{ flex: 1, background: 'rgba(14, 165, 233, 0.1)', borderRadius: '12px', padding: '12px', textAlign: 'center', border: '1px solid rgba(14, 165, 233, 0.2)' }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>
-                            {(() => {
-                                try {
-                                    return JSON.parse(localStorage.getItem('sec_students') || '[]').length || 1250;
-                                } catch { return '1.2K'; }
-                            })()}
-                        </div>
+                    <div style={{
+                        flex: 1,
+                        background: 'rgba(14, 165, 233, 0.1)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        textAlign: 'center',
+                        border: '1px solid rgba(14, 165, 233, 0.2)'
+                    }}>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>2.4K</div>
                         <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Students</div>
                     </div>
                 </div>

@@ -1,46 +1,30 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Users, FileText, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import './Secretary.css';
 
 const SecretaryDashboard = () => {
     const { t } = useTheme();
-    const navigate = useNavigate();
 
-    // Dynamic Stats
-    const students = JSON.parse(localStorage.getItem('sec_students') || '[]');
-    const studentsCount = students.length;
-    
-    const messages = JSON.parse(localStorage.getItem('edutraker_messages') || '[]');
-    const unreadCount = messages.filter(m => !m.read).length;
-    
-    // Calculate Absent Today
-    const today = new Date().toISOString().split('T')[0];
-    const attendance = JSON.parse(localStorage.getItem('sec_attendance') || '{}');
-    const todayAttendance = attendance[today] || {};
-    const absentCount = Object.values(todayAttendance).filter(r => r.status === 'Absent').length;
-
+    // Mock Data for Quick Stats
     const stats = [
-        { labelKey: 'secretary.dashboard.totalStudents', value: studentsCount.toString(), icon: Users, color: '#4F46E5', bgColor: '#EEF2FF', link: '/secretary/admissions' },
-        { labelKey: 'secretary.dashboard.unreadMessages', value: unreadCount.toString(), icon: FileText, color: '#F59E0B', bgColor: '#FEF3C7', link: '/secretary/communication' },
-        { labelKey: 'secretary.dashboard.absentToday', value: absentCount.toString(), icon: Clock, color: '#EF4444', bgColor: '#FEE2E2', link: '/secretary/attendance' },
+        { labelKey: 'secretary.dashboard.totalStudents', value: '1,234', icon: Users, color: '#4F46E5', bgColor: '#EEF2FF', link: '/secretary/admissions' },
+        { labelKey: 'secretary.dashboard.unreadMessages', value: '3', icon: FileText, color: '#F59E0B', bgColor: '#FEF3C7', link: '/secretary/communication' },
+        { labelKey: 'secretary.dashboard.absentToday', value: '12', icon: Clock, color: '#EF4444', bgColor: '#FEE2E2', link: '/secretary/attendance' },
     ];
 
-    // Tasks & Events (Dynamic with defaults if empty for demo)
-    const pendingTasks = JSON.parse(localStorage.getItem('sec_tasks') || '[]').length > 0 
-        ? JSON.parse(localStorage.getItem('sec_tasks')) 
-        : [
-            { id: 1, title: 'Review Application #1023 - John Doe', time: '2 hours ago', type: 'application' },
-            { id: 2, title: 'Verify Documents for Class 1-A', time: '5 hours ago', type: 'doc' },
-        ];
+    const pendingTasks = [
+        { id: 1, title: 'Review Application #1023 - John Doe', time: '2 hours ago', type: 'application' },
+        { id: 2, title: 'Verify Documents for Class 1-A', time: '5 hours ago', type: 'doc' },
+        { id: 3, title: 'Print Schedule for Mr. Smith', time: '1 day ago', type: 'admin' },
+        { id: 4, title: 'Guardian Linking Request - Sarah Connor', time: '1 day ago', type: 'guardian' },
+    ];
 
-    const events = JSON.parse(localStorage.getItem('sec_events') || '[]').length > 0
-        ? JSON.parse(localStorage.getItem('sec_events'))
-        : [
-            { id: 1, title: 'Parent-Teacher Meeting', date: 'Dec 15, 2025', time: '10:00 AM' },
-            { id: 2, title: 'School Assembly', date: 'Dec 16, 2025', time: '08:00 AM' },
-        ];
+    const events = [
+        { id: 1, title: 'Parent-Teacher Meeting', date: 'Dec 15, 2025', time: '10:00 AM' },
+        { id: 2, title: 'School Assembly', date: 'Dec 16, 2025', time: '08:00 AM' },
+        { id: 3, title: 'Staff Meeting', date: 'Dec 18, 2025', time: '02:00 PM' },
+    ];
 
     return (
         <div className="secretary-dashboard">
@@ -55,7 +39,7 @@ const SecretaryDashboard = () => {
                     <div
                         key={index}
                         className="stat-card cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => navigate(stat.link)}
+                        onClick={() => window.location.href = stat.link}
                     >
                         <div
                             className="stat-icon-wrapper"

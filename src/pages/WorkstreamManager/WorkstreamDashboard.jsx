@@ -1,6 +1,5 @@
 import React from 'react';
 import { School, Users, GraduationCap, TrendingUp, TrendingDown, Activity, Award } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import './Workstream.css';
@@ -8,69 +7,30 @@ import './Workstream.css';
 const WorkstreamDashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const navigate = useNavigate();
 
-    // Dynamic Data Loading
-    const schools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
-    
-    // Calculate Stats
-    const totalSchools = schools.length;
-    const totalStudents = schools.reduce((acc, curr) => acc + (parseInt(curr.students) || 0), 0);
-    const totalTeachers = schools.reduce((acc, curr) => acc + (parseInt(curr.teachers) || 0), 0);
-    const avgPerformance = totalSchools > 0 
-        ? Math.round(schools.reduce((acc, curr) => acc + (parseInt(curr.performanceScore) || 0), 0) / totalSchools) 
-        : 0;
-
+    // Mock Data
     const stats = [
-        { 
-            title: t('workstream.dashboard.totalSchools'), 
-            value: totalSchools.toString(), 
-            icon: School, 
-            trend: 'Active Schools', 
-            trendUp: true, 
-            color: 'purple',
-            onClick: () => navigate('/workstream-manager/schools')
-        },
-        { 
-            title: t('workstream.dashboard.totalStudents'), 
-            value: totalStudents.toLocaleString(), 
-            icon: GraduationCap, 
-            trend: 'Enrolled Across Cluster', 
-            trendUp: true, 
-            color: 'blue',
-            onClick: () => navigate('/workstream-manager/reports') // Or a specific student list if it existed
-        },
-        { 
-            title: t('workstream.dashboard.totalTeachers'), 
-            value: totalTeachers.toString(), 
-            icon: Users, 
-            trend: 'Assigned Teachers', 
-            trendUp: true, 
-            color: 'indigo',
-             onClick: () => navigate('/workstream-manager/managers') // Or reports
-        },
-        { 
-            title: 'Avg. Performance', 
-            value: `${avgPerformance}%`, 
-            icon: Award, 
-            trend: 'Academic Score', 
-            trendUp: true, 
-            color: 'green',
-            onClick: () => navigate('/workstream-manager/reports')
-        },
+        { title: t('workstream.dashboard.totalSchools'), value: '12', icon: School, trend: '+2 this month', trendUp: true, color: 'purple' },
+        { title: t('workstream.dashboard.totalStudents'), value: '3,450', icon: GraduationCap, trend: '+150 this month', trendUp: true, color: 'blue' },
+        { title: t('workstream.dashboard.totalTeachers'), value: '245', icon: Users, trend: '-3 this month', trendUp: false, color: 'indigo' },
+        { title: 'Avg. Performance', value: '87%', icon: Award, trend: '+5% this term', trendUp: true, color: 'green' },
     ];
 
-    const schoolPerformance = [...schools].sort((a, b) => b.performanceScore - a.performanceScore).slice(0, 6);
+    const schoolPerformance = [
+        { name: 'Al-Noor Academy', score: 92, students: 420 },
+        { name: 'Gaza Central', score: 88, students: 380 },
+        { name: 'Al-Quds School', score: 85, students: 350 },
+        { name: 'Hope Academy', score: 78, students: 290 },
+        { name: 'Al-Aqsa School', score: 95, students: 450 },
+        { name: 'Sunrise School', score: 72, students: 260 },
+    ];
 
-    const recentActivity = JSON.parse(localStorage.getItem('ws_activity') || '[]').length > 0 
-        ? JSON.parse(localStorage.getItem('ws_activity')) 
-        : [
-            // Keep empty or show a placeholder message if real activity log implementation is separate
-            // For now, let's keep it empty to reflect "real" state, or maybe a "No recent activity" message
-        ];
-    
-    // If no activity, maybe show a default welcome log?
-    // The user asked to "adjust it to what is registered", so if nothing is registered, show nothing or meaningful empty state.
+    const recentActivity = [
+        { action: 'New teacher assigned', school: 'Al-Noor Academy', time: '2 hours ago', type: 'info' },
+        { action: 'Performance report submitted', school: 'Gaza Central', time: '5 hours ago', type: 'success' },
+        { action: 'Student enrollment approved', school: 'Hope Academy', time: '1 day ago', type: 'info' },
+        { action: 'Budget request pending', school: 'Al-Quds School', time: '2 days ago', type: 'warning' },
+    ];
 
     const getScoreColor = (score) => {
         if (score >= 90) return '#059669';
@@ -100,14 +60,7 @@ const WorkstreamDashboard = () => {
             {/* Stats Cards */}
             <div className="stats-grid">
                 {stats.map((stat, index) => (
-                    <div 
-                        key={index} 
-                        className="stat-card" 
-                        onClick={stat.onClick}
-                        style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                    >
+                    <div key={index} className="stat-card">
                         <div className="stat-header">
                             <span className="stat-title">{stat.title}</span>
                             <div className="stat-icon" style={getIconStyle(stat.color)}>
@@ -130,60 +83,54 @@ const WorkstreamDashboard = () => {
                     <div className="chart-header">
                         <h3 className="chart-title">{t('workstream.dashboard.academicPerformance')}</h3>
                     </div>
-                    {schoolPerformance.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            {schoolPerformance.map((school, index) => (
-                                <div key={index} style={{
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {schoolPerformance.map((school, index) => (
+                            <div key={index} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '16px',
+                                padding: '12px 16px',
+                                background: 'var(--color-bg-hover)',
+                                borderRadius: '12px',
+                                transition: 'all 0.2s ease'
+                            }}>
+                                <div style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '10px',
+                                    background: `linear-gradient(135deg, ${getScoreColor(school.score)}20, ${getScoreColor(school.score)}10)`,
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '16px',
-                                    padding: '12px 16px',
-                                    background: 'var(--color-bg-hover)',
-                                    borderRadius: '12px',
-                                    transition: 'all 0.2s ease'
+                                    justifyContent: 'center',
+                                    color: getScoreColor(school.score),
+                                    fontWeight: '700',
+                                    fontSize: '0.875rem'
                                 }}>
+                                    {school.score}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '4px' }}>{school.name}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{school.students} students</div>
+                                </div>
+                                <div style={{ width: '120px' }}>
                                     <div style={{
-                                        width: '40px',
-                                        height: '40px',
-                                        borderRadius: '10px',
-                                        background: `linear-gradient(135deg, ${getScoreColor(school.performanceScore)}20, ${getScoreColor(school.performanceScore)}10)`,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: getScoreColor(school.performanceScore),
-                                        fontWeight: '700',
-                                        fontSize: '0.875rem'
+                                        height: '8px',
+                                        background: 'var(--color-border-subtle)',
+                                        borderRadius: '4px',
+                                        overflow: 'hidden'
                                     }}>
-                                        {school.performanceScore}
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '4px' }}>{school.name}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{school.students} students</div>
-                                    </div>
-                                    <div style={{ width: '120px' }}>
                                         <div style={{
-                                            height: '8px',
-                                            background: 'var(--color-border-subtle)',
+                                            width: `${school.score}%`,
+                                            height: '100%',
+                                            background: `linear-gradient(90deg, ${getScoreColor(school.score)}, ${getScoreColor(school.score)}aa)`,
                                             borderRadius: '4px',
-                                            overflow: 'hidden'
-                                        }}>
-                                            <div style={{
-                                                width: `${school.performanceScore}%`,
-                                                height: '100%',
-                                                background: `linear-gradient(90deg, ${getScoreColor(school.performanceScore)}, ${getScoreColor(school.performanceScore)}aa)`,
-                                                borderRadius: '4px',
-                                                transition: 'width 0.5s ease'
-                                            }}></div>
-                                        </div>
+                                            transition: 'width 0.5s ease'
+                                        }}></div>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                            No schools registered yet.
-                        </div>
-                    )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Recent Activity */}
@@ -194,49 +141,43 @@ const WorkstreamDashboard = () => {
                             Recent Activity
                         </h3>
                     </div>
-                    {recentActivity.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {recentActivity.map((activity, index) => (
-                                <div key={index} style={{
-                                    display: 'flex',
-                                    gap: '12px',
-                                    padding: '12px',
-                                    background: 'var(--color-bg-hover)',
-                                    borderRadius: '12px',
-                                    borderLeft: `3px solid ${activity.type === 'success' ? '#059669' :
-                                            activity.type === 'warning' ? '#8b5cf6' : '#4f46e5'
-                                        }`
-                                }}>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: '600', color: 'var(--color-text-main)', fontSize: '0.875rem', marginBottom: '4px' }}>
-                                            {activity.action}
-                                        </div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                            {activity.school}
-                                        </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {recentActivity.map((activity, index) => (
+                            <div key={index} style={{
+                                display: 'flex',
+                                gap: '12px',
+                                padding: '12px',
+                                background: 'var(--color-bg-hover)',
+                                borderRadius: '12px',
+                                borderLeft: `3px solid ${activity.type === 'success' ? '#059669' :
+                                        activity.type === 'warning' ? '#8b5cf6' : '#4f46e5'
+                                    }`
+                            }}>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)', fontSize: '0.875rem', marginBottom: '4px' }}>
+                                        {activity.action}
                                     </div>
-                                    <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-light)', whiteSpace: 'nowrap' }}>
-                                        {activity.time}
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                        {activity.school}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                           No recent activity.
-                        </div>
-                    )}
+                                <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-light)', whiteSpace: 'nowrap' }}>
+                                    {activity.time}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {/* Enrollment Trends - Example chart (using simple CSS for now as in original) */}
+            {/* Enrollment Trends */}
             <div className="chart-card" style={{ marginTop: '24px' }}>
                 <div className="chart-header">
                     <h3 className="chart-title">{t('workstream.dashboard.enrollmentTrends')}</h3>
                 </div>
                 <div className="css-chart-container" style={{ height: '180px' }}>
                     {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, index) => {
-                        const enrollment = [85, 92, 78, 95, 88, 102][index]; // Keep mock for trends as we don't have historical data
+                        const enrollment = [85, 92, 78, 95, 88, 102][index];
                         const graduates = [45, 52, 48, 55, 62, 58][index];
                         return (
                             <div key={month} className="css-bar-group">

@@ -7,58 +7,20 @@ import '../WorkstreamManager/Workstream.css';
 
 const GuardianLinking = () => {
     const { t } = useTheme();
-    const [guardians, setGuardians] = useState(() => {
-        const saved = localStorage.getItem('sec_guardians');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, name: 'Sarah Connor', student: 'John Connor', relation: 'Mother', access: 'Full', status: 'Linked' },
-            { id: 2, name: 'Kyle Reese', student: 'John Connor', relation: 'Father', access: 'Limited', status: 'Linked' },
-            { id: 3, name: 'Martha Kent', student: 'Clark Kent', relation: 'Mother', access: 'Full', status: 'Linked' },
-            { id: 4, name: 'Jonathan Kent', student: '-', relation: '-', access: 'None', status: 'Unlinked' },
-        ];
-    });
-
-    React.useEffect(() => {
-        localStorage.setItem('sec_guardians', JSON.stringify(guardians));
-    }, [guardians]);
+    const [guardians] = useState([
+        { id: 1, name: 'Sarah Connor', student: 'John Connor', relation: 'Mother', access: 'Full', status: 'Linked' },
+        { id: 2, name: 'Kyle Reese', student: 'John Connor', relation: 'Father', access: 'Limited', status: 'Linked' },
+        { id: 3, name: 'Martha Kent', student: 'Clark Kent', relation: 'Mother', access: 'Full', status: 'Linked' },
+        { id: 4, name: 'Jonathan Kent', student: '-', relation: '-', access: 'None', status: 'Unlinked' },
+    ]);
 
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [selectedGuardian, setSelectedGuardian] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
 
     const handleLinkClick = (guardian) => {
-        setSelectedGuardian(guardian); // If null, it's "Add New"
+        setSelectedGuardian(guardian);
         setIsLinkModalOpen(true);
     };
-
-    const handleSaveGuardian = (event) => {
-        event.preventDefault();
-        const formData = new FormData(event.target);
-        const name = formData.get('guardianName') || selectedGuardian?.name;
-        const student = formData.get('studentName');
-        const relation = formData.get('relation');
-
-        if (selectedGuardian) {
-            // Edit Existing
-            setGuardians(guardians.map(g => g.id === selectedGuardian.id ? { ...g, student, relation, status: 'Linked' } : g));
-        } else {
-            // Create New
-            const newGuardian = {
-                id: Date.now(),
-                name: name,
-                student: student,
-                relation: relation,
-                access: 'Full', // Default
-                status: 'Linked'
-            };
-            setGuardians([...guardians, newGuardian]);
-        }
-        setIsLinkModalOpen(false);
-    };
-
-    const filteredGuardians = guardians.filter(g => 
-        g.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        g.student.toLowerCase().includes(searchTerm.toLowerCase())
-    );
 
     return (
         <div className="secretary-dashboard">
@@ -75,8 +37,6 @@ const GuardianLinking = () => {
                             type="text"
                             placeholder={t('secretary.guardians.searchGuardians')}
                             className="search-input"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
                     <div className="action-btn-group">
@@ -99,7 +59,7 @@ const GuardianLinking = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredGuardians.map((guardian) => (
+                        {guardians.map((guardian) => (
                             <tr key={guardian.id}>
                                 <td className="font-medium">{guardian.name}</td>
                                 <td>{guardian.student}</td>
@@ -136,27 +96,22 @@ const GuardianLinking = () => {
                 onClose={() => setIsLinkModalOpen(false)}
                 title={selectedGuardian ? `${t('secretary.guardians.manageLink')}: ${selectedGuardian.name}` : t('secretary.guardians.linkGuardianToStudent')}
             >
-                <form className="space-y-4" onSubmit={handleSaveGuardian}>
-                    {!selectedGuardian ? (
+                <form className="space-y-4">
+                    {!selectedGuardian && (
                         <div className="form-group">
                             <label className="form-label">{t('secretary.guardians.searchGuardian')}</label>
-                            <input name="guardianName" type="text" className="form-input" placeholder="Enter new guardian name" required />
-                        </div>
-                    ) : (
-                         <div className="form-group">
-                            <label className="form-label">Guardian</label>
-                            <input type="text" className="form-input" value={selectedGuardian.name} disabled />
+                            <input type="text" className="form-input" placeholder={t('secretary.guardians.searchGuardians')} />
                         </div>
                     )}
 
                     <div className="form-group">
                         <label className="form-label">{t('secretary.guardians.selectStudent')}</label>
-                        <input name="studentName" type="text" className="form-input" placeholder={t('secretary.guardians.searchStudent')} defaultValue={selectedGuardian?.student === '-' ? '' : selectedGuardian?.student} required />
+                        <input type="text" className="form-input" placeholder={t('secretary.guardians.searchStudent')} defaultValue={selectedGuardian?.student === '-' ? '' : selectedGuardian?.student} />
                     </div>
 
                     <div className="form-group">
                         <label className="form-label">{t('secretary.guardians.relationshipToStudent')}</label>
-                        <select name="relation" className="form-select" defaultValue={selectedGuardian?.relation}>
+                        <select className="form-select" defaultValue={selectedGuardian?.relation}>
                             <option value="">{t('secretary.guardians.selectRelationship')}</option>
                             <option value="Mother">{t('secretary.guardians.mother')}</option>
                             <option value="Father">{t('secretary.guardians.father')}</option>
@@ -183,7 +138,7 @@ const GuardianLinking = () => {
 
                     <div className="flex justify-end gap-2 mt-6">
                         <button type="button" className="btn-secondary" onClick={() => setIsLinkModalOpen(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', background: 'white' }}>{t('common.cancel')}</button>
-                        <button type="submit" className="btn-primary">{t('common.save')}</button>
+                        <button type="button" className="btn-primary">{t('common.save')}</button>
                     </div>
                 </form>
             </Modal>

@@ -8,60 +8,14 @@ const SecretaryAttendance = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedClass, setSelectedClass] = useState('1-A');
 
-    // Load Students from Shared Storage
-    const [students] = useState(() => {
-        const savedStudents = localStorage.getItem('sec_students');
-        // Fallback or use what's there. Attendance needs all students, or filtered by class.
-        // For this demo, we'll use all students found or a default list if admissions hasn't run yet.
-        return savedStudents ? JSON.parse(savedStudents) : [
-             { id: 1, name: 'Alice Johnson', status: 'Present', time: '08:00 AM' }, // Fallback mock
-             { id: 2, name: 'Bob Smith', status: 'Absent', time: '-' },
-        ];
-    });
-
-    // Attendance State
-    const [attendanceRecords, setAttendanceRecords] = useState(() => {
-        const saved = localStorage.getItem('sec_attendance');
-        return saved ? JSON.parse(saved) : {}; 
-        // Structure: { "2025-12-27": { studentId: { status: 'Present', time: '...' } } }
-    });
-
-    const [searchTerm, setSearchTerm] = useState('');
-
-    React.useEffect(() => {
-        localStorage.setItem('sec_attendance', JSON.stringify(attendanceRecords));
-    }, [attendanceRecords]);
-
-    // Derived state: Combine Students + Today's Attendance
-    const getStudentAttendance = (studentId) => {
-        const todayRecord = attendanceRecords[date];
-        if (todayRecord && todayRecord[studentId]) {
-            return todayRecord[studentId];
-        }
-        return { status: 'Pending', time: '-' }; // Default
-    };
-
-    const handleMarkAttendance = (studentId, status) => {
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setAttendanceRecords(prev => ({
-            ...prev,
-            [date]: {
-                ...(prev[date] || {}),
-                [studentId]: { status, time: status === 'Absent' ? '-' : time }
-            }
-        }));
-    };
-
-    const displayedStudents = students
-        .filter(s => {
-            const matchesClass = selectedClass ? s.class === selectedClass : true;
-            const matchesName = s.name.toLowerCase().includes(searchTerm.toLowerCase());
-            return matchesClass && matchesName;
-        })
-        .map(s => ({
-            ...s,
-            ...getStudentAttendance(s.id)
-        }));
+    // Mock Data
+    const students = [
+        { id: 1, name: 'Alice Johnson', status: 'Present', time: '08:00 AM' },
+        { id: 2, name: 'Bob Smith', status: 'Absent', time: '-' },
+        { id: 3, name: 'Charlie Brown', status: 'Late', time: '08:45 AM' },
+        { id: 4, name: 'David Lee', status: 'Present', time: '07:55 AM' },
+        { id: 5, name: 'Eva Green', status: 'Excused', time: '-' },
+    ];
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -75,10 +29,10 @@ const SecretaryAttendance = () => {
 
     const getStatusTranslation = (status) => {
         switch (status) {
-            case 'Present': return 'Present';
-            case 'Absent': return 'Absent';
-            case 'Late': return 'Late';
-            case 'Excused': return 'Excused';
+            case 'Present': return t('secretary.attendance.present');
+            case 'Absent': return t('secretary.attendance.absent');
+            case 'Late': return t('secretary.attendance.late');
+            case 'Excused': return t('secretary.attendance.excused');
             default: return status;
         }
     };
@@ -86,8 +40,8 @@ const SecretaryAttendance = () => {
     return (
         <div className="secretary-dashboard">
             <header className="secretary-header">
-                <h1>Attendance Management</h1>
-                <p>Track and manage student daily attendance.</p>
+                <h1>{t('secretary.attendance.title')}</h1>
+                <p>{t('secretary.attendance.subtitle')}</p>
             </header>
 
             <div className="management-card">
@@ -118,10 +72,8 @@ const SecretaryAttendance = () => {
                         <Search size={18} className="search-icon" />
                         <input
                             type="text"
-                            placeholder="Search student..."
+                            placeholder={t('secretary.attendance.searchStudent')}
                             className="search-input"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
                 </div>
@@ -130,16 +82,14 @@ const SecretaryAttendance = () => {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>Student Name</th>
-                                <th>Arrival Time</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th>{t('secretary.attendance.studentName')}</th>
+                                <th>{t('secretary.attendance.arrivalTime')}</th>
+                                <th>{t('secretary.attendance.status')}</th>
+                                <th>{t('secretary.attendance.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {displayedStudents.length === 0 ? (
-                                <tr><td colspan="4" className="text-center p-4 text-gray-400">No students found</td></tr>
-                            ) : displayedStudents.map((student) => (
+                            {students.map((student) => (
                                 <tr key={student.id}>
                                     <td className="font-medium">{student.name}</td>
                                     <td className="text-gray-500">{student.time}</td>
@@ -150,13 +100,13 @@ const SecretaryAttendance = () => {
                                     </td>
                                     <td>
                                         <div className="flex gap-2">
-                                            <button className="btn-icon" title="Mark Present" onClick={() => handleMarkAttendance(student.id, 'Present')}>
+                                            <button className="btn-icon" title={t('secretary.attendance.markPresent')}>
                                                 <CheckCircle size={18} className="text-green-600" />
                                             </button>
-                                            <button className="btn-icon" title="Mark Absent" onClick={() => handleMarkAttendance(student.id, 'Absent')}>
+                                            <button className="btn-icon" title={t('secretary.attendance.markAbsent')}>
                                                 <XCircle size={18} className="text-red-600" />
                                             </button>
-                                            <button className="btn-icon" title="Mark Late" onClick={() => handleMarkAttendance(student.id, 'Late')}>
+                                            <button className="btn-icon" title={t('secretary.attendance.markLate')}>
                                                 <Clock size={18} className="text-orange-600" />
                                             </button>
                                         </div>

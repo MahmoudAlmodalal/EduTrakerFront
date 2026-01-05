@@ -8,44 +8,17 @@ import styles from './UserManagement.module.css';
 const UserManagement = () => {
     const { t } = useTheme();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [users, setUsers] = useState(() => {
-        const savedUsers = localStorage.getItem('edutraker_users');
-        return savedUsers ? JSON.parse(savedUsers) : [
-            { id: 1, name: 'John Doe', email: 'john@edutraker.com', role: 'Workstream Manager', status: 'Active', workstream: 'Gaza North' },
-            { id: 2, name: 'Jane Smith', email: 'jane@edutraker.com', role: 'Workstream Manager', status: 'Active', workstream: 'Gaza South' },
-            { id: 3, name: 'Ahmad Khalil', email: 'ahmad@edutraker.com', role: 'School Manager', status: 'Active', workstream: 'Mid Area' },
-            { id: 4, name: 'Sara Younis', email: 'sara@edutraker.com', role: 'Workstream Manager', status: 'Inactive', workstream: 'Khan Younis' },
-        ];
-    });
-
-    React.useEffect(() => {
-        localStorage.setItem('edutraker_users', JSON.stringify(users));
-    }, [users]);
+    const [users, setUsers] = useState([
+        { id: 1, name: 'John Doe', email: 'john@edutraker.com', role: 'Workstream Manager', status: 'Active', workstream: 'Gaza North' },
+        { id: 2, name: 'Jane Smith', email: 'jane@edutraker.com', role: 'Workstream Manager', status: 'Active', workstream: 'Gaza South' },
+        { id: 3, name: 'Ahmad Khalil', email: 'ahmad@edutraker.com', role: 'School Manager', status: 'Active', workstream: 'Mid Area' },
+        { id: 4, name: 'Sara Younis', email: 'sara@edutraker.com', role: 'Workstream Manager', status: 'Inactive', workstream: 'Khan Younis' },
+    ]);
 
     const handleStatusToggle = (id) => {
         setUsers(users.map(user =>
             user.id === id ? { ...user, status: user.status === 'Active' ? 'Inactive' : 'Active' } : user
         ));
-    };
-
-    const handleDeleteUser = (id) => {
-        if (window.confirm(t('Are you sure you want to delete this user?'))) {
-            setUsers(users.filter(user => user.id !== id));
-        }
-    };
-
-    const handleExport = () => {
-        const headers = ['ID', 'Name', 'Email', 'Role', 'Status', 'Workstream'];
-        const csvContent = [
-            headers.join(','),
-            ...users.map(user => [user.id, user.name, user.email, user.role, user.status, user.workstream].join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'users_export.csv';
-        link.click();
     };
 
     const [isEditing, setIsEditing] = useState(false);
@@ -63,7 +36,7 @@ const UserManagement = () => {
             ));
         } else {
             const newUser = {
-                id: Date.now(),
+                id: users.length + 1,
                 name: formData.name,
                 email: formData.email,
                 role: 'Workstream Manager',
@@ -113,7 +86,7 @@ const UserManagement = () => {
                     <p className={styles.subtitle}>Manage system users and their access levels across workstreams.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <Button variant="outline" icon={FileDown} onClick={handleExport}>Export</Button>
+                    <Button variant="outline" icon={FileDown} onClick={() => { }}>Export</Button>
                     <Button variant="primary" icon={UserPlus} onClick={openCreateModal}>
                         {t('users.create')}
                     </Button>
@@ -181,7 +154,7 @@ const UserManagement = () => {
                                         <td>
                                             <div className={styles.actions}>
                                                 <button className={styles.actionBtn} onClick={() => handleEditUser(user)} title="Edit"><Edit size={16} /></button>
-                                                <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleDeleteUser(user.id)} title="Delete"><Trash2 size={16} /></button>
+                                                <button className={`${styles.actionBtn} ${styles.danger}`} title="Delete"><Trash2 size={16} /></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -233,9 +206,11 @@ const UserManagement = () => {
                                 onChange={(e) => setFormData({ ...formData, workstream: e.target.value })}
                             >
                                 <option value="">{t('users.form.selectWorkstream')}</option>
-                                {JSON.parse(localStorage.getItem('edutraker_workstreams') || '[]').map(ws => (
-                                    <option key={ws.id} value={ws.name}>{ws.name}</option>
-                                ))}
+                                <option value="Gaza North">Gaza North</option>
+                                <option value="Gaza South">Gaza South</option>
+                                <option value="Mid Area">Mid Area</option>
+                                <option value="Khan Younis">Khan Younis</option>
+                                <option value="Rafah">Rafah</option>
                             </select>
                         </div>
                     </div>

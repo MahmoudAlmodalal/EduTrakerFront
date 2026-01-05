@@ -6,54 +6,35 @@ import './Workstream.css';
 const SchoolManagement = () => {
     const { t } = useTheme();
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [schools, setSchools] = useState(() => {
-        const saved = localStorage.getItem('ws_schools');
-        return saved ? JSON.parse(saved) : [
-            { id: 101, name: 'Al-Noor Academy', location: 'Gaza City', capacity: 500, students: 420, teachers: 25, performanceScore: 92, attendanceRate: 95, classrooms: 20, status: 'Active' },
-            { id: 102, name: 'Gaza Central', location: 'Rafah', capacity: 400, students: 380, teachers: 22, performanceScore: 88, attendanceRate: 88, classrooms: 18, status: 'Active' },
-        ];
-    });
+    const [schools, setSchools] = useState([
+        { id: 1, name: 'Springfield Elementary', location: 'Springfield', capacity: 500, students: 450, status: 'Active' },
+        { id: 2, name: 'Shelbyville High', location: 'Shelbyville', capacity: 1200, students: 1100, status: 'Active' },
+        { id: 3, name: 'Ogdenville Tech', location: 'Ogdenville', capacity: 300, students: 150, status: 'Inactive' },
+    ]);
 
-    React.useEffect(() => {
-        localStorage.setItem('ws_schools', JSON.stringify(schools));
-    }, [schools]);
-
-    const [newSchool, setNewSchool] = useState({ 
-        name: '', location: '', capacity: '', students: '', teachers: '', classrooms: '', 
-        isEditing: false, id: null 
-    });
+    const [newSchool, setNewSchool] = useState({ name: '', location: '', capacity: '', isEditing: false, id: null });
 
     const [searchTerm, setSearchTerm] = useState('');
     const [viewSchool, setViewSchool] = useState(null);
 
     const handleCreateSchool = (e) => {
         e.preventDefault();
-        const schoolData = {
-            name: newSchool.name,
-            location: newSchool.location,
-            capacity: parseInt(newSchool.capacity),
-            students: parseInt(newSchool.students) || 0,
-            teachers: parseInt(newSchool.teachers) || 0,
-            classrooms: parseInt(newSchool.classrooms) || 0,
-            attendanceRate: Math.floor(Math.random() * 20) + 80, // Random 80-100% since we don't input it
-            performanceScore: Math.floor(Math.random() * 30) + 70 // Random 70-100%
-        };
-
         if (newSchool.isEditing) {
             setSchools(schools.map(school =>
                 school.id === newSchool.id
-                    ? { ...school, ...schoolData }
+                    ? { ...school, name: newSchool.name, location: newSchool.location, capacity: newSchool.capacity }
                     : school
             ));
         } else {
             const school = {
-                id: Date.now(),
-                ...schoolData,
+                id: schools.length + 1,
+                ...newSchool,
+                students: 0,
                 status: 'Active'
             };
             setSchools([...schools, school]);
         }
-        setNewSchool({ name: '', location: '', capacity: '', students: '', teachers: '', classrooms: '', isEditing: false, id: null });
+        setNewSchool({ name: '', location: '', capacity: '', isEditing: false, id: null });
         setShowCreateForm(false);
     };
 
@@ -76,9 +57,6 @@ const SchoolManagement = () => {
                 name: schoolToEdit.name,
                 location: schoolToEdit.location,
                 capacity: schoolToEdit.capacity,
-                students: schoolToEdit.students,
-                teachers: schoolToEdit.teachers,
-                classrooms: schoolToEdit.classrooms,
                 isEditing: true,
                 id: schoolToEdit.id
             });
@@ -115,8 +93,8 @@ const SchoolManagement = () => {
             {showCreateForm && (
                 <div className="management-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
                     <h3 className="chart-title" style={{ marginBottom: '1rem' }}>{newSchool.isEditing ? t('workstream.schools.form.editTitle') : t('workstream.schools.form.createTitle')}</h3>
-                    <form onSubmit={handleCreateSchool} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', maxWidth: '600px' }}>
-                        <div style={{ gridColumn: 'span 2' }}>
+                    <form onSubmit={handleCreateSchool} style={{ display: 'grid', gap: '1rem', maxWidth: '500px' }}>
+                        <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.schools.form.name')}</label>
                             <input
                                 type="text"
@@ -149,47 +127,13 @@ const SchoolManagement = () => {
                                 placeholder={t('workstream.schools.form.capacity')}
                             />
                         </div>
-                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.dashboard.totalStudents')}</label>
-                            <input
-                                type="number"
-                                required
-                                value={newSchool.students}
-                                onChange={(e) => setNewSchool({ ...newSchool, students: e.target.value })}
-                                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder="Number of Students"
-                            />
-                        </div>
-                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.dashboard.totalTeachers')}</label>
-                            <input
-                                type="number"
-                                required
-                                value={newSchool.teachers}
-                                onChange={(e) => setNewSchool({ ...newSchool, teachers: e.target.value })}
-                                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder="Number of Teachers"
-                            />
-                        </div>
-                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Classrooms</label>
-                            <input
-                                type="number"
-                                required
-                                value={newSchool.classrooms}
-                                onChange={(e) => setNewSchool({ ...newSchool, classrooms: e.target.value })}
-                                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder="Number of Classrooms"
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', gridColumn: 'span 2' }}>
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                             <button type="submit" className="btn-primary">{newSchool.isEditing ? t('common.save') : t('common.create')}</button>
                             <button
                                 type="button"
                                 onClick={() => {
                                     setShowCreateForm(false);
-                                    setNewSchool({ name: '', location: '', capacity: '', students: '', teachers: '', classrooms: '', isEditing: false, id: null });
+                                    setNewSchool({ name: '', location: '', capacity: '', isEditing: false, id: null });
                                 }}
                                 style={{
                                     padding: '0.5rem 1rem',

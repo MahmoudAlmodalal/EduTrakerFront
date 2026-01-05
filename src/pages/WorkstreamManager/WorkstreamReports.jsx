@@ -6,59 +6,17 @@ import './Workstream.css';
 const WorkstreamReports = () => {
     const { t } = useTheme();
 
-    // Load Schools Data
-    const schools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
+    const attendanceData = [
+        { school: 'Springfield Elementary', attendance: 92, absent: 8 },
+        { school: 'Shelbyville High', attendance: 88, absent: 12 },
+        { school: 'Ogdenville Tech', attendance: 95, absent: 5 },
+    ];
 
-    // Calculate Dynamic Stats
-    const totalAttendance = schools.reduce((acc, s) => acc + (parseInt(s.attendanceRate) || 0), 0);
-    const avgAttendance = schools.length ? (totalAttendance / schools.length).toFixed(1) : 0;
-
-    const totalStudents = schools.reduce((acc, s) => acc + (parseInt(s.students) || 0), 0);
-    const totalTeachers = schools.reduce((acc, s) => acc + (parseInt(s.teachers) || 0), 0);
-    const teacherRatio = totalTeachers ? `1:${Math.round(totalStudents / totalTeachers)}` : '0:0';
-
-    const totalCapacity = schools.reduce((acc, s) => acc + (parseInt(s.capacity) || 0), 0);
-    // Classroom usage can be proxy for Capacity Utilization based on registered students vs capacity
-    const classroomUsage = totalCapacity ? Math.round((totalStudents / totalCapacity) * 100) : 0;
-
-    // Prep Table Data
-    const attendanceData = schools.map(s => ({
-        school: s.name,
-        attendance: s.attendanceRate || 0,
-        absent: 100 - (s.attendanceRate || 0)
-    }));
-
-    const resourceData = schools.map(s => ({
-        school: s.name,
-        teachers: s.teachers || 0,
-        classrooms: s.classrooms || 0,
-        capacity: s.capacity || 0,
-        students: s.students || 0,
-        utilization: s.capacity ? Math.round((s.students / s.capacity) * 100) : 0 
-    }));
-
-    const handleDownload = (reportType) => {
-        let headers, content, filename;
-
-        if (reportType === 'ATTENDANCE') {
-            headers = ['School', 'Attendance Rate (%)', 'Absent Rate (%)'];
-            content = attendanceData.map(d => [d.school, d.attendance, d.absent].join(','));
-            filename = 'attendance_report.csv';
-        } else if (reportType === 'RESOURCES') {
-            headers = ['School', 'Teachers', 'Classrooms', 'Students', 'Capacity', 'Utilization (%)'];
-            content = resourceData.map(d => [d.school, d.teachers, d.classrooms, d.students, d.capacity, d.utilization].join(','));
-            filename = 'resource_utilization_report.csv';
-        }
-
-        if (headers && content) {
-            const csvContent = [headers.join(','), ...content].join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-        }
-    };
+    const resourceData = [
+        { school: 'Springfield Elementary', teachers: 45, classrooms: 50, utilization: 90 },
+        { school: 'Shelbyville High', teachers: 110, classrooms: 100, utilization: 110 },
+        { school: 'Ogdenville Tech', teachers: 15, classrooms: 20, utilization: 75 },
+    ];
 
     return (
         <div className="workstream-dashboard">
@@ -76,7 +34,7 @@ const WorkstreamReports = () => {
                             <Calendar size={20} />
                         </div>
                     </div>
-                    <div className="stat-value">{avgAttendance}%</div>
+                    <div className="stat-value">91.6%</div>
                     <div className="stat-trend trend-up">
                         <span>Stable across cluster</span>
                     </div>
@@ -88,7 +46,7 @@ const WorkstreamReports = () => {
                             <Users size={20} />
                         </div>
                     </div>
-                    <div className="stat-value">{teacherRatio}</div>
+                    <div className="stat-value">1:24</div>
                     <div className="stat-trend">
                         <span style={{ color: 'var(--color-text-muted)' }}>Target is 1:20</span>
                     </div>
@@ -100,9 +58,9 @@ const WorkstreamReports = () => {
                             <BookOpen size={20} />
                         </div>
                     </div>
-                    <div className="stat-value">{classroomUsage}%</div>
+                    <div className="stat-value">92%</div>
                     <div className="stat-trend trend-down">
-                        <span>Capacity Utilization</span>
+                        <span>High utilization warning</span>
                     </div>
                 </div>
             </div>
@@ -112,11 +70,7 @@ const WorkstreamReports = () => {
                 <div className="chart-card">
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <h3 className="chart-title">{t('workstream.reports.monthlyAttendance')}</h3>
-                        <button 
-                            onClick={() => handleDownload('ATTENDANCE')}
-                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}
-                            title="Download CSV"
-                        >
+                        <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}>
                             <Download size={18} />
                         </button>
                     </div>
@@ -130,26 +84,20 @@ const WorkstreamReports = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {attendanceData.length > 0 ? (
-                                attendanceData.map((data, index) => (
-                                    <tr key={index}>
-                                        <td style={{ fontWeight: '500' }}>{data.school}</td>
-                                        <td style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>{data.attendance}%</td>
-                                        <td style={{ color: 'var(--color-error)' }}>{data.absent}%</td>
-                                        <td>
-                                            {data.attendance >= 90 ? (
-                                                <span className="status-badge status-active">{t('workstream.reports.status.optimal')}</span>
-                                            ) : (
-                                                <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#d97706' }}>{t('workstream.reports.status.attention')}</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="4" style={{ textAlign: 'center', padding: '1rem', color: 'var(--color-text-muted)' }}>No data available</td>
+                            {attendanceData.map((data, index) => (
+                                <tr key={index}>
+                                    <td style={{ fontWeight: '500' }}>{data.school}</td>
+                                    <td style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>{data.attendance}%</td>
+                                    <td style={{ color: 'var(--color-error)' }}>{data.absent}%</td>
+                                    <td>
+                                        {data.attendance >= 90 ? (
+                                            <span className="status-badge status-active">{t('workstream.reports.status.optimal')}</span>
+                                        ) : (
+                                            <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#d97706' }}>{t('workstream.reports.status.attention')}</span>
+                                        )}
+                                    </td>
                                 </tr>
-                            )}
+                            ))}
                         </tbody>
                     </table>
                 </div>
@@ -158,11 +106,7 @@ const WorkstreamReports = () => {
                 <div className="chart-card">
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <h3 className="chart-title">{t('workstream.reports.resourceUtilization')}</h3>
-                        <button 
-                            onClick={() => handleDownload('RESOURCES')}
-                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}
-                            title="Download CSV"
-                        >
+                        <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}>
                             <Download size={18} />
                         </button>
                     </div>
@@ -175,36 +119,30 @@ const WorkstreamReports = () => {
                             </tr>
                         </thead>
                         <tbody>
-                             {resourceData.length > 0 ? (
-                                resourceData.map((data, index) => (
-                                    <tr key={index}>
-                                        <td style={{ fontWeight: '500' }}>{data.school}</td>
-                                        <td>{data.teachers} / {data.classrooms}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ flex: 1, backgroundColor: '#e2e8f0', height: '6px', borderRadius: '3px' }}>
-                                                    <div style={{
-                                                        width: `${Math.min(data.utilization, 100)}%`,
-                                                        backgroundColor: data.utilization > 100 ? 'var(--color-error)' : 'var(--color-primary)',
-                                                        height: '100%',
-                                                        borderRadius: '3px'
-                                                    }}></div>
-                                                </div>
-                                                <span style={{ fontSize: '0.75rem', fontWeight: '600', width: '30px' }}>{data.utilization}%</span>
+                            {resourceData.map((data, index) => (
+                                <tr key={index}>
+                                    <td style={{ fontWeight: '500' }}>{data.school}</td>
+                                    <td>{data.teachers} / {data.classrooms}</td>
+                                    <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ flex: 1, backgroundColor: '#e2e8f0', height: '6px', borderRadius: '3px' }}>
+                                                <div style={{
+                                                    width: `${Math.min(data.utilization, 100)}%`,
+                                                    backgroundColor: data.utilization > 100 ? 'var(--color-error)' : 'var(--color-primary)',
+                                                    height: '100%',
+                                                    borderRadius: '3px'
+                                                }}></div>
                                             </div>
-                                            {data.utilization > 100 && (
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                                                    <AlertCircle size={12} /> {t('workstream.reports.status.overCapacity')}
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="3" style={{ textAlign: 'center', padding: '1rem', color: 'var(--color-text-muted)' }}>No data available</td>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: '600', width: '30px' }}>{data.utilization}%</span>
+                                        </div>
+                                        {data.utilization > 100 && (
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                                <AlertCircle size={12} /> {t('workstream.reports.status.overCapacity')}
+                                            </div>
+                                        )}
+                                    </td>
                                 </tr>
-                            )}
+                            ))}
                         </tbody>
                     </table>
                 </div>

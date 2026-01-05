@@ -17,63 +17,13 @@ const Communication = () => {
     }, [location.state]);
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [replyText, setReplyText] = useState('');
 
-    const [isComposeOpen, setIsComposeOpen] = useState(false);
-    const [newMessage, setNewMessage] = useState({ recipient: '', subject: '', content: '' });
-
-    const handleSendReply = () => {
-        if (!replyText.trim() || !selectedMessage) return;
-        
-        const replyMsg = {
-            id: Date.now(),
-            type: 'internal',
-            sender: 'Super Admin', // Current User
-            subject: `Re: ${selectedMessage.subject}`,
-            date: 'Just now',
-            preview: `Reply: ${replyText.substring(0, 50)}...`,
-            content: replyText,
-            role: 'Admin',
-            read: true
-        };
-
-        const updatedMessages = [replyMsg, ...messages];
-        setMessages(updatedMessages);
-        setReplyText('');
-        alert(t('Message sent successfully'));
-    };
-
-    const handleCompose = (e) => {
-        e.preventDefault();
-        const msg = {
-            id: Date.now(),
-            type: 'internal',
-            sender: 'Super Admin',
-            subject: newMessage.subject,
-            date: 'Just now',
-            preview: newMessage.content.substring(0, 50) + '...',
-            content: newMessage.content,
-            role: 'Admin',
-            read: true
-        };
-        setMessages([msg, ...messages]);
-        setIsComposeOpen(false);
-        setNewMessage({ recipient: '', subject: '', content: '' });
-    };
-
-    const [messages, setMessages] = useState(() => {
-        const savedMessages = localStorage.getItem('edutraker_messages');
-        return savedMessages ? JSON.parse(savedMessages) : [
-            { id: 1, type: 'internal', sender: "Ahmed (Gaza North Manager)", subject: "Weekly Report", date: "10:30 AM", preview: "Here is the weekly report for the northern district schools...", content: "Dear Admin,\n\nHere is the weekly report for the northern district schools. We have successfully completed the renovation of 3 schools and distributed the new textbooks.\n\nAttendance rates are up by 5% compared to last week.\n\nBest regards,\nAhmed", role: "Workstream Manager", read: false },
-            { id: 2, type: 'internal', sender: "Sarah (System Admin)", subject: "Database Maintenance", date: "Yesterday", preview: "Scheduled maintenance will happen on Friday at...", content: "Scheduled maintenance will happen on Friday at 2:00 AM UTC. Please ensure all backups are completed.", role: "Admin", read: true },
-            { id: 3, type: 'external', sender: "Mohammed Al-Masri (Parent)", subject: "Login Inquiry", date: "Oct 12", preview: "I was unable to login to the portal using...", content: "Hello,\n\nI was unable to login to the portal using my provided credentials. It says 'Invalid Password' even though I just reset it.\n\nCan you please check my account status?\n\nThanks,\nMohammed", role: "Guardian", read: false },
-            { id: 4, type: 'external', sender: "Fatima Khalil (Parent)", subject: "Transport Request", date: "Oct 11", preview: "Is there a bus route available for...", content: "Is there a bus route available for the new residential area in Khan Younis?", role: "Guardian", read: true }
-        ];
-    });
-
-    useEffect(() => {
-        localStorage.setItem('edutraker_messages', JSON.stringify(messages));
-    }, [messages]);
+    const [messages, setMessages] = useState([
+        { id: 1, type: 'internal', sender: "Ahmed (Gaza North Manager)", subject: "Weekly Report", date: "10:30 AM", preview: "Here is the weekly report for the northern district schools...", content: "Dear Admin,\n\nHere is the weekly report for the northern district schools. We have successfully completed the renovation of 3 schools and distributed the new textbooks.\n\nAttendance rates are up by 5% compared to last week.\n\nBest regards,\nAhmed", role: "Workstream Manager", read: false },
+        { id: 2, type: 'internal', sender: "Sarah (System Admin)", subject: "Database Maintenance", date: "Yesterday", preview: "Scheduled maintenance will happen on Friday at...", content: "Scheduled maintenance will happen on Friday at 2:00 AM UTC. Please ensure all backups are completed.", role: "Admin", read: true },
+        { id: 3, type: 'external', sender: "Mohammed Al-Masri (Parent)", subject: "Login Inquiry", date: "Oct 12", preview: "I was unable to login to the portal using...", content: "Hello,\n\nI was unable to login to the portal using my provided credentials. It says 'Invalid Password' even though I just reset it.\n\nCan you please check my account status?\n\nThanks,\nMohammed", role: "Guardian", read: false },
+        { id: 4, type: 'external', sender: "Fatima Khalil (Parent)", subject: "Transport Request", date: "Oct 11", preview: "Is there a bus route available for...", content: "Is there a bus route available for the new residential area in Khan Younis?", role: "Guardian", read: true }
+    ]);
 
     const [notifications, setNotifications] = useState([
         { id: 101, title: "New School Registered", message: "Al-Amal School has completed registration.", time: "2 hours ago", read: false },
@@ -103,59 +53,8 @@ const Communication = () => {
                     <h1 className={styles.title}>{t('communication.title')}</h1>
                     <p className={styles.subtitle}>{t('communication.subtitle')}</p>
                 </div>
-
-                <Button variant="primary" icon={Plus} onClick={() => setIsComposeOpen(true)}>{t('communication.newMessage')}</Button>
+                <Button variant="primary" icon={Plus}>{t('communication.newMessage')}</Button>
             </div>
-
-            {isComposeOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-                }}>
-                    <div className={styles.card} style={{ width: '500px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
-                        <h3 className={styles.cardTitle} style={{ marginBottom: '1.5rem' }}>{t('communication.newMessage')}</h3>
-                        <form onSubmit={handleCompose} style={{ display: 'grid', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>To</label>
-                                <select 
-                                    required
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                    value={newMessage.recipient}
-                                    onChange={e => setNewMessage({...newMessage, recipient: e.target.value})}
-                                >
-                                    <option value="">Select Recipient</option>
-                                    <option value="All Workstream Managers">All Workstream Managers</option>
-                                    <option value="All School Managers">All School Managers</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Subject</label>
-                                <input 
-                                    type="text" 
-                                    required
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                    value={newMessage.subject}
-                                    onChange={e => setNewMessage({...newMessage, subject: e.target.value})}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Message</label>
-                                <textarea 
-                                    required
-                                    rows={5}
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                    value={newMessage.content}
-                                    onChange={e => setNewMessage({...newMessage, content: e.target.value})}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                                <Button variant="outline" type="button" onClick={() => setIsComposeOpen(false)}>{t('common.cancel')}</Button>
-                                <Button variant="primary" type="submit">{t('communication.send')}</Button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '1.5rem', height: 'calc(100vh - 200px)' }}>
                 {/* Sidebar / List */}
@@ -308,11 +207,9 @@ const Communication = () => {
                                     <input
                                         type="text"
                                         placeholder={t('communication.typeReply')}
-                                        value={replyText}
-                                        onChange={(e) => setReplyText(e.target.value)}
                                         style={{ flex: 1, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
-                                    <Button variant="primary" icon={Send} onClick={handleSendReply}>{t('communication.send')}</Button>
+                                    <Button variant="primary" icon={Send}>{t('communication.send')}</Button>
                                 </div>
                             </div>
                         </>

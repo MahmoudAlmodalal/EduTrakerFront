@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { Users, School, Briefcase, TrendingUp, TrendingDown, Bell, Activity as ActivityIcon, UserPlus, ShieldCheck } from 'lucide-react';
@@ -9,14 +8,9 @@ import {
 } from 'recharts';
 import styles from './Dashboard.module.css';
 
-const StatCard = ({ title, value, change, icon: Icon, color, isNotification, path }) => {
-    const navigate = useNavigate();
+const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) => {
     return (
-        <div 
-            className={styles.statCard} 
-            onClick={() => path && navigate(path)}
-            style={{ cursor: path ? 'pointer' : 'default' }}
-        >
+        <div className={styles.statCard}>
             <div className={styles.statHeader}>
                 <div className={`${styles.iconWrapper} ${styles[color]}`}>
                     {typeof Icon === 'string' && Icon === 'Bell' ? <Bell size={24} /> : <Icon size={24} />}
@@ -39,25 +33,13 @@ const StatCard = ({ title, value, change, icon: Icon, color, isNotification, pat
 const Dashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const navigate = useNavigate();
 
-    // Dynamic Data
-    const workstreams = JSON.parse(localStorage.getItem('edutraker_workstreams') || '[]');
-    const schools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
-    const users = JSON.parse(localStorage.getItem('edutraker_users') || '[]');
-    
-    // Calculate Stats
-    const totalWorkstreams = workstreams.length;
-    const totalSchools = schools.length;
-    const totalUsers = users.length;
-    const totalRegistrants = schools.reduce((acc, s) => acc + (s.students || 0), 0); // Sum of students in all schools as proxy for registrants
-
+    // Mock Data
     const stats = [
-        { title: t('dashboard.stats.workstreams'), value: totalWorkstreams.toString(), change: 0, icon: Briefcase, color: 'blue', path: '/admin/workstreams' },
-        { title: t('dashboard.stats.schools'), value: totalSchools.toString(), change: totalSchools > 0 ? 12.3 : 0, icon: School, color: 'green', path: '/admin/schools' },
-        { title: t('dashboard.stats.users'), value: totalUsers.toLocaleString(), change: totalUsers > 0 ? 8.1 : 0, icon: Users, color: 'purple', path: '/admin/users' },
-        { title: 'Total Students', value: totalRegistrants.toLocaleString(), change: 15.4, icon: Users, color: 'indigo', path: '/admin/analytics' },
-        { title: t('dashboard.stats.notifications'), value: '5', change: 0, icon: 'Bell', color: 'orange', isNotification: true, path: '/admin/communication' },
+        { title: t('dashboard.stats.workstreams'), value: '12', change: 4.5, icon: Briefcase, color: 'blue' },
+        { title: t('dashboard.stats.schools'), value: '148', change: 12.3, icon: School, color: 'green' },
+        { title: t('dashboard.stats.users'), value: '24,592', change: 8.1, icon: Users, color: 'purple' },
+        { title: t('dashboard.stats.notifications'), value: '5', change: 0, icon: 'Bell', color: 'orange', isNotification: true },
     ];
 
     const activityData = [

@@ -42,10 +42,6 @@ const WorkstreamLayout = () => {
         return 'WM';
     };
 
-    // Dynamic stats
-    const schoolsCount = JSON.parse(localStorage.getItem('ws_schools') || '[]').length;
-    const managersCount = JSON.parse(localStorage.getItem('ws_manager_assignments') || '[]').length;
-
     return (
         <div className="workstream-layout">
             {/* Sidebar */}
@@ -70,7 +66,7 @@ const WorkstreamLayout = () => {
                         textAlign: 'center',
                         border: '1px solid rgba(79, 70, 229, 0.2)'
                     }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>{schoolsCount}</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>12</div>
                         <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schools</div>
                     </div>
                     <div style={{
@@ -81,7 +77,7 @@ const WorkstreamLayout = () => {
                         textAlign: 'center',
                         border: '1px solid rgba(14, 165, 233, 0.2)'
                     }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>{managersCount}</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>8</div>
                         <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Managers</div>
                     </div>
                 </div>

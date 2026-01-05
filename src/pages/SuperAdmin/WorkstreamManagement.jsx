@@ -10,19 +10,12 @@ const WorkstreamManagement = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Mock Data
-    const [workstreams, setWorkstreams] = useState(() => {
-        const savedWorkstreams = localStorage.getItem('edutraker_workstreams');
-        return savedWorkstreams ? JSON.parse(savedWorkstreams) : [
-            { id: 1, name: 'Gaza North', schools: 12, users: 4500, manager: 'John Doe', status: 'Active', location: 'Jabalia, Gaza North' },
-            { id: 2, name: 'Gaza South', schools: 8, users: 3200, manager: 'Jane Smith', status: 'Active', location: 'Rafah, Gaza South' },
-            { id: 3, name: 'Khan Younis', schools: 15, users: 5100, manager: 'Pending', status: 'Inactive', location: 'Khan Younis Center' },
-            { id: 4, name: 'Mid Area', schools: 10, users: 2800, manager: 'Ahmad Khalil', status: 'Active', location: 'Deir al-Balah' },
-        ];
-    });
-
-    React.useEffect(() => {
-        localStorage.setItem('edutraker_workstreams', JSON.stringify(workstreams));
-    }, [workstreams]);
+    const [workstreams, setWorkstreams] = useState([
+        { id: 1, name: 'Gaza North', schools: 12, users: 4500, manager: 'John Doe', status: 'Active', location: 'Jabalia, Gaza North' },
+        { id: 2, name: 'Gaza South', schools: 8, users: 3200, manager: 'Jane Smith', status: 'Active', location: 'Rafah, Gaza South' },
+        { id: 3, name: 'Khan Younis', schools: 15, users: 5100, manager: 'Pending', status: 'Inactive', location: 'Khan Younis Center' },
+        { id: 4, name: 'Mid Area', schools: 10, users: 2800, manager: 'Ahmad Khalil', status: 'Active', location: 'Deir al-Balah' },
+    ]);
 
     const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
     const [selectedWorkstream, setSelectedWorkstream] = useState(null);
@@ -41,7 +34,7 @@ const WorkstreamManagement = () => {
             ));
         } else {
             const newWorkstream = {
-                id: Date.now(),
+                id: workstreams.length + 1,
                 name: formData.name,
                 schools: 0,
                 users: 0,
@@ -79,12 +72,6 @@ const WorkstreamManagement = () => {
         setIsModalOpen(true);
     };
 
-    const handleDeleteWorkstream = (id) => {
-        if (window.confirm(t('Are you sure you want to delete this workstream?'))) {
-            setWorkstreams(workstreams.filter(ws => ws.id !== id));
-        }
-    };
-
     const openConfigModal = (workstream) => {
         setSelectedWorkstream(workstream);
         setIsConfigModalOpen(true);
@@ -103,22 +90,8 @@ const WorkstreamManagement = () => {
             </div>
 
             <div className={styles.grid}>
-                {workstreams.map((ws) => {
-                    // Dynamic counts calculation
-                    const allSchools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
-                    const allUsers = JSON.parse(localStorage.getItem('edutraker_users') || '[]');
-                    
-                    // Count schools in this workstream (matching by name or location snippet)
-                    const schoolCount = allSchools.filter(s => 
-                        (s.workstream === ws.name) || 
-                        (s.location && s.location.includes(ws.name))
-                    ).length;
-
-                    // Count users in this workstream
-                    const userCount = allUsers.filter(u => u.workstream === ws.name).length;
-
-                    return (
-                        <div key={ws.id} className={styles.card}>
+                {workstreams.map((ws) => (
+                    <div key={ws.id} className={styles.card}>
                         <div className={styles.cardHeader}>
                             <div className={styles.workstreamInfo}>
                                 <h3 className={styles.cardTitle}>{ws.name}</h3>
@@ -139,14 +112,14 @@ const WorkstreamManagement = () => {
                                         <School size={14} style={{ color: 'var(--color-primary)' }} />
                                         <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
                                     </div>
-                                    <span className={styles.statValue}>{schoolCount}</span>
+                                    <span className={styles.statValue}>{ws.schools}</span>
                                 </div>
                                 <div className={styles.statItem}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                                         <Users size={14} style={{ color: '#8b5cf6' }} />
                                         <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
                                     </div>
-                                    <span className={styles.statValue}>{userCount.toLocaleString()}</span>
+                                    <span className={styles.statValue}>{ws.users.toLocaleString()}</span>
                                 </div>
                             </div>
 
@@ -166,12 +139,11 @@ const WorkstreamManagement = () => {
                             <div className={styles.actions}>
                                 <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
                                 <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
-                                <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleDeleteWorkstream(ws.id)} title="Delete"><Trash2 size={18} /></button>
+                                <button className={`${styles.actionBtn} ${styles.danger}`} title="Delete"><Trash2 size={18} /></button>
                             </div>
                         </div>
                     </div>
-                    );
-                })}
+                ))}
             </div>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? t('workstreams.modal.editTitle') : t('workstreams.modal.createTitle')}>
@@ -217,12 +189,9 @@ const WorkstreamManagement = () => {
                                 onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
                             >
                                 <option value="">{t('workstreams.form.selectManager')}</option>
-                                {JSON.parse(localStorage.getItem('edutraker_users') || '[]')
-                                    .filter(u => u.role === 'Workstream Manager')
-                                    .map(u => (
-                                        <option key={u.id} value={u.name}>{u.name}</option>
-                                    ))
-                                }
+                                <option value="John Doe">John Doe</option>
+                                <option value="Jane Smith">Jane Smith</option>
+                                <option value="Ahmad Khalil">Ahmad Khalil</option>
                             </select>
                         </div>
                     </div>

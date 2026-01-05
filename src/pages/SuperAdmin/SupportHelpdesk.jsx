@@ -6,47 +6,11 @@ import styles from './Dashboard.module.css';
 const SupportHelpdesk = () => {
     const { t } = useTheme();
 
-    const [tickets, setTickets] = React.useState(() => {
-        const savedTickets = localStorage.getItem('edutraker_tickets');
-        return savedTickets ? JSON.parse(savedTickets) : [
-            { id: 'TKT-001', subject: 'Login Issue at Al-Amal School', priority: 'High', status: 'Open', date: '2025-12-14' },
-            { id: 'TKT-002', subject: 'Data Sync Error', priority: 'Medium', status: 'In Progress', date: '2025-12-13' },
-            { id: 'TKT-003', subject: 'Feature Request: Bulk Upload', priority: 'Low', status: 'Closed', date: '2025-12-10' },
-        ];
-    });
-
-    React.useEffect(() => {
-        localStorage.setItem('edutraker_tickets', JSON.stringify(tickets));
-    }, [tickets]);
-
-    const toggleStatus = (id) => {
-        setTickets(tickets.map(t => {
-            if (t.id === id) {
-                const newStatus = t.status === 'Open' ? 'In Progress' : (t.status === 'In Progress' ? 'Closed' : 'Open');
-                return { ...t, status: newStatus };
-            }
-            return t;
-        }));
-    };
-
-    const handleViewTicket = (id) => {
-        alert(`Viewing ticket ${id} details...`);
-    };
-
-    // Calculate dynamic stats
-    const openTicketsCount = tickets.filter(t => t.status === 'Open').length;
-    const pendingCount = tickets.filter(t => t.status === 'In Progress').length;
-    
-    // Resolved this week (assuming 'Closed' means resolved)
-    // For simplicity in this mock environment without moment/date-fns, we'll just count all 'Closed'
-    // or checks if the date string is within last 7 days roughly if date format is YYYY-MM-DD
-    const resolvedCount = tickets.filter(t => {
-        if (t.status !== 'Closed') return false;
-        const ticketDate = new Date(t.date);
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        return ticketDate >= oneWeekAgo;
-    }).length;
+    const tickets = [
+        { id: 'TKT-001', subject: 'Login Issue at Al-Amal School', priority: 'High', status: 'Open', date: '2025-12-14' },
+        { id: 'TKT-002', subject: 'Data Sync Error', priority: 'Medium', status: 'In Progress', date: '2025-12-13' },
+        { id: 'TKT-003', subject: 'Feature Request: Bulk Upload', priority: 'Low', status: 'Closed', date: '2025-12-10' },
+    ];
 
     return (
         <div className={styles.container}>
@@ -61,7 +25,7 @@ const SupportHelpdesk = () => {
                         </div>
                     </div>
                     <div className={styles.statBody}>
-                        <span className={styles.statValue}>{openTicketsCount}</span>
+                        <span className={styles.statValue}>5</span>
                     </div>
                 </div>
                 <div className={styles.statCard}>
@@ -72,7 +36,7 @@ const SupportHelpdesk = () => {
                         </div>
                     </div>
                     <div className={styles.statBody}>
-                        <span className={styles.statValue}>{pendingCount}</span>
+                        <span className={styles.statValue}>12</span>
                     </div>
                 </div>
                 <div className={styles.statCard}>
@@ -83,7 +47,7 @@ const SupportHelpdesk = () => {
                         </div>
                     </div>
                     <div className={styles.statBody}>
-                        <span className={styles.statValue}>{resolvedCount}</span>
+                        <span className={styles.statValue}>28</span>
                     </div>
                 </div>
             </div>
@@ -120,21 +84,10 @@ const SupportHelpdesk = () => {
                                     </span>
                                 </td>
                                 <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-main)' }}>
-                                    <span 
-                                        onClick={() => toggleStatus(ticket.id)}
-                                        style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
-                                        title="Click to change status"
-                                    >
-                                        {ticket.status}
-                                    </span>
+                                    {ticket.status}
                                 </td>
                                 <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
-                                    <button 
-                                        style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}
-                                        onClick={() => handleViewTicket(ticket.id)}
-                                    >
-                                        {t('support.view')}
-                                    </button>
+                                    <button style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>{t('support.view')}</button>
                                 </td>
                             </tr>
                         ))}

@@ -6,20 +6,21 @@ import './Workstream.css';
 const SchoolManagerAssignment = () => {
     const { t } = useTheme();
     const [showAssignForm, setShowAssignForm] = useState(false);
-    const [managers, setManagers] = useState(() => {
-        const saved = localStorage.getItem('ws_manager_assignments');
-        return saved ? JSON.parse(saved) : [];
-    });
-
-    React.useEffect(() => {
-        localStorage.setItem('ws_manager_assignments', JSON.stringify(managers));
-    }, [managers]);
+    const [managers, setManagers] = useState([
+        { id: 1, name: 'Seymour Skinner', email: 'skinner@springfield.edu', school: 'Springfield Elementary', status: 'Assigned' },
+        { id: 2, name: 'Gary Chalmers', email: 'chalmers@edu.gov', school: 'Unassigned', status: 'Available' },
+        { id: 3, name: 'Edna Krabappel', email: 'krabappel@springfield.edu', school: 'Springfield Elementary', status: 'Assigned' },
+    ]);
 
     const [newManager, setNewManager] = useState({ name: '', email: '', schoolId: '', isEditing: false, id: null });
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Load Schools from Shared Storage for dropdown
-    const schools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
+    // Mock Schools for dropdown
+    const schools = [
+        { id: 1, name: 'Springfield Elementary' },
+        { id: 2, name: 'Shelbyville High' },
+        { id: 3, name: 'Ogdenville Tech' },
+    ];
 
     const handleAssignManager = (e) => {
         e.preventDefault();
@@ -168,30 +169,11 @@ const SchoolManagerAssignment = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
                                 width: '100%',
-                                padding: '0.5rem 2.5rem 0.5rem 2.5rem', // Added padding right for X button
+                                padding: '0.5rem 0.5rem 0.5rem 2.5rem',
                                 borderRadius: '0.375rem',
                                 border: '1px solid var(--color-border)'
                             }}
                         />
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm('')}
-                                style={{
-                                    position: 'absolute',
-                                    right: '10px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: 'var(--color-text-muted)',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                }}
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
                     </div>
                 </div>
 

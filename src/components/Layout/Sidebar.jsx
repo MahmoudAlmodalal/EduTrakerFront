@@ -44,14 +44,6 @@ const Sidebar = ({ isOpen }) => {
             { path: '/school-manager/departments', label: t('school.nav.departments'), icon: Layers },
             { path: '/school-manager/secretaries', label: t('school.nav.secretaries'), icon: UserCheck },
         ],
-        SECRETARY: [
-            { path: '/secretary', label: t('secretary.nav.dashboard') || 'Dashboard', icon: LayoutDashboard },
-            { path: '/secretary/admissions', label: t('secretary.nav.admissions') || 'Admissions', icon: UserCheck },
-            { path: '/secretary/guardians', label: t('secretary.nav.guardians') || 'Guardians', icon: Users },
-            { path: '/secretary/attendance', label: t('secretary.nav.attendance') || 'Attendance', icon: UserCheck },
-            { path: '/secretary/communication', label: t('secretary.nav.communication') || 'Communication', icon: MessageSquare },
-            { path: '/secretary/settings', label: t('secretary.nav.settings') || 'Settings', icon: Settings },
-        ],
     };
 
     const currentLinks = links[role] || links.SUPER_ADMIN;
