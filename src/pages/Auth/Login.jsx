@@ -1,57 +1,132 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
-import { GraduationCap, Mail, Lock } from 'lucide-react';
+import { GraduationCap, AlertCircle } from 'lucide-react';
 import styles from './Login.module.css';
 
 const Login = ({ role }) => {
     const { t } = useTheme();
+    const { login } = useAuth();
+    const { workstreamId } = useParams();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const { login } = useAuth();
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const roleConfig = {
-        'SUPER_ADMIN': { title: t('auth.role.superAdmin'), defaultEmail: 'admin@edutraker.com' },
-        'WORKSTREAM_MANAGER': { title: t('auth.role.workstreamManager'), defaultEmail: 'workstream@edutraker.com' },
-        'SCHOOL_MANAGER': { title: t('auth.role.schoolManager'), defaultEmail: 'manager@edutraker.com' },
-        'SECRETARY': { title: t('auth.role.secretary'), defaultEmail: 'secretary@edutraker.com' },
-        'TEACHER': { title: t('auth.role.teacher'), defaultEmail: 'teacher@edutraker.com' },
-        'STUDENT': { title: t('auth.role.student'), defaultEmail: 'student@edutraker.com' },
-        'GUARDIAN': { title: t('auth.role.guardian'), defaultEmail: 'guardian@edutraker.com' },
-    };
+    // Workstream info state
+    const [workstreamName, setWorkstreamName] = useState(null);
+    const [workstreamNotFound, setWorkstreamNotFound] = useState(false);
+    const [loadingWorkstream, setLoadingWorkstream] = useState(false);
 
-    const currentRole = role ? roleConfig[role] : null;
-    const displayTitle = currentRole ? currentRole.title : t('auth.signInTitle');
+    // Determine if this is a portal or workstream login
+    const isPortalLogin = role === 'PORTAL';
 
-    const handleSubmit = (e) => {
+    // Fetch workstream info on mount (for workstream login)
+    useEffect(() => {
+        if (!isPortalLogin && workstreamId) {
+            setLoadingWorkstream(true);
+            fetch(`/api/workstreams/${workstreamId}/info/`)
+                .then(res => {
+                    if (res.ok) return res.json();
+                    throw new Error('Not found');
+                })
+                .then(data => {
+                    setWorkstreamName(data.name);
+                    setWorkstreamNotFound(false);
+                })
+                .catch(() => {
+                    setWorkstreamNotFound(true);
+                    setWorkstreamName(null);
+                })
+                .finally(() => setLoadingWorkstream(false));
+        }
+    }, [isPortalLogin, workstreamId]);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setIsLoading(true);
 
-        let isValid = false;
+        // Portal uses /api/portal/auth/login/, Workstream uses /api/workstream/:id/auth/login/
+        const loginUrl = isPortalLogin
+            ? '/api/portal/auth/login/'
+            : `/api/workstream/${workstreamId}/auth/login/`;
 
-        if (role) {
-            if (email === currentRole.defaultEmail && password === role.toLowerCase()) {
-                isValid = true;
-            } else if (email === 'admin@edutraker.com' && password === 'admin') {
-                isValid = true;
-            }
-        } else {
-            if (email === 'admin@edutraker.com' && password === 'admin') {
-                isValid = true;
-            }
-        }
-
-        if (isValid) {
-            login({
-                name: currentRole?.title || 'User',
-                role: role || 'SUPER_ADMIN',
-                email
+        try {
+            console.log('Attempting login to:', loginUrl);
+            const response = await fetch(loginUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
             });
-        } else {
-            setError(t('auth.error.invalid'));
+
+            console.log('Response Status:', response.status);
+            const text = await response.text();
+
+            let data;
+            try {
+                data = text ? JSON.parse(text) : {};
+            } catch (e) {
+                console.error('JSON Parse Error:', e);
+                console.log('Response Body:', text);
+                throw new Error(`Server returned invalid JSON (${response.status}). Check console for details.`);
+            }
+
+            if (response.ok) {
+                // Pass user data and tokens to the AuthContext
+                login({
+                    ...data.user,
+                    role: data.user.role || role,
+                    accessToken: data.tokens.access,
+                    refreshToken: data.tokens.refresh
+                });
+            } else {
+                setError(data.detail || data.non_field_errors?.[0] || t('auth.error.invalid'));
+            }
+        } catch (err) {
+            console.error('Login error:', err);
+            setError(err.message || "Unable to connect to the server. Please try again later.");
+        } finally {
+            setIsLoading(false);
         }
+    };
+
+    // Show error state if workstream not found
+    if (workstreamNotFound) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.loginWrapper}>
+                    <div className={styles.card}>
+                        <div className={styles.header}>
+                            <div className={styles.logo}>
+                                <div className={styles.logoIcon}><AlertCircle size={24} /></div>
+                                <h1 className={styles.title}>EduTraker</h1>
+                            </div>
+                            <p className={styles.subtitle} style={{ color: 'var(--color-error, #ef4444)' }}>
+                                Workstream Not Found
+                            </p>
+                        </div>
+                        <div className={styles.form}>
+                            <div className={styles.error}>
+                                Workstream with ID "{workstreamId}" does not exist or is inactive.
+                            </div>
+                            <a href="/login" className={styles.backLink} style={{ textAlign: 'center', display: 'block', marginTop: '1rem' }}>
+                                ← Back to Portal Login
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Determine subtitle text
+    const getSubtitle = () => {
+        if (isPortalLogin) return 'Portal Login';
+        if (loadingWorkstream) return 'Loading...';
+        return workstreamName ? `${workstreamName} Login` : `Workstream ${workstreamId} Login`;
     };
 
     return (
@@ -60,12 +135,12 @@ const Login = ({ role }) => {
                 <div className={styles.card}>
                     <div className={styles.header}>
                         <div className={styles.logo}>
-                            <div className={styles.logoIcon}>
-                                <GraduationCap size={24} />
-                            </div>
+                            <div className={styles.logoIcon}><GraduationCap size={24} /></div>
                             <h1 className={styles.title}>EduTraker</h1>
                         </div>
-                        <p className={styles.subtitle}>{displayTitle}</p>
+                        <p className={styles.subtitle}>
+                            {getSubtitle()}
+                        </p>
                     </div>
 
                     <form onSubmit={handleSubmit} className={styles.form}>
@@ -79,7 +154,6 @@ const Login = ({ role }) => {
                                 className={styles.input}
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder={currentRole?.defaultEmail || "name@company.com"}
                                 required
                             />
                         </div>
@@ -92,24 +166,16 @@ const Login = ({ role }) => {
                                 className={styles.input}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
                                 required
                             />
                         </div>
 
-                        <Button
-                            type="submit"
-                            variant="primary"
-                            size="large"
-                            style={{ marginTop: '0.5rem' }}
-                        >
-                            {t('auth.signInBtn')}
+                        <Button type="submit" variant="primary" size="large" disabled={isLoading}>
+                            {isLoading ? 'Verifying...' : t('auth.signInBtn')}
                         </Button>
 
                         <div className={styles.footer}>
-                            <a href="/login" className={styles.backLink}>
-                                {t('auth.backToSelection')}
-                            </a>
+                            <a href="/login" className={styles.backLink}>{t('auth.backToSelection')}</a>
                         </div>
                     </form>
                 </div>

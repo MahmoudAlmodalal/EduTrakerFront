@@ -16,21 +16,16 @@ const RoleSelection = () => {
     const roles = [
         {
             id: 'education',
-            title: 'Education & Learning',
+            title: 'workstream login',
             items: [
-                { path: '/login/student', label: 'Student', icon: <GraduationCap size={28} />, desc: 'Access your personalized learning portal, courses, and tracks.' },
-                { path: '/login/teacher', label: 'Teacher', icon: <BookOpen size={28} />, desc: 'Manage your classes, assessments, and student performance.' },
-                { path: '/login/guardian', label: 'Guardian', icon: <Users size={28} />, desc: 'Stay connected with your child\'s academic journey and alerts.' },
+                { path: '/login/workstream/1', label: 'workstream', icon: <GraduationCap size={28} />, desc: 'Access workstream for role (Student, guardian, teacher, secretary, school manager, workstream manager).' },
             ]
         },
         {
             id: 'administration',
-            title: 'School Management',
+            title: 'login portal',
             items: [
-                { path: '/login/school-manager', label: 'School Manager', icon: <School size={28} />, desc: 'Oversee school operations, staff, and overall performance.' },
-                { path: '/login/secretary', label: 'Secretary', icon: <UserCheck size={28} />, desc: 'Handle admissions, records, and student documentation.' },
-                { path: '/login/workstream-manager', label: 'Workstream Mgr', icon: <Briefcase size={28} />, desc: 'Manage school networks, workstreams, and configurations.' },
-                { path: '/login/super-admin', label: 'Super Admin', icon: <ShieldAlert size={28} />, desc: 'Global system settings, security, and infrastructure.' },
+                { path: '/login/portal', label: 'administration', icon: <School size={28} />, desc: 'login to portal admin to manage workstreams and admin users.' },
             ]
         }
     ];

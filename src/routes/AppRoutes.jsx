@@ -78,14 +78,12 @@ const AppRoutes = () => {
         <Routes>
             {/* Public Routes */}
             <Route path="/unauthorized" element={<Unauthorized />} />
-            <Route path="/login" element={<RoleSelection />} />
-            <Route path="/login/super-admin" element={<Login role="SUPER_ADMIN" />} />
-            <Route path="/login/workstream-manager" element={<Login role="WORKSTREAM_MANAGER" />} />
-            <Route path="/login/school-manager" element={<Login role="SCHOOL_MANAGER" />} />
-            <Route path="/login/secretary" element={<Login role="SECRETARY" />} />
-            <Route path="/login/teacher" element={<Login role="TEACHER" />} />
-            <Route path="/login/student" element={<Login role="STUDENT" />} />
-            <Route path="/login/guardian" element={<Login role="GUARDIAN" />} />
+
+            {/* Portal Login (default) - for Admin & Workstream Manager */}
+            <Route path="/login" element={<Login role="PORTAL" />} />
+
+            {/* Workstream Login - URL: /login/workstream/:id */}
+            <Route path="/login/workstream/:workstreamId" element={<Login role="WORKSTREAM" />} />
 
             {/* Protected Routes - Super Admin */}
             <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
