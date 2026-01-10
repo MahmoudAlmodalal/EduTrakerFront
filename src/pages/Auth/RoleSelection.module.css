@@ -1,0 +1,146 @@
+.container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-bg-body);
+    background-image:
+        radial-gradient(at 0% 0%, var(--color-primary-light) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, var(--color-primary-light) 0px, transparent 50%);
+    padding: var(--spacing-8);
+}
+
+.contentWrapper {
+    width: 100%;
+    max-width: 1000px;
+    animation: fadeIn 0.8s ease-out;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: var(--spacing-12);
+}
+
+.title {
+    font-size: var(--font-size-4xl);
+    font-weight: 800;
+    color: var(--color-text-main);
+    letter-spacing: -0.05em;
+    margin-bottom: var(--spacing-2);
+}
+
+.subtitle {
+    font-size: var(--font-size-lg);
+    color: var(--color-text-muted);
+}
+
+.section {
+    margin-bottom: var(--spacing-12);
+}
+
+.sectionTitle {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-6);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+}
+
+.sectionTitle::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--color-primary-subtle), transparent);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-6);
+}
+
+.roleCard {
+    background: var(--color-bg-surface);
+    padding: var(--spacing-8);
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--color-border-subtle);
+    transition: all var(--transition-normal);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-decoration: none;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+}
+
+.roleCard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--color-primary) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+    z-index: 0;
+}
+
+.roleCard:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-premium);
+    border-color: var(--color-primary-subtle);
+}
+
+.roleCard:hover::before {
+    opacity: 0.03;
+}
+
+.roleIcon {
+    width: 56px;
+    height: 56px;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--spacing-6);
+    transition: all var(--transition-normal);
+    position: relative;
+    z-index: 1;
+}
+
+.roleCard:hover .roleIcon {
+    transform: scale(1.1) rotate(5deg);
+    background: var(--color-primary);
+    color: white;
+}
+
+.roleName {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin-bottom: var(--spacing-2);
+    position: relative;
+    z-index: 1;
+}
+
+.roleDescription {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    position: relative;
+    z-index: 1;
+}
+
+@media (max-width: 640px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
