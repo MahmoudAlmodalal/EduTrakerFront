@@ -44,7 +44,6 @@ export const translations = {
         'settings.announcementPlaceholder': 'Type a message to broadcast to all users...',
         'settings.announcementHint': 'This message will be displayed on all user dashboards.',
         'settings.saveAndBroadcast': 'Save & Broadcast',
-        'settings.saveAndBroadcast': 'Save & Broadcast',
         'settings.generalSettings': 'General Settings',
         'settings.profileInformation': 'Profile Information',
         'settings.securitySettings': 'Security Settings',
@@ -70,11 +69,8 @@ export const translations = {
         'settings.savePreferences': 'Save Preferences',
         'settings.changeAvatar': 'Change Avatar',
         'settings.avatarHint': 'JPG, GIF or PNG. Max size of 800K',
-        'settings.fullName': 'Full Name',
         'settings.emailAddress': 'Email Address',
-        'settings.currentPassword': 'Current Password',
         'settings.currentPasswordPlaceholder': 'Enter current password to save changes',
-        'settings.updateProfile': 'Update Profile',
 
         // Dashboard
         'dashboard.title': 'Dashboard Overview',
@@ -481,9 +477,7 @@ export const translations = {
         // School Manager Navigation
         'school.nav.overview': 'Overview',
         'school.nav.academicConfig': 'Academic Config',
-        'school.nav.reports': 'Reports',
         'school.nav.teacherMonitoring': 'Teacher Monitoring',
-        'school.nav.departments': 'Departments',
         'school.nav.secretaryMonitoring': 'Secretary Monitoring',
         'school.nav.communication': 'Communication',
         'school.nav.settings': 'Settings',
@@ -647,37 +641,6 @@ export const translations = {
         'secretary.nav.attendance': 'Attendance',
         'secretary.nav.communication': 'Communication',
         'secretary.nav.settings': 'Settings',
-
-        // Teacher Settings
-        'teacher.settings.title': 'Settings',
-        'teacher.settings.subtitle': 'Manage your profile, preferences, and account security.',
-        'teacher.settings.tab.general': 'General',
-        'teacher.settings.tab.profile': 'Profile',
-        'teacher.settings.tab.security': 'Security',
-        'teacher.settings.general.title': 'General Preferences',
-        'teacher.settings.general.subtitle': 'Customize your experience and interface settings.',
-        'teacher.settings.language': 'Language',
-        'teacher.settings.appearance': 'Appearance',
-        'teacher.settings.lightMode': 'Light Mode',
-        'teacher.settings.darkMode': 'Dark Mode',
-        'teacher.settings.savePreferences': 'Save Preferences',
-        'teacher.settings.profile.title': 'Profile Settings',
-        'teacher.settings.profile.subtitle': 'Update your personal information and biography.',
-        'teacher.settings.fullName': 'Full Name',
-        'teacher.settings.phoneNumber': 'Phone Number',
-        'teacher.settings.emailAddress': 'Email Address',
-        'teacher.settings.emailManaged': 'Email is managed by administrator',
-        'teacher.settings.bio': 'Biography',
-        'teacher.settings.updateProfile': 'Update Profile',
-        'teacher.settings.security.title': 'Security Settings',
-        'teacher.settings.security.subtitle': 'Manage your password and account protection.',
-        'teacher.settings.changePassword': 'Change Password',
-        'teacher.settings.currentPassword': 'Current Password',
-        'teacher.settings.newPassword': 'New Password',
-        'teacher.settings.confirmPassword': 'Confirm Password',
-        'teacher.settings.twoFactor': 'Two-Factor Authentication',
-        'teacher.settings.twoFactorDesc': 'Add an extra layer of security to your account',
-        'teacher.settings.updateSecurity': 'Update Security Settings',
 
         // Secretary Settings
         'secretary.settings.title': 'Settings',
@@ -881,8 +844,7 @@ export const translations = {
         'guardian.monitoring.positive': 'Positive',
         'guardian.monitoring.negative': 'Negative',
 
-        // Guardian Communication
-        'guardian.communication.title': 'Communication Center',
+        // Guardian Communication (additional keys)
         'guardian.communication.messages': 'Messages',
         'guardian.communication.newMessage': 'New Message',
         'guardian.communication.teachers': 'Teachers',
@@ -1013,7 +975,6 @@ export const translations = {
         'settings.announcementPlaceholder': 'اكتب رسالة لبثها لجميع المستخدمين...',
         'settings.announcementHint': 'سيتم عرض هذه الرسالة في لوحات تحكم جميع المستخدمين.',
         'settings.saveAndBroadcast': 'حفظ وبث',
-        'settings.saveAndBroadcast': 'حفظ وبث',
         'settings.generalSettings': 'الإعدادات العامة',
         'settings.profileInformation': 'معلومات الملف الشخصي',
         'settings.securitySettings': 'إعدادات الأمان',
@@ -1039,11 +1000,8 @@ export const translations = {
         'settings.savePreferences': 'حفظ التفضيلات',
         'settings.changeAvatar': 'تغيير الصورة الرمزية',
         'settings.avatarHint': 'JPG, GIF أو PNG. الحد الأقصى 800K',
-        'settings.fullName': 'الاسم الكامل',
         'settings.emailAddress': 'البريد الإلكتروني',
-        'settings.currentPassword': 'كلمة المرور الحالية',
         'settings.currentPasswordPlaceholder': 'أدخل كلمة المرور الحالية لحفظ التغييرات',
-        'settings.updateProfile': 'تحديث الملف الشخصي',
 
         // Dashboard
         'dashboard.title': 'نظرة عامة على لوحة المعلومات',
@@ -1450,9 +1408,7 @@ export const translations = {
         // School Manager Navigation
         'school.nav.overview': 'نظرة عامة',
         'school.nav.academicConfig': 'الإعداد الأكاديمي',
-        'school.nav.reports': 'التقارير',
         'school.nav.teacherMonitoring': 'متابعة المعلمين',
-        'school.nav.departments': 'الأقسام',
         'school.nav.secretaryMonitoring': 'متابعة السكرتارية',
         'school.nav.communication': 'التواصل',
         'school.nav.settings': 'الإعدادات',
@@ -1620,37 +1576,6 @@ export const translations = {
         // Secretary Settings
         'secretary.settings.title': 'الإعدادات',
         'secretary.settings.subtitle': 'إدارة ملفك الشخصي وتفضيلاتك وأمان حسابك.',
-
-        // Teacher Settings
-        'teacher.settings.title': 'الإعدادات',
-        'teacher.settings.subtitle': 'إدارة ملفك الشخصي وتفضيلاتك وأمان حسابك.',
-        'teacher.settings.tab.general': 'عام',
-        'teacher.settings.tab.profile': 'الملف الشخصي',
-        'teacher.settings.tab.security': 'الأمان',
-        'teacher.settings.general.title': 'التفضيلات العامة',
-        'teacher.settings.general.subtitle': 'تخصيص تجربتك وإعدادات الواجهة.',
-        'teacher.settings.language': 'اللغة',
-        'teacher.settings.appearance': 'المظهر',
-        'teacher.settings.lightMode': 'الوضع الفاتح',
-        'teacher.settings.darkMode': 'الوضع الداكن',
-        'teacher.settings.savePreferences': 'حفظ التفضيلات',
-        'teacher.settings.profile.title': 'إعدادات الملف الشخصي',
-        'teacher.settings.profile.subtitle': 'تحديث معلوماتك الشخصية وسيرتك الذاتية.',
-        'teacher.settings.fullName': 'الاسم الكامل',
-        'teacher.settings.phoneNumber': 'رقم الهاتف',
-        'teacher.settings.emailAddress': 'البريد الإلكتروني',
-        'teacher.settings.emailManaged': 'يتم إدارة البريد الإلكتروني من قبل المسؤول',
-        'teacher.settings.bio': 'السيرة الذاتية',
-        'teacher.settings.updateProfile': 'تحديث الملف الشخصي',
-        'teacher.settings.security.title': 'إعدادات الأمان',
-        'teacher.settings.security.subtitle': 'إدارة كلمة المرور وحماية حسابك.',
-        'teacher.settings.changePassword': 'تغيير كلمة المرور',
-        'teacher.settings.currentPassword': 'كلمة المرور الحالية',
-        'teacher.settings.newPassword': 'كلمة المرور الجديدة',
-        'teacher.settings.confirmPassword': 'تأكيد كلمة المرور',
-        'teacher.settings.twoFactor': 'المصادقة الثنائية',
-        'teacher.settings.twoFactorDesc': 'أضف طبقة إضافية من الأمان لحسابك',
-        'teacher.settings.updateSecurity': 'تحديث إعدادات الأمان',
 
         // Secretary Dashboard
         'secretary.dashboard.title': 'لوحة تحكم السكرتارية',
@@ -1847,8 +1772,7 @@ export const translations = {
         'guardian.monitoring.positive': 'إيجابي',
         'guardian.monitoring.negative': 'سلبي',
 
-        // Guardian Communication
-        'guardian.communication.title': 'مركز التواصل',
+        // Guardian Communication (additional keys)
         'guardian.communication.messages': 'الرسائل',
         'guardian.communication.newMessage': 'رسالة جديدة',
         'guardian.communication.teachers': 'المعلمون',
