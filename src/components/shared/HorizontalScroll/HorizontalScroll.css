@@ -1,0 +1,251 @@
+/**
+ * HorizontalScroll Component Styles
+ * Smooth horizontal scrolling with navigation controls
+ */
+
+/* ==================== Wrapper ==================== */
+.horizontal-scroll-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+}
+
+/* ==================== Scroll Container ==================== */
+.horizontal-scroll-container {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    
+    /* Hide scrollbar but keep functionality */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.horizontal-scroll-container::-webkit-scrollbar {
+    display: none;
+}
+
+/* Firefox scrollbar styling (optional) */
+.horizontal-scroll-container {
+    scrollbar-color: var(--color-border, #cbd5e1) transparent;
+    scrollbar-width: thin;
+}
+
+/* ==================== Navigation Arrows ==================== */
+.horizontal-scroll-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: var(--color-bg-surface, white);
+    color: var(--color-text-muted, #64748b);
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 0;
+}
+
+.horizontal-scroll-arrow:hover:not(:disabled) {
+    background: var(--color-primary, #4f46e5);
+    color: white;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    transform: translateY(-50%) scale(1.05);
+}
+
+.horizontal-scroll-arrow:active:not(:disabled) {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.horizontal-scroll-arrow:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--color-bg-muted, #f8fafc);
+}
+
+.horizontal-scroll-arrow svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2.5;
+}
+
+/* Left Arrow */
+.horizontal-scroll-arrow--left {
+    left: 0;
+    padding-right: 2px;
+}
+
+/* Right Arrow */
+.horizontal-scroll-arrow--right {
+    right: 0;
+    padding-left: 2px;
+}
+
+/* ==================== Scroll Indicator ==================== */
+.horizontal-scroll-indicator {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg,
+        var(--color-primary, #4f46e5) 0%,
+        var(--color-accent, #8b5cf6) 50%,
+        var(--color-secondary, #0ea5e9) 100%
+    );
+    border-radius: 2px;
+    opacity: 0.6;
+    animation: slideIndicator 0.5s ease-out;
+}
+
+@keyframes slideIndicator {
+    from {
+        opacity: 0;
+        transform: scaleX(0);
+    }
+    to {
+        opacity: 0.6;
+        transform: scaleX(1);
+    }
+}
+
+/* ==================== Dark Mode ==================== */
+[data-theme="dark"] .horizontal-scroll-arrow {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-muted, #94a3b8);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .horizontal-scroll-arrow:hover:not(:disabled) {
+    background: var(--color-primary, #818cf8);
+    color: white;
+    box-shadow: 0 4px 12px rgba(129, 140, 248, 0.4);
+}
+
+[data-theme="dark"] .horizontal-scroll-arrow:disabled {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* ==================== Mobile Responsive ==================== */
+@media (max-width: 768px) {
+    .horizontal-scroll-arrow {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+    }
+
+    .horizontal-scroll-arrow svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Make arrows more prominent on mobile */
+    .horizontal-scroll-arrow:hover:not(:disabled) {
+        transform: translateY(-50%) scale(1.1);
+    }
+}
+
+@media (max-width: 480px) {
+    .horizontal-scroll-arrow {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+    }
+
+    .horizontal-scroll-arrow svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+/* ==================== Content Styles ==================== */
+.horizontal-scroll-container > * {
+    flex-shrink: 0;
+}
+
+/* Smooth fade effect at edges */
+.horizontal-scroll-container::before,
+.horizontal-scroll-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.horizontal-scroll-container::before {
+    left: 0;
+    background: linear-gradient(90deg,
+        var(--color-bg-body, #f8fafc) 0%,
+        transparent 100%
+    );
+}
+
+.horizontal-scroll-container::after {
+    right: 0;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        var(--color-bg-body, #f8fafc) 100%
+    );
+}
+
+[data-theme="dark"] .horizontal-scroll-container::before {
+    background: linear-gradient(90deg,
+        var(--color-bg-body, #0f172a) 0%,
+        transparent 100%
+    );
+}
+
+[data-theme="dark"] .horizontal-scroll-container::after {
+    background: linear-gradient(90deg,
+        transparent 0%,
+        var(--color-bg-body, #0f172a) 100%
+    );
+}
+
+/* ==================== RTL Support ==================== */
+[dir="rtl"] .horizontal-scroll-arrow--left {
+    left: auto;
+    right: 0;
+    padding-right: 0;
+    padding-left: 2px;
+}
+
+[dir="rtl"] .horizontal-scroll-arrow--right {
+    right: auto;
+    left: 0;
+    padding-left: 0;
+    padding-right: 2px;
+}
+
+/* ==================== Accessibility ==================== */
+.horizontal-scroll-arrow:focus {
+    outline: 2px solid var(--color-primary, #4f46e5);
+    outline-offset: 2px;
+}
+
+/* Remove focus outline when using mouse */
+.horizontal-scroll-arrow:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.horizontal-scroll-arrow:focus-visible {
+    outline: 2px solid var(--color-primary, #4f46e5);
+    outline-offset: 2px;
+}
