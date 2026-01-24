@@ -1,0 +1,125 @@
+.layout {
+    display: flex;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    flex-direction: row;
+}
+
+[data-theme='dark'] .layout {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+.mainContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    transition: margin var(--transition-slow) cubic-bezier(0.4, 0, 0.2, 1);
+    margin-inline-start: 280px;
+    min-width: 0;
+    position: relative;
+    width: 100%;
+}
+
+.mainContent::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(circle at top right, rgba(79, 70, 229, 0.04), transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.mainContent::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 280px;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.03), transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+[dir="rtl"] .mainContent::after {
+    left: auto;
+    right: 280px;
+}
+
+.mainContent.expanded {
+    margin-inline-start: 0;
+}
+
+.mainContent.expanded::after {
+    left: 0;
+}
+
+[dir="rtl"] .mainContent.expanded::after {
+    left: auto;
+    right: 0;
+}
+
+.contentArea {
+    padding: var(--spacing-8);
+    flex: 1;
+    position: relative;
+    z-index: 1;
+    overflow-x: hidden;
+}
+
+/* Tablet Responsiveness (1024px and below) */
+@media (max-width: 1024px) {
+    .mainContent {
+        margin-inline-start: 0;
+    }
+
+    .mainContent::after {
+        left: 0;
+    }
+
+    [dir="rtl"] .mainContent::after {
+        left: auto;
+        right: 0;
+    }
+
+    .contentArea {
+        padding: var(--spacing-6);
+    }
+}
+
+/* Mobile Responsiveness (768px and below) */
+@media (max-width: 768px) {
+    .layout {
+        flex-direction: column;
+    }
+
+    .mainContent {
+        margin-inline-start: 0;
+        width: 100%;
+        min-height: calc(100vh - 70px);
+    }
+
+    .mainContent::before {
+        display: none;
+    }
+
+    .mainContent::after {
+        display: none;
+    }
+
+    .contentArea {
+        padding: var(--spacing-4);
+        padding-bottom: var(--spacing-8);
+    }
+}
+
+/* Small Mobile (480px and below) */
+@media (max-width: 480px) {
+    .contentArea {
+        padding: var(--spacing-3);
+        padding-bottom: var(--spacing-6);
+    }
+}
