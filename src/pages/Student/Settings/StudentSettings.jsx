@@ -18,6 +18,7 @@ import {
     Smartphone,
     BookOpen
 } from 'lucide-react';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentSettings = () => {
@@ -26,10 +27,48 @@ const StudentSettings = () => {
     const { user } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        student_id_code: ''
+    });
 
-    const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+    React.useEffect(() => {
+        const fetchProfile = async () => {
+            if (!user?.id) return;
+            try {
+                const data = await studentService.getProfile(user.id);
+                setProfile({
+                    first_name: data.full_name?.split(' ')[0] || '',
+                    last_name: data.full_name?.split(' ').slice(1).join(' ') || '',
+                    email: data.email || '',
+                    phone: data.user?.phone || '',
+                    student_id_code: data.id_code || 'N/A'
+                });
+            } catch (error) {
+                console.error('Error fetching profile:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchProfile();
+    }, [user?.id]);
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        try {
+            await studentService.updateProfile(user.id, {
+                full_name: `${profile.first_name} ${profile.last_name}`,
+                email: profile.email
+            });
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2000);
+        } catch (error) {
+            console.error('Error updating profile:', error);
+        }
     };
 
     const tabs = [
@@ -61,8 +100,8 @@ const StudentSettings = () => {
                             </button>
                         </div>
                         <div className="settings-profile-info">
-                            <span className="settings-profile-name">{user?.name || 'Student User'}</span>
-                            <span className="settings-profile-email">student@edutraker.com</span>
+                            <span className="settings-profile-name">{user?.full_name || 'Student User'}</span>
+                            <span className="settings-profile-email">{user?.email || 'student@edutraker.com'}</span>
                         </div>
                     </div>
 
@@ -95,11 +134,21 @@ const StudentSettings = () => {
                                 <div className="form-grid">
                                     <div className="form-group">
                                         <label>{t('student.settings.profile.firstName') || 'First Name'}</label>
-                                        <input type="text" defaultValue="Student" className="form-input" />
+                                        <input
+                                            type="text"
+                                            value={profile.first_name}
+                                            onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
+                                            className="form-input"
+                                        />
                                     </div>
                                     <div className="form-group">
                                         <label>{t('student.settings.profile.lastName') || 'Last Name'}</label>
-                                        <input type="text" defaultValue="User" className="form-input" />
+                                        <input
+                                            type="text"
+                                            value={profile.last_name}
+                                            onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
+                                            className="form-input"
+                                        />
                                     </div>
                                 </div>
 
@@ -107,7 +156,12 @@ const StudentSettings = () => {
                                     <label>{t('student.settings.profile.email') || 'Email Address'}</label>
                                     <div className="input-with-icon">
                                         <Mail size={18} />
-                                        <input type="email" defaultValue="student@edutraker.com" className="form-input" />
+                                        <input
+                                            type="email"
+                                            value={profile.email}
+                                            onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                                            className="form-input"
+                                        />
                                     </div>
                                 </div>
 
@@ -115,7 +169,12 @@ const StudentSettings = () => {
                                     <label>Phone Number</label>
                                     <div className="input-with-icon">
                                         <Smartphone size={18} />
-                                        <input type="tel" placeholder="+1 (555) 000-0000" className="form-input" />
+                                        <input
+                                            type="tel"
+                                            value={profile.phone}
+                                            onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                                            className="form-input"
+                                        />
                                     </div>
                                 </div>
 
@@ -123,7 +182,7 @@ const StudentSettings = () => {
                                     <label>Student ID</label>
                                     <div className="input-with-icon">
                                         <BookOpen size={18} />
-                                        <input type="text" defaultValue="STU-2024-001" className="form-input" disabled />
+                                        <input type="text" value={profile.student_id_code} className="form-input" disabled />
                                     </div>
                                 </div>
 

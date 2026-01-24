@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { Users, School, Briefcase, TrendingUp, TrendingDown, Bell, Activity as ActivityIcon, UserPlus, ShieldCheck } from 'lucide-react';
@@ -33,13 +33,66 @@ const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) =
 const Dashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
+    const [statsData, setStatsData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Mock Data
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const token = localStorage.getItem('accessToken');
+                const response = await fetch('/api/statistics/dashboard/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch statistics');
+
+                const data = await response.json();
+                setStatsData(data.statistics);
+            } catch (err) {
+                console.error('Error fetching stats:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+    }, []);
+
+    // Map Backend Stats to UI
     const stats = [
-        { title: t('dashboard.stats.workstreams'), value: '12', change: 4.5, icon: Briefcase, color: 'blue' },
-        { title: t('dashboard.stats.schools'), value: '148', change: 12.3, icon: School, color: 'green' },
-        { title: t('dashboard.stats.users'), value: '24,592', change: 8.1, icon: Users, color: 'purple' },
-        { title: t('dashboard.stats.notifications'), value: '5', change: 0, icon: 'Bell', color: 'orange', isNotification: true },
+        {
+            title: t('dashboard.stats.workstreams'),
+            value: loading ? '...' : (statsData?.total_workstreams || '0'),
+            change: 4.5,
+            icon: Briefcase,
+            color: 'blue'
+        },
+        {
+            title: t('dashboard.stats.schools'),
+            value: loading ? '...' : (statsData?.total_schools || '0'),
+            change: 12.3,
+            icon: School,
+            color: 'green'
+        },
+        {
+            title: t('dashboard.stats.users'),
+            value: loading ? '...' : ((statsData?.total_students || 0) + (statsData?.total_teachers || 0)).toLocaleString(),
+            change: 8.1,
+            icon: Users,
+            color: 'purple'
+        },
+        {
+            title: t('dashboard.stats.notifications'),
+            value: '5',
+            change: 0,
+            icon: 'Bell',
+            color: 'orange',
+            isNotification: true
+        },
     ];
 
     const activityData = [

@@ -1,26 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Guardian.css';
-import { Plus, Calendar } from 'lucide-react';
+import { Plus, Calendar, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import guardianService from '../../services/guardianService';
 
 const Communication = () => {
     const { t } = useTheme();
     const [activeTab, setActiveTab] = useState('teachers');
+    const [loading, setLoading] = useState(true);
+    const [messages, setMessages] = useState([]);
+    const [meetings, setMeetings] = useState([]); // Still mocked
 
-    // Mock Messages
-    const teacherMessages = [
-        { id: 1, sender: "Mr. Smith (Math)", subject: "Ahmed's progress", date: "Oct 12", preview: "Ahmed has improved significantly in..." },
-        { id: 2, sender: "Ms. Doe (Science)", subject: "Upcoming Project", date: "Oct 10", preview: "Please ensure Sara brings the required..." }
-    ];
+    useEffect(() => {
+        const fetchMessages = async () => {
+            setLoading(true);
+            try {
+                const res = await guardianService.getMessages();
+                setMessages(res.results || []);
 
-    const adminMessages = [
-        { id: 1, sender: "School Admin", subject: "Tuition Fees", date: "Oct 01", preview: "This is a reminder regarding the tuition..." }
-    ];
+                // Mock meetings for now
+                setMeetings([
+                    { id: 1, with: "Mrs. Johnson (Principal)", statusKey: "pending", date: "Requested for Nov 05" },
+                    { id: 2, with: "Mr. Smith", statusKey: "approved", date: "Oct 20 at 10:00 AM" }
+                ]);
+            } catch (error) {
+                console.error("Error fetching messages:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const meetings = [
-        { id: 1, with: "Mrs. Johnson (Principal)", statusKey: "pending", date: "Requested for Nov 05" },
-        { id: 2, with: "Mr. Smith", statusKey: "approved", date: "Oct 20 at 10:00 AM" }
-    ];
+        fetchMessages();
+    }, []);
+
+    const filteredMessages = messages.filter(msg => {
+        if (activeTab === 'teachers') {
+            return msg.sender_role === 'teacher';
+        } else {
+            return msg.sender_role !== 'teacher';
+        }
+    });
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="animate-spin text-primary" size={48} />
+            </div>
+        );
+    }
 
     return (
         <div className="guardian-communication">
@@ -54,18 +81,21 @@ const Communication = () => {
                     </div>
 
                     <div className="messages-list">
-                        {(activeTab === 'teachers' ? teacherMessages : adminMessages).map(msg => (
+                        {filteredMessages.map(msg => (
                             <div key={msg.id} className="message-thread">
                                 <div className="message-header">
-                                    <span className="message-sender">{msg.sender}</span>
-                                    <span className="message-date">{msg.date}</span>
+                                    <span className="message-sender">{msg.sender_name} ({msg.sender_role})</span>
+                                    <span className="message-date">{new Date(msg.created_at).toLocaleDateString()}</span>
                                 </div>
                                 <div className="message-subject">{msg.subject}</div>
                                 <div className="message-preview">
-                                    {msg.preview}
+                                    {msg.body}
                                 </div>
                             </div>
                         ))}
+                        {filteredMessages.length === 0 && (
+                            <div className="text-muted text-center py-4">{t('common.noMessages')}</div>
+                        )}
                     </div>
                 </div>
 

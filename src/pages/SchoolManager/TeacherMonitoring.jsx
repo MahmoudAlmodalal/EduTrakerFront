@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Users,
     Star,
@@ -7,25 +7,56 @@ import {
     Clock,
     Search,
     Plus,
-    MoreVertical
+    MoreVertical,
+    Edit,
+    Trash
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../utils/api';
 import './SchoolManager.css';
 
 const TeacherMonitoring = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('directory');
+    const [teachers, setTeachers] = useState([]);
+    const [evaluations, setEvaluations] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const schoolId = user?.school;
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!schoolId) return;
+            setLoading(true);
+            try {
+                const [teachersData, evaluationsData] = await Promise.all([
+                    api.get(`/teacher/teachers/`),
+                    api.get('/manager/staff-evaluations/')
+                ]);
+                setTeachers(teachersData.results || teachersData);
+                setEvaluations(evaluationsData.results || evaluationsData);
+            } catch (error) {
+                console.error('Failed to fetch teacher monitoring data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [schoolId]);
 
     const renderTabContent = () => {
+        if (loading) return <div>Loading...</div>;
         switch (activeTab) {
             case 'directory':
-                return <TeacherDirectory t={t} />;
+                return <TeacherDirectory teachers={teachers} setTeachers={setTeachers} t={t} />;
             case 'performance':
-                return <PerformanceEvaluation t={t} />;
+                return <PerformanceEvaluation evaluations={evaluations} setEvaluations={setEvaluations} teachers={teachers} t={t} />;
             case 'activity':
-                return <ActivityLogs t={t} />;
+                return <ActivityLogs teachers={teachers} t={t} />;
             default:
-                return <TeacherDirectory t={t} />;
+                return <TeacherDirectory teachers={teachers} setTeachers={setTeachers} t={t} />;
         }
     };
 
@@ -89,7 +120,7 @@ const TeacherMonitoring = () => {
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Activity size={18} />
-                        {t('school.teachers.activityLog')}
+                        Activities
                     </div>
                 </button>
             </div>
@@ -102,42 +133,15 @@ const TeacherMonitoring = () => {
 };
 
 // Sub-components
-const TeacherDirectory = ({ t }) => {
-    const [teachers, setTeachers] = useState([
-        { id: 1, name: 'John Smith', subject: 'Mathematics', role: 'Teacher', status: 'Active' },
-        { id: 2, name: 'Sarah Johnson', subject: 'Science', role: 'Head of Dept', status: 'Active' },
-        { id: 3, name: 'Michael Brown', subject: 'English', role: 'Teacher', status: 'On Leave' },
-        { id: 4, name: 'Emily Davis', subject: 'History', role: 'Teacher', status: 'Active' },
-    ]);
-
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [currentTeacher, setCurrentTeacher] = useState(null);
-    const [formData, setFormData] = useState({ name: '', subject: '', role: 'Teacher', status: 'Active' });
-
-    const openModal = (teacher = null) => {
-        if (teacher) {
-            setCurrentTeacher(teacher);
-            setFormData({ name: teacher.name, subject: teacher.subject, role: teacher.role, status: teacher.status });
-        } else {
-            setCurrentTeacher(null);
-            setFormData({ name: '', subject: '', role: 'Teacher', status: 'Active' });
-        }
-        setIsModalOpen(true);
-    };
-
-    const handleSave = (e) => {
-        e.preventDefault();
-        if (currentTeacher) {
-            setTeachers(teachers.map(t => t.id === currentTeacher.id ? { ...t, ...formData } : t));
-        } else {
-            setTeachers([...teachers, { id: teachers.length + 1, ...formData }]);
-        }
-        setIsModalOpen(false);
-    };
-
-    const handleDelete = (id) => {
-        if (window.confirm('Are you sure you want to delete this teacher?')) {
-            setTeachers(teachers.filter(t => t.id !== id));
+const TeacherDirectory = ({ teachers, setTeachers, t }) => {
+    const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to deactivate this teacher?')) {
+            try {
+                await api.post(`/teacher/teachers/${id}/deactivate/`);
+                setTeachers(teachers.filter(t => t.id !== id));
+            } catch (error) {
+                console.error('Failed to deactivate teacher:', error);
+            }
         }
     };
 
@@ -157,38 +161,95 @@ const TeacherDirectory = ({ t }) => {
                         }}
                     />
                 </div>
-                <button className="btn-primary" onClick={() => openModal()}>
-                    <Plus size={18} />
-                    {t('school.teachers.addTeacher')}
-                </button>
             </div>
             <table className="data-table">
                 <thead>
                     <tr>
-                        <th>{t('school.teachers.name')}</th>
-                        <th>{t('school.teachers.subjects')}</th>
-                        <th>{t('school.teachers.department')}</th>
-                        <th>{t('school.teachers.status')}</th>
-                        <th>{t('school.teachers.actions')}</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {teachers.map((teacher) => (
                         <tr key={teacher.id}>
-                            <td className="font-medium text-gray-900">{teacher.name}</td>
-                            <td>{teacher.subject}</td>
-                            <td>{teacher.role}</td>
+                            <td className="font-medium text-gray-900">{teacher.full_name}</td>
+                            <td>{teacher.email}</td>
                             <td>
-                                <span className={`status-badge ${teacher.status === 'Active' ? 'status-active' : 'status-inactive'}`}>
-                                    {teacher.status}
+                                <span style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '999px',
+                                    fontSize: '12px',
+                                    background: teacher.is_active ? 'var(--color-success-light)' : 'var(--color-error-light)',
+                                    color: teacher.is_active ? 'var(--color-success)' : 'var(--color-error)'
+                                }}>
+                                    {teacher.is_active ? 'Active' : 'Inactive'}
                                 </span>
                             </td>
                             <td>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button onClick={() => openModal(teacher)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{t('school.teachers.edit')}</button>
-                                    <button onClick={() => handleDelete(teacher.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>{t('school.teachers.delete')}</button>
+                                    <button onClick={() => handleDelete(teacher.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>
+                                        <Trash size={16} />
+                                    </button>
                                 </div>
                             </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
+const PerformanceEvaluation = ({ evaluations, setEvaluations, teachers, t }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ staff_id: '', score: 5, comments: '' });
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await api.post('/manager/staff-evaluations/create/', formData);
+            setEvaluations([...evaluations, response]);
+            setIsModalOpen(false);
+            setFormData({ staff_id: '', score: 5, comments: '' });
+        } catch (error) {
+            console.error('Failed to create evaluation:', error);
+        }
+    };
+
+    return (
+        <div className="management-card">
+            <div className="table-header-actions">
+                <h3 className="chart-title">Latest Evaluations</h3>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                    <Plus size={18} />
+                    New Evaluation
+                </button>
+            </div>
+            <table className="data-table">
+                <thead>
+                    <tr>
+                        <th>Teacher</th>
+                        <th>Score</th>
+                        <th>Comments</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {evaluations.map((evalItem) => (
+                        <tr key={evalItem.id}>
+                            <td className="font-medium text-gray-900">{evalItem.staff_name}</td>
+                            <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <Star size={16} fill="gold" stroke="gold" />
+                                    <span style={{ fontWeight: 'bold' }}>{evalItem.score}</span>
+                                </div>
+                            </td>
+                            <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {evalItem.comments}
+                            </td>
+                            <td>{new Date(evalItem.created_at).toLocaleDateString()}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -204,52 +265,46 @@ const TeacherDirectory = ({ t }) => {
                         backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '400px',
                         border: '1px solid var(--color-border)'
                     }}>
-                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>{currentTeacher ? 'Edit Teacher' : 'Add Teacher'}</h2>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>New Staff Evaluation</h2>
                         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Full Name</label>
-                                <input
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Select Staff</label>
+                                <select
                                     required
-                                    value={formData.name}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    value={formData.staff_id}
+                                    onChange={e => setFormData({ ...formData, staff_id: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                >
+                                    <option value="">Select Staff Member</option>
+                                    {teachers.map(t => (
+                                        <option key={t.id} value={t.id}>{t.full_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Score (1-10)</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="10"
+                                    required
+                                    value={formData.score}
+                                    onChange={e => setFormData({ ...formData, score: e.target.value })}
                                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
                                 />
                             </div>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Subject</label>
-                                <input
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Comments</label>
+                                <textarea
                                     required
-                                    value={formData.subject}
-                                    onChange={e => setFormData({ ...formData, subject: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                    value={formData.comments}
+                                    onChange={e => setFormData({ ...formData, comments: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', minHeight: '100px' }}
                                 />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Role</label>
-                                <select
-                                    value={formData.role}
-                                    onChange={e => setFormData({ ...formData, role: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                >
-                                    <option value="Teacher">Teacher</option>
-                                    <option value="Head of Dept">Head of Dept</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Status</label>
-                                <select
-                                    value={formData.status}
-                                    onChange={e => setFormData({ ...formData, status: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                >
-                                    <option value="Active">Active</option>
-                                    <option value="On Leave">On Leave</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
                                 <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
-                                <button type="submit" className="btn-primary">Save</button>
+                                <button type="submit" className="btn-primary">Save Evaluation</button>
                             </div>
                         </form>
                     </div>
@@ -259,102 +314,33 @@ const TeacherDirectory = ({ t }) => {
     );
 };
 
-const PerformanceEvaluation = ({ t }) => {
-    const evaluations = [
-        { id: 1, name: 'John Smith', rating: 4.8, comments: 'Excellent engagement with students.', date: '2023-11-15' },
-        { id: 2, name: 'Sarah Johnson', rating: 4.9, comments: 'Consistently high teaching standards.', date: '2023-11-10' },
-        { id: 3, name: 'Michael Brown', rating: 4.2, comments: 'Good, but attendance could improve.', date: '2023-10-25' },
-    ];
-
+const ActivityLogs = ({ teachers, t }) => {
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <h3 className="chart-title">Latest Evaluations</h3>
-                <button className="btn-primary" style={{ background: 'white', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}>
-                    Start New Evaluation
-                </button>
+                <h3 className="chart-title">Teacher Presence</h3>
             </div>
             <table className="data-table">
                 <thead>
                     <tr>
                         <th>Teacher</th>
-                        <th>Rating (out of 5)</th>
-                        <th>Comments</th>
-                        <th>Last Evaluated</th>
+                        <th>Email</th>
+                        <th>Last Login</th>
+                        <th>Join Date</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {evaluations.map((evalItem) => (
-                        <tr key={evalItem.id}>
-                            <td className="font-medium text-gray-900">{evalItem.name}</td>
-                            <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <Star size={16} fill="gold" stroke="gold" />
-                                    <span style={{ fontWeight: 'bold' }}>{evalItem.rating}</span>
-                                </div>
-                            </td>
-                            <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {evalItem.comments}
-                            </td>
-                            <td>{evalItem.date}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
-};
-
-const ActivityLogs = ({ t }) => {
-    const activity = [
-        { id: 1, name: 'John Smith', action: 'Graded Assignment: Math Homework', time: '2 hours ago', speed: 'Fast' },
-        { id: 2, name: 'Sarah Johnson', action: 'Uploaded Lesson Plan: Photosynthesis', time: '4 hours ago', speed: 'Normal' },
-        { id: 3, name: 'Emily Davis', action: 'Logged in', time: '5 hours ago', speed: '-' },
-        { id: 4, name: 'Michael Brown', action: 'Graded Quiz: Vocab', time: '1 day ago', speed: 'Slow' },
-    ];
-
-    return (
-        <div className="management-card">
-            <div className="table-header-actions">
-                <h3 className="chart-title">Implementation Monitoring</h3>
-            </div>
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Teacher</th>
-                        <th>Last Action</th>
-                        <th>Time</th>
-                        <th>Grading Speed</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {activity.map((log) => (
-                        <tr key={log.id}>
-                            <td className="font-medium text-gray-900">{log.name}</td>
-                            <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Activity size={16} className="text-gray-400" />
-                                    {log.action}
-                                </div>
-                            </td>
+                    {teachers.map((teacher) => (
+                        <tr key={teacher.id}>
+                            <td className="font-medium text-gray-900">{teacher.full_name}</td>
+                            <td>{teacher.email}</td>
                             <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <Clock size={16} className="text-gray-400" />
-                                    {log.time}
+                                    {teacher.last_login ? new Date(teacher.last_login).toLocaleString() : 'Never'}
                                 </div>
                             </td>
-                            <td>
-                                <span className={`status-badge ${log.speed === 'Fast' ? 'status-active' :
-                                    log.speed === 'Slow' ? 'status-inactive' : // Reusing inactive for warning-ish look or defined another
-                                        ''
-                                    }`}
-                                    style={{
-                                        backgroundColor: log.speed === 'Fast' ? '#dcfce7' : log.speed === 'Slow' ? '#fee2e2' : '#f1f5f9',
-                                        color: log.speed === 'Fast' ? '#166534' : log.speed === 'Slow' ? '#991b1b' : '#475569'
-                                    }}>
-                                    {log.speed}
-                                </span>
-                            </td>
+                            <td>{new Date(teacher.date_joined).toLocaleDateString()}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -364,3 +350,4 @@ const ActivityLogs = ({ t }) => {
 };
 
 export default TeacherMonitoring;
+

@@ -14,74 +14,47 @@ import {
     ChevronRight
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentCommunication = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const [selectedTab, setSelectedTab] = useState('messages');
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [isComposing, setIsComposing] = useState(false);
     const [replyText, setReplyText] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [messages, setMessages] = useState([]);
 
-    const [messages, setMessages] = useState([
-        {
-            id: 1,
-            sender: 'Dr. Smith',
-            senderRole: 'Mathematics Teacher',
-            avatar: 'DS',
-            subject: 'Homework Feedback',
-            preview: 'Great work on your last assignment! I wanted to share some feedback...',
-            date: '10:30 AM',
-            unread: true,
-            starred: false,
-            thread: [
-                { id: 101, from: 'Dr. Smith', text: 'Great work on your last assignment! I wanted to share some feedback on your calculus solutions. Your approach to problem 3 was excellent.', time: '10:30 AM' }
-            ]
-        },
-        {
-            id: 2,
-            sender: 'School Admin',
-            senderRole: 'Administration',
-            avatar: 'SA',
-            subject: 'Upcoming Exam Schedule',
-            preview: 'Please note the updated exam schedule for December...',
-            date: 'Yesterday',
-            unread: true,
-            starred: true,
-            thread: [
-                { id: 201, from: 'School Admin', text: 'Please note the updated exam schedule for December. Final exams will begin on December 15th. Make sure to review the attached schedule.', time: 'Yesterday 2:00 PM' }
-            ]
-        },
-        {
-            id: 3,
-            sender: 'Prof. Johnson',
-            senderRole: 'Physics Teacher',
-            avatar: 'PJ',
-            subject: 'Lab Report Submission',
-            preview: 'Your lab report has been received. I will grade it by...',
-            date: 'Dec 10',
-            unread: false,
-            starred: false,
-            thread: [
-                { id: 301, from: 'Prof. Johnson', text: 'Your lab report has been received. I will grade it by Friday and post the results on the portal.', time: 'Dec 10 4:00 PM' }
-            ]
-        },
-        {
-            id: 4,
-            sender: 'Parent',
-            senderRole: 'Guardian',
-            avatar: 'P',
-            subject: 'Pickup Time Today',
-            preview: 'I will pick you up at 3:30 PM today instead of the usual time...',
-            date: 'Dec 9',
-            unread: false,
-            starred: false,
-            thread: [
-                { id: 401, from: 'Parent', text: 'I will pick you up at 3:30 PM today instead of the usual time. Wait at the main gate.', time: 'Dec 9 9:00 AM' }
-            ]
-        },
-    ]);
+    React.useEffect(() => {
+        const fetchMessages = async () => {
+            try {
+                const data = await studentService.getMessages();
+                const msgs = (data.results || data || []).map(m => ({
+                    id: m.id,
+                    sender: m.sender_name || 'System',
+                    senderRole: m.sender_role || 'Staff',
+                    avatar: m.sender_name?.charAt(0) || 'S',
+                    subject: m.subject || '(No Subject)',
+                    preview: m.body?.substring(0, 60) + '...',
+                    date: new Date(m.created_at).toLocaleDateString(),
+                    unread: !m.is_read,
+                    starred: false,
+                    thread_id: m.thread_id,
+                    body: m.body
+                }));
+                setMessages(msgs);
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchMessages();
+    }, []);
 
     const notifications = [
         { id: 1, type: 'grade', title: 'New Grade Posted', message: 'Mathematics Quiz 3 - Score: 92%', time: '2 hours ago' },
@@ -91,25 +64,33 @@ const StudentCommunication = () => {
 
     const [newMessage, setNewMessage] = useState({ to: '', subject: '', body: '' });
 
-    const handleSendMessage = (e) => {
+    const handleSendMessage = async (e) => {
         e.preventDefault();
-        const newMsg = {
-            id: messages.length + 1,
-            sender: 'Me',
-            senderRole: 'Student',
-            avatar: 'ME',
-            subject: newMessage.subject,
-            preview: newMessage.body.substring(0, 60) + '...',
-            date: 'Just now',
-            unread: false,
-            starred: false,
-            thread: [
-                { id: Date.now(), from: 'Me', text: newMessage.body, time: 'Just now' }
-            ]
-        };
-        setMessages([newMsg, ...messages]);
-        setIsComposing(false);
-        setNewMessage({ to: '', subject: '', body: '' });
+        try {
+            const data = await studentService.sendMessage({
+                recipient_id: newMessage.to,
+                subject: newMessage.subject,
+                body: newMessage.body
+            });
+
+            const newMsg = {
+                id: data.id,
+                sender: 'Me',
+                senderRole: 'Student',
+                avatar: 'ME',
+                subject: data.subject,
+                preview: data.body.substring(0, 60) + '...',
+                date: 'Just now',
+                unread: false,
+                starred: false,
+                body: data.body
+            };
+            setMessages([newMsg, ...messages]);
+            setIsComposing(false);
+            setNewMessage({ to: '', subject: '', body: '' });
+        } catch (error) {
+            console.error('Error sending message:', error);
+        }
     };
 
     const handleSendReply = () => {

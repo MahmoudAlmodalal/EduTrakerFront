@@ -14,81 +14,71 @@ import {
     TrendingUp
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentSubjects = () => {
     const { t } = useTheme();
-    const [selectedSubject, setSelectedSubject] = useState(null);
+    const { user } = useAuth();
+    const [selectedSubject, setSelectedSubject] = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
+    const [subjects, setSubjects] = React.useState([]);
 
-    // Mock Data with enhanced information
-    const subjects = [
-        {
-            id: 1,
-            name: 'Mathematics',
-            teacher: 'Dr. Smith',
-            description: 'Advanced Calculus and Linear Algebra',
-            progress: 75,
-            grade: 'A-',
-            nextClass: 'Tomorrow 9:00 AM',
-            color: '#0891b2',
-            materials: [
-                { id: 1, title: 'Week 1: Introduction to Limits', type: 'lecture', date: '2025-01-10', size: '2.4 MB' },
-                { id: 2, title: 'Calculus Cheat Sheet', type: 'resource', date: '2025-01-12', size: '1.1 MB' },
-                { id: 3, title: 'Practice Problems Set 1', type: 'exercise', date: '2025-01-14', size: '856 KB' },
-            ],
-            assignments: [
-                { id: 1, title: 'Homework 3', due: '2025-12-15', status: 'pending', points: 100 },
-                { id: 2, title: 'Midterm Project', due: '2025-12-20', status: 'pending', points: 200 },
-            ]
-        },
-        {
-            id: 2,
-            name: 'Physics',
-            teacher: 'Prof. Johnson',
-            description: 'Mechanics and Thermodynamics',
-            progress: 60,
-            grade: 'B+',
-            nextClass: 'Today 11:45 AM',
-            color: '#8b5cf6',
-            materials: [
-                { id: 1, title: 'Newton Laws Notes', type: 'lecture', date: '2025-01-11', size: '1.8 MB' },
-            ],
-            assignments: [
-                { id: 1, title: 'Lab Report', due: '2025-12-18', status: 'submitted', points: 150 },
-            ]
-        },
-        {
-            id: 3,
-            name: 'English Literature',
-            teacher: 'Ms. Davis',
-            description: 'Modern American Literature',
-            progress: 90,
-            grade: 'A',
-            nextClass: 'Wednesday 2:00 PM',
-            color: '#10b981',
-            materials: [
-                { id: 1, title: 'The Great Gatsby Analysis', type: 'lecture', date: '2025-01-09', size: '3.2 MB' },
-            ],
-            assignments: []
-        },
-        {
-            id: 4,
-            name: 'Computer Science',
-            teacher: 'Mr. Wilson',
-            description: 'Algorithms and Data Structures',
-            progress: 45,
-            grade: 'A+',
-            nextClass: 'Thursday 10:30 AM',
-            color: '#f59e0b',
-            materials: [
-                { id: 1, title: 'Sorting Algorithms', type: 'lecture', date: '2025-01-08', size: '4.5 MB' },
-                { id: 2, title: 'Big O Notation Guide', type: 'resource', date: '2025-01-10', size: '920 KB' },
-            ],
-            assignments: [
-                { id: 1, title: 'Coding Challenge #5', due: '2025-12-22', status: 'pending', points: 100 },
-            ]
-        },
-    ];
+    React.useEffect(() => {
+        const fetchSubjects = async () => {
+            try {
+                const data = await studentService.getDashboardStats();
+                const courseData = data.statistics.courses.courses || [];
+
+                // Map API courses to UI subjects
+                const mappedSubjects = courseData.map((c, index) => ({
+                    id: c.course_id,
+                    classroom_id: c.classroom_id,
+                    name: c.course_name,
+                    teacher: c.teacher_name,
+                    description: `${c.course_code} - ${c.grade_name}`,
+                    progress: 0, // Need to implement progress logic or fetch separately
+                    grade: 'N/A', // Potentially from grades summary
+                    nextClass: 'Scheduled',
+                    color: ['#0891b2', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'][index % 5],
+                    materials: [],
+                    assignments: []
+                }));
+                setSubjects(mappedSubjects);
+            } catch (error) {
+                console.error('Error fetching subjects:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSubjects();
+    }, []);
+
+    const fetchSubjectDetails = async (subject) => {
+        try {
+            setSelectedSubject({ ...subject, loading: true });
+            const materialsData = await studentService.getLearningMaterials({
+                course: subject.id,
+                classroom: subject.classroom_id
+            });
+
+            // Map materials
+            const materials = (materialsData.results || materialsData || []).map(m => ({
+                id: m.id,
+                title: m.title,
+                type: m.file_type || 'resource',
+                date: new Date(m.created_at).toLocaleDateString(),
+                size: m.file_size ? `${(m.file_size / 1024 / 1024).toFixed(1)} MB` : 'N/A',
+                url: m.file_url
+            }));
+
+            setSelectedSubject({ ...subject, materials, loading: false });
+        } catch (error) {
+            console.error('Error fetching subject details:', error);
+            setSelectedSubject({ ...subject, loading: false });
+        }
+    };
 
     const getTypeIcon = (type) => {
         switch (type) {
@@ -599,7 +589,7 @@ const StudentSubjects = () => {
                 {subjects.map((subject, index) => (
                     <div
                         key={subject.id}
-                        onClick={() => setSelectedSubject(subject)}
+                        onClick={() => fetchSubjectDetails(subject)}
                         className="subject-card-premium"
                         style={{ '--subject-color': subject.color, animationDelay: `${index * 0.05}s` }}
                     >

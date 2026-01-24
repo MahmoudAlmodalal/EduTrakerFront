@@ -11,39 +11,72 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentAttendance = () => {
     const { t } = useTheme();
-    const [filterStatus, setFilterStatus] = useState('all');
+    const { user } = useAuth();
+    const [filterStatus, setFilterStatus] = React.useState('all');
+    const [loading, setLoading] = React.useState(true);
+    const [attendanceHistory, setAttendanceHistory] = React.useState([]);
+    const [stats, setStats] = React.useState({
+        present: 0,
+        absent: 0,
+        late: 0,
+        excused: 0,
+        totalDays: 0,
+        attendanceRate: 0
+    });
 
-    // Mock Data
-    const attendanceStats = {
-        present: 45,
-        absent: 3,
-        late: 2,
-        excused: 1,
-        totalDays: 51,
-        attendanceRate: 88.2
-    };
+    React.useEffect(() => {
+        const fetchAttendance = async () => {
+            if (!user?.id) return;
+            try {
+                const data = await studentService.getAttendance(user.id);
+                // Adjust data mapping based on API response
+                const records = data.results || data || [];
+                setAttendanceHistory(records.map(r => ({
+                    id: r.id,
+                    date: r.date,
+                    subject: r.course_name || 'Subject',
+                    statusKey: r.status,
+                    time: new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                })));
 
-    const monthlyData = [
-        { month: 'Sep', present: 20, absent: 1, late: 0, total: 21 },
-        { month: 'Oct', present: 18, absent: 2, late: 1, total: 21 },
-        { month: 'Nov', present: 21, absent: 0, late: 1, total: 22 },
-        { month: 'Dec', present: 8, absent: 0, late: 0, total: 8 },
-    ];
+                // Simple stat calculation if not provided by backend summary
+                const counts = records.reduce((acc, curr) => {
+                    acc[curr.status] = (acc[curr.status] || 0) + 1;
+                    return acc;
+                }, {});
 
-    const attendanceHistory = [
-        { id: 1, date: '2024-12-10', subject: 'Mathematics', statusKey: 'present', time: '08:00 AM' },
-        { id: 2, date: '2024-12-10', subject: 'Physics', statusKey: 'present', time: '10:00 AM' },
-        { id: 3, date: '2024-12-09', subject: 'Chemistry', statusKey: 'late', time: '08:15 AM' },
-        { id: 4, date: '2024-12-08', subject: 'English', statusKey: 'absent', time: '09:00 AM' },
-        { id: 5, date: '2024-12-08', subject: 'History', statusKey: 'present', time: '11:00 AM' },
-        { id: 6, date: '2024-12-07', subject: 'Biology', statusKey: 'excused', time: '08:00 AM' },
-        { id: 7, date: '2024-12-06', subject: 'Mathematics', statusKey: 'present', time: '08:00 AM' },
-        { id: 8, date: '2024-12-05', subject: 'Physics', statusKey: 'present', time: '10:00 AM' },
-    ];
+                const total = records.length;
+                const present = counts.present || 0;
+                const late = counts.late || 0;
+
+                setStats({
+                    present,
+                    absent: counts.absent || 0,
+                    late: counts.late || 0,
+                    excused: counts.excused || 0,
+                    totalDays: total,
+                    attendanceRate: total > 0 ? Math.round(((present + late) / total) * 100) : 0
+                });
+            } catch (error) {
+                console.error('Error fetching attendance:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchAttendance();
+    }, [user?.id]);
+
+    if (loading) return <div className="loading-container">Loading...</div>;
+
+    const attendanceStats = stats;
+
+    const monthlyData = []; // Can be calculated from history if needed
 
     const getStatusBadge = (statusKey) => {
         const configs = {

@@ -1,28 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './Guardian.css';
-import { Bell, Calendar, TrendingUp } from 'lucide-react';
+import { Bell, Calendar, TrendingUp, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import guardianService from '../../services/guardianService';
 
 const GuardianDashboard = () => {
     const { t } = useTheme();
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState(null);
+    const [notifications, setNotifications] = useState([]);
+    const [upcomingEvents, setUpcomingEvents] = useState([]); // Still mocked as no backend yet
 
-    // Mock Data
-    const children = [
-        { id: 1, name: "Ahmed", grade: "5th Grade", gpa: "3.8" },
-        { id: 2, name: "Sara", grade: "3rd Grade", gpa: "3.9" }
-    ];
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                const [statsRes, notificationsRes] = await Promise.all([
+                    guardianService.getDashboardStats(),
+                    guardianService.getNotifications()
+                ]);
+                setStats(statsRes.statistics);
+                setNotifications(notificationsRes.results || []);
 
-    const notifications = [
-        { id: 1, type: 'warning', message: "Ahmed was absent on Oct 12 without excuse.", title: "Absence Alert" },
-        { id: 2, type: 'danger', message: "Sara scored below average in Math Quiz.", title: "Low Grade Alert" },
-        { id: 3, type: 'info', message: "Parent-Teacher meeting scheduled for next week.", title: "Event Reminder" }
-    ];
+                // Mock events for now as they don't exist in backend
+                setUpcomingEvents([
+                    { id: 1, title: "Math Midterm", date: "Oct 20, 2025", child: "Ahmed" },
+                    { id: 2, title: "Science Fair", date: "Oct 25, 2025", child: "Sara" }
+                ]);
+            } catch (error) {
+                console.error("Error fetching dashboard data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const upcomingEvents = [
-        { id: 1, title: "Math Midterm", date: "Oct 20, 2025", child: "Ahmed" },
-        { id: 2, title: "Science Fair", date: "Oct 25, 2025", child: "Sara" },
-        { id: 3, title: "School Trip", date: "Nov 01, 2025", child: "All" }
-    ];
+        fetchDashboardData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="animate-spin text-primary" size={48} />
+            </div>
+        );
+    }
 
     return (
         <div className="guardian-dashboard">
@@ -36,7 +56,7 @@ const GuardianDashboard = () => {
                         <TrendingUp size={20} color="#4f46e5" />
                     </div>
                     <div className="children-list">
-                        {children.map(child => (
+                        {stats?.children?.map(child => (
                             <div key={child.id} className="child-summary-item">
                                 <div className="child-avatar">{child.name.charAt(0)}</div>
                                 <div>
@@ -45,6 +65,9 @@ const GuardianDashboard = () => {
                                 </div>
                             </div>
                         ))}
+                        {(!stats?.children || stats.children.length === 0) && (
+                            <div className="text-muted text-center py-4">{t('common.noData')}</div>
+                        )}
                     </div>
                 </div>
 
@@ -55,12 +78,15 @@ const GuardianDashboard = () => {
                         <Bell size={20} color="#f59e0b" />
                     </div>
                     <div className="notifications-list">
-                        {notifications.map(notif => (
-                            <div key={notif.id} className={`notification-item ${notif.type}`}>
+                        {notifications.slice(0, 5).map(notif => (
+                            <div key={notif.id} className={`notification-item ${notif.is_read ? '' : 'unread'}`}>
                                 <div className="notification-title">{notif.title}</div>
                                 <div className="notification-message">{notif.message}</div>
                             </div>
                         ))}
+                        {notifications.length === 0 && (
+                            <div className="text-muted text-center py-4">{t('common.noNotifications')}</div>
+                        )}
                     </div>
                 </div>
 

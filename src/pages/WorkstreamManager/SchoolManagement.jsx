@@ -1,52 +1,88 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, MapPin, Users, Edit, CheckCircle, Eye, Trash2, X } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { api } from '../../utils/api';
 import './Workstream.css';
 
 const SchoolManagement = () => {
     const { t } = useTheme();
+    const [loading, setLoading] = useState(true);
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [schools, setSchools] = useState([
-        { id: 1, name: 'Springfield Elementary', location: 'Springfield', capacity: 500, students: 450, status: 'Active' },
-        { id: 2, name: 'Shelbyville High', location: 'Shelbyville', capacity: 1200, students: 1100, status: 'Active' },
-        { id: 3, name: 'Ogdenville Tech', location: 'Ogdenville', capacity: 300, students: 150, status: 'Inactive' },
-    ]);
-
-    const [newSchool, setNewSchool] = useState({ name: '', location: '', capacity: '', isEditing: false, id: null });
-
+    const [schools, setSchools] = useState([]);
+    const [newSchool, setNewSchool] = useState({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [viewSchool, setViewSchool] = useState(null);
 
-    const handleCreateSchool = (e) => {
+    const fetchSchools = async () => {
+        setLoading(true);
+        try {
+            const data = await api.get('/school/school/');
+            setSchools(data || []);
+        } catch (error) {
+            console.error('Failed to fetch schools:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchSchools();
+    }, []);
+
+    const handleCreateSchool = async (e) => {
         e.preventDefault();
-        if (newSchool.isEditing) {
-            setSchools(schools.map(school =>
-                school.id === newSchool.id
-                    ? { ...school, name: newSchool.name, location: newSchool.location, capacity: newSchool.capacity }
-                    : school
-            ));
-        } else {
-            const school = {
-                id: schools.length + 1,
-                ...newSchool,
-                students: 0,
-                status: 'Active'
-            };
-            setSchools([...schools, school]);
+        try {
+            if (newSchool.isEditing) {
+                await api.patch(`/school/school/${newSchool.id}/update/`, {
+                    school_name: newSchool.school_name,
+                    location: newSchool.location,
+                    capacity: newSchool.capacity
+                });
+            } else {
+                await api.post('/school/school/create/', {
+                    school_name: newSchool.school_name,
+                    location: newSchool.location,
+                    capacity: newSchool.capacity
+                });
+            }
+            fetchSchools();
+            setNewSchool({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
+            setShowCreateForm(false);
+        } catch (error) {
+            console.error('Failed to save school:', error);
+            alert(`Error: ${error.message}`);
         }
-        setNewSchool({ name: '', location: '', capacity: '', isEditing: false, id: null });
-        setShowCreateForm(false);
     };
 
-    const handleActivateAll = () => {
+    const handleActivateAll = async () => {
         if (window.confirm(t('workstream.schools.confirmActivate'))) {
-            setSchools(schools.map(school => ({ ...school, status: 'Active' })));
+            try {
+                // Bulk activation placeholder
+                alert('Bulk activation not implemented in backend yet. Individual activation available via table.');
+            } catch (error) {
+                console.error('Failed to activate schools:', error);
+            }
         }
     };
 
-    const handleDeleteSchool = (id) => {
+    const handleDeleteSchool = async (id) => {
         if (window.confirm(t('workstream.schools.confirmDelete'))) {
-            setSchools(schools.filter(school => school.id !== id));
+            try {
+                await api.post(`/school/school/${id}/deactivate/`);
+                fetchSchools();
+            } catch (error) {
+                console.error('Failed to delete school:', error);
+            }
+        }
+    };
+
+    const handleToggleStatus = async (school) => {
+        const endpoint = school.is_active ? 'deactivate' : 'activate';
+        try {
+            await api.post(`/school/school/${school.id}/${endpoint}/`);
+            fetchSchools();
+        } catch (error) {
+            console.error(`Failed to ${endpoint} school:`, error);
         }
     };
 
@@ -54,7 +90,7 @@ const SchoolManagement = () => {
         const schoolToEdit = schools.find(s => s.id === id);
         if (schoolToEdit) {
             setNewSchool({
-                name: schoolToEdit.name,
+                school_name: schoolToEdit.school_name,
                 location: schoolToEdit.location,
                 capacity: schoolToEdit.capacity,
                 isEditing: true,
@@ -65,9 +101,13 @@ const SchoolManagement = () => {
     };
 
     const filteredSchools = schools.filter(school =>
-        school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        school.location.toLowerCase().includes(searchTerm.toLowerCase())
+        (school.school_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (school.location?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
+
+    if (loading && schools.length === 0) {
+        return <div className="workstream-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading...</div>;
+    }
 
     return (
         <div className="workstream-dashboard">
@@ -99,8 +139,8 @@ const SchoolManagement = () => {
                             <input
                                 type="text"
                                 required
-                                value={newSchool.name}
-                                onChange={(e) => setNewSchool({ ...newSchool, name: e.target.value })}
+                                value={newSchool.school_name}
+                                onChange={(e) => setNewSchool({ ...newSchool, school_name: e.target.value })}
                                 style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
                                 placeholder={t('workstream.schools.form.name')}
                             />
@@ -128,12 +168,12 @@ const SchoolManagement = () => {
                             />
                         </div>
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                            <button type="submit" className="btn-primary">{newSchool.isEditing ? t('common.save') : t('common.create')}</button>
+                            <button type="submit" className="btn-primary" disabled={loading}>{newSchool.isEditing ? t('common.save') : t('common.create')}</button>
                             <button
                                 type="button"
                                 onClick={() => {
                                     setShowCreateForm(false);
-                                    setNewSchool({ name: '', location: '', capacity: '', isEditing: false, id: null });
+                                    setNewSchool({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
                                 }}
                                 style={{
                                     padding: '0.5rem 1rem',
@@ -166,7 +206,7 @@ const SchoolManagement = () => {
                         <div style={{ display: 'grid', gap: '1rem' }}>
                             <div>
                                 <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.name')}</label>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{viewSchool.name}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{viewSchool.school_name}</div>
                             </div>
                             <div>
                                 <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.location')}</label>
@@ -176,10 +216,10 @@ const SchoolManagement = () => {
                             </div>
                             <div>
                                 <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.capacity')}</label>
-                                <div>{viewSchool.students} / {viewSchool.capacity} {t('workstream.schools.table.students')}</div>
+                                <div>{viewSchool.student_count || 0} / {viewSchool.capacity} {t('workstream.schools.table.students')}</div>
                                 <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', marginTop: '4px' }}>
                                     <div style={{
-                                        width: `${(viewSchool.students / viewSchool.capacity) * 100}%`,
+                                        width: `${(viewSchool.student_count / viewSchool.capacity) * 100 || 0}%`,
                                         height: '100%',
                                         background: 'var(--color-primary)',
                                         borderRadius: '4px'
@@ -189,8 +229,8 @@ const SchoolManagement = () => {
                             <div>
                                 <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.status')}</label>
                                 <div>
-                                    <span className={`status-badge ${viewSchool.status === 'Active' ? 'status-active' : 'status-inactive'}`}>
-                                        {viewSchool.status}
+                                    <span className={`status-badge ${viewSchool.is_active ? 'status-active' : 'status-inactive'}`}>
+                                        {viewSchool.is_active ? 'Active' : 'Inactive'}
                                     </span>
                                 </div>
                             </div>
@@ -210,14 +250,11 @@ const SchoolManagement = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
                                 width: '100%',
-                                padding: '0.5rem 0.5rem 0.5rem 2.5rem',
+                                padding: '0.5rem 0.5rem 0.5rem 2.25rem',
                                 borderRadius: '0.375rem',
                                 border: '1px solid var(--color-border)'
                             }}
                         />
-                    </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        {/* Filter placeholder */}
                     </div>
                 </div>
 
@@ -235,7 +272,7 @@ const SchoolManagement = () => {
                         {filteredSchools.map((school) => (
                             <tr key={school.id}>
                                 <td>
-                                    <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{school.name}</div>
+                                    <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{school.school_name}</div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>ID: #{school.id}</div>
                                 </td>
                                 <td>
@@ -247,11 +284,11 @@ const SchoolManagement = () => {
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         <Users size={14} color="var(--color-text-muted)" />
-                                        <span>{school.students} / {school.capacity}</span>
+                                        <span>{school.student_count || 0} / {school.capacity}</span>
                                     </div>
                                     <div style={{ width: '100px', height: '4px', background: '#e2e8f0', borderRadius: '2px', marginTop: '4px' }}>
                                         <div style={{
-                                            width: `${(school.students / school.capacity) * 100}%`,
+                                            width: `${(school.student_count / school.capacity) * 100 || 0}%`,
                                             height: '100%',
                                             background: 'var(--color-primary)',
                                             borderRadius: '2px'
@@ -259,8 +296,13 @@ const SchoolManagement = () => {
                                     </div>
                                 </td>
                                 <td>
-                                    <span className={`status-badge ${school.status === 'Active' ? 'status-active' : 'status-inactive'}`}>
-                                        {school.status}
+                                    <span
+                                        onClick={() => handleToggleStatus(school)}
+                                        className={`status-badge ${school.is_active ? 'status-active' : 'status-inactive'}`}
+                                        style={{ cursor: 'pointer' }}
+                                        title="Click to toggle status"
+                                    >
+                                        {school.is_active ? 'Active' : 'Inactive'}
                                     </span>
                                 </td>
                                 <td>
@@ -282,7 +324,7 @@ const SchoolManagement = () => {
                                         <button
                                             onClick={() => handleDeleteSchool(school.id)}
                                             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
-                                            title="Delete School"
+                                            title="Deactivate School"
                                         >
                                             <Trash2 size={18} />
                                         </button>

@@ -1,38 +1,70 @@
-import React, { useState } from 'react';
-import { Users, UserCheck, AlertTriangle, Check, Search, Filter } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, UserCheck, AlertTriangle, Check, Search, Filter, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import teacherService from '../../services/teacherService';
 
 const ClassManagement = () => {
     const { t } = useTheme();
-    const [selectedClass, setSelectedClass] = useState('Grade 10-A');
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [classes, setClasses] = useState([]);
+    const [selectedClass, setSelectedClass] = useState(null);
     const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [searchQuery, setSearchQuery] = useState('');
 
-    // Mock Data
-    const classes = ['Grade 10-A', 'Grade 10-B', 'Grade 11-A', 'Grade 11-B'];
+    // Student Data with Attendance State
+    const [students, setStudents] = useState([]);
 
-    // Mock Student Data with Attendance State (Present, Absent, Late)
-    const [students, setStudents] = useState([
-        { id: 1, name: 'Ahmed Ali', status: 'Present', behavior: 'Neutral' },
-        { id: 2, name: 'Sara Khan', status: 'Present', behavior: 'Neutral' },
-        { id: 3, name: 'Mohamed Zaki', status: 'Absent', behavior: 'Negative' },
-        { id: 4, name: 'Layla Mahmoud', status: 'Late', behavior: 'Positive' },
-        { id: 5, name: 'Omar Youssef', status: 'Present', behavior: 'Neutral' },
-        { id: 6, name: 'Hana Salem', status: 'Absent', behavior: 'Neutral' },
-        { id: 7, name: 'Yarah Ahmed', status: 'Present', behavior: 'Positive' },
-    ]);
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            try {
+                setLoading(true);
+                // Fetch teacher profile to get course allocations
+                const profile = await teacherService.getProfile(user.user_id);
+                // Assuming profile contains allocations or we use a fallback
+                // For now, let's fetch students directly if we can't find specific class list
+                const studentsData = await teacherService.getStudents({ school_id: user.school_id });
+                setStudents(studentsData.results || studentsData || []);
 
-    const handleAttendanceStatus = (id, status) => {
-        setStudents(students.map(student => {
-            if (student.id === id) {
-                return { ...student, status };
+                // Mock classes if not found in profile for now to keep UI working
+                setClasses(['Grade 10-A', 'Grade 10-B', 'Grade 11-A', 'Grade 11-B']);
+                setSelectedClass('Grade 10-A');
+            } catch (error) {
+                console.error("Error fetching class data:", error);
+            } finally {
+                setLoading(false);
             }
-            return student;
-        }));
+        };
+
+        fetchInitialData();
+    }, [user.user_id, user.school_id]);
+
+    const handleAttendanceStatus = async (studentId, status) => {
+        try {
+            // Optimistic update
+            setStudents(prev => prev.map(s => s.user_id === studentId ? { ...s, attendance_status: status } : s));
+
+            // In a real scenario, we'd call recordAttendance here or on "Save Changes"
+            // For now, just local state to match UI
+        } catch (error) {
+            console.error("Error updating attendance:", error);
+        }
+    };
+
+    const handleSaveAttendance = async () => {
+        try {
+            alert('Saving attendance records...');
+            // Loop through students and record attendance
+            // This would normally be a bulk operation if the backend supports it
+        } catch (error) {
+            console.error("Error saving attendance:", error);
+        }
     };
 
     const handleBehaviorLog = (id, type) => {
-        setStudents(students.map(student => {
-            if (student.id === id) {
+        setStudents(prev => prev.map(student => {
+            if (student.user_id === id) {
                 return { ...student, behavior: type };
             }
             return student;
@@ -47,6 +79,18 @@ const ClassManagement = () => {
             default: return status;
         }
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="animate-spin text-teacher-primary" size={48} />
+            </div>
+        );
+    }
+
+    const filteredStudents = students.filter(s =>
+        s.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -78,7 +122,7 @@ const ClassManagement = () => {
                 <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <p style={{ fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>{t('teacher.classes.totalStudents')}</p>
-                        <p style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--teacher-text-main)' }}>{students.length}</p>
+                        <p style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--teacher-text-main)' }}>{filteredStudents.length}</p>
                     </div>
                     <div style={{ padding: '0.75rem', backgroundColor: '#DBEAFE', color: '#2563EB', borderRadius: '0.5rem' }}>
                         <Users size={24} />
@@ -88,7 +132,7 @@ const ClassManagement = () => {
                     <div>
                         <p style={{ fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>{t('teacher.classes.presentToday')}</p>
                         <p style={{ fontSize: '1.5rem', fontWeight: '700', color: '#16A34A' }}>
-                            {students.filter(s => s.status === 'Present').length}
+                            {filteredStudents.filter(s => s.attendance_status === 'Present').length}
                         </p>
                     </div>
                     <div style={{ padding: '0.75rem', backgroundColor: '#DCFCE7', color: '#16A34A', borderRadius: '0.5rem' }}>
@@ -99,7 +143,7 @@ const ClassManagement = () => {
                     <div>
                         <p style={{ fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>{t('teacher.classes.absentToday')}</p>
                         <p style={{ fontSize: '1.5rem', fontWeight: '700', color: '#DC2626' }}>
-                            {students.filter(s => s.status === 'Absent').length}
+                            {filteredStudents.filter(s => s.attendance_status === 'Absent').length}
                         </p>
                     </div>
                     <div style={{ padding: '0.75rem', backgroundColor: '#FEE2E2', color: '#DC2626', borderRadius: '0.5rem' }}>
@@ -110,7 +154,7 @@ const ClassManagement = () => {
                     <div>
                         <p style={{ fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>{t('teacher.classes.lateToday')}</p>
                         <p style={{ fontSize: '1.5rem', fontWeight: '700', color: '#D97706' }}>
-                            {students.filter(s => s.status === 'Late').length}
+                            {filteredStudents.filter(s => s.attendance_status === 'Late').length}
                         </p>
                     </div>
                     <div style={{ padding: '0.75rem', backgroundColor: '#FEF3C7', color: '#D97706', borderRadius: '0.5rem' }}>
@@ -129,6 +173,8 @@ const ClassManagement = () => {
                             type="text"
                             placeholder={t('teacher.classes.searchStudent')}
                             className="teacher-input has-icon"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
                 </div>
@@ -144,38 +190,39 @@ const ClassManagement = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {students.map((student) => (
-                                <tr key={student.id}>
-                                    <td className="font-bold text-slate-800">{student.name}</td>
+                            {filteredStudents.map((student) => (
+                                <tr key={student.user_id}>
+                                    <td className="font-bold text-slate-800">{student.full_name}</td>
                                     <td>
-                                        <span className={`status-badge ${student.status === 'Present' ? 'success' :
-                                            student.status === 'Absent' ? 'error' : 'warning'
+                                        <span className={`status-badge ${student.attendance_status === 'Present' ? 'success' :
+                                            student.attendance_status === 'Absent' ? 'error' :
+                                                student.attendance_status === 'Late' ? 'warning' : 'info'
                                             }`}>
-                                            {getStatusText(student.status)}
+                                            {getStatusText(student.attendance_status || t('teacher.classes.notRecorded'))}
                                         </span>
                                     </td>
                                     <td>
                                         <div className="action-group">
                                             <button
-                                                onClick={() => handleAttendanceStatus(student.id, 'Present')}
-                                                className={`icon-btn ${student.status === 'Present' ? 'success' : ''}`}
-                                                style={student.status === 'Present' ? { backgroundColor: '#DCFCE7', color: '#15803D', borderColor: '#15803D' } : {}}
+                                                onClick={() => handleAttendanceStatus(student.user_id, 'Present')}
+                                                className={`icon-btn ${student.attendance_status === 'Present' ? 'success' : ''}`}
+                                                style={student.attendance_status === 'Present' ? { backgroundColor: '#DCFCE7', color: '#15803D', borderColor: '#15803D' } : {}}
                                                 title={t('teacher.classes.present')}
                                             >
                                                 P
                                             </button>
                                             <button
-                                                onClick={() => handleAttendanceStatus(student.id, 'Absent')}
-                                                className={`icon-btn ${student.status === 'Absent' ? 'danger' : ''}`}
-                                                style={student.status === 'Absent' ? { backgroundColor: '#FEE2E2', color: '#DC2626', borderColor: '#DC2626' } : {}}
+                                                onClick={() => handleAttendanceStatus(student.user_id, 'Absent')}
+                                                className={`icon-btn ${student.attendance_status === 'Absent' ? 'danger' : ''}`}
+                                                style={student.attendance_status === 'Absent' ? { backgroundColor: '#FEE2E2', color: '#DC2626', borderColor: '#DC2626' } : {}}
                                                 title={t('teacher.classes.absent')}
                                             >
                                                 A
                                             </button>
                                             <button
-                                                onClick={() => handleAttendanceStatus(student.id, 'Late')}
-                                                className={`icon-btn ${student.status === 'Late' ? 'warning' : ''}`}
-                                                style={student.status === 'Late' ? { backgroundColor: '#FEF3C7', color: '#D97706', borderColor: '#D97706' } : {}}
+                                                onClick={() => handleAttendanceStatus(student.user_id, 'Late')}
+                                                className={`icon-btn ${student.attendance_status === 'Late' ? 'warning' : ''}`}
+                                                style={student.attendance_status === 'Late' ? { backgroundColor: '#FEF3C7', color: '#D97706', borderColor: '#D97706' } : {}}
                                                 title={t('teacher.classes.late')}
                                             >
                                                 L
@@ -185,14 +232,14 @@ const ClassManagement = () => {
                                     <td>
                                         <div className="action-group">
                                             <button
-                                                onClick={() => handleBehaviorLog(student.id, 'Positive')}
+                                                onClick={() => handleBehaviorLog(student.user_id, 'Positive')}
                                                 className={`icon-btn ${student.behavior === 'Positive' ? 'success' : ''}`}
                                                 title="Log Positive Behavior"
                                             >
                                                 <Check size={18} />
                                             </button>
                                             <button
-                                                onClick={() => handleBehaviorLog(student.id, 'Negative')}
+                                                onClick={() => handleBehaviorLog(student.user_id, 'Negative')}
                                                 className={`icon-btn ${student.behavior === 'Negative' ? 'danger' : ''}`}
                                                 title="Log Negative Behavior"
                                             >
@@ -207,7 +254,7 @@ const ClassManagement = () => {
                 </div>
 
                 <div style={{ padding: '1rem', borderTop: '1px solid var(--teacher-border)', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="btn-primary" onClick={() => alert('Attendance changes saved successfully!')}>
+                    <button className="btn-primary" onClick={handleSaveAttendance}>
                         {t('teacher.classes.saveChanges')}
                     </button>
                 </div>

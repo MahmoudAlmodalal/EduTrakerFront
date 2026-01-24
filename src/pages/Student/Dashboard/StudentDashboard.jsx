@@ -11,40 +11,63 @@ import {
     Zap
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentDashboard = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
+    const [loading, setLoading] = React.useState(true);
+    const [dashboardData, setDashboardData] = React.useState(null);
 
-    // Mock Data
-    const todaySchedule = [
-        { id: 1, time: '08:00', subject: 'Mathematics', room: 'Room 101', teacher: 'Dr. Smith', status: 'done' },
-        { id: 2, time: '09:45', subject: 'Physics', room: 'Lab 2', teacher: 'Prof. Johnson', status: 'now' },
-        { id: 3, time: '11:45', subject: 'Chemistry', room: 'Lab 1', teacher: 'Ms. Williams', status: 'upcoming' },
-        { id: 4, time: '13:30', subject: 'English', room: 'Room 203', teacher: 'Mr. Davis', status: 'upcoming' },
-    ];
+    React.useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                const data = await studentService.getDashboardStats();
+                setDashboardData(data.statistics);
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDashboardData();
+    }, []);
 
-    const assignments = [
-        { id: 1, title: 'Calculus Homework 3', subject: 'Mathematics', due: 'Today', status: 'urgent', progress: 75 },
-        { id: 2, title: 'Physics Lab Report', subject: 'Physics', due: 'Tomorrow', status: 'pending', progress: 30 },
-        { id: 3, title: 'Essay Draft', subject: 'English', due: 'In 3 days', status: 'pending', progress: 0 },
-    ];
+    if (loading) {
+        return <div className="loading-container">Loading...</div>;
+    }
+
+    const { profile, courses, grades, attendance, classmates } = dashboardData || {};
+
+    const todaySchedule = dashboardData?.schedule || []; // If schedule added later
+    const assignments = grades?.marks?.slice(0, 3).map(m => ({
+        id: m.assignment_id,
+        title: m.title,
+        subject: m.course_name || 'Subject',
+        due: m.due_date || 'N/A',
+        status: m.score ? 'graded' : 'pending',
+        progress: m.percentage || 0
+    })) || [];
 
     const stats = {
-        attendance: 92,
-        gpa: 3.8,
-        completedTasks: 24,
-        rank: 'Top 10%'
+        attendance: attendance?.attendance_rate || 0,
+        gpa: grades?.overall_average ? (grades.overall_average / 25).toFixed(2) : '0.0', // Assuming 100 max
+        completedTasks: grades?.graded_assignments || 0,
+        rank: classmates?.rank || 'N/A'
     };
 
     const getStatusBadge = (status) => {
         switch (status) {
             case 'done':
+            case 'graded':
                 return <span className="status-badge status-done"><CheckCircle size={12} /> Completed</span>;
             case 'now':
                 return <span className="status-badge status-now"><Zap size={12} /> In Progress</span>;
             case 'upcoming':
-                return <span className="status-badge status-upcoming"><Clock size={12} /> Upcoming</span>;
+            case 'pending':
+                return <span className="status-badge status-upcoming"><Clock size={12} /> Pending</span>;
             default:
                 return null;
         }
@@ -56,7 +79,7 @@ const StudentDashboard = () => {
             <header className="dashboard-header">
                 <div className="dashboard-header-content">
                     <h1 className="dashboard-title">
-                        {t('student.dashboard.welcome') || 'Welcome back'}, <span className="text-gradient">Student!</span>
+                        {t('student.dashboard.welcome') || 'Welcome back'}, <span className="text-gradient">{user?.full_name || 'Student'}!</span>
                     </h1>
                     <p className="dashboard-subtitle">
                         {t('student.dashboard.subtitle') || "Here's what's happening with your studies today."}
@@ -180,11 +203,11 @@ const StudentDashboard = () => {
                         </div>
                         <div className="attendance-stats">
                             <div className="attendance-stat">
-                                <span className="attendance-stat-value text-success">184</span>
+                                <span className="attendance-stat-value text-success">{attendance?.by_status?.present || 0}</span>
                                 <span className="attendance-stat-label">Days Present</span>
                             </div>
                             <div className="attendance-stat">
-                                <span className="attendance-stat-value text-danger">16</span>
+                                <span className="attendance-stat-value text-danger">{attendance?.by_status?.absent || 0}</span>
                                 <span className="attendance-stat-label">Days Absent</span>
                             </div>
                         </div>

@@ -1,27 +1,70 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Calendar, AlertCircle, CheckCircle, Bell, Plus, FileText, UserCheck, Search, ChevronRight } from 'lucide-react';
+import { Clock, Calendar, AlertCircle, CheckCircle, Bell, Plus, FileText, UserCheck, Search, ChevronRight, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import teacherService from '../../services/teacherService';
+import secretaryService from '../../services/secretaryService';
 
 const TeacherDashboard = () => {
     const navigate = useNavigate();
     const { t } = useTheme();
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [schedule, setSchedule] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [stats, setStats] = useState({
+        avgAttendance: '0%',
+        pendingAssignments: 0,
+        totalToGrade: 0
+    });
 
-    // Mock Data for Schedule
-    const schedule = [
-        { id: 1, day: 'Today', time: '08:00 - 09:30', subject: 'Mathematics', class: 'Grade 10-A', room: 'Room 101', status: 'current' },
-        { id: 2, day: 'Today', time: '10:00 - 11:30', subject: 'Physics', class: 'Grade 11-B', room: 'Lab 2', status: 'upcoming' },
-        { id: 3, day: 'Tomorrow', time: '09:00 - 10:30', subject: 'Mathematics', class: 'Grade 10-B', room: 'Room 102', status: 'upcoming' },
-        { id: 5, day: 'Thu', time: '12:00 - 01:30', subject: 'Physics', class: 'Grade 11-A', room: 'Lab 1', status: 'upcoming' },
-    ];
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                setLoading(true);
+                // In a real scenario, we might have a specific dashboard endpoint
+                // but here we'll fetch notifications and some basic stats
+                const [notifData, marksData, attendanceData] = await Promise.all([
+                    secretaryService.getNotifications(),
+                    teacherService.getMarks({ include_inactive: false }),
+                    teacherService.getAttendance({ date: new Date().toISOString().split('T')[0] })
+                ]);
 
-    // Mock Data for Notifications
-    const notifications = [
-        { id: 1, type: 'alert', message: '5 students have overdue assignments in Grade 10-A', time: '2h ago' },
-        { id: 2, type: 'info', message: 'Staff meeting scheduled for Friday at 2 PM', time: '5h ago' },
-        { id: 3, type: 'success', message: 'Grade 11-B Physics results published successfully', time: '1d ago' },
-        { id: 4, type: 'alert', message: 'Student "Ahmed Ali" has 3 consecutive absences', time: '2d ago' },
-    ];
+                setNotifications(notifData.slice(0, 5));
+
+                // Calculate some stats from marks if possible, or use defaults
+                if (marksData) {
+                    setStats(prev => ({
+                        ...prev,
+                        totalToGrade: marksData.count || marksData.length || 0
+                    }));
+                }
+
+                // Mock schedule for now as there's no direct "schedule" endpoint found in urls.py
+                // unless it's handled via lessons/classes
+                setSchedule([
+                    { id: 1, day: 'Today', time: '08:00 - 09:30', subject: 'Mathematics', class: 'Grade 10-A', room: 'Room 101', status: 'current' },
+                    { id: 2, day: 'Today', time: '10:00 - 11:30', subject: 'Physics', class: 'Grade 11-B', room: 'Lab 2', status: 'upcoming' },
+                ]);
+
+            } catch (error) {
+                console.error("Error fetching dashboard data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDashboardData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="animate-spin text-teacher-primary" size={48} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -124,9 +167,9 @@ const TeacherDashboard = () => {
                                 <div style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--teacher-success)', borderRadius: '0.75rem' }}>
                                     <UserCheck size={24} />
                                 </div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--teacher-success)', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '0.25rem 0.5rem', borderRadius: '999px' }}>+2%</span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--teacher-success)', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '0.25rem 0.5rem', borderRadius: '999px' }}>+0%</span>
                             </div>
-                            <h3 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '0.25rem' }}>94%</h3>
+                            <h3 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '0.25rem' }}>{stats.avgAttendance}</h3>
                             <p style={{ color: 'var(--teacher-text-muted)', fontSize: '0.875rem' }}>{t('teacher.dashboard.avgAttendance')}</p>
                         </div>
 
@@ -135,9 +178,9 @@ const TeacherDashboard = () => {
                                 <div style={{ padding: '0.75rem', backgroundColor: 'rgba(234, 88, 12, 0.2)', color: 'var(--teacher-warning)', borderRadius: '0.75rem' }}>
                                     <FileText size={24} />
                                 </div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--teacher-warning)', backgroundColor: 'rgba(234, 88, 12, 0.15)', padding: '0.25rem 0.5rem', borderRadius: '999px' }}>5 {t('teacher.dashboard.pending')}</span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--teacher-warning)', backgroundColor: 'rgba(234, 88, 12, 0.15)', padding: '0.25rem 0.5rem', borderRadius: '999px' }}>{stats.pendingAssignments} {t('teacher.dashboard.pending')}</span>
                             </div>
-                            <h3 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '0.25rem' }}>12</h3>
+                            <h3 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '0.25rem' }}>{stats.totalToGrade}</h3>
                             <p style={{ color: 'var(--teacher-text-muted)', fontSize: '0.875rem' }}>{t('teacher.dashboard.assignmentsToGrade')}</p>
                         </div>
                     </div>

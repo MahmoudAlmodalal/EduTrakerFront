@@ -1,30 +1,74 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, FileText, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import secretaryService from '../../services/secretaryService';
 import './Secretary.css';
 
 const SecretaryDashboard = () => {
     const { t } = useTheme();
+    const [stats, setStats] = useState([]);
+    const [pendingTasks, setPendingTasks] = useState([]);
+    const [events, setEvents] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Mock Data for Quick Stats
-    const stats = [
-        { labelKey: 'secretary.dashboard.totalStudents', value: '1,234', icon: Users, color: '#4F46E5', bgColor: '#EEF2FF', link: '/secretary/admissions' },
-        { labelKey: 'secretary.dashboard.unreadMessages', value: '3', icon: FileText, color: '#F59E0B', bgColor: '#FEF3C7', link: '/secretary/communication' },
-        { labelKey: 'secretary.dashboard.absentToday', value: '12', icon: Clock, color: '#EF4444', bgColor: '#FEE2E2', link: '/secretary/attendance' },
-    ];
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                setLoading(true);
+                const data = await secretaryService.getDashboardStats();
 
-    const pendingTasks = [
-        { id: 1, title: 'Review Application #1023 - John Doe', time: '2 hours ago', type: 'application' },
-        { id: 2, title: 'Verify Documents for Class 1-A', time: '5 hours ago', type: 'doc' },
-        { id: 3, title: 'Print Schedule for Mr. Smith', time: '1 day ago', type: 'admin' },
-        { id: 4, title: 'Guardian Linking Request - Sarah Connor', time: '1 day ago', type: 'guardian' },
-    ];
+                // Transform backend stats to frontend format
+                const transformedStats = [
+                    {
+                        labelKey: 'secretary.dashboard.totalStudents',
+                        value: data.total_students || '0',
+                        icon: Users,
+                        color: '#4F46E5',
+                        bgColor: '#EEF2FF',
+                        link: '/secretary/admissions'
+                    },
+                    {
+                        labelKey: 'secretary.dashboard.unreadMessages',
+                        value: data.unread_messages || '0',
+                        icon: FileText,
+                        color: '#F59E0B',
+                        bgColor: '#FEF3C7',
+                        link: '/secretary/communication'
+                    },
+                    {
+                        labelKey: 'secretary.dashboard.absentToday',
+                        value: data.absent_today || '0',
+                        icon: Clock,
+                        color: '#EF4444',
+                        bgColor: '#FEE2E2',
+                        link: '/secretary/attendance'
+                    },
+                ];
+                setStats(transformedStats);
 
-    const events = [
-        { id: 1, title: 'Parent-Teacher Meeting', date: 'Dec 15, 2025', time: '10:00 AM' },
-        { id: 2, title: 'School Assembly', date: 'Dec 16, 2025', time: '08:00 AM' },
-        { id: 3, title: 'Staff Meeting', date: 'Dec 18, 2025', time: '02:00 PM' },
-    ];
+                // For now, keep some mock or fetch from other endpoints if available
+                setPendingTasks(data.pending_tasks || [
+                    { id: 1, title: 'Review Application #1023', time: '2 hours ago', type: 'application' },
+                    { id: 2, title: 'Verify Documents', time: '5 hours ago', type: 'doc' },
+                ]);
+
+                setEvents(data.upcoming_events || [
+                    { id: 1, title: 'Parent-Teacher Meeting', date: 'Dec 15, 2025', time: '10:00 AM' },
+                ]);
+
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDashboardData();
+    }, []);
+
+    if (loading) {
+        return <div className="p-8 text-center">Loading dashboard...</div>;
+    }
 
     return (
         <div className="secretary-dashboard">
@@ -90,7 +134,7 @@ const SecretaryDashboard = () => {
                             <div key={event.id} className="event-item">
                                 <div className="event-date">
                                     <span className="event-month">{event.date.split(' ')[0]}</span>
-                                    <span className="event-day">{event.date.split(' ')[1].replace(',', '')}</span>
+                                    <span className="event-day">{event.date.split(' ')[1]?.replace(',', '') || ''}</span>
                                 </div>
                                 <div className="task-content">
                                     <h4>{event.title}</h4>

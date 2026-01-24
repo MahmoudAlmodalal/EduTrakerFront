@@ -1,11 +1,71 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { Save, Bell, Lock, Globe, Mail, Moon, Sun, Users } from 'lucide-react';
+import { Save, Bell, Lock, Globe, Mail, Moon, Sun, Users, Loader2 } from 'lucide-react';
 import './Guardian.css';
+import guardianService from '../../services/guardianService';
 
 const GuardianSettings = () => {
     const [activeTab, setActiveTab] = useState('profile');
     const { theme, toggleTheme, language, changeLanguage, t } = useTheme();
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [profile, setProfile] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: ''
+    });
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const user = JSON.parse(localStorage.getItem('user'));
+                if (user) {
+                    const res = await guardianService.getProfile(user.id);
+                    const [firstName, ...lastNameParts] = (res.user?.full_name || '').split(' ');
+                    setProfile({
+                        firstName: firstName || '',
+                        lastName: lastNameParts.join(' ') || '',
+                        email: res.user?.email || '',
+                        phone: res.phone_number || ''
+                    });
+                }
+            } catch (error) {
+                console.error("Error fetching profile:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProfile();
+    }, []);
+
+    const handleSaveProfile = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            const user = JSON.parse(localStorage.getItem('user'));
+            await guardianService.updateProfile(user.id, {
+                user: {
+                    full_name: `${profile.firstName} ${profile.lastName}`.trim()
+                },
+                phone_number: profile.phone
+            });
+            // Update local storage if needed or show success message
+        } catch (error) {
+            console.error("Error updating profile:", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="animate-spin text-primary" size={48} />
+            </div>
+        );
+    }
 
     return (
         <div>
@@ -83,31 +143,56 @@ const GuardianSettings = () => {
                 {/* Settings Content */}
                 <div className="guardian-card" style={{ flex: 1, padding: '2rem' }}>
                     {activeTab === 'profile' && (
-                        <div>
+                        <form onSubmit={handleSaveProfile}>
                             <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-text-main)', fontWeight: '600' }}>{t('guardian.settings.profile.title') || 'Profile Information'}</h3>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--color-text-main)' }}>{t('guardian.settings.profile.firstName') || 'First Name'}</label>
-                                    <input type="text" defaultValue="Guardian" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }} />
+                                    <input
+                                        type="text"
+                                        value={profile.firstName}
+                                        onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
+                                    />
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--color-text-main)' }}>{t('guardian.settings.profile.lastName') || 'Last Name'}</label>
-                                    <input type="text" defaultValue="User" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }} />
+                                    <input
+                                        type="text"
+                                        value={profile.lastName}
+                                        onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
+                                    />
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
                                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--color-text-main)' }}>{t('guardian.settings.profile.email') || 'Email'}</label>
                                     <div style={{ position: 'relative' }}>
                                         <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
-                                        <input type="email" defaultValue="guardian@edutraker.com" style={{ width: '100%', padding: '0.75rem 0.75rem 0.75rem 2.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }} />
+                                        <input
+                                            type="email"
+                                            value={profile.email}
+                                            disabled
+                                            style={{ width: '100%', padding: '0.75rem 0.75rem 0.75rem 2.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-body)', color: 'var(--color-text-muted)', cursor: 'not-allowed' }}
+                                        />
                                     </div>
+                                </div>
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--color-text-main)' }}>{t('guardian.settings.profile.phone') || 'Phone Number'}</label>
+                                    <input
+                                        type="text"
+                                        value={profile.phone}
+                                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
+                                    />
                                 </div>
                             </div>
                             <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-                                <button className="btn-primary">
-                                    <Save size={18} /> {t('guardian.settings.profile.saveBtn') || 'Save Changes'}
+                                <button className="btn-primary" type="submit" disabled={saving}>
+                                    {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                    {t('guardian.settings.profile.saveBtn') || 'Save Changes'}
                                 </button>
                             </div>
-                        </div>
+                        </form>
                     )}
 
                     {activeTab === 'preferences' && (

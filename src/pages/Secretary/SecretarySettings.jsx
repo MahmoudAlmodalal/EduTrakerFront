@@ -1,12 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Bell, Lock, Globe, Save, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import secretaryService from '../../services/secretaryService';
 import './Secretary.css';
 
 const SecretarySettings = () => {
     const { theme, toggleTheme, language, changeLanguage, t } = useTheme();
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('general');
     const [notifications, setNotifications] = useState({ email: true, newApplicationAlerts: true });
+
+    const [profile, setProfile] = useState({
+        full_name: '',
+        email: '',
+        office_number: '',
+        department: '',
+        phone: '' // if available
+    });
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (user?.user_id) {
+            fetchProfile();
+        }
+    }, [user]);
+
+    const fetchProfile = async () => {
+        try {
+            setLoading(true);
+            const data = await secretaryService.getProfile(user.user_id);
+            setProfile({
+                full_name: data.full_name,
+                email: data.email,
+                office_number: data.office_number || '',
+                department: data.department || '',
+                phone: data.phone || ''
+            });
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateProfile = async (e) => {
+        e.preventDefault();
+        try {
+            setLoading(true);
+            await secretaryService.updateProfile(user.user_id, {
+                full_name: profile.full_name,
+                office_number: profile.office_number,
+                department: profile.department
+            });
+            alert('Profile updated successfully!');
+        } catch (error) {
+            alert('Error updating profile: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -68,30 +121,58 @@ const SecretarySettings = () => {
                             <h2>{t('settings.profile') || 'Profile Information'}</h2>
                             <User size={20} style={{ color: 'var(--sec-primary)' }} />
                         </div>
-                        <form className="max-w-xl">
-                            <div className="profile-avatar-section">
-                                <div className="avatar-circle">MD</div>
-                                <div>
-                                    <button type="button" className="btn-secondary">{t('settings.changeAvatar') || 'Change Avatar'}</button>
-                                    <p className="avatar-hint">JPG, GIF or PNG. Max size 800K</p>
+                        {loading ? <p>Loading profile...</p> : (
+                            <form className="max-w-xl" onSubmit={handleUpdateProfile}>
+                                <div className="profile-avatar-section">
+                                    <div className="avatar-circle">{(profile.full_name || 'U').charAt(0)}</div>
+                                    <div>
+                                        <button type="button" className="btn-secondary">{t('settings.changeAvatar') || 'Change Avatar'}</button>
+                                        <p className="avatar-hint">JPG, GIF or PNG. Max size 800K</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('settings.fullName') || 'Full Name'}</label>
-                                <input type="text" className="form-input" defaultValue="Maria Davis" />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('settings.email') || 'Email Address'}</label>
-                                <input type="email" className="form-input" defaultValue="secretary@school.edu" />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('settings.phone') || 'Phone Number'}</label>
-                                <input type="tel" className="form-input" defaultValue="+1 234 567 890" />
-                            </div>
-                            <div className="form-actions">
-                                <button type="button" className="btn-primary">{t('settings.updateProfile') || 'Update Profile'}</button>
-                            </div>
-                        </form>
+                                <div className="form-group">
+                                    <label className="form-label">{t('settings.fullName') || 'Full Name'}</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={profile.full_name}
+                                        onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">{t('settings.email') || 'Email Address'}</label>
+                                    <input
+                                        type="email"
+                                        className="form-input"
+                                        value={profile.email}
+                                        disabled
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Department</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={profile.department}
+                                        onChange={(e) => setProfile({ ...profile, department: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Office Number</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={profile.office_number}
+                                        onChange={(e) => setProfile({ ...profile, office_number: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-actions">
+                                    <button type="submit" className="btn-primary" disabled={loading}>
+                                        {loading ? 'Updating...' : (t('settings.updateProfile') || 'Update Profile')}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
                     </div>
                 );
             case 'security':

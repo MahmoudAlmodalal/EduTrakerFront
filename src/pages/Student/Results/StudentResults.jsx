@@ -11,67 +11,44 @@ import {
     Minus
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentResults = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const [expandedSubject, setExpandedSubject] = useState(null);
+    const [loading, setLoading] = React.useState(true);
+    const [resultsData, setResultsData] = React.useState({
+        overallAverage: 0,
+        totalAssignments: 0,
+        gradedAssignments: 0,
+        marks: [],
+        byType: {}
+    });
 
-    // Mock Result Data
-    const overallStats = {
-        gpa: 3.8,
-        rank: 'Top 10%',
-        totalCredits: 42,
-        successRate: 92
-    };
-
-    const results = [
-        {
-            subject: 'Mathematics',
-            color: '#0891b2',
-            assessments: [
-                { title: 'Quiz 1', date: '2024-10-15', grade: 92, total: 100, average: 85 },
-                { title: 'Midterm', date: '2024-11-20', grade: 88, total: 100, average: 75 },
-                { title: 'Homework 3', date: '2024-12-05', grade: 95, total: 100, average: 88 },
-            ],
-            finalGrade: 91,
-            letterGrade: 'A-',
-            trend: 'up'
-        },
-        {
-            subject: 'Physics',
-            color: '#8b5cf6',
-            assessments: [
-                { title: 'Lab Report 1', date: '2024-10-18', grade: 78, total: 100, average: 80 },
-                { title: 'Lab Report 2', date: '2024-11-25', grade: 85, total: 100, average: 82 },
-            ],
-            finalGrade: 81,
-            letterGrade: 'B+',
-            trend: 'stable'
-        },
-        {
-            subject: 'English',
-            color: '#10b981',
-            assessments: [
-                { title: 'Essay 1', date: '2024-10-22', grade: 88, total: 100, average: 85 },
-                { title: 'Poetry Analysis', date: '2024-11-30', grade: 90, total: 100, average: 86 },
-            ],
-            finalGrade: 89,
-            letterGrade: 'A-',
-            trend: 'up'
-        },
-        {
-            subject: 'Computer Science',
-            color: '#f59e0b',
-            assessments: [
-                { title: 'Algorithm Test', date: '2024-11-10', grade: 95, total: 100, average: 70 },
-                { title: 'Project Phase 1', date: '2024-12-01', grade: 98, total: 100, average: 85 },
-            ],
-            finalGrade: 96,
-            letterGrade: 'A+',
-            trend: 'up'
-        },
-    ];
+    React.useEffect(() => {
+        const fetchResults = async () => {
+            if (!user?.id) return;
+            try {
+                const data = await studentService.getDashboardStats();
+                const grades = data.statistics.grades;
+                setResultsData({
+                    overallAverage: grades.overall_average || 0,
+                    totalAssignments: grades.total_assignments || 0,
+                    gradedAssignments: grades.graded_assignments || 0,
+                    marks: grades.marks || [],
+                    byType: grades.by_type || {}
+                });
+            } catch (error) {
+                console.error('Error fetching results:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchResults();
+    }, [user?.id]);
 
     const getTrendIcon = (trend) => {
         switch (trend) {
@@ -96,9 +73,29 @@ const StudentResults = () => {
         return '#ef4444';
     };
 
+    if (loading) return <div className="loading-container">Loading...</div>;
+
+    const overallStats = {
+        gpa: (resultsData.overallAverage / 25).toFixed(2),
+        rank: 'N/A',
+        totalCredits: resultsData.gradedAssignments,
+        successRate: resultsData.overallAverage
+    };
+
+    // Group marks by course/subject if needed, but for now we'll use them as is
+    const results = resultsData.marks.map(m => ({
+        subject: m.course_name || m.title,
+        color: '#0891b2', // Can be dynamic
+        assessments: [
+            { title: m.title, date: m.due_date, grade: m.score, total: 100, average: 80 } // Mock average
+        ],
+        finalGrade: m.percentage,
+        letterGrade: m.score >= 90 ? 'A' : m.score >= 80 ? 'B' : 'C',
+        trend: 'stable'
+    }));
+
     return (
         <div className="student-results">
-            {/* Header */}
             <header className="page-header">
                 <div>
                     <h1 className="page-title">{t('student.results.title') || 'Academic Results'}</h1>
@@ -106,7 +103,6 @@ const StudentResults = () => {
                 </div>
             </header>
 
-            {/* Stats Overview */}
             <div className="results-stats-grid">
                 <div className="result-stat-card gpa-card">
                     <div className="result-stat-icon" style={{ background: 'linear-gradient(135deg, #10b981, #34d399)' }}>
@@ -120,16 +116,11 @@ const StudentResults = () => {
                         <svg viewBox="0 0 36 36">
                             <path
                                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none"
-                                stroke="#e0f2fe"
-                                strokeWidth="3"
+                                fill="none" stroke="#e0f2fe" strokeWidth="3"
                             />
                             <path
                                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none"
-                                stroke="#10b981"
-                                strokeWidth="3"
-                                strokeLinecap="round"
+                                fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round"
                                 strokeDasharray={`${(overallStats.gpa / 4) * 100}, 100`}
                             />
                         </svg>
@@ -167,7 +158,6 @@ const StudentResults = () => {
                 </div>
             </div>
 
-            {/* Subject Results */}
             <div className="results-list">
                 {results.map((result, index) => (
                     <div
@@ -206,16 +196,11 @@ const StudentResults = () => {
                                 <svg viewBox="0 0 36 36">
                                     <path
                                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                        fill="none"
-                                        stroke="#e0f2fe"
-                                        strokeWidth="3"
+                                        fill="none" stroke="#e0f2fe" strokeWidth="3"
                                     />
                                     <path
                                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                        fill="none"
-                                        stroke={result.color}
-                                        strokeWidth="3"
-                                        strokeLinecap="round"
+                                        fill="none" stroke={result.color} strokeWidth="3" strokeLinecap="round"
                                         strokeDasharray={`${result.finalGrade}, 100`}
                                     />
                                 </svg>
@@ -226,7 +211,6 @@ const StudentResults = () => {
                             </button>
                         </div>
 
-                        {/* Expanded Details */}
                         <div className="result-card-details">
                             <table className="assessments-table">
                                 <thead>
@@ -244,11 +228,8 @@ const StudentResults = () => {
                                             <td className="assessment-title">{assessment.title}</td>
                                             <td className="assessment-date">{assessment.date}</td>
                                             <td>
-                                                <span
-                                                    className="assessment-score"
-                                                    style={{ color: getGradeColor(assessment.grade) }}
-                                                >
-                                                    {assessment.grade}/{assessment.total}
+                                                <span className="assessment-score" style={{ color: getGradeColor(assessment.grade) }}>
+                                                    {assessment.grade}/100
                                                 </span>
                                             </td>
                                             <td className="assessment-average">{assessment.average}</td>

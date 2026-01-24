@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     BookOpen,
     Users,
@@ -10,36 +10,59 @@ import {
     Search
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../utils/api';
 import './SchoolManager.css';
 
 const AcademicConfiguration = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('subjects');
+    const [courses, setCourses] = useState([]);
+    const [teachers, setTeachers] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Mock Data for Tabs
-    const [allocations, setAllocations] = useState([
-        { id: 1, class: '1-A', subject: 'Mathematics', teacher: 'Mr. Smith' },
-        { id: 2, class: '1-A', subject: 'Science', teacher: 'Ms. Johnson' },
-        { id: 3, class: '1-B', subject: 'Mathematics', teacher: 'Mr. Smith' },
-    ]);
+    const schoolId = user?.school;
 
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!schoolId) return;
+            setLoading(true);
+            try {
+                const [coursesData, teachersData] = await Promise.all([
+                    api.get(`/school/school/${schoolId}/courses/`),
+                    api.get('/teacher/teachers/')
+                ]);
+                setCourses(coursesData.results || coursesData);
+                setTeachers(teachersData.results || teachersData);
+            } catch (error) {
+                console.error('Failed to fetch academic configuration data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [schoolId]);
+
+    // Mock conflicts
     const [conflicts, setConflicts] = useState([
         { id: 1, type: 'Room Double Booking', description: 'Room 101 booked for Math 1-A and Sci 1-B at Monday 9:00 AM', severity: 'High' },
         { id: 2, type: 'Teacher Overlap', description: 'Mr. Smith assigned to 1-A and 1-B at Tuesday 10:00 AM', severity: 'High' },
     ]);
 
     const renderTabContent = () => {
+        if (loading) return <div>Loading...</div>;
         switch (activeTab) {
             case 'subjects':
-                return <SubjectAllocation allocations={allocations} />;
+                return <SubjectAllocation initialCourses={courses} schoolId={schoolId} />;
             case 'teachers':
-                return <TeacherAllocation allocations={allocations} />;
+                return <TeacherAllocation initialAllocations={[]} teachers={teachers} />;
             case 'timetable':
                 return <TimetableGenerator />;
             case 'conflicts':
                 return <ConflictDetection conflicts={conflicts} />;
             default:
-                return <SubjectAllocation allocations={allocations} />;
+                return <SubjectAllocation initialCourses={courses} schoolId={schoolId} />;
         }
     };
 
@@ -56,7 +79,6 @@ const AcademicConfiguration = () => {
                     className={`pb-2 px-1 ${activeTab === 'subjects' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
                     style={{
                         paddingBottom: '0.5rem',
-
                         color: activeTab === 'subjects' ? 'var(--color-primary)' : 'var(--color-text-muted)',
                         fontWeight: 500,
                         background: 'none',
@@ -134,20 +156,45 @@ const AcademicConfiguration = () => {
 };
 
 // Sub-components for Tabs
-const SubjectAllocation = ({ allocations: initialAllocations }) => {
-    const [allocations, setAllocations] = useState(initialAllocations);
+const SubjectAllocation = ({ initialCourses, schoolId }) => {
+    const [courses, setCourses] = useState(initialCourses);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ class: '', subject: '' });
+    const [grades, setGrades] = useState([]);
+    const [formData, setFormData] = useState({ grade_id: '', course_code: '', name: '' });
 
-    const handleSave = (e) => {
+    useEffect(() => {
+        const fetchGrades = async () => {
+            try {
+                const response = await api.get('/school/grades/');
+                setGrades(response.results || response);
+            } catch (error) {
+                console.error('Failed to fetch grades:', error);
+            }
+        };
+        fetchGrades();
+    }, []);
+
+    const handleSave = async (e) => {
         e.preventDefault();
-        setAllocations([...allocations, { id: Date.now(), ...formData, teacher: 'Unassigned' }]);
-        setIsModalOpen(false);
-        setFormData({ class: '', subject: '' });
+        try {
+            const response = await api.post(`/school/school/${schoolId}/courses/create/`, formData);
+            setCourses([...courses, response]);
+            setIsModalOpen(false);
+            setFormData({ grade_id: '', course_code: '', name: '' });
+        } catch (error) {
+            console.error('Failed to create course:', error);
+            alert('Failed to create course. Please check your permissions.');
+        }
     };
 
-    const handleRemove = (id) => {
-        setAllocations(allocations.filter(a => a.id !== id));
+    const handleRemove = async (id) => {
+        if (!window.confirm('Are you sure you want to deactivate this subject?')) return;
+        try {
+            await api.post(`/school/school/${schoolId}/courses/${id}/deactivate/`);
+            setCourses(courses.filter(c => c.id !== id));
+        } catch (error) {
+            console.error('Failed to deactivate course:', error);
+        }
     };
 
     return (
@@ -156,24 +203,38 @@ const SubjectAllocation = ({ allocations: initialAllocations }) => {
                 <h3 className="chart-title">Subject Allocations</h3>
                 <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
                     <Plus size={18} />
-                    Allocate Subject
+                    Add Subject
                 </button>
             </div>
             <table className="data-table">
                 <thead>
                     <tr>
-                        <th>Class</th>
-                        <th>Subject</th>
+                        <th>Grade</th>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {allocations.map((item) => (
+                    {courses.map((item) => (
                         <tr key={item.id}>
-                            <td className="font-medium text-gray-900">{item.class}</td>
-                            <td>{item.subject}</td>
+                            <td className="font-medium text-gray-900">{item.grade_name}</td>
+                            <td>{item.course_code}</td>
+                            <td>{item.name}</td>
                             <td>
-                                <button onClick={() => handleRemove(item.id)} className="text-red-600 hover:text-red-900" style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                                <span style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '999px',
+                                    fontSize: '12px',
+                                    background: item.is_active ? 'var(--color-success-light)' : 'var(--color-error-light)',
+                                    color: item.is_active ? 'var(--color-success)' : 'var(--color-error)'
+                                }}>
+                                    {item.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td>
+                                <button onClick={() => handleRemove(item.id)} className="text-red-600 hover:text-red-900" style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer' }}>Deactivate</button>
                             </td>
                         </tr>
                     ))}
@@ -190,36 +251,41 @@ const SubjectAllocation = ({ allocations: initialAllocations }) => {
                         backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '400px',
                         border: '1px solid var(--color-border)'
                     }}>
-                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>Allocate Subject to Class</h2>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add Subject to School</h2>
                         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Class</label>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Grade</label>
                                 <select
                                     required
-                                    value={formData.class}
-                                    onChange={e => setFormData({ ...formData, class: e.target.value })}
+                                    value={formData.grade_id}
+                                    onChange={e => setFormData({ ...formData, grade_id: e.target.value })}
                                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
                                 >
-                                    <option value="">Select Class</option>
-                                    <option value="1-A">1-A</option>
-                                    <option value="1-B">1-B</option>
-                                    <option value="2-A">2-A</option>
+                                    <option value="">Select Grade</option>
+                                    {grades.map(g => (
+                                        <option key={g.id} value={g.id}>{g.name}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Subject</label>
-                                <select
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Course Code</label>
+                                <input
                                     required
-                                    value={formData.subject}
-                                    onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                                    placeholder="e.g. MATH101"
+                                    value={formData.course_code}
+                                    onChange={e => setFormData({ ...formData, course_code: e.target.value })}
                                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                >
-                                    <option value="">Select Subject</option>
-                                    <option value="Mathematics">Mathematics</option>
-                                    <option value="Science">Science</option>
-                                    <option value="English">English</option>
-                                    <option value="History">History</option>
-                                </select>
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Name</label>
+                                <input
+                                    required
+                                    placeholder="e.g. Mathematics"
+                                    value={formData.name}
+                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
                                 <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
@@ -233,19 +299,19 @@ const SubjectAllocation = ({ allocations: initialAllocations }) => {
     );
 };
 
-const TeacherAllocation = ({ allocations: initialAllocations }) => {
-    // Determine which allocations need teachers or are editable
+const TeacherAllocation = ({ initialAllocations, teachers }) => {
     const [allocations, setAllocations] = useState(initialAllocations);
     const [editingId, setEditingId] = useState(null);
     const [selectedTeacher, setSelectedTeacher] = useState('');
 
     const handleEdit = (item) => {
         setEditingId(item.id);
-        setSelectedTeacher(item.teacher === 'Unassigned' ? '' : item.teacher);
+        setSelectedTeacher(item.teacher_id || '');
     };
 
     const handleSave = (id) => {
-        setAllocations(allocations.map(a => a.id === id ? { ...a, teacher: selectedTeacher || 'Unassigned' } : a));
+        const teacher = teachers.find(t => String(t.id) === String(selectedTeacher));
+        setAllocations(allocations.map(a => a.id === id ? { ...a, teacher: teacher ? teacher.full_name : 'Unassigned', teacher_id: selectedTeacher } : a));
         setEditingId(null);
     };
 
@@ -264,7 +330,13 @@ const TeacherAllocation = ({ allocations: initialAllocations }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {allocations.map((item) => (
+                    {allocations.length === 0 ? (
+                        <tr>
+                            <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                No teacher allocations found. Configure subjects first.
+                            </td>
+                        </tr>
+                    ) : allocations.map((item) => (
                         <tr key={item.id}>
                             <td>{item.class}</td>
                             <td>{item.subject}</td>
@@ -276,16 +348,16 @@ const TeacherAllocation = ({ allocations: initialAllocations }) => {
                                         style={{ padding: '0.25rem', borderRadius: '0.25rem', border: '1px solid var(--color-border)' }}
                                     >
                                         <option value="">Select Teacher</option>
-                                        <option value="Mr. Smith">Mr. Smith</option>
-                                        <option value="Ms. Johnson">Ms. Johnson</option>
-                                        <option value="Mrs. Davis">Mrs. Davis</option>
+                                        {teachers.map(t => (
+                                            <option key={t.id} value={t.id}>{t.full_name}</option>
+                                        ))}
                                     </select>
                                 ) : (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--color-bg-body)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--color-text-main)' }}>
-                                            {item.teacher.charAt(0)}
+                                            {item.teacher ? item.teacher.charAt(0) : 'U'}
                                         </div>
-                                        {item.teacher}
+                                        {item.teacher || 'Unassigned'}
                                     </div>
                                 )}
                             </td>
@@ -433,3 +505,4 @@ const ConflictDetection = ({ conflicts }) => (
 );
 
 export default AcademicConfiguration;
+

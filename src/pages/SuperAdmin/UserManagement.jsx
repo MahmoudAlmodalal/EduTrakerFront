@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, UserPlus, FileDown, Filter } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
@@ -8,75 +8,156 @@ import styles from './UserManagement.module.css';
 const UserManagement = () => {
     const { t } = useTheme();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [users, setUsers] = useState([
-        { id: 1, name: 'John Doe', email: 'john@edutraker.com', role: 'Workstream Manager', status: 'Active', workstream: 'Gaza North' },
-        { id: 2, name: 'Jane Smith', email: 'jane@edutraker.com', role: 'Workstream Manager', status: 'Active', workstream: 'Gaza South' },
-        { id: 3, name: 'Ahmad Khalil', email: 'ahmad@edutraker.com', role: 'School Manager', status: 'Active', workstream: 'Mid Area' },
-        { id: 4, name: 'Sara Younis', email: 'sara@edutraker.com', role: 'Workstream Manager', status: 'Inactive', workstream: 'Khan Younis' },
-    ]);
-
-    const handleStatusToggle = (id) => {
-        setUsers(users.map(user =>
-            user.id === id ? { ...user, status: user.status === 'Active' ? 'Inactive' : 'Active' } : user
-        ));
-    };
+    const [users, setUsers] = useState([]);
+    const [workstreams, setWorkstreams] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [pagination, setPagination] = useState({ count: 0, next: null, previous: null });
+    const [currentPage, setCurrentPage] = useState(1);
 
     const [isEditing, setIsEditing] = useState(false);
     const [currentUserId, setCurrentUserId] = useState(null);
-    const [formData, setFormData] = useState({ name: '', email: '', workstream: '' });
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        workstreamId: '',
+        role: 'manager_workstream',
+        password: ''
+    });
 
-    const handleCreateUser = (e) => {
+    const fetchUsers = async (page = 1, search = '') => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('accessToken');
+            const url = `/api/users/?page=${page}&search=${search}`;
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch users');
+            const data = await response.json();
+            setUsers(data.results || []);
+            setPagination({ count: data.count, next: data.next, previous: data.previous });
+        } catch (err) {
+            console.error('Error fetching users:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchWorkstreams = async () => {
+        try {
+            const token = localStorage.getItem('accessToken');
+            const response = await fetch('/api/workstream/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setWorkstreams(data);
+            }
+        } catch (err) {
+            console.error('Error fetching workstreams:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchUsers(currentPage, searchTerm);
+    }, [currentPage, searchTerm]);
+
+    useEffect(() => {
+        fetchWorkstreams();
+    }, []);
+
+    const handleStatusToggle = async (user) => {
+        const token = localStorage.getItem('accessToken');
+        const url = `/api/users/${user.id}/${user.is_active ? 'deactivate' : 'activate'}/`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Action failed');
+            fetchUsers(currentPage, searchTerm);
+        } catch (err) {
+            alert('Status update failed: ' + err.message);
+        }
+    };
+
+    const handleCreateUser = async (e) => {
         e.preventDefault();
+        const token = localStorage.getItem('accessToken');
 
-        if (isEditing) {
-            setUsers(users.map(user =>
-                user.id === currentUserId
-                    ? { ...user, name: formData.name, email: formData.email, workstream: formData.workstream }
-                    : user
-            ));
-        } else {
-            const newUser = {
-                id: users.length + 1,
-                name: formData.name,
-                email: formData.email,
-                role: 'Workstream Manager',
-                status: 'Active',
-                workstream: formData.workstream
-            };
-            setUsers([...users, newUser]);
+        const payload = {
+            email: formData.email,
+            full_name: formData.name,
+            role: formData.role,
+            work_stream: formData.workstreamId ? parseInt(formData.workstreamId) : null,
+        };
+
+        if (!isEditing) {
+            payload.password = formData.password || 'Temporary123!';
+        } else if (formData.password) {
+            payload.password = formData.password;
         }
 
-        setIsModalOpen(false);
-        resetForm();
+        try {
+            let response;
+            if (isEditing) {
+                response = await fetch(`/api/users/${currentUserId}/`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                response = await fetch('/api/users/create/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(JSON.stringify(errorData));
+            }
+
+            fetchUsers(currentPage, searchTerm);
+            setIsModalOpen(false);
+            resetForm();
+        } catch (err) {
+            alert('Operation failed: ' + err.message);
+        }
     };
 
     const handleEditUser = (user) => {
         setIsEditing(true);
         setCurrentUserId(user.id);
-        setFormData({ name: user.name, email: user.email, workstream: user.workstream });
+        setFormData({
+            name: user.full_name,
+            email: user.email,
+            workstreamId: user.work_stream ? user.work_stream.toString() : '',
+            role: user.role,
+            password: ''
+        });
         setIsModalOpen(true);
     };
 
     const resetForm = () => {
         setIsEditing(false);
         setCurrentUserId(null);
-        setFormData({ name: '', email: '', workstream: '' });
+        setFormData({ name: '', email: '', workstreamId: '', role: 'manager_workstream', password: '' });
     };
 
     const openCreateModal = () => {
         resetForm();
         setIsModalOpen(true);
     };
-
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const filteredUsers = users.filter(user =>
-        (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (user.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (user.workstream || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (user.status || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
 
     return (
         <div className={styles.container}>
@@ -120,41 +201,42 @@ const UserManagement = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredUsers.length > 0 ? (
-                                filteredUsers.map((user) => (
+                            {loading ? (
+                                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</td></tr>
+                            ) : users.length > 0 ? (
+                                users.map((user) => (
                                     <tr key={user.id}>
                                         <td>
                                             <div className={styles.userInfo}>
                                                 <div className={styles.avatar}>
-                                                    {user.name.charAt(0)}
+                                                    {user.full_name?.charAt(0) || 'U'}
                                                 </div>
                                                 <div className={styles.userDetails}>
-                                                    <span className={styles.userName}>{user.name}</span>
+                                                    <span className={styles.userName}>{user.full_name}</span>
                                                     <span className={styles.userEmail}>{user.email}</span>
                                                 </div>
                                             </div>
                                         </td>
                                         <td>
                                             <span className={styles.roleBadge}>
-                                                {user.role === 'Workstream Manager' ? t('auth.role.workstreamManager') :
-                                                    user.role === 'School Manager' ? t('auth.role.schoolManager') : user.role}
+                                                {user.role}
                                             </span>
                                         </td>
-                                        <td style={{ fontWeight: 500 }}>{user.workstream}</td>
+                                        <td style={{ fontWeight: 500 }}>{user.work_stream_name || 'N/A'}</td>
                                         <td>
                                             <span
-                                                className={`${styles.statusBadge} ${user.status === 'Active' ? styles.active : styles.inactive}`}
-                                                onClick={() => handleStatusToggle(user.id)}
+                                                className={`${styles.statusBadge} ${user.is_active ? styles.active : styles.inactive}`}
+                                                onClick={() => handleStatusToggle(user)}
                                                 style={{ cursor: 'pointer' }}
                                                 title={t('users.status.toggle')}
                                             >
-                                                {user.status === 'Active' ? t('common.active') : t('common.inactive')}
+                                                {user.is_active ? t('common.active') : t('common.inactive')}
                                             </span>
                                         </td>
                                         <td>
                                             <div className={styles.actions}>
                                                 <button className={styles.actionBtn} onClick={() => handleEditUser(user)} title="Edit"><Edit size={16} /></button>
-                                                <button className={`${styles.actionBtn} ${styles.danger}`} title="Delete"><Trash2 size={16} /></button>
+                                                <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleStatusToggle(user)} title="Delete (Deactivate)"><Trash2 size={16} /></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -173,6 +255,28 @@ const UserManagement = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {pagination.count > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
+                        <Button
+                            variant="outline"
+                            size="small"
+                            disabled={!pagination.previous}
+                            onClick={() => setCurrentPage(prev => prev - 1)}
+                        >
+                            Previous
+                        </Button>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>Page {currentPage}</span>
+                        <Button
+                            variant="outline"
+                            size="small"
+                            disabled={!pagination.next}
+                            onClick={() => setCurrentPage(prev => prev + 1)}
+                        >
+                            Next
+                        </Button>
+                    </div>
+                )}
             </div>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? t('users.modal.editTitle') : t('users.modal.createTitle')}>
@@ -198,19 +302,41 @@ const UserManagement = () => {
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             />
                         </div>
+                        {!isEditing && (
+                            <div className={styles.formGroup}>
+                                <label>{t('auth.password')}</label>
+                                <input
+                                    type="password"
+                                    placeholder="Enter password"
+                                    required
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                />
+                            </div>
+                        )}
+                        <div className={styles.formGroup}>
+                            <label>Role</label>
+                            <select
+                                required
+                                value={formData.role}
+                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                            >
+                                <option value="admin">Super Admin</option>
+                                <option value="manager_workstream">Workstream Manager</option>
+                                <option value="manager_school">School Manager</option>
+                                <option value="guest">Guest</option>
+                            </select>
+                        </div>
                         <div className={styles.formGroup}>
                             <label>{t('users.form.assignWorkstream')}</label>
                             <select
-                                required
-                                value={formData.workstream}
-                                onChange={(e) => setFormData({ ...formData, workstream: e.target.value })}
+                                value={formData.workstreamId}
+                                onChange={(e) => setFormData({ ...formData, workstreamId: e.target.value })}
                             >
-                                <option value="">{t('users.form.selectWorkstream')}</option>
-                                <option value="Gaza North">Gaza North</option>
-                                <option value="Gaza South">Gaza South</option>
-                                <option value="Mid Area">Mid Area</option>
-                                <option value="Khan Younis">Khan Younis</option>
-                                <option value="Rafah">Rafah</option>
+                                <option value="">None / Select Workstream</option>
+                                {workstreams.map(ws => (
+                                    <option key={ws.id} value={ws.id}>{ws.workstream_name}</option>
+                                ))}
                             </select>
                         </div>
                     </div>

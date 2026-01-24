@@ -1,41 +1,122 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, FileText, Upload, Download, Check, X, UserPlus, Users } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import secretaryService from '../../services/secretaryService';
 import './Secretary.css';
 import '../WorkstreamManager/Workstream.css';
 
 const StudentAdmissions = () => {
     const { t } = useTheme();
     const [activeTab, setActiveTab] = useState('applications');
+    const [loading, setLoading] = useState(false);
 
-    // Mock Data
-    // Mock Data
-    const [applications] = useState([
-        { id: 101, name: 'Alice Johnson', grade: '1st Grade', submittedDate: '2025-12-10', status: 'Pending' },
-        { id: 102, name: 'Bob Smith', grade: '2nd Grade', submittedDate: '2025-12-11', status: 'Under Review' },
-        { id: 103, name: 'Charlie Brown', grade: '1st Grade', submittedDate: '2025-12-12', status: 'Pending' },
-    ]);
+    // Backend Data States
+    const [applications, setApplications] = useState([]);
+    const [unassignedStudents, setUnassignedStudents] = useState([]);
+    const [files] = useState([]); // File management can be connected later if needed
 
-    const [files] = useState([
-        { id: 1, student: 'Alice Johnson', type: 'Birth Certificate', size: '1.2 MB', date: '2025-12-10' },
-        { id: 2, student: 'Bob Smith', type: 'Immunization Record', size: '2.5 MB', date: '2025-12-11' },
-    ]);
+    // Form States
+    const [newStudent, setNewStudent] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        password: 'ChangeMe123!', // Default password
+        date_of_birth: '',
+        gender: 'Male',
+        grade_level_id: '',
+        school_id: 1, // Should be fetched from profile
+        guardian_name: '',
+        guardian_phone: ''
+    });
 
-    // Class Assignment State
-    const [unassignedStudents, setUnassignedStudents] = useState([
-        { id: 201, name: 'David Lee', grade: '1st Grade' },
-        { id: 202, name: 'Eva Green', grade: '1st Grade' },
-        { id: 203, name: 'Frank White', grade: '2nd Grade' },
-        { id: 204, name: 'Grace Hall', grade: '1st Grade' },
-    ]);
     const [selectedClass, setSelectedClass] = useState('');
     const [selectedStudent, setSelectedStudent] = useState('');
 
-    const handleAssign = () => {
+    useEffect(() => {
+        if (activeTab === 'applications') {
+            fetchApplications();
+        } else if (activeTab === 'class-assignment') {
+            fetchUnassignedStudents();
+        }
+    }, [activeTab]);
+
+    const fetchApplications = async () => {
+        try {
+            setLoading(true);
+            const data = await secretaryService.getApplications();
+            // Data might be paginated
+            setApplications(data.results || data);
+        } catch (error) {
+            console.error('Error fetching applications:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchUnassignedStudents = async () => {
+        try {
+            setLoading(true);
+            const data = await secretaryService.getUnassignedStudents();
+            setUnassignedStudents(data.results || data);
+        } catch (error) {
+            console.error('Error fetching unassigned students:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleApprove = async (id) => {
+        try {
+            await secretaryService.approveApplication(id);
+            fetchApplications();
+        } catch (error) {
+            alert('Error approving application: ' + error.message);
+        }
+    };
+
+    const handleReject = async (id) => {
+        try {
+            await secretaryService.rejectApplication(id);
+            fetchApplications();
+        } catch (error) {
+            alert('Error rejecting application: ' + error.message);
+        }
+    };
+
+    const handleCreateStudent = async (e) => {
+        e.preventDefault();
+        try {
+            setLoading(true);
+            // Transform data if needed
+            const payload = {
+                email: newStudent.email,
+                full_name: `${newStudent.first_name} ${newStudent.last_name}`,
+                password: newStudent.password,
+                school_id: 1, // Mock school id
+                date_of_birth: newStudent.date_of_birth,
+                gender: newStudent.gender,
+                // Add other fields as per backend expectations
+            };
+            await secretaryService.createStudent(payload);
+            alert('Student record created successfully!');
+            setActiveTab('applications');
+        } catch (error) {
+            alert('Error creating student: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAssign = async () => {
         if (!selectedClass || !selectedStudent) return;
-        setUnassignedStudents(unassignedStudents.filter(s => s.id.toString() !== selectedStudent));
-        setSelectedStudent('');
-        // in a real app, you would also call an API to update the student's record
+        try {
+            await secretaryService.assignToClass(selectedStudent, selectedClass);
+            alert('Student assigned successfully!');
+            fetchUnassignedStudents();
+            setSelectedStudent('');
+        } catch (error) {
+            alert('Error assigning student: ' + error.message);
+        }
     };
 
     // Render Functions
@@ -55,90 +136,112 @@ const StudentAdmissions = () => {
                     Filter
                 </button>
             </div>
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Application ID</th>
-                        <th>Student Name</th>
-                        <th>Grade Applied</th>
-                        <th>Submitted Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {applications.map((app) => (
-                        <tr key={app.id}>
-                            <td>#{app.id}</td>
-                            <td className="font-medium">{app.name}</td>
-                            <td>{app.grade}</td>
-                            <td>{app.submittedDate}</td>
-                            <td>
-                                <span className={`status-badge ${app.status === 'Pending' ? 'status-inactive' : 'status-active'}`}
-                                    style={app.status === 'Pending' ? { backgroundColor: '#fff7ed', color: '#c2410c' } : {}}
-                                >
-                                    {app.status}
-                                </span>
-                            </td>
-                            <td>
-                                <div className="action-btn-group">
-                                    <button className="btn-icon success" title="Approve">
-                                        <Check size={18} />
-                                    </button>
-                                    <button className="btn-icon danger" title="Reject">
-                                        <X size={18} />
-                                    </button>
-                                    <button className="btn-icon info" title="View Details">
-                                        <FileText size={18} />
-                                    </button>
-                                </div>
-                            </td>
+            {loading ? <p className="p-4 text-center">Loading applications...</p> : (
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Student Name</th>
+                            <th>Grade Applied</th>
+                            <th>Submitted Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {applications.map((app) => (
+                            <tr key={app.id}>
+                                <td>#{app.id}</td>
+                                <td className="font-medium">{app.student_name || 'N/A'}</td>
+                                <td>{app.grade_name || app.grade_level || 'N/A'}</td>
+                                <td>{app.created_at?.split('T')[0] || 'N/A'}</td>
+                                <td>
+                                    <span className={`status-badge ${app.is_active ? 'status-active' : 'status-inactive'}`}>
+                                        {app.is_active ? 'Active' : 'Pending'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div className="action-btn-group">
+                                        <button className="btn-icon success" title="Approve" onClick={() => handleApprove(app.id)}>
+                                            <Check size={18} />
+                                        </button>
+                                        <button className="btn-icon danger" title="Reject" onClick={() => handleReject(app.id)}>
+                                            <X size={18} />
+                                        </button>
+                                        <button className="btn-icon info" title="View Details">
+                                            <FileText size={18} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                        {applications.length === 0 && (
+                            <tr><td colSpan="6" className="text-center p-4">No applications found.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            )}
         </div>
     );
 
     const renderAddNewStudent = () => (
         <div className="management-card max-w-3xl mx-auto p-8">
             <h2 className="widget-header text-xl font-bold mb-6 pb-4 border-b border-gray-100">Manual Student Entry</h2>
-            <form>
+            <form onSubmit={handleCreateStudent}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
                         <label className="form-label">First Name</label>
-                        <input type="text" className="form-input" placeholder="e.g. John" />
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder="e.g. John"
+                            value={newStudent.first_name}
+                            onChange={(e) => setNewStudent({ ...newStudent, first_name: e.target.value })}
+                            required
+                        />
                     </div>
                     <div className="form-group">
                         <label className="form-label">Last Name</label>
-                        <input type="text" className="form-input" placeholder="e.g. Doe" />
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder="e.g. Doe"
+                            value={newStudent.last_name}
+                            onChange={(e) => setNewStudent({ ...newStudent, last_name: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Email</label>
+                        <input
+                            type="email"
+                            className="form-input"
+                            placeholder="student@example.com"
+                            value={newStudent.email}
+                            onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                            required
+                        />
                     </div>
                     <div className="form-group">
                         <label className="form-label">Date of Birth</label>
-                        <input type="date" className="form-input" />
+                        <input
+                            type="date"
+                            className="form-input"
+                            value={newStudent.date_of_birth}
+                            onChange={(e) => setNewStudent({ ...newStudent, date_of_birth: e.target.value })}
+                            required
+                        />
                     </div>
                     <div className="form-group">
                         <label className="form-label">Gender</label>
-                        <select className="form-select">
-                            <option>Male</option>
-                            <option>Female</option>
-                            <option>Other</option>
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Grade Level</label>
-                        <select className="form-select">
-                            <option>1st Grade</option>
-                            <option>2nd Grade</option>
-                            <option>3rd Grade</option>
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Class Assignment</label>
-                        <select className="form-select">
-                            <option>Class 1-A</option>
-                            <option>Class 1-B</option>
-                            <option>Pending</option>
+                        <select
+                            className="form-select"
+                            value={newStudent.gender}
+                            onChange={(e) => setNewStudent({ ...newStudent, gender: e.target.value })}
+                        >
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
                         </select>
                     </div>
                 </div>
@@ -148,18 +251,30 @@ const StudentAdmissions = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="form-group">
                             <label className="form-label">Guardian Name</label>
-                            <input type="text" className="form-input" />
+                            <input
+                                type="text"
+                                className="form-input"
+                                value={newStudent.guardian_name}
+                                onChange={(e) => setNewStudent({ ...newStudent, guardian_name: e.target.value })}
+                            />
                         </div>
                         <div className="form-group">
                             <label className="form-label">Contact Number</label>
-                            <input type="tel" className="form-input" />
+                            <input
+                                type="tel"
+                                className="form-input"
+                                value={newStudent.guardian_phone}
+                                onChange={(e) => setNewStudent({ ...newStudent, guardian_phone: e.target.value })}
+                            />
                         </div>
                     </div>
                 </div>
 
                 <div className="flex justify-end gap-4 mt-8">
-                    <button type="button" className="btn-secondary bg-white border border-gray-300">Cancel</button>
-                    <button type="submit" className="btn-primary">Save Student Record</button>
+                    <button type="button" className="btn-secondary bg-white border border-gray-300" onClick={() => setActiveTab('applications')}>Cancel</button>
+                    <button type="submit" className="btn-primary" disabled={loading}>
+                        {loading ? 'Saving...' : 'Save Student Record'}
+                    </button>
                 </div>
             </form>
         </div>
@@ -236,33 +351,8 @@ const StudentAdmissions = () => {
     const renderClassAssignment = () => {
         const toggleStudentSelection = (id) => {
             const strId = id.toString();
-            if (selectedStudent === strId) { // If currently selected (single mode logic reuse or strict eq), actually let's make it array for multi
-                // For now, let's keep it simple but better UI. 
-                // Wait, I promised multi-select. Let's do multi-select.
-                // But wait, the state 'selectedStudent' is a string. I should change it to array or just handle single selection BETTER first.
-                // Actually, let's stick to the plan: "Multi-select: Allow assigning multiple students".
-                // So I need to change state handling too.
-                // Since I cannot easily change the state definition (it's inside the component top level), 
-                // I will treat 'selectedStudent' as a comma-separated string or just ignore the old state name and use a new local state if I could, 
-                // but I can't easily add state hooks in this replace block without changing the whole component.
-                // Ah, I can render the content, but I can't verify if I can change the top level state hooks easily with this tool if they are far away.
-                // Top level state was: const [selectedStudent, setSelectedStudent] = useState('');
-                // I will change the logic to usage of a new local set for this render function? No, that won't work across re-renders.
-                // I should probably just make it a single-select but MUCH BETTER visuals first to be safe, 
-                // OR use the existing state to store one ID, but make the UI look like a grid.
-
-                // User said "class assismant part in admission not good".
-                // I will make it a nice Drag and Drop-like grid (click to select).
-                setSelectedStudent(selectedStudent === strId ? '' : strId);
-            } else {
-                setSelectedStudent(strId);
-            }
+            setSelectedStudent(selectedStudent === strId ? '' : strId);
         };
-
-        // Note: For true multi-select I would need to refactor the state at the top of the file. 
-        // Given the constraints and the tool I'm using, I will stick to Single Select but make it look Premium.
-        // If I really want multi-select I'd need to use `multi_replace` to change the state definition too.
-        // Let's do that in a separate step if needed. For now, let's upgrade the UI to a grid.
 
         return (
             <div className="management-card">
@@ -279,9 +369,8 @@ const StudentAdmissions = () => {
                             onChange={(e) => setSelectedClass(e.target.value)}
                         >
                             <option value="">Select Target Class...</option>
-                            <option value="1-A">Class 1-A (Mrs. K)</option>
-                            <option value="1-B">Class 1-B (Mr. S)</option>
-                            <option value="2-A">Class 2-A (Ms. L)</option>
+                            <option value="1">Class 1-A</option>
+                            <option value="2">Class 1-B</option>
                         </select>
                         <button
                             className={`btn-primary ${(!selectedStudent || !selectedClass) ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -295,7 +384,7 @@ const StudentAdmissions = () => {
                 </div>
 
                 <div className="assignment-grid-container">
-                    {unassignedStudents.length === 0 ? (
+                    {loading ? <p className="text-center p-8">Loading students...</p> : unassignedStudents.length === 0 ? (
                         <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                             <Users size={48} className="mx-auto mb-2 opacity-20" />
                             <p>All students have been assigned!</p>
@@ -315,11 +404,11 @@ const StudentAdmissions = () => {
                                         <div className="flex items-center gap-3">
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${selectedStudent === student.id.toString() ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-500 group-hover:bg-blue-50 group-hover:text-blue-600'
                                                 }`}>
-                                                {student.name.charAt(0)}
+                                                {(student.full_name || student.user?.full_name || 'S').charAt(0)}
                                             </div>
                                             <div>
-                                                <h4 className="font-bold text-gray-800">{student.name}</h4>
-                                                <p className="text-xs text-gray-500">{student.grade}</p>
+                                                <h4 className="font-bold text-gray-800">{student.full_name || student.user?.full_name}</h4>
+                                                <p className="text-xs text-gray-500">{student.grade_name || 'No Grade'}</p>
                                             </div>
                                         </div>
                                         {selectedStudent === student.id.toString() && (
@@ -356,7 +445,7 @@ const StudentAdmissions = () => {
                     <div className="tab-content">
                         <FileText size={18} />
                         {t('secretary.admissions.newApplications')}
-                        <span className="tab-badge">3</span>
+                        <span className="tab-badge">{applications.length}</span>
                     </div>
                 </button>
                 <button

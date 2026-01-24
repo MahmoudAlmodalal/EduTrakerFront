@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { Users, GraduationCap, BookOpen, UserCheck, TrendingUp, Calendar } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
+import { api } from '../../utils/api';
 import styles from './SchoolDashboard.module.css';
 
 const StatCard = ({ title, value, change, icon: Icon, color, isPositive, fromLastMonthText }) => (
@@ -17,48 +18,100 @@ const StatCard = ({ title, value, change, icon: Icon, color, isPositive, fromLas
         </div>
         <div className={styles.statBody}>
             <span className={styles.statValue}>{value}</span>
-            <span className={styles.statChange}>
-                <span className={isPositive ? styles.positive : styles.negative}>
-                    {isPositive ? '+' : ''}{change}%
+            {change !== undefined && (
+                <span className={styles.statChange}>
+                    <span className={isPositive ? styles.positive : styles.negative}>
+                        {isPositive ? '+' : ''}{change}%
+                    </span>
+                    <span style={{ color: 'var(--color-text-muted)', marginLeft: '4px' }}>{fromLastMonthText}</span>
                 </span>
-                <span style={{ color: 'var(--color-text-muted)', marginLeft: '4px' }}>{fromLastMonthText}</span>
-            </span>
+            )}
         </div>
     </div>
 );
 
 const SchoolDashboard = () => {
     const { t, theme } = useTheme();
+    const [statsData, setStatsData] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const isDark = theme === 'dark';
     const textMuted = isDark ? '#94a3b8' : '#64748b';
     const gridColor = isDark ? '#334155' : '#e2e8f0';
     const tooltipBg = isDark ? '#1e293b' : '#ffffff';
 
-    // Mock Data
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const response = await api.get('/reports/statistics/dashboard/');
+                setStatsData(response.statistics);
+            } catch (error) {
+                console.error('Failed to fetch dashboard stats:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStats();
+    }, []);
+
     const fromLastMonth = t('school.dashboard.fromLastMonth');
+
+    // Process stats for cards
     const stats = [
-        { title: t('school.dashboard.totalStudents'), value: '1,250', change: 5.2, icon: Users, color: 'blue', isPositive: true, fromLastMonthText: fromLastMonth },
-        { title: t('school.dashboard.totalTeachers'), value: '85', change: 2.1, icon: GraduationCap, color: 'green', isPositive: true, fromLastMonthText: fromLastMonth },
-        { title: t('school.dashboard.totalClasses'), value: '42', change: 0, icon: BookOpen, color: 'purple', isPositive: true, fromLastMonthText: fromLastMonth },
-        { title: t('school.dashboard.attendance'), value: '96%', change: -1.5, icon: UserCheck, color: 'orange', isPositive: false, fromLastMonthText: fromLastMonth },
+        {
+            title: t('school.dashboard.totalStudents'),
+            value: statsData?.total_students?.toLocaleString() || '0',
+            change: 0, // Backend doesn't provide change yet
+            icon: Users,
+            color: 'blue',
+            isPositive: true,
+            fromLastMonthText: fromLastMonth
+        },
+        {
+            title: t('school.dashboard.totalTeachers') || 'Total Teachers',
+            value: statsData?.total_teachers?.toLocaleString() || '0',
+            change: 0,
+            icon: GraduationCap,
+            color: 'green',
+            isPositive: true,
+            fromLastMonthText: fromLastMonth
+        },
+        {
+            title: t('school.dashboard.totalClasses') || 'Total Classrooms',
+            value: statsData?.classroom_count?.toLocaleString() || statsData?.total_classrooms?.toLocaleString() || '0',
+            change: 0,
+            icon: BookOpen,
+            color: 'purple',
+            isPositive: true,
+            fromLastMonthText: fromLastMonth
+        },
+        {
+            title: t('school.dashboard.attendance') || 'Attendance',
+            value: '96%', // Mock attendance as backend doesn't provide it in dashboard stats yet
+            change: 0,
+            icon: UserCheck,
+            color: 'orange',
+            isPositive: true,
+            fromLastMonthText: fromLastMonth
+        },
     ];
 
-    const gradeData = [
-        { name: 'Grade 1', avg: 88 },
-        { name: 'Grade 2', avg: 85 },
-        { name: 'Grade 3', avg: 82 },
-        { name: 'Grade 4', avg: 89 },
-        { name: 'Grade 5', avg: 84 },
-        { name: 'Grade 6', avg: 86 },
-    ];
+    // Process grade data for chart
+    const gradeData = statsData?.by_grade?.map(item => ({
+        name: item.grade_name,
+        avg: item.count // Using count as mock for average grade for now since backend provides count
+    })) || [];
 
     const successData = [
-        { name: 'Passed', value: 1150 },
-        { name: 'Failed', value: 100 },
+        { name: 'Passed', value: 85 },
+        { name: 'Failed', value: 15 },
     ];
 
     const COLORS = ['#10b981', '#ef4444'];
+
+    if (loading) {
+        return <div className={styles.container}>Loading dashboard...</div>;
+    }
 
     return (
         <div className={styles.container}>
@@ -75,7 +128,7 @@ const SchoolDashboard = () => {
             <div className={styles.contentGrid}>
                 <div className={styles.mainChartSection}>
                     <div className={styles.chartCard}>
-                        <h2 className={styles.cardTitle}>{t('school.dashboard.avgGrades')}</h2>
+                        <h2 className={styles.cardTitle}>{t('school.dashboard.avgGrades') || 'Student Distribution by Grade'}</h2>
                         <div className={styles.chartContainer}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={gradeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -90,7 +143,6 @@ const SchoolDashboard = () => {
                                     <YAxis
                                         axisLine={false}
                                         tickLine={false}
-                                        domain={[0, 100]}
                                         tick={{ fill: textMuted, fontSize: 12 }}
                                     />
                                     <Tooltip
@@ -136,3 +188,4 @@ const SchoolDashboard = () => {
 };
 
 export default SchoolDashboard;
+

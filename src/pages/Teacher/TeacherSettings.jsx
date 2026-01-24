@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
-import { User, Lock, Globe, Save, Camera, Check, AlertCircle, Shield, Moon, Sun, ChevronRight, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Lock, Globe, Save, Camera, Check, AlertCircle, Shield, Moon, Sun, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import teacherService from '../../services/teacherService';
 import './Teacher.css';
 
 const TeacherSettings = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('general');
+    const [loading, setLoading] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
 
@@ -13,11 +17,33 @@ const TeacherSettings = () => {
 
     // Profile State
     const [profile, setProfile] = useState({
-        name: 'Mr. Teacher',
-        email: 'teacher@edutraker.com',
-        phone: '+1 234 567 890',
-        bio: 'Mathematics Teacher | Grade 10 & 11'
+        name: '',
+        email: '',
+        phone: '',
+        bio: '',
+        specialization: ''
     });
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                setLoading(true);
+                const data = await teacherService.getProfile(user.user_id);
+                setProfile({
+                    name: data.user_name || data.user?.full_name || '',
+                    email: data.user_email || data.user?.email || '',
+                    phone: data.phone_number || '',
+                    bio: data.bio || '',
+                    specialization: data.specialization || ''
+                });
+            } catch (error) {
+                console.error("Error fetching teacher profile:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchProfile();
+    }, [user.user_id]);
 
     // Security State
     const [security, setSecurity] = useState({
@@ -27,15 +53,26 @@ const TeacherSettings = () => {
         twoFactor: false
     });
 
-    const handleSave = (section) => {
+    const handleSave = async (section) => {
         setIsLoading(true);
-        setTimeout(() => {
-            setIsLoading(false);
+        try {
+            if (section === 'Profile') {
+                await teacherService.updateProfile(user.user_id, {
+                    bio: profile.bio,
+                    specialization: profile.specialization
+                    // Other fields might be read-only or handled differently in backend
+                });
+            }
             setSuccessMessage(`${section} updated successfully!`);
             setTimeout(() => {
                 setSuccessMessage('');
             }, 3000);
-        }, 800);
+        } catch (error) {
+            console.error(`Error updating ${section}:`, error);
+            alert(`Failed to update ${section}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const renderSuccessMessage = () => {
@@ -55,6 +92,14 @@ const TeacherSettings = () => {
         { id: 'profile', label: t('teacher.settings.tab.profile'), icon: User },
         { id: 'security', label: t('teacher.settings.tab.security'), icon: Lock }
     ];
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="animate-spin text-teacher-primary" size={48} />
+            </div>
+        );
+    }
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -152,7 +197,7 @@ const TeacherSettings = () => {
                                         className="btn-primary"
                                         disabled={isLoading}
                                     >
-                                        {isLoading ? <span className="loader px-2"></span> : <Save size={18} />}
+                                        {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                                         <span>{t('teacher.settings.savePreferences')}</span>
                                     </button>
                                 </div>
@@ -178,7 +223,7 @@ const TeacherSettings = () => {
                             <form className="space-y-8">
                                 <div className="flex items-center gap-6 pb-6 border-b border-gray-100">
                                     <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center text-2xl font-bold text-slate-600 border border-slate-200">
-                                        TC
+                                        {profile.name.split(' ').map(n => n[0]).join('')}
                                     </div>
                                     <div className="space-y-2">
                                         <h3 className="font-bold text-slate-800">{profile.name}</h3>
@@ -207,18 +252,19 @@ const TeacherSettings = () => {
                                         <label className="text-sm font-semibold text-slate-700">{t('teacher.settings.fullName')}</label>
                                         <input
                                             type="text"
-                                            className="beauty-input"
+                                            className="teacher-input w-full bg-gray-50 text-gray-500"
                                             value={profile.name}
-                                            onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                                            readOnly
+                                            disabled
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-semibold text-slate-700">{t('teacher.settings.phoneNumber')}</label>
+                                        <label className="text-sm font-semibold text-slate-700">Specialization</label>
                                         <input
-                                            type="tel"
+                                            type="text"
                                             className="teacher-input w-full"
-                                            value={profile.phone}
-                                            onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                                            value={profile.specialization}
+                                            onChange={(e) => setProfile({ ...profile, specialization: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-2 md:col-span-2">
@@ -252,7 +298,7 @@ const TeacherSettings = () => {
                                         className="btn-primary"
                                         disabled={isLoading}
                                     >
-                                        {isLoading ? <span className="loader px-2"></span> : <Save size={18} />}
+                                        {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                                         <span>{t('teacher.settings.updateProfile')}</span>
                                     </button>
                                 </div>

@@ -1,36 +1,82 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Guardian.css';
-import { FileText, UserCheck, AlertTriangle } from 'lucide-react';
+import { FileText, UserCheck, AlertTriangle, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import guardianService from '../../services/guardianService';
 
 const ChildrenMonitoring = () => {
     const { t } = useTheme();
-    const [selectedChild, setSelectedChild] = useState(1);
+    const [children, setChildren] = useState([]);
+    const [selectedChild, setSelectedChild] = useState(null);
     const [activeTab, setActiveTab] = useState('results');
+    const [loading, setLoading] = useState(true);
+    const [dataLoading, setDataLoading] = useState(false);
 
-    // Mock Data
-    const children = [
-        { id: 1, name: "Ahmed" },
-        { id: 2, name: "Sara" }
-    ];
+    const [results, setResults] = useState([]);
+    const [attendance, setAttendance] = useState([]);
+    const [behavior, setBehavior] = useState([]); // Still mocked
 
-    const results = [
-        { id: 1, subject: "Mathematics", type: "Quiz", score: "18/20", date: "2023-10-10" },
-        { id: 2, subject: "Science", type: "Assignment", score: "9/10", date: "2023-10-05" },
-        { id: 3, subject: "History", type: "Midterm", score: "42/50", date: "2023-09-28" }
-    ];
+    useEffect(() => {
+        const fetchChildren = async () => {
+            try {
+                // Get user ID from local storage or decode token
+                const user = JSON.parse(localStorage.getItem('user'));
+                if (user) {
+                    const res = await guardianService.getLinkedStudents(user.id);
+                    const childData = res.map(link => ({
+                        id: link.student_id,
+                        name: link.student_name
+                    }));
+                    setChildren(childData);
+                    if (childData.length > 0) {
+                        setSelectedChild(childData[0].id);
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching children:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const attendance = [
-        { id: 1, date: "2023-10-12", statusKey: "absent", reason: "Sick Request" },
-        { id: 2, date: "2023-10-11", statusKey: "present", reason: "-" },
-        { id: 3, date: "2023-10-10", statusKey: "present", reason: "-" },
-        { id: 4, date: "2023-10-09", statusKey: "late", reason: "Traffic" }
-    ];
+        fetchChildren();
+    }, []);
 
-    const behavior = [
-        { id: 1, date: "2023-10-01", typeKey: "positive", comment: "Helped a classmate." },
-        { id: 2, date: "2023-09-25", typeKey: "negative", comment: "Talking during class." }
-    ];
+    const fetchChildData = useCallback(async () => {
+        if (!selectedChild) return;
+        setDataLoading(true);
+        try {
+            if (activeTab === 'results') {
+                const res = await guardianService.getMarks(selectedChild);
+                setResults(res.results || []);
+            } else if (activeTab === 'attendance') {
+                const res = await guardianService.getAttendance(selectedChild);
+                setAttendance(res.results || []);
+            } else if (activeTab === 'behavior') {
+                // Mock behavior as it's not in backend
+                setBehavior([
+                    { id: 1, date: "2023-10-01", typeKey: "positive", comment: "Helped a classmate." },
+                    { id: 2, date: "2023-09-25", typeKey: "negative", comment: "Talking during class." }
+                ]);
+            }
+        } catch (error) {
+            console.error("Error fetching child data:", error);
+        } finally {
+            setDataLoading(false);
+        }
+    }, [selectedChild, activeTab]);
+
+    useEffect(() => {
+        fetchChildData();
+    }, [fetchChildData]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="animate-spin text-primary" size={48} />
+            </div>
+        );
+    }
 
     return (
         <div className="guardian-monitoring">
@@ -72,7 +118,13 @@ const ChildrenMonitoring = () => {
             </div>
 
             {/* Tab Content */}
-            <div className="guardian-card" style={{ minHeight: '400px' }}>
+            <div className="guardian-card" style={{ minHeight: '400px', position: 'relative' }}>
+                {dataLoading && (
+                    <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10 rounded-lg">
+                        <Loader2 className="animate-spin text-primary" size={32} />
+                    </div>
+                )}
+
                 {activeTab === 'results' && (
                     <table className="guardian-table">
                         <thead>
@@ -86,12 +138,15 @@ const ChildrenMonitoring = () => {
                         <tbody>
                             {results.map(res => (
                                 <tr key={res.id}>
-                                    <td>{res.subject}</td>
-                                    <td>{res.type}</td>
-                                    <td>{res.date}</td>
-                                    <td><span className="score-badge">{res.score}</span></td>
+                                    <td>{res.course_name}</td>
+                                    <td>{res.assessment_type}</td>
+                                    <td>{res.date_recorded}</td>
+                                    <td><span className="score-badge">{res.marks_obtained}/{res.max_marks}</span></td>
                                 </tr>
                             ))}
+                            {results.length === 0 && (
+                                <tr><td colSpan="4" className="text-center py-4">{t('common.noData')}</td></tr>
+                            )}
                         </tbody>
                     </table>
                 )}
@@ -110,13 +165,16 @@ const ChildrenMonitoring = () => {
                                 <tr key={att.id}>
                                     <td>{att.date}</td>
                                     <td>
-                                        <span className={`status-badge ${att.statusKey}`}>
-                                            {t(`guardian.monitoring.${att.statusKey}`)}
+                                        <span className={`status-badge ${att.status}`}>
+                                            {t(`guardian.monitoring.${att.status}`)}
                                         </span>
                                     </td>
-                                    <td>{att.reason}</td>
+                                    <td>{att.remarks || '-'}</td>
                                 </tr>
                             ))}
+                            {attendance.length === 0 && (
+                                <tr><td colSpan="3" className="text-center py-4">{t('common.noData')}</td></tr>
+                            )}
                         </tbody>
                     </table>
                 )}

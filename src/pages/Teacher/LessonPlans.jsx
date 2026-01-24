@@ -1,35 +1,61 @@
-import React, { useState } from 'react';
-import { BookOpen, Plus, Calendar, Paperclip, MoreVertical, Trash2, Edit2, Save, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, Plus, Calendar, Paperclip, MoreVertical, Trash2, Edit2, Save, X, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import teacherService from '../../services/teacherService';
 
 const LessonPlans = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('plans');
     const [isCreating, setIsCreating] = useState(false);
     const [editingId, setEditingId] = useState(null);
 
-    const [plans, setPlans] = useState([
-        { id: 1, title: 'Introduction to Algebra', date: '2025-12-16', class: 'Grade 10-A', content: 'algebra_intro.pdf', objectives: 'Understand variables and constants.' },
-        { id: 2, title: 'Newton\'s Laws of Motion', date: '2025-12-18', class: 'Grade 11-B', content: 'physics_ch3.ppt', objectives: 'Explain the three laws of motion.' },
-        { id: 3, title: 'Quadratic Equations', date: '2025-12-20', class: 'Grade 10-B', content: 'worksheet_4.docx', objectives: 'Solve quadratic equations by factoring.' },
-    ]);
-
-    const [resources, setResources] = useState([
-        { id: 1, title: 'Mathematics Syllabus 2025', type: 'PDF', size: '2.4 MB', date: '2025-12-01' },
-        { id: 2, title: 'Physics Textbook - Part 1', type: 'PDF', size: '15.8 MB', date: '2025-11-20' },
-        { id: 3, title: 'Exam Guidelines', type: 'DOCX', size: '500 KB', date: '2025-12-10' },
-    ]);
+    const [plans, setPlans] = useState([]);
+    const [resources, setResources] = useState([]);
 
     const [formData, setFormData] = useState({
         title: '',
-        class: 'Grade 10-A',
-        date: '',
+        classroom_id: '',
+        course_id: '',
+        academic_year_id: 1, // Fallback
+        date_planned: '',
         objectives: '',
-        content: ''
+        content: '',
+        is_published: true
     });
 
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [plansData, materialsData] = await Promise.all([
+                    teacherService.getLessonPlans(),
+                    teacherService.getLearningMaterials()
+                ]);
+                setPlans(plansData.results || plansData || []);
+                setResources(materialsData.results || materialsData || []);
+            } catch (error) {
+                console.error("Error fetching lesson plans data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
     const handleStartCreate = () => {
-        setFormData({ title: '', class: 'Grade 10-A', date: '', objectives: '', content: '' });
+        setFormData({
+            title: '',
+            classroom_id: '',
+            course_id: '',
+            academic_year_id: 1,
+            date_planned: '',
+            objectives: '',
+            content: '',
+            is_published: true
+        });
         setIsCreating(true);
         setEditingId(null);
     };
@@ -40,41 +66,55 @@ const LessonPlans = () => {
         setEditingId(plan.id);
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
-        if (activeTab === 'plans') {
-            if (editingId) {
-                setPlans(plans.map(p => p.id === editingId ? { ...formData, id: editingId } : p));
-                alert(`Lesson Plan "${formData.title}" updated successfully!`);
+        try {
+            if (activeTab === 'plans') {
+                if (editingId) {
+                    const updated = await teacherService.updateLessonPlan(editingId, formData);
+                    setPlans(plans.map(p => p.id === editingId ? updated : p));
+                    alert(`Lesson Plan "${formData.title}" updated successfully!`);
+                } else {
+                    const payload = { ...formData, teacher: user.user_id };
+                    const created = await teacherService.createLessonPlan(payload);
+                    setPlans([created, ...plans]);
+                    alert(`Lesson Plan "${formData.title}" created successfully!`);
+                }
             } else {
-                const newPlan = { ...formData, id: plans.length + 1, content: formData.content || 'new_file.pdf' };
-                setPlans([...plans, newPlan]);
-                alert(`Lesson Plan "${formData.title}" created successfully!`);
+                // Learning material upload would go here
+                alert(`Resource upload functionality pending file handling.`);
             }
-        } else {
-            const newRes = {
-                id: resources.length + 1,
-                title: formData.title,
-                type: 'PDF',
-                size: '1.0 MB',
-                date: new Date().toISOString().split('T')[0]
-            };
-            setResources([newRes, ...resources]);
-            alert(`Resource "${formData.title}" uploaded successfully!`);
+            setIsCreating(false);
+            setEditingId(null);
+        } catch (error) {
+            console.error("Error saving lesson plan:", error);
+            alert("Failed to save lesson plan");
         }
-        setIsCreating(false);
-        setEditingId(null);
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to delete this?')) {
-            if (activeTab === 'plans') {
-                setPlans(plans.filter(p => p.id !== id));
-            } else {
-                setResources(resources.filter(r => r.id !== id));
+            try {
+                if (activeTab === 'plans') {
+                    await teacherService.deleteLessonPlan(id);
+                    setPlans(plans.filter(p => p.id !== id));
+                } else {
+                    // await teacherService.deleteLearningMaterial(id);
+                    setResources(resources.filter(r => r.id !== id));
+                }
+            } catch (error) {
+                console.error("Error deleting item:", error);
             }
         }
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="animate-spin text-teacher-primary" size={48} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -159,24 +199,21 @@ const LessonPlans = () => {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                                     <div>
                                         <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.forClass')}</label>
-                                        <select
-                                            value={formData.class}
-                                            onChange={(e) => setFormData({ ...formData, class: e.target.value })}
-                                            className="teacher-select w-full"
-                                        >
-                                            <option>Grade 10-A</option>
-                                            <option>Grade 10-B</option>
-                                            <option>Grade 11-A</option>
-                                            <option>Grade 11-B</option>
-                                        </select>
+                                        <input
+                                            type="number"
+                                            value={formData.classroom_id}
+                                            onChange={(e) => setFormData({ ...formData, classroom_id: e.target.value })}
+                                            className="teacher-input w-full"
+                                            placeholder="Classroom ID"
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.date')}</label>
                                         <input
                                             type="date"
                                             required
-                                            value={formData.date}
-                                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                            value={formData.date_planned}
+                                            onChange={(e) => setFormData({ ...formData, date_planned: e.target.value })}
                                             className="teacher-input w-full"
                                         />
                                     </div>
@@ -190,17 +227,17 @@ const LessonPlans = () => {
                                         className="teacher-input w-full"
                                     ></textarea>
                                 </div>
+                                <div>
+                                    <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.content')}</label>
+                                    <textarea
+                                        rows="5"
+                                        value={formData.content}
+                                        onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                                        className="teacher-input w-full"
+                                    ></textarea>
+                                </div>
                             </>
                         )}
-
-                        <div>
-                            <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.uploadFile')}</label>
-                            <div style={{ border: '2px dashed var(--teacher-border)', borderRadius: '0.75rem', padding: '2rem', textAlign: 'center', cursor: 'pointer', color: 'var(--teacher-text-muted)' }}>
-                                <Paperclip className="mx-auto mb-2" size={24} />
-                                <p className="text-sm">{t('teacher.lessonPlans.uploadHint')}</p>
-                                <p className="text-xs">{t('teacher.lessonPlans.fileTypes')}</p>
-                            </div>
-                        </div>
 
                         <div className="flex justify-end gap-3 pt-2">
                             <button type="button" onClick={() => setIsCreating(false)} className="icon-btn" style={{ width: 'auto', padding: '0.5rem 1rem' }}>{t('teacher.assessments.cancel')}</button>
@@ -230,25 +267,12 @@ const LessonPlans = () => {
                             <div className="space-y-2">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>
                                     <Calendar size={16} style={{ color: 'var(--teacher-primary)' }} />
-                                    <span>{plan.date}</span>
+                                    <span>{plan.date_planned}</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>
                                     <BookOpen size={16} style={{ color: 'var(--teacher-accent)' }} />
-                                    <span>{plan.class}</span>
+                                    <span>Class: {plan.classroom_name}</span>
                                 </div>
-                            </div>
-
-                            <div style={{ padding: '0.75rem', backgroundColor: 'var(--teacher-bg)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-                                    <Paperclip size={16} className="flex-shrink-0" style={{ color: 'var(--teacher-text-muted)' }} />
-                                    <span style={{ fontSize: '0.875rem', color: 'var(--teacher-text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.content}</span>
-                                </div>
-                                <button
-                                    onClick={() => alert(`Opening file: ${plan.content}`)}
-                                    style={{ fontSize: '0.75rem', color: 'var(--teacher-primary)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}
-                                >
-                                    {t('teacher.lessonPlans.view')}
-                                </button>
                             </div>
 
                             <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--teacher-border)', display: 'flex', gap: '0.5rem' }}>
@@ -289,19 +313,19 @@ const LessonPlans = () => {
                                         <td className="font-bold text-slate-800">{res.title}</td>
                                         <td>
                                             <span className="status-badge info">
-                                                {res.type}
+                                                {res.file_type || 'PDF'}
                                             </span>
                                         </td>
-                                        <td className="text-slate-500">{res.size}</td>
-                                        <td className="text-slate-500">{res.date}</td>
+                                        <td className="text-slate-500">{(res.file_size / 1024 / 1024).toFixed(2)} MB</td>
+                                        <td className="text-slate-500">{new Date(res.created_at).toLocaleDateString()}</td>
                                         <td>
                                             <div className="action-group">
                                                 <button
                                                     className="text-sm font-medium"
                                                     style={{ color: 'var(--teacher-primary)', background: 'none', border: 'none', cursor: 'pointer' }}
-                                                    onClick={() => alert(`Downloading: ${res.title}`)}
+                                                    onClick={() => window.open(res.file_url, '_blank')}
                                                 >
-                                                    {t('teacher.lessonPlans.download')}
+                                                    {t('teacher.lessonPlans.view')}
                                                 </button>
                                                 <button onClick={() => handleDelete(res.id)} className="icon-btn danger" style={{ border: 'none' }}><Trash2 size={18} /></button>
                                             </div>

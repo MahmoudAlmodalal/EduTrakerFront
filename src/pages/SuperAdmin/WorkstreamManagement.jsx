@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Settings, Edit, Trash2, MapPin, Users, School, Layers, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
@@ -8,55 +8,126 @@ import styles from './WorkstreamManagement.module.css';
 const WorkstreamManagement = () => {
     const { t } = useTheme();
     const [isModalOpen, setIsModalOpen] = useState(false);
-
-    // Mock Data
-    const [workstreams, setWorkstreams] = useState([
-        { id: 1, name: 'Gaza North', schools: 12, users: 4500, manager: 'John Doe', status: 'Active', location: 'Jabalia, Gaza North' },
-        { id: 2, name: 'Gaza South', schools: 8, users: 3200, manager: 'Jane Smith', status: 'Active', location: 'Rafah, Gaza South' },
-        { id: 3, name: 'Khan Younis', schools: 15, users: 5100, manager: 'Pending', status: 'Inactive', location: 'Khan Younis Center' },
-        { id: 4, name: 'Mid Area', schools: 10, users: 2800, manager: 'Ahmad Khalil', status: 'Active', location: 'Deir al-Balah' },
-    ]);
+    const [workstreams, setWorkstreams] = useState([]);
+    const [managers, setManagers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
     const [selectedWorkstream, setSelectedWorkstream] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [currentWorkstreamId, setCurrentWorkstreamId] = useState(null);
-    const [formData, setFormData] = useState({ name: '', quota: '', manager: '', location: '' });
+    const [formData, setFormData] = useState({ name: '', quota: '100', managerId: '', location: '', description: '' });
 
-    const handleCreateWorkstream = (e) => {
-        e.preventDefault();
-
-        if (isEditing) {
-            setWorkstreams(workstreams.map(ws =>
-                ws.id === currentWorkstreamId
-                    ? { ...ws, name: formData.name, manager: formData.manager, location: formData.location }
-                    : ws
-            ));
-        } else {
-            const newWorkstream = {
-                id: workstreams.length + 1,
-                name: formData.name,
-                schools: 0,
-                users: 0,
-                manager: formData.manager || 'Pending',
-                status: 'Active',
-                location: formData.location || 'Unknown'
-            };
-            setWorkstreams([...workstreams, newWorkstream]);
+    const fetchWorkstreams = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('accessToken');
+            const response = await fetch('/api/workstream/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch workstreams');
+            const data = await response.json();
+            setWorkstreams(data);
+        } catch (err) {
+            console.error('Error fetching workstreams:', err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
+    };
 
-        setIsModalOpen(false);
-        resetForm();
+    const fetchManagers = async () => {
+        try {
+            const token = localStorage.getItem('accessToken');
+            const response = await fetch('/api/users/?role=manager_workstream', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setManagers(data.results || data);
+            }
+        } catch (err) {
+            console.error('Error fetching managers:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchWorkstreams();
+        fetchManagers();
+    }, []);
+
+    const handleCreateWorkstream = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('accessToken');
+
+        const payload = {
+            workstream_name: formData.name,
+            capacity: parseInt(formData.quota),
+            manager_id: formData.managerId ? parseInt(formData.managerId) : null,
+            description: formData.description || '',
+            is_active: true
+        };
+
+        try {
+            let response;
+            if (isEditing) {
+                response = await fetch(`/api/workstreams/${currentWorkstreamId}/update/`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                response = await fetch('/api/workstream/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            if (!response.ok) throw new Error('Action failed');
+
+            await fetchWorkstreams();
+            setIsModalOpen(false);
+            resetForm();
+        } catch (err) {
+            alert('Operation failed: ' + err.message);
+        }
+    };
+
+    const handleDeactivate = async (id, currentStatus) => {
+        if (!window.confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this workstream?`)) return;
+
+        const token = localStorage.getItem('accessToken');
+        const url = `/api/workstreams/${id}/deactivate/`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Action failed');
+            await fetchWorkstreams();
+        } catch (err) {
+            alert('Status update failed: ' + err.message);
+        }
     };
 
     const handleEditWorkstream = (ws) => {
         setIsEditing(true);
         setCurrentWorkstreamId(ws.id);
         setFormData({
-            name: ws.name,
-            quota: 5000,
-            manager: ws.manager !== 'Pending' ? ws.manager : '',
-            location: ws.location || ''
+            name: ws.workstream_name,
+            quota: ws.capacity.toString(),
+            managerId: ws.manager_id ? ws.manager_id.toString() : '',
+            location: '',
+            description: ws.description || ''
         });
         setIsModalOpen(true);
     };
@@ -64,7 +135,7 @@ const WorkstreamManagement = () => {
     const resetForm = () => {
         setIsEditing(false);
         setCurrentWorkstreamId(null);
-        setFormData({ name: '', quota: '', manager: '', location: '' });
+        setFormData({ name: '', quota: '100', managerId: '', location: '', description: '' });
     };
 
     const openCreateModal = () => {
@@ -89,62 +160,72 @@ const WorkstreamManagement = () => {
                 </Button>
             </div>
 
-            <div className={styles.grid}>
-                {workstreams.map((ws) => (
-                    <div key={ws.id} className={styles.card}>
-                        <div className={styles.cardHeader}>
-                            <div className={styles.workstreamInfo}>
-                                <h3 className={styles.cardTitle}>{ws.name}</h3>
-                                <div className={styles.locationLabel}>
-                                    <MapPin size={12} />
-                                    <span>{ws.location}</span>
-                                </div>
-                            </div>
-                            <span className={`${styles.statusBadge} ${ws.status === 'Active' ? styles.active : styles.inactive}`}>
-                                {ws.status === 'Active' ? t('common.active') : t('common.inactive')}
-                            </span>
-                        </div>
-
-                        <div className={styles.cardBody}>
-                            <div className={styles.statsContainer}>
-                                <div className={styles.statItem}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                        <School size={14} style={{ color: 'var(--color-primary)' }} />
-                                        <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '3rem' }}>Loading workstreams...</div>
+            ) : (
+                <div className={styles.grid}>
+                    {workstreams.map((ws) => (
+                        <div key={ws.id} className={styles.card}>
+                            <div className={styles.cardHeader}>
+                                <div className={styles.workstreamInfo}>
+                                    <h3 className={styles.cardTitle}>{ws.workstream_name}</h3>
+                                    <div className={styles.locationLabel}>
+                                        <MapPin size={12} />
+                                        <span>{ws.location || 'Not Specified'}</span>
                                     </div>
-                                    <span className={styles.statValue}>{ws.schools}</span>
                                 </div>
-                                <div className={styles.statItem}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                        <Users size={14} style={{ color: '#8b5cf6' }} />
-                                        <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
+                                <span className={`${styles.statusBadge} ${ws.is_active ? styles.active : styles.inactive}`}>
+                                    {ws.is_active ? t('common.active') : t('common.inactive')}
+                                </span>
+                            </div>
+
+                            <div className={styles.cardBody}>
+                                <div className={styles.statsContainer}>
+                                    <div className={styles.statItem}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            <School size={14} style={{ color: 'var(--color-primary)' }} />
+                                            <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
+                                        </div>
+                                        <span className={styles.statValue}>{ws.capacity} Max</span>
                                     </div>
-                                    <span className={styles.statValue}>{ws.users.toLocaleString()}</span>
+                                    <div className={styles.statItem}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            <Users size={14} style={{ color: '#8b5cf6' }} />
+                                            <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
+                                        </div>
+                                        <span className={styles.statValue}>N/A</span>
+                                    </div>
+                                </div>
+
+                                <div className={styles.managerSection}>
+                                    <div className={styles.managerAvatar}>
+                                        {ws.manager_id ? 'M' : '?'}
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager ID</p>
+                                        <p className={styles.managerName}>{ws.manager_id || 'Pending'}</p>
+                                    </div>
+                                    <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
                                 </div>
                             </div>
 
-                            <div className={styles.managerSection}>
-                                <div className={styles.managerAvatar}>
-                                    {ws.manager !== 'Pending' ? ws.manager.charAt(0) : '?'}
+                            <div className={styles.cardFooter}>
+                                <div className={styles.actions}>
+                                    <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
+                                    <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
+                                    <button
+                                        className={`${styles.actionBtn} ${styles.danger}`}
+                                        title={ws.is_active ? "Deactivate" : "Activate"}
+                                        onClick={() => handleDeactivate(ws.id, ws.is_active)}
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
                                 </div>
-                                <div>
-                                    <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager</p>
-                                    <p className={styles.managerName}>{ws.manager}</p>
-                                </div>
-                                <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
                             </div>
                         </div>
-
-                        <div className={styles.cardFooter}>
-                            <div className={styles.actions}>
-                                <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
-                                <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
-                                <button className={`${styles.actionBtn} ${styles.danger}`} title="Delete"><Trash2 size={18} /></button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? t('workstreams.modal.editTitle') : t('workstreams.modal.createTitle')}>
                 <form className={styles.form} onSubmit={handleCreateWorkstream}>
@@ -164,9 +245,17 @@ const WorkstreamManagement = () => {
                             <input
                                 type="text"
                                 placeholder="e.g. Gaza City, Center"
-                                required
                                 value={formData.location}
                                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                            />
+                        </div>
+                        <div className={styles.formGroup}>
+                            <label>Description (Optional)</label>
+                            <textarea
+                                placeholder="Workstream description"
+                                value={formData.description}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                style={{ minHeight: '80px', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)' }}
                             />
                         </div>
                         <div className={styles.formGroup}>
@@ -176,22 +265,21 @@ const WorkstreamManagement = () => {
                                 value={formData.quota}
                                 onChange={(e) => setFormData({ ...formData, quota: e.target.value })}
                             >
-                                <option value="">Select quota limit</option>
-                                <option value="5000">5,000 Users</option>
-                                <option value="10000">10,000 Users</option>
-                                <option value="25000">25,000 Users</option>
+                                <option value="100">100 Schools (Basic)</option>
+                                <option value="500">500 Schools (Standard)</option>
+                                <option value="1000">1000 Schools (Premium)</option>
                             </select>
                         </div>
                         <div className={styles.formGroup}>
                             <label>{t('workstreams.form.assignManager')}</label>
                             <select
-                                value={formData.manager}
-                                onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                                value={formData.managerId}
+                                onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
                             >
                                 <option value="">{t('workstreams.form.selectManager')}</option>
-                                <option value="John Doe">John Doe</option>
-                                <option value="Jane Smith">Jane Smith</option>
-                                <option value="Ahmad Khalil">Ahmad Khalil</option>
+                                {managers.map(manager => (
+                                    <option key={manager.id} value={manager.id}>{manager.full_name}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
@@ -202,7 +290,7 @@ const WorkstreamManagement = () => {
                 </form>
             </Modal>
 
-            <Modal isOpen={isConfigModalOpen} onClose={() => setIsConfigModalOpen(false)} title={`${t('workstreams.config.title')}: ${selectedWorkstream?.name}`}>
+            <Modal isOpen={isConfigModalOpen} onClose={() => setIsConfigModalOpen(false)} title={`${t('workstreams.config.title')}: ${selectedWorkstream?.workstream_name}`}>
                 <form className={styles.form} onSubmit={(e) => { e.preventDefault(); setIsConfigModalOpen(false); }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         <div className={styles.formGroup}>
