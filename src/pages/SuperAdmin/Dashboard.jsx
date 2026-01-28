@@ -7,6 +7,9 @@ import {
     LineChart, Line, PieChart, Pie, Cell
 } from 'recharts';
 import styles from './Dashboard.module.css';
+import { api } from '../../utils/api';
+import reportService from '../../services/reportService';
+import secretaryService from '../../services/secretaryService';
 
 const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) => {
     return (
@@ -31,35 +34,56 @@ const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) =
 };
 
 const Dashboard = () => {
+    console.log('Dashboard component rendering...');
+
     const { t } = useTheme();
     const { user } = useAuth();
     const [statsData, setStatsData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const [activities, setActivities] = useState([]);
+
+    console.log('Dashboard - user:', user);
+
     useEffect(() => {
-        const fetchStats = async () => {
+        const fetchData = async () => {
             try {
-                const token = localStorage.getItem('accessToken');
-                const response = await fetch('/api/statistics/dashboard/', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+                setLoading(true);
+                console.log('Fetching dashboard data...');
 
-                if (!response.ok) throw new Error('Failed to fetch statistics');
+                const [statsRes, activityRes] = await Promise.all([
+                    reportService.getDashboardStats().catch(err => {
+                        console.warn('Failed to fetch stats:', err);
+                        return { statistics: {} };
+                    }),
+                    secretaryService.getNotifications().catch(err => {
+                        console.warn('Failed to fetch notifications:', err);
+                        return [];
+                    })
+                ]);
 
-                const data = await response.json();
-                setStatsData(data.statistics);
+                console.log('Dashboard data fetched:', { statsRes, activityRes });
+                setStatsData(statsRes.statistics || {});
+
+                // Ensure activities is always an array
+                const activitiesData = Array.isArray(activityRes) ? activityRes :
+                    (activityRes?.results && Array.isArray(activityRes.results)) ? activityRes.results :
+                        [];
+                setActivities(activitiesData);
+                setError(null);
             } catch (err) {
-                console.error('Error fetching stats:', err);
+                console.error('Error fetching dashboard data:', err);
                 setError(err.message);
+                // Set default values even on error
+                setStatsData({});
+                setActivities([]);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchStats();
+        fetchData();
     }, []);
 
     // Map Backend Stats to UI
@@ -119,7 +143,7 @@ const Dashboard = () => {
         <div className={styles.container}>
             <div className={styles.header}>
                 <div>
-                    <h1 className={styles.pageTitle}>Good morning, {user?.name || 'Admin'}</h1>
+                    <h1 className={styles.pageTitle}>Good morning, {user?.displayName || user?.email || 'Admin'}</h1>
                     <p className={styles.subtitle}>Here's what's happening across EduTraker today.</p>
                 </div>
             </div>
@@ -182,34 +206,23 @@ const Dashboard = () => {
                 <div className={styles.activityCard}>
                     <h2 className={styles.cardTitle}>{t('dashboard.activity.title')}</h2>
                     <div className={styles.activityList}>
-                        <div className={styles.activityItem}>
-                            <div className={styles.activityIcon}><UserPlus size={16} /></div>
-                            <div className={styles.activityContent}>
-                                <p className={styles.activityText}>{t('mock.activity.1')}</p>
-                                <span className={styles.activityTime}>2 mins ago</span>
-                            </div>
-                        </div>
-                        <div className={styles.activityItem}>
-                            <div className={styles.activityIcon}><ShieldCheck size={16} /></div>
-                            <div className={styles.activityContent}>
-                                <p className={styles.activityText}>{t('mock.activity.2')}</p>
-                                <span className={styles.activityTime}>15 mins ago</span>
-                            </div>
-                        </div>
-                        <div className={styles.activityItem}>
-                            <div className={styles.activityIcon}><ActivityIcon size={16} /></div>
-                            <div className={styles.activityContent}>
-                                <p className={styles.activityText}>{t('mock.activity.3')}</p>
-                                <span className={styles.activityTime}>1 hr ago</span>
-                            </div>
-                        </div>
-                        <div className={styles.activityItem}>
-                            <div className={styles.activityIcon}><Bell size={16} /></div>
-                            <div className={styles.activityContent}>
-                                <p className={styles.activityText}>{t('mock.activity.4')}</p>
-                                <span className={styles.activityTime}>3 hrs ago</span>
-                            </div>
-                        </div>
+                        {loading ? (
+                            <div className={styles.loadingPulse}>Fetching updates...</div>
+                        ) : !Array.isArray(activities) || activities.length === 0 ? (
+                            <div className={styles.emptyActivity}>No recent activity</div>
+                        ) : (
+                            activities.slice(0, 5).map((activity, index) => (
+                                <div key={activity.id || index} className={styles.activityItem}>
+                                    <div className={styles.activityIcon}>
+                                        {activity.type === 'alert' ? <ShieldCheck size={16} /> : <Bell size={16} />}
+                                    </div>
+                                    <div className={styles.activityContent}>
+                                        <p className={styles.activityText}>{activity.message || activity.title}</p>
+                                        <span className={styles.activityTime}>{activity.created_at_human || 'Just now'}</span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>

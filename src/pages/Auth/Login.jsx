@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
 import { GraduationCap, AlertCircle } from 'lucide-react';
+import authService from '../../services/authService';
+import { api } from '../../utils/api';
 import styles from './Login.module.css';
 
 const Login = ({ role }) => {
+    console.log('Login component rendered with role:', role);
+
     const { t } = useTheme();
     const { login } = useAuth();
     const { workstreamId } = useParams();
@@ -27,11 +31,7 @@ const Login = ({ role }) => {
     useEffect(() => {
         if (!isPortalLogin && workstreamId) {
             setLoadingWorkstream(true);
-            fetch(`/api/workstreams/${workstreamId}/info/`)
-                .then(res => {
-                    if (res.ok) return res.json();
-                    throw new Error('Not found');
-                })
+            api.get(`/workstreams/${workstreamId}/info/`)
                 .then(data => {
                     setWorkstreamName(data.name);
                     setWorkstreamNotFound(false);
@@ -49,42 +49,21 @@ const Login = ({ role }) => {
         setError('');
         setIsLoading(true);
 
-        // Portal uses /api/portal/auth/login/, Workstream uses /api/workstream/:id/auth/login/
-        const loginUrl = isPortalLogin
-            ? '/api/portal/auth/login/'
-            : `/api/workstream/${workstreamId}/auth/login/`;
+        console.log('Login attempt started', { email, role, workstreamId });
 
         try {
-            console.log('Attempting login to:', loginUrl);
-            const response = await fetch(loginUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
-            });
+            const data = await authService.login(
+                { email, password },
+                role,
+                workstreamId
+            );
 
-            console.log('Response Status:', response.status);
-            const text = await response.text();
+            console.log('Login response received:', data);
 
-            let data;
-            try {
-                data = text ? JSON.parse(text) : {};
-            } catch (e) {
-                console.error('JSON Parse Error:', e);
-                console.log('Response Body:', text);
-                throw new Error(`Server returned invalid JSON (${response.status}). Check console for details.`);
-            }
+            // Pass user data and tokens to the AuthContext
+            login(data, role, workstreamId);
 
-            if (response.ok) {
-                // Pass user data and tokens to the AuthContext
-                login({
-                    ...data.user,
-                    role: data.user.role || role,
-                    accessToken: data.tokens.access,
-                    refreshToken: data.tokens.refresh
-                });
-            } else {
-                setError(data.detail || data.non_field_errors?.[0] || t('auth.error.invalid'));
-            }
+            console.log('Login context updated');
         } catch (err) {
             console.error('Login error:', err);
             setError(err.message || "Unable to connect to the server. Please try again later.");
@@ -92,6 +71,7 @@ const Login = ({ role }) => {
             setIsLoading(false);
         }
     };
+
 
     // Show error state if workstream not found
     if (workstreamNotFound) {
@@ -112,8 +92,8 @@ const Login = ({ role }) => {
                             <div className={styles.error}>
                                 Workstream with ID "{workstreamId}" does not exist or is inactive.
                             </div>
-                            <a href="/login" className={styles.backLink} style={{ textAlign: 'center', display: 'block', marginTop: '1rem' }}>
-                                ← Back to Portal Login
+                            <a href="/" className={styles.backLink} style={{ textAlign: 'center', display: 'block', marginTop: '1rem' }}>
+                                ← Back to Role Selection
                             </a>
                         </div>
                     </div>
@@ -170,12 +150,29 @@ const Login = ({ role }) => {
                             />
                         </div>
 
+                        <div style={{ textAlign: 'right', marginBottom: 'var(--spacing-4)' }}>
+                            <Link
+                                to="/password-reset"
+                                className={styles.backLink}
+                                style={{ fontSize: 'var(--font-size-sm)' }}
+                            >
+                                Forgot Password?
+                            </Link>
+                        </div>
+
                         <Button type="submit" variant="primary" size="large" disabled={isLoading}>
                             {isLoading ? 'Verifying...' : t('auth.signInBtn')}
                         </Button>
 
                         <div className={styles.footer}>
-                            <a href="/login" className={styles.backLink}>{t('auth.backToSelection')}</a>
+                            <Link to="/" className={styles.backLink}>{t('auth.backToSelection')}</Link>
+                            <span style={{ margin: '0 0.5rem', color: 'var(--color-text-muted)' }}>•</span>
+                            <Link
+                                to={isPortalLogin ? "/register/portal" : `/register/workstream/${workstreamId}`}
+                                className={styles.backLink}
+                            >
+                                Create Account
+                            </Link>
                         </div>
                     </form>
                 </div>

@@ -4,6 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import styles from './WorkstreamManagement.module.css';
+import { api } from '../../utils/api';
 
 const WorkstreamManagement = () => {
     const { t } = useTheme();
@@ -22,13 +23,8 @@ const WorkstreamManagement = () => {
     const fetchWorkstreams = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('accessToken');
-            const response = await fetch('/api/workstream/', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch workstreams');
-            const data = await response.json();
-            setWorkstreams(data);
+            const data = await api.get('/workstream/');
+            setWorkstreams(data.results || data);
         } catch (err) {
             console.error('Error fetching workstreams:', err);
             setError(err.message);
@@ -39,14 +35,8 @@ const WorkstreamManagement = () => {
 
     const fetchManagers = async () => {
         try {
-            const token = localStorage.getItem('accessToken');
-            const response = await fetch('/api/users/?role=manager_workstream', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setManagers(data.results || data);
-            }
+            const data = await api.get('/users/?role=manager_workstream');
+            setManagers(data.results || data);
         } catch (err) {
             console.error('Error fetching managers:', err);
         }
@@ -59,39 +49,21 @@ const WorkstreamManagement = () => {
 
     const handleCreateWorkstream = async (e) => {
         e.preventDefault();
-        const token = localStorage.getItem('accessToken');
 
         const payload = {
             workstream_name: formData.name,
             capacity: parseInt(formData.quota),
             manager_id: formData.managerId ? parseInt(formData.managerId) : null,
             description: formData.description || '',
-            is_active: true
+            location: formData.location || '',
         };
 
         try {
-            let response;
             if (isEditing) {
-                response = await fetch(`/api/workstreams/${currentWorkstreamId}/update/`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
+                await api.patch(`/workstreams/${currentWorkstreamId}/update/`, payload);
             } else {
-                response = await fetch('/api/workstream/', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
+                await api.post('/workstream/', payload);
             }
-
-            if (!response.ok) throw new Error('Action failed');
 
             await fetchWorkstreams();
             setIsModalOpen(false);
@@ -102,17 +74,13 @@ const WorkstreamManagement = () => {
     };
 
     const handleDeactivate = async (id, currentStatus) => {
-        if (!window.confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this workstream?`)) return;
+        const action = currentStatus ? 'deactivate' : 'activate';
+        if (!window.confirm(`Are you sure you want to ${action} this workstream?`)) return;
 
-        const token = localStorage.getItem('accessToken');
-        const url = `/api/workstreams/${id}/deactivate/`;
+        const url = `/workstreams/${id}/deactivate/`;
 
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Action failed');
+            await api.post(url);
             await fetchWorkstreams();
         } catch (err) {
             alert('Status update failed: ' + err.message);
@@ -126,7 +94,7 @@ const WorkstreamManagement = () => {
             name: ws.workstream_name,
             quota: ws.capacity.toString(),
             managerId: ws.manager_id ? ws.manager_id.toString() : '',
-            location: '',
+            location: ws.location || '',
             description: ws.description || ''
         });
         setIsModalOpen(true);
@@ -186,24 +154,24 @@ const WorkstreamManagement = () => {
                                             <School size={14} style={{ color: 'var(--color-primary)' }} />
                                             <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
                                         </div>
-                                        <span className={styles.statValue}>{ws.capacity} Max</span>
+                                        <span className={styles.statValue}>{ws.capacity} Schools</span>
                                     </div>
                                     <div className={styles.statItem}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                                             <Users size={14} style={{ color: '#8b5cf6' }} />
                                             <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
                                         </div>
-                                        <span className={styles.statValue}>N/A</span>
+                                        <span className={styles.statValue}>Managed</span>
                                     </div>
                                 </div>
 
                                 <div className={styles.managerSection}>
                                     <div className={styles.managerAvatar}>
-                                        {ws.manager_id ? 'M' : '?'}
+                                        {ws.manager_name?.charAt(0) || '?'}
                                     </div>
                                     <div>
-                                        <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager ID</p>
-                                        <p className={styles.managerName}>{ws.manager_id || 'Pending'}</p>
+                                        <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager</p>
+                                        <p className={styles.managerName}>{ws.manager_name || 'Pending'}</p>
                                     </div>
                                     <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
                                 </div>

@@ -3,7 +3,7 @@ import { api } from '../utils/api';
 const secretaryService = {
     // Dashboard Stats
     getDashboardStats: async () => {
-        return api.get('/reports/statistics/dashboard/');
+        return api.get('/statistics/dashboard/');
     },
 
     // Secretary Profile/Settings

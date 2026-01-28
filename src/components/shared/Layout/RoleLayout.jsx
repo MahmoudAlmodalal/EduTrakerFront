@@ -49,6 +49,7 @@ const RoleLayout = ({ role: propRole, className = '' }) => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
     const { role: authRole, config, navigation, basePath, displayName, brandIcon } = useRole();
+    const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
     const navigate = useNavigate();
     const currentRole = propRole || authRole;
@@ -68,8 +69,27 @@ const RoleLayout = ({ role: propRole, className = '' }) => {
 
     return (
         <div className={`role-layout ${className}`} data-role={currentRole}>
+            {/* Mobile Header */}
+            <header className="role-mobile-header">
+                <button className="role-menu-toggle" onClick={() => setIsSidebarOpen(true)}>
+                    <Icons.Menu size={24} />
+                </button>
+                <div className="role-mobile-brand">
+                    <span className="role-brand-text">{t('app.name') || 'EduTraker'}</span>
+                </div>
+                <div style={{ width: 40 }} /> {/* Spacer */}
+            </header>
+
+            {/* Sidebar Overlay */}
+            {isSidebarOpen && (
+                <div className="role-sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+            )}
+
             {/* Sidebar */}
-            <aside className="role-sidebar">
+            <aside className={`role-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+                <button className="role-sidebar-close" onClick={() => setIsSidebarOpen(false)}>
+                    <Icons.X size={24} />
+                </button>
                 {/* Brand */}
                 <div className="role-brand">
                     <div className="role-brand-icon">

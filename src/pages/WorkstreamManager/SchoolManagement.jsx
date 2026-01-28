@@ -16,7 +16,7 @@ const SchoolManagement = () => {
     const fetchSchools = async () => {
         setLoading(true);
         try {
-            const data = await api.get('/school/school/');
+            const data = await api.get('/school/');
             setSchools(data || []);
         } catch (error) {
             console.error('Failed to fetch schools:', error);
@@ -33,13 +33,13 @@ const SchoolManagement = () => {
         e.preventDefault();
         try {
             if (newSchool.isEditing) {
-                await api.patch(`/school/school/${newSchool.id}/update/`, {
+                await api.patch(`/school/${newSchool.id}/update/`, {
                     school_name: newSchool.school_name,
                     location: newSchool.location,
                     capacity: newSchool.capacity
                 });
             } else {
-                await api.post('/school/school/create/', {
+                await api.post('/school/create/', {
                     school_name: newSchool.school_name,
                     location: newSchool.location,
                     capacity: newSchool.capacity
@@ -68,7 +68,7 @@ const SchoolManagement = () => {
     const handleDeleteSchool = async (id) => {
         if (window.confirm(t('workstream.schools.confirmDelete'))) {
             try {
-                await api.post(`/school/school/${id}/deactivate/`);
+                await api.post(`/school/${id}/deactivate/`);
                 fetchSchools();
             } catch (error) {
                 console.error('Failed to delete school:', error);
@@ -79,7 +79,7 @@ const SchoolManagement = () => {
     const handleToggleStatus = async (school) => {
         const endpoint = school.is_active ? 'deactivate' : 'activate';
         try {
-            await api.post(`/school/school/${school.id}/${endpoint}/`);
+            await api.post(`/school/${school.id}/${endpoint}/`);
             fetchSchools();
         } catch (error) {
             console.error(`Failed to ${endpoint} school:`, error);

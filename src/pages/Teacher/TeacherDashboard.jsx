@@ -23,26 +23,26 @@ const TeacherDashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 setLoading(true);
-                // In a real scenario, we might have a specific dashboard endpoint
-                // but here we'll fetch notifications and some basic stats
-                const [notifData, marksData, attendanceData] = await Promise.all([
+                // Fetch notifications, marks, and dashboard statistics
+                const [notifData, marksData, statsResponse] = await Promise.all([
                     secretaryService.getNotifications(),
                     teacherService.getMarks({ include_inactive: false }),
-                    teacherService.getAttendance({ date: new Date().toISOString().split('T')[0] })
+                    secretaryService.getDashboardStats()
                 ]);
 
                 setNotifications(notifData.slice(0, 5));
 
-                // Calculate some stats from marks if possible, or use defaults
-                if (marksData) {
-                    setStats(prev => ({
-                        ...prev,
-                        totalToGrade: marksData.count || marksData.length || 0
-                    }));
+                if (statsResponse && statsResponse.statistics) {
+                    const s = statsResponse.statistics;
+                    setStats({
+                        avgAttendance: s.avg_attendance || '85%', // Fallback if not provided
+                        pendingAssignments: s.pending_assignments || 0,
+                        totalToGrade: s.total_to_grade || (marksData ? (marksData.count || marksData.length || 0) : 0)
+                    });
                 }
 
-                // Mock schedule for now as there's no direct "schedule" endpoint found in urls.py
-                // unless it's handled via lessons/classes
+                // Mock schedule for now as there's no direct "schedule" endpoint yet
+                // In future, this could be fetched from /teacher/schedule/ or class lessons
                 setSchedule([
                     { id: 1, day: 'Today', time: '08:00 - 09:30', subject: 'Mathematics', class: 'Grade 10-A', room: 'Room 101', status: 'current' },
                     { id: 2, day: 'Today', time: '10:00 - 11:30', subject: 'Physics', class: 'Grade 11-B', room: 'Lab 2', status: 'upcoming' },

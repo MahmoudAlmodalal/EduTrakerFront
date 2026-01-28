@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { Clock, User, Activity, FileText, Calendar } from 'lucide-react';
+import { Clock, User as UserIcon, Activity, FileText, Calendar } from 'lucide-react';
 import styles from './ActivityLog.module.css';
 
 const ActivityLog = () => {
@@ -29,25 +29,25 @@ const ActivityLog = () => {
                             <tr>
                                 <th>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Calendar size={14} />
+                                        <Calendar size={16} color="var(--color-primary)" />
                                         {t('activity.table.timestamp')}
                                     </div>
                                 </th>
                                 <th>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Activity size={14} />
+                                        <Activity size={16} color="var(--color-primary)" />
                                         {t('activity.table.action')}
                                     </div>
                                 </th>
                                 <th>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <User size={14} />
+                                        <UserIcon size={16} color="var(--color-primary)" />
                                         {t('activity.table.user')}
                                     </div>
                                 </th>
                                 <th>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <FileText size={14} />
+                                        <FileText size={16} color="var(--color-primary)" />
                                         {t('activity.table.details')}
                                     </div>
                                 </th>
@@ -58,14 +58,18 @@ const ActivityLog = () => {
                                 <tr key={log.id}>
                                     <td className={styles.timestamp}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Clock size={14} style={{ color: 'var(--color-text-light)' }} />
+                                            <Clock size={14} opacity={0.6} />
                                             {log.time}
                                         </div>
                                     </td>
-                                    <td className={styles.actionText}>{log.action}</td>
-                                    <td className={styles.userCell}>
-                                        <User size={14} className={styles.userIcon} />
-                                        {log.user}
+                                    <td>
+                                        <span className={styles.actionText}>{log.action}</span>
+                                    </td>
+                                    <td>
+                                        <div className={styles.userCell}>
+                                            <UserIcon size={14} className={styles.userIcon} />
+                                            {log.user}
+                                        </div>
                                     </td>
                                     <td className={styles.detailsCell}>{log.details}</td>
                                 </tr>

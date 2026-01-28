@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, UserPlus, FileDown, Filter } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, UserPlus, FileDown, Filter, Layers } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import styles from './UserManagement.module.css';
+import { api } from '../../utils/api';
 
 const UserManagement = () => {
     const { t } = useTheme();
@@ -12,6 +13,8 @@ const UserManagement = () => {
     const [workstreams, setWorkstreams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState('');
+    const [workstreamFilter, setWorkstreamFilter] = useState('');
     const [pagination, setPagination] = useState({ count: 0, next: null, previous: null });
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -25,16 +28,15 @@ const UserManagement = () => {
         password: ''
     });
 
-    const fetchUsers = async (page = 1, search = '') => {
+    const fetchUsers = async (page = 1, search = '', role = '', workstream = '') => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('accessToken');
-            const url = `/api/users/?page=${page}&search=${search}`;
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch users');
-            const data = await response.json();
+            let url = `/users/?page=${page}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            if (role) url += `&role=${role}`;
+            if (workstream) url += `&work_stream=${workstream}`;
+
+            const data = await api.get(url);
             setUsers(data.results || []);
             setPagination({ count: data.count, next: data.next, previous: data.previous });
         } catch (err) {
@@ -46,46 +48,46 @@ const UserManagement = () => {
 
     const fetchWorkstreams = async () => {
         try {
-            const token = localStorage.getItem('accessToken');
-            const response = await fetch('/api/workstream/', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setWorkstreams(data);
-            }
+            const data = await api.get('/workstream/');
+            setWorkstreams(data.results || data);
         } catch (err) {
             console.error('Error fetching workstreams:', err);
         }
     };
 
     useEffect(() => {
-        fetchUsers(currentPage, searchTerm);
-    }, [currentPage, searchTerm]);
+        fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter);
+    }, [currentPage, searchTerm, roleFilter, workstreamFilter]);
 
     useEffect(() => {
         fetchWorkstreams();
     }, []);
 
     const handleStatusToggle = async (user) => {
-        const token = localStorage.getItem('accessToken');
-        const url = `/api/users/${user.id}/${user.is_active ? 'deactivate' : 'activate'}/`;
+        const url = `/users/${user.id}/${user.is_active ? 'deactivate' : 'activate'}/`;
 
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Action failed');
-            fetchUsers(currentPage, searchTerm);
+            await api.post(url);
+            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter);
         } catch (err) {
             alert('Status update failed: ' + err.message);
         }
     };
 
+    const handleDeleteUser = async (user) => {
+        // PER USER CLARIFICATION: "delet is deactivate"
+        if (!window.confirm(`Are you sure you want to deactivate ${user.full_name}?`)) return;
+
+        try {
+            await api.post(`/users/${user.id}/deactivate/`);
+            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter);
+        } catch (err) {
+            alert('Deactivation failed: ' + err.message);
+        }
+    };
+
     const handleCreateUser = async (e) => {
         e.preventDefault();
-        const token = localStorage.getItem('accessToken');
 
         const payload = {
             email: formData.email,
@@ -101,33 +103,13 @@ const UserManagement = () => {
         }
 
         try {
-            let response;
             if (isEditing) {
-                response = await fetch(`/api/users/${currentUserId}/`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
+                await api.patch(`/users/${currentUserId}/`, payload);
             } else {
-                response = await fetch('/api/users/create/', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
+                await api.post('/users/create/', payload);
             }
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(JSON.stringify(errorData));
-            }
-
-            fetchUsers(currentPage, searchTerm);
+            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter);
             setIsModalOpen(false);
             resetForm();
         } catch (err) {
@@ -185,7 +167,53 @@ const UserManagement = () => {
                     />
                     <Search size={18} className={styles.searchIcon} />
                 </div>
-                <Button variant="outline" icon={Filter}>Filters</Button>
+
+                <div className={styles.filterGroup}>
+                    <div className={styles.selectWrapper}>
+                        <Filter size={14} className={styles.filterIcon} />
+                        <select
+                            className={styles.filterSelect}
+                            value={roleFilter}
+                            onChange={(e) => setRoleFilter(e.target.value)}
+                        >
+                            <option value="">All Roles</option>
+                            <option value="admin">Super Admin</option>
+                            <option value="manager_workstream">Workstream Manager</option>
+                            <option value="manager_school">School Manager</option>
+                            <option value="teacher">Teacher</option>
+                            <option value="secretary">Secretary</option>
+                            <option value="student">Student</option>
+                        </select>
+                    </div>
+
+                    <div className={styles.selectWrapper}>
+                        <Layers size={14} className={styles.filterIcon} />
+                        <select
+                            className={styles.filterSelect}
+                            value={workstreamFilter}
+                            onChange={(e) => setWorkstreamFilter(e.target.value)}
+                        >
+                            <option value="">All Workstreams</option>
+                            {workstreams.map(ws => (
+                                <option key={ws.id} value={ws.id}>{ws.workstream_name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {(roleFilter || workstreamFilter || searchTerm) && (
+                        <Button
+                            variant="ghost"
+                            size="small"
+                            onClick={() => {
+                                setRoleFilter('');
+                                setWorkstreamFilter('');
+                                setSearchTerm('');
+                            }}
+                        >
+                            Clear
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <div className={styles.tableCard}>
@@ -219,7 +247,7 @@ const UserManagement = () => {
                                         </td>
                                         <td>
                                             <span className={styles.roleBadge}>
-                                                {user.role}
+                                                {user.role?.replace('_', ' ')}
                                             </span>
                                         </td>
                                         <td style={{ fontWeight: 500 }}>{user.work_stream_name || 'N/A'}</td>
@@ -236,7 +264,7 @@ const UserManagement = () => {
                                         <td>
                                             <div className={styles.actions}>
                                                 <button className={styles.actionBtn} onClick={() => handleEditUser(user)} title="Edit"><Edit size={16} /></button>
-                                                <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleStatusToggle(user)} title="Delete (Deactivate)"><Trash2 size={16} /></button>
+                                                <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleDeleteUser(user)} title="Deactivate"><Trash2 size={16} /></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -247,7 +275,7 @@ const UserManagement = () => {
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                                             <Search size={48} style={{ color: 'var(--slate-300)' }} />
                                             <p style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>{t('users.noUsersFound')}</p>
-                                            <Button variant="outline" size="small" onClick={() => setSearchTerm('')}>Clear Search</Button>
+                                            <Button variant="outline" size="small" onClick={() => { setSearchTerm(''); setRoleFilter(''); setWorkstreamFilter(''); }}>Reset Filters</Button>
                                         </div>
                                     </td>
                                 </tr>
@@ -266,7 +294,7 @@ const UserManagement = () => {
                         >
                             Previous
                         </Button>
-                        <span style={{ display: 'flex', alignItems: 'center' }}>Page {currentPage}</span>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>Page {currentPage} of {Math.ceil(pagination.count / 10)}</span>
                         <Button
                             variant="outline"
                             size="small"
@@ -324,6 +352,9 @@ const UserManagement = () => {
                                 <option value="admin">Super Admin</option>
                                 <option value="manager_workstream">Workstream Manager</option>
                                 <option value="manager_school">School Manager</option>
+                                <option value="teacher">Teacher</option>
+                                <option value="secretary">Secretary</option>
+                                <option value="student">Student</option>
                                 <option value="guest">Guest</option>
                             </select>
                         </div>
@@ -340,7 +371,7 @@ const UserManagement = () => {
                             </select>
                         </div>
                     </div>
-                    <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
+                    <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>
                         <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">{t('common.cancel')}</Button>
                         <Button variant="primary" type="submit">{isEditing ? 'Update User' : t('common.create')}</Button>
                     </div>

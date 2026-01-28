@@ -2,6 +2,9 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import Login from '../pages/Auth/Login';
+import Register from '../pages/Auth/Register';
+import RequestPasswordReset from '../pages/Auth/RequestPasswordReset';
+import ConfirmPasswordReset from '../pages/Auth/ConfirmPasswordReset';
 import RoleSelection from '../pages/Auth/RoleSelection';
 import Unauthorized from '../pages/Unauthorized';
 
@@ -79,11 +82,26 @@ const AppRoutes = () => {
             {/* Public Routes */}
             <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Portal Login (default) - for Admin & Workstream Manager */}
-            <Route path="/login" element={<Login role="PORTAL" />} />
+            {/* Role Selection (Home) */}
+            <Route path="/" element={<RoleSelection />} />
+
+            {/* Portal Login - for Admin & Workstream Manager */}
+            <Route path="/login/portal" element={<Login role="PORTAL" />} />
+            <Route path="/login" element={<Navigate to="/login/portal" replace />} />
+
+            {/* Portal Registration */}
+            <Route path="/register/portal" element={<Register role="PORTAL" />} />
+            <Route path="/register" element={<Navigate to="/register/portal" replace />} />
 
             {/* Workstream Login - URL: /login/workstream/:id */}
             <Route path="/login/workstream/:workstreamId" element={<Login role="WORKSTREAM" />} />
+
+            {/* Workstream Registration */}
+            <Route path="/register/workstream/:workstreamId" element={<Register role="WORKSTREAM" />} />
+
+            {/* Password Reset */}
+            <Route path="/password-reset" element={<RequestPasswordReset />} />
+            <Route path="/password-reset/confirm" element={<ConfirmPasswordReset />} />
 
             {/* Protected Routes - Super Admin */}
             <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>

@@ -76,9 +76,9 @@ const Sidebar = ({ isOpen }) => {
 
             <div className={styles.footer}>
                 <div className={styles.userProfile}>
-                    <div className={styles.avatar}>{user?.name?.[0] || 'U'}</div>
+                    <div className={styles.avatar}>{user?.displayName?.[0] || user?.email?.[0] || 'U'}</div>
                     <div className={styles.userInfo}>
-                        <span className={styles.userName}>{user?.name || 'User'}</span>
+                        <span className={styles.userName}>{user?.displayName || user?.email || 'User'}</span>
                         <span className={styles.userRole}>{role?.replace('_', ' ') || 'Guest'}</span>
                     </div>
                     <button

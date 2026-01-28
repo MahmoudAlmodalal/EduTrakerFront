@@ -5,7 +5,11 @@ import AppRoutes from './routes/AppRoutes';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 
+console.log('App.jsx loaded');
+
 function App() {
+  console.log('App component rendering...');
+
   return (
     <BrowserRouter>
       <AuthProvider>

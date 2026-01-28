@@ -137,6 +137,16 @@
     --z-modal: 1050;
     --z-popover: 1060;
     --z-tooltip: 1070;
+
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --glass-blur: 12px;
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+
+    /* Vibrant Gradients */
+    --grad-primary: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    --grad-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6));
 }
 
 /* ========================================================================
@@ -202,11 +212,30 @@
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
     --shadow-glow: 0 0 20px rgba(129, 140, 248, 0.3);
     --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3);
+
+    /* Glassmorphism Dark */
+    --glass-bg: rgba(30, 41, 59, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-blur: 12px;
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+
+    /* Vibrant Gradients Dark */
+    --grad-primary: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+    --grad-surface: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.6));
 }
 
 /* ========================================================================
    PREMIUM COMPONENTS
    ======================================================================== */
+
+/* Glassmorphism Utility */
+.glass-premium {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
 
 /* Premium Card Component */
 .premium-card {

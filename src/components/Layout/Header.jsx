@@ -110,7 +110,7 @@ const Header = ({ toggleSidebar }) => {
 
                 <div className={styles.userSection} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
                     <div style={{ textAlign: 'right', display: 'none', md: 'block' }}>
-                        <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text-main)', lineHeight: 1 }}>{user?.name || 'Admin'}</p>
+                        <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text-main)', lineHeight: 1 }}>{user?.displayName || user?.email || 'Admin'}</p>
                         <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>{user?.role?.replace('_', ' ').toLowerCase() || 'super admin'}</p>
                     </div>
                 </div>

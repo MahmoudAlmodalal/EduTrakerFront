@@ -2,6 +2,7 @@ import React from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { MessageSquare, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import styles from './Dashboard.module.css';
+import { api } from '../../utils/api';
 
 const SupportHelpdesk = () => {
     const { t } = useTheme();
