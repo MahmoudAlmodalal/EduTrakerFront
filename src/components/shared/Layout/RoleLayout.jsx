@@ -71,8 +71,23 @@ const RoleLayout = ({ role: propRole, className = '' }) => {
         <div className={`role-layout ${className}`} data-role={currentRole}>
             {/* Mobile Header */}
             <header className="role-mobile-header">
-                <button className="role-menu-toggle" onClick={() => setIsSidebarOpen(true)}>
-                    <Icons.Menu size={24} />
+                <button
+                    className="role-menu-toggle"
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+                    style={{ border: 'none', background: 'transparent', boxShadow: 'none', padding: 0, width: 'auto', height: 'auto' }}
+                >
+                    <div className="_logoIcon_1y948_34" style={{
+                        color: 'var(--color-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--color-primary-light)',
+                        padding: '8px',
+                        borderRadius: '12px'
+                    }}>
+                        <Icons.GraduationCap size={24} />
+                    </div>
                 </button>
                 <div className="role-mobile-brand">
                     <span className="role-brand-text">{t('app.name') || 'EduTraker'}</span>
@@ -87,15 +102,18 @@ const RoleLayout = ({ role: propRole, className = '' }) => {
 
             {/* Sidebar */}
             <aside className={`role-sidebar ${isSidebarOpen ? 'open' : ''}`}>
-                <button className="role-sidebar-close" onClick={() => setIsSidebarOpen(false)}>
-                    <Icons.X size={24} />
-                </button>
-                {/* Brand */}
-                <div className="role-brand">
-                    <div className="role-brand-icon">
-                        <DynamicIcon name={brandIcon} size={28} />
+                {/* Sidebar Header (Brand + Close Button) */}
+                <div className="role-sidebar-header-container">
+                    <div className="role-brand" onClick={() => setIsSidebarOpen(false)} style={{ cursor: 'pointer' }}>
+                        <div className="role-brand-icon">
+                            <Icons.GraduationCap size={28} />
+                        </div>
+                        <span className="role-brand-text">{t('app.name') || 'EduTraker'}</span>
                     </div>
-                    <span className="role-brand-text">{t('app.name') || 'EduTraker'}</span>
+
+                    <button className="role-sidebar-close" onClick={() => setIsSidebarOpen(false)}>
+                        <Icons.X size={24} />
+                    </button>
                 </div>
 
                 {/* Navigation */}

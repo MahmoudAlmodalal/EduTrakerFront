@@ -43,6 +43,7 @@ const Dashboard = () => {
     const [error, setError] = useState(null);
 
     const [activities, setActivities] = useState([]);
+    const [chartData, setChartData] = useState([]);
 
     console.log('Dashboard - user:', user);
 
@@ -52,25 +53,16 @@ const Dashboard = () => {
                 setLoading(true);
                 console.log('Fetching dashboard data...');
 
-                const [statsRes, activityRes] = await Promise.all([
-                    reportService.getDashboardStats().catch(err => {
-                        console.warn('Failed to fetch stats:', err);
-                        return { statistics: {} };
-                    }),
-                    secretaryService.getNotifications().catch(err => {
-                        console.warn('Failed to fetch notifications:', err);
-                        return [];
-                    })
-                ]);
+                const statsRes = await reportService.getDashboardStats().catch(err => {
+                    console.warn('Failed to fetch stats:', err);
+                    return { statistics: {}, recent_activity: [], activity_chart: [] };
+                });
 
-                console.log('Dashboard data fetched:', { statsRes, activityRes });
+                console.log('Dashboard data fetched:', statsRes);
                 setStatsData(statsRes.statistics || {});
+                setActivities(statsRes.recent_activity || []);
+                setChartData(statsRes.activity_chart || []);
 
-                // Ensure activities is always an array
-                const activitiesData = Array.isArray(activityRes) ? activityRes :
-                    (activityRes?.results && Array.isArray(activityRes.results)) ? activityRes.results :
-                        [];
-                setActivities(activitiesData);
                 setError(null);
             } catch (err) {
                 console.error('Error fetching dashboard data:', err);
@@ -78,6 +70,7 @@ const Dashboard = () => {
                 // Set default values even on error
                 setStatsData({});
                 setActivities([]);
+                setChartData([]);
             } finally {
                 setLoading(false);
             }
@@ -91,42 +84,41 @@ const Dashboard = () => {
         {
             title: t('dashboard.stats.workstreams'),
             value: loading ? '...' : (statsData?.total_workstreams || '0'),
-            change: 4.5,
+            change: statsData?.workstreams_change || 0,
             icon: Briefcase,
             color: 'blue'
         },
         {
             title: t('dashboard.stats.schools'),
             value: loading ? '...' : (statsData?.total_schools || '0'),
-            change: 12.3,
+            change: statsData?.schools_change || 0,
             icon: School,
             color: 'green'
         },
         {
             title: t('dashboard.stats.users'),
-            value: loading ? '...' : ((statsData?.total_students || 0) + (statsData?.total_teachers || 0)).toLocaleString(),
-            change: 8.1,
+            value: loading ? '...' : (statsData?.total_users || '0').toLocaleString(),
+            change: statsData?.users_change || 0,
             icon: Users,
             color: 'purple'
         },
         {
             title: t('dashboard.stats.notifications'),
             value: '5',
-            change: 0,
             icon: 'Bell',
             color: 'orange',
             isNotification: true
         },
     ];
 
-    const activityData = [
-        { name: 'Mon', logins: 4000 },
-        { name: 'Tue', logins: 3000 },
-        { name: 'Wed', logins: 5000 },
-        { name: 'Thu', logins: 2780 },
-        { name: 'Fri', logins: 1890 },
-        { name: 'Sat', logins: 2390 },
-        { name: 'Sun', logins: 3490 },
+    const activityData = chartData.length > 0 ? chartData : [
+        { name: 'Mon', logins: 0 },
+        { name: 'Tue', logins: 0 },
+        { name: 'Wed', logins: 0 },
+        { name: 'Thu', logins: 0 },
+        { name: 'Fri', logins: 0 },
+        { name: 'Sat', logins: 0 },
+        { name: 'Sun', logins: 0 },
     ];
 
     const distributionData = [

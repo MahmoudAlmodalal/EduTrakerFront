@@ -16,6 +16,18 @@ const Communication = () => {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // Compose Modal State
+    const [isComposeOpen, setIsComposeOpen] = useState(false);
+    const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
+    const [recipientSearchResults, setRecipientSearchResults] = useState([]);
+    const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+    const [newMessage, setNewMessage] = useState({
+        recipient_id: null,
+        recipient_name: '',
+        subject: '',
+        body: ''
+    });
+
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -62,6 +74,69 @@ const Communication = () => {
         }
     };
 
+    // New Message Handlers
+    const handleComposeClick = () => {
+        setIsComposeOpen(true);
+        setNewMessage({ recipient_id: null, recipient_name: '', subject: '', body: '' });
+        setRecipientSearchTerm('');
+        setRecipientSearchResults([]);
+    };
+
+    const handleUserSearch = async (term) => {
+        setRecipientSearchTerm(term);
+        if (term.length < 2) {
+            setRecipientSearchResults([]);
+            return;
+        }
+
+        setIsSearchingUsers(true);
+        try {
+            // Using the UserListApi endpoint with search param
+            const response = await api.get('/users/', { params: { search: term } });
+            setRecipientSearchResults(response.results || response);
+        } catch (err) {
+            console.error('Error searching users:', err);
+        } finally {
+            setIsSearchingUsers(false);
+        }
+    };
+
+    const handleSelectRecipient = (user) => {
+        setNewMessage(prev => ({ ...prev, recipient_id: user.id, recipient_name: user.full_name || user.email }));
+        setRecipientSearchTerm('');
+        setRecipientSearchResults([]);
+    };
+
+    const handleSendNewMessage = async () => {
+        if (!newMessage.recipient_id) {
+            alert('Please select a recipient from the search results.');
+            return;
+        }
+        if (!newMessage.subject) {
+            alert('Please enter a subject.');
+            return;
+        }
+        if (!newMessage.body) {
+            alert('Please enter a message body.');
+            return;
+        }
+
+        try {
+            await api.post('/user-messages/', {
+                recipient_ids: [newMessage.recipient_id],
+                subject: newMessage.subject,
+                body: newMessage.body
+            });
+
+            setIsComposeOpen(false);
+            fetchData(); // Refresh list to show sent message if applicable
+            alert('Message sent successfully!');
+        } catch (err) {
+            console.error('Error sending message:', err);
+            alert('Failed to send message. Please try again.');
+        }
+    };
+
     const filteredItems = activeTab === 'notifications'
         ? notifications
         : messages.filter(m => (m.type === activeTab || !m.type) && (
@@ -76,7 +151,7 @@ const Communication = () => {
                     <h1 className={styles.title}>{t('communication.title')}</h1>
                     <p className={styles.subtitle}>{t('communication.subtitle')}</p>
                 </div>
-                <Button variant="primary" icon={Plus}>{t('communication.newMessage')}</Button>
+                <Button variant="primary" icon={Plus} onClick={handleComposeClick}>{t('communication.newMessage')}</Button>
             </div>
 
             <div className={styles.layout}>
@@ -192,7 +267,77 @@ const Communication = () => {
                     )}
                 </div>
             </div>
-        </div>
+
+            {/* Compose Modal */}
+            {
+                isComposeOpen && (
+                    <div className={styles.modalOverlay}>
+                        <div className={styles.modalContent}>
+                            <div className={styles.modalHeader}>
+                                <h2>{t('communication.newMessage')}</h2>
+                                <button onClick={() => setIsComposeOpen(false)} className={styles.closeBtn}>×</button>
+                            </div>
+                            <div className={styles.modalBody}>
+                                <div className={styles.formGroup}>
+                                    <label>{t('communication.recipient')}</label>
+                                    {newMessage.recipient_name ? (
+                                        <div className={styles.selectedRecipient}>
+                                            <span>{newMessage.recipient_name}</span>
+                                            <button onClick={() => setNewMessage(prev => ({ ...prev, recipient_id: null, recipient_name: '' }))} className={styles.removeRecipientBtn}>×</button>
+                                        </div>
+                                    ) : (
+                                        <div className={styles.searchContainer}>
+                                            <input
+                                                type="text"
+                                                placeholder="Search user by name or email..."
+                                                value={recipientSearchTerm}
+                                                onChange={(e) => handleUserSearch(e.target.value)}
+                                                className={styles.input}
+                                            />
+                                            {recipientSearchResults.length > 0 && (
+                                                <div className={styles.searchResults}>
+                                                    {recipientSearchResults.map(user => (
+                                                        <div key={user.id} onClick={() => handleSelectRecipient(user)} className={styles.searchResultItem}>
+                                                            <div className={styles.resultName}>{user.full_name}</div>
+                                                            <div className={styles.resultEmail}>{user.email}</div>
+                                                            <div className={styles.resultRole}>{user.role}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>{t('communication.subject')}</label>
+                                    <input
+                                        type="text"
+                                        value={newMessage.subject}
+                                        onChange={(e) => setNewMessage({ ...newMessage, subject: e.target.value })}
+                                        className={styles.input}
+                                        placeholder="Enter subject"
+                                    />
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>{t('communication.messageBody')}</label>
+                                    <textarea
+                                        value={newMessage.body}
+                                        onChange={(e) => setNewMessage({ ...newMessage, body: e.target.value })}
+                                        className={styles.textarea}
+                                        placeholder="Type your message here..."
+                                        rows={6}
+                                    />
+                                </div>
+                            </div>
+                            <div className={styles.modalFooter}>
+                                <Button variant="secondary" onClick={() => setIsComposeOpen(false)}>{t('common.cancel')}</Button>
+                                <Button variant="primary" onClick={handleSendNewMessage} icon={Send}>{t('communication.send')}</Button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 

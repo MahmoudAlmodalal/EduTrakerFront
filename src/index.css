@@ -11,6 +11,13 @@
   /* Neutrals - High Contrast Slate Scale */
   --slate-50: #f8fafc;
   --slate-100: #f1f5f9;
+
+  /* Z-Index Layers */
+  --z-header: 1000;
+  --z-menu-btn: 1001;
+  --z-overlay: 9999;
+  --z-sidebar: 10000;
+  --z-modal: 11000;
   --slate-200: #e2e8f0;
   --slate-300: #cbd5e1;
   --slate-400: #94a3b8;

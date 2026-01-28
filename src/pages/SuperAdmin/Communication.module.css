@@ -296,3 +296,197 @@
         z-index: var(--z-modal);
     }
 }
+
+/* Modal Styles */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+.modalContent {
+    background: var(--color-bg-surface);
+    border-radius: 20px;
+    width: 600px;
+    max-width: 90vw;
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-xl);
+    /* overflow: hidden; Removed to allow search results to overflow if needed */
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modalHeader {
+    padding: var(--spacing-6);
+    border-bottom: 1px solid var(--color-border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modalHeader h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.closeBtn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 0;
+}
+
+.modalBody {
+    padding: var(--spacing-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-6);
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+.formGroup label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+}
+
+.input,
+.textarea {
+    width: 100%;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-hover);
+    color: var(--color-text-main);
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.input:focus,
+.textarea:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 4px var(--color-primary-light);
+    outline: none;
+    background: var(--color-bg-surface);
+}
+
+.mobileSearch {
+    display: none;
+}
+
+.searchContainer {
+    position: relative;
+}
+
+.searchResults {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    z-index: 10;
+}
+
+.searchResultItem {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--color-border-light);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.searchResultItem:last-child {
+    border-bottom: none;
+}
+
+.searchResultItem:hover {
+    background: var(--color-bg-hover);
+}
+
+.resultName {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.resultEmail {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.resultRole {
+    font-size: 0.75rem;
+    color: var(--color-primary);
+    text-transform: capitalize;
+}
+
+.selectedRecipient {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-primary-light);
+    padding: 10px 15px;
+    border-radius: 12px;
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.removeRecipientBtn {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.modalFooter {
+    padding: var(--spacing-6);
+    border-top: 1px solid var(--color-border-light);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-4);
+    background: var(--color-bg-hover);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}

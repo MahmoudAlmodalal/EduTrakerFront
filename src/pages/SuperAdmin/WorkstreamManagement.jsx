@@ -5,6 +5,7 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import styles from './WorkstreamManagement.module.css';
 import { api } from '../../utils/api';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const WorkstreamManagement = () => {
     const { t } = useTheme();
@@ -19,11 +20,17 @@ const WorkstreamManagement = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [currentWorkstreamId, setCurrentWorkstreamId] = useState(null);
     const [formData, setFormData] = useState({ name: '', quota: '100', managerId: '', location: '', description: '' });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
 
     const fetchWorkstreams = async () => {
         setLoading(true);
         try {
-            const data = await api.get('/workstream/');
+            let query = '/workstream/?';
+            if (searchTerm) query += `search=${encodeURIComponent(searchTerm)}&`;
+            if (statusFilter !== 'all') query += `is_active=${statusFilter === 'active'}&`;
+
+            const data = await api.get(query);
             setWorkstreams(data.results || data);
         } catch (err) {
             console.error('Error fetching workstreams:', err);
@@ -43,7 +50,14 @@ const WorkstreamManagement = () => {
     };
 
     useEffect(() => {
-        fetchWorkstreams();
+        const delayDebounceFn = setTimeout(() => {
+            fetchWorkstreams();
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, statusFilter]);
+
+    useEffect(() => {
         fetchManagers();
     }, []);
 
@@ -73,14 +87,15 @@ const WorkstreamManagement = () => {
         }
     };
 
-    const handleDeactivate = async (id, currentStatus) => {
+    const handleToggleStatus = async (id, currentStatus) => {
         const action = currentStatus ? 'deactivate' : 'activate';
         if (!window.confirm(`Are you sure you want to ${action} this workstream?`)) return;
 
-        const url = `/workstreams/${id}/deactivate/`;
+        // Use update endpoint to toggle is_active
+        const url = `/workstreams/${id}/update/`;
 
         try {
-            await api.post(url);
+            await api.patch(url, { is_active: !currentStatus });
             await fetchWorkstreams();
         } catch (err) {
             alert('Status update failed: ' + err.message);
@@ -128,71 +143,134 @@ const WorkstreamManagement = () => {
                 </Button>
             </div>
 
+            {/* Filters Section */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                    <input
+                        type="text"
+                        placeholder="Search workstreams..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-bg-surface)',
+                            color: 'var(--color-text-primary)'
+                        }}
+                    />
+                </div>
+                <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-bg-surface)',
+                        color: 'var(--color-text-primary)',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <option value="all">All Status</option>
+                    <option value="active">Active Only</option>
+                    <option value="inactive">Inactive Only</option>
+                </select>
+            </div>
+
             {loading ? (
                 <div style={{ textAlign: 'center', padding: '3rem' }}>Loading workstreams...</div>
             ) : (
-                <div className={styles.grid}>
-                    {workstreams.map((ws) => (
-                        <div key={ws.id} className={styles.card}>
-                            <div className={styles.cardHeader}>
-                                <div className={styles.workstreamInfo}>
-                                    <h3 className={styles.cardTitle}>{ws.workstream_name}</h3>
-                                    <div className={styles.locationLabel}>
-                                        <MapPin size={12} />
-                                        <span>{ws.location || 'Not Specified'}</span>
-                                    </div>
-                                </div>
-                                <span className={`${styles.statusBadge} ${ws.is_active ? styles.active : styles.inactive}`}>
-                                    {ws.is_active ? t('common.active') : t('common.inactive')}
-                                </span>
-                            </div>
-
-                            <div className={styles.cardBody}>
-                                <div className={styles.statsContainer}>
-                                    <div className={styles.statItem}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            <School size={14} style={{ color: 'var(--color-primary)' }} />
-                                            <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
-                                        </div>
-                                        <span className={styles.statValue}>{ws.capacity} Schools</span>
-                                    </div>
-                                    <div className={styles.statItem}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            <Users size={14} style={{ color: '#8b5cf6' }} />
-                                            <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
-                                        </div>
-                                        <span className={styles.statValue}>Managed</span>
-                                    </div>
-                                </div>
-
-                                <div className={styles.managerSection}>
-                                    <div className={styles.managerAvatar}>
-                                        {ws.manager_name?.charAt(0) || '?'}
-                                    </div>
-                                    <div>
-                                        <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager</p>
-                                        <p className={styles.managerName}>{ws.manager_name || 'Pending'}</p>
-                                    </div>
-                                    <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
-                                </div>
-                            </div>
-
-                            <div className={styles.cardFooter}>
-                                <div className={styles.actions}>
-                                    <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
-                                    <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
-                                    <button
-                                        className={`${styles.actionBtn} ${styles.danger}`}
-                                        title={ws.is_active ? "Deactivate" : "Activate"}
-                                        onClick={() => handleDeactivate(ws.id, ws.is_active)}
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                            </div>
+                <>
+                    {/* Analytics Section */}
+                    <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: 'var(--color-bg-surface)', borderRadius: '12px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--color-text-primary)' }}>User Distribution by Workstream</h3>
+                        <div style={{ width: '100%', height: 300 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                    data={workstreams}
+                                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                                    <XAxis dataKey="workstream_name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: 'var(--color-bg-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }}
+                                        itemStyle={{ color: 'var(--color-text-primary)' }}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="total_users" name="Total Users" fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Bar dataKey="capacity" name="Capacity" fill="var(--slate-300)" radius={[4, 4, 0, 0]} barSize={40} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
-                    ))}
-                </div>
+                    </div>
+
+                    <div className={styles.grid}>
+                        {workstreams.map((ws) => (
+                            <div key={ws.id} className={styles.card}>
+                                <div className={styles.cardHeader}>
+                                    <div className={styles.workstreamInfo}>
+                                        <h3 className={styles.cardTitle}>{ws.workstream_name}</h3>
+                                        <div className={styles.locationLabel}>
+                                            <MapPin size={12} />
+                                            <span>{ws.location || 'Not Specified'}</span>
+                                        </div>
+                                    </div>
+                                    <span className={`${styles.statusBadge} ${ws.is_active ? styles.active : styles.inactive}`}>
+                                        {ws.is_active ? t('common.active') : t('common.inactive')}
+                                    </span>
+                                </div>
+
+                                <div className={styles.cardBody}>
+                                    <div className={styles.statsContainer}>
+                                        <div className={styles.statItem}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                                <School size={14} style={{ color: 'var(--color-primary)' }} />
+                                                <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
+                                            </div>
+                                            <span className={styles.statValue}>{ws.total_schools || 0} Schools</span>
+                                        </div>
+                                        <div className={styles.statItem}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                                <Users size={14} style={{ color: '#8b5cf6' }} />
+                                                <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
+                                            </div>
+                                            <span className={styles.statValue}>{ws.total_users || 0} Clients</span>
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.managerSection}>
+                                        <div className={styles.managerAvatar}>
+                                            {ws.manager_name?.charAt(0) || '?'}
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager</p>
+                                            <p className={styles.managerName}>{ws.manager_name || 'Pending'}</p>
+                                        </div>
+                                        <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
+                                    </div>
+                                </div>
+
+                                <div className={styles.cardFooter}>
+                                    <div className={styles.actions}>
+                                        <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
+                                        <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
+                                        <button
+                                            className={`${styles.actionBtn} ${styles.danger}`}
+                                            title={ws.is_active ? "Deactivate" : "Activate"}
+                                            onClick={() => handleToggleStatus(ws.id, ws.is_active)}
+                                            style={{ backgroundColor: ws.is_active ? undefined : 'var(--color-success)', color: ws.is_active ? undefined : 'white' }}
+                                        >
+                                            {ws.is_active ? <Trash2 size={18} /> : <div style={{ fontWeight: 'bold', fontSize: '12px' }}>ACTIVATE</div>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </>
             )}
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? t('workstreams.modal.editTitle') : t('workstreams.modal.createTitle')}>

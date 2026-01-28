@@ -8,32 +8,32 @@ const studentService = {
 
     // Get student profile
     getProfile: async (studentId) => {
-        return api.get(`/student/users/${studentId}/`); // Adjusted to standard endpoint if exists
+        return api.get(`/student/profile/${studentId}/`);
     },
 
     updateProfile: async (studentId, data) => {
-        return api.patch(`/student/users/${studentId}/`, data);
+        return api.patch(`/student/profile/${studentId}/`, data);
     },
 
     // Get attendance history
     getAttendance: async (studentId) => {
-        return api.get(`/teacher/attendance/?student_id=${studentId}`);
+        return api.get(`/student/attendance/?student_id=${studentId}`);
     },
 
     // Get assignments
-    getAssignments: async () => {
-        return api.get('/teacher/assignments/');
+    getAssignments: async (studentId) => {
+        return api.get(`/student/assignments/?student_id=${studentId}`);
     },
 
     // Get marks/results
     getMarks: async (studentId) => {
-        return api.get(`/teacher/marks/?student_id=${studentId}`);
+        return api.get(`/student/marks/?student_id=${studentId}`);
     },
 
     // Get learning materials
-    getLearningMaterials: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/teacher/learning-materials/?${queryParams}`);
+    getLearningMaterials: async (studentId, filters = {}) => {
+        const queryParams = new URLSearchParams({ ...filters, student_id: studentId }).toString();
+        return api.get(`/student/learning-materials/?${queryParams}`);
     },
 
     // Messages

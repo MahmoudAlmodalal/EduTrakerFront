@@ -10,12 +10,14 @@ const WorkstreamDashboard = () => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [dashboardData, setDashboardData] = useState(null);
+    const [recentActivities, setRecentActivities] = useState([]);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const data = await api.get('/reports/statistics/dashboard/');
-                setDashboardData(data.statistics);
+                const response = await api.get('/reports/statistics/dashboard/');
+                setDashboardData(response.statistics);
+                setRecentActivities(response.recent_activity || []);
             } catch (error) {
                 console.error('Failed to fetch dashboard data:', error);
             } finally {
@@ -70,12 +72,12 @@ const WorkstreamDashboard = () => {
         { name: 'Sunrise School', score: 72, students: 260 },
     ];
 
-    const recentActivity = [
-        { action: 'New teacher assigned', school: 'Al-Noor Academy', time: '2 hours ago', type: 'info' },
-        { action: 'Performance report submitted', school: 'Gaza Central', time: '5 hours ago', type: 'success' },
-        { action: 'Student enrollment approved', school: 'Hope Academy', time: '1 day ago', type: 'info' },
-        { action: 'Budget request pending', school: 'Al-Quds School', time: '2 days ago', type: 'warning' },
-    ];
+    const recentActivity = recentActivities.length > 0 ? recentActivities.map(item => ({
+        action: item.description,
+        school: item.entity_type,
+        time: item.created_at_human,
+        type: item.action_type === 'login' ? 'info' : (item.action_type === 'create' ? 'success' : 'warning')
+    })) : [];
 
     const getScoreColor = (score) => {
         if (score >= 90) return '#059669';

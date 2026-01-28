@@ -3,10 +3,10 @@ import { api } from '../utils/api';
 const teacherService = {
     // Teacher Profile/Settings
     getProfile: async (id) => {
-        return api.get(`/teacher/teachers/${id}/`);
+        return api.get(`/teacher/profile/${id}/`);
     },
     updateProfile: async (id, data) => {
-        return api.patch(`/teacher/teachers/${id}/`, data);
+        return api.patch(`/teacher/profile/${id}/`, data);
     },
 
     // Course Allocations / Classes
@@ -21,7 +21,7 @@ const teacherService = {
 
     getStudents: async (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/student/users/?${queryParams}`);
+        return api.get(`/teacher/students/?${queryParams}`);
     },
 
     // Assignments
@@ -68,12 +68,13 @@ const teacherService = {
         formData.append('file', data.file);
 
         const token = localStorage.getItem('accessToken');
-        const response = await fetch('http://localhost:8000/api/teacher/marks/bulk-import/', {
+        const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+        const response = await fetch(`${BASE_URL}/teacher/marks/bulk-import/`, {
             method: 'POST',
             headers: {
                 ...(token ? { 'Authorization': `Bearer ${token}` } : {})
             },
-            body: formData,
+            body: data, // FormData passed in
         });
 
         if (response.status === 204) return null;

@@ -15,6 +15,7 @@ const UserManagement = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
     const [workstreamFilter, setWorkstreamFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [pagination, setPagination] = useState({ count: 0, next: null, previous: null });
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -28,13 +29,15 @@ const UserManagement = () => {
         password: ''
     });
 
-    const fetchUsers = async (page = 1, search = '', role = '', workstream = '') => {
+    const fetchUsers = async (page = 1, search = '', role = '', workstream = '', status = '') => {
         setLoading(true);
         try {
             let url = `/users/?page=${page}`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (role) url += `&role=${role}`;
             if (workstream) url += `&work_stream=${workstream}`;
+            if (status === 'active') url += `&is_active=true`;
+            if (status === 'inactive') url += `&is_active=false`;
 
             const data = await api.get(url);
             setUsers(data.results || []);
@@ -56,8 +59,8 @@ const UserManagement = () => {
     };
 
     useEffect(() => {
-        fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter);
-    }, [currentPage, searchTerm, roleFilter, workstreamFilter]);
+        fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter, statusFilter);
+    }, [currentPage, searchTerm, roleFilter, workstreamFilter, statusFilter]);
 
     useEffect(() => {
         fetchWorkstreams();
@@ -68,7 +71,8 @@ const UserManagement = () => {
 
         try {
             await api.post(url);
-            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter);
+            await api.post(url);
+            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter, statusFilter);
         } catch (err) {
             alert('Status update failed: ' + err.message);
         }
@@ -80,7 +84,8 @@ const UserManagement = () => {
 
         try {
             await api.post(`/users/${user.id}/deactivate/`);
-            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter);
+            await api.post(`/users/${user.id}/deactivate/`);
+            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter, statusFilter);
         } catch (err) {
             alert('Deactivation failed: ' + err.message);
         }
@@ -109,7 +114,7 @@ const UserManagement = () => {
                 await api.post('/users/create/', payload);
             }
 
-            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter);
+            fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter, statusFilter);
             setIsModalOpen(false);
             resetForm();
         } catch (err) {
@@ -136,6 +141,42 @@ const UserManagement = () => {
         setFormData({ name: '', email: '', workstreamId: '', role: 'manager_workstream', password: '' });
     };
 
+    const handleExport = async () => {
+        try {
+            let url = `/users/export/`;
+            const params = [];
+            if (searchTerm) params.push(`search=${encodeURIComponent(searchTerm)}`);
+            if (roleFilter) params.push(`role=${roleFilter}`);
+            if (workstreamFilter) params.push(`work_stream=${workstreamFilter}`);
+            if (statusFilter === 'active') params.push(`is_active=true`);
+            if (statusFilter === 'inactive') params.push(`is_active=false`);
+
+            if (params.length > 0) {
+                url += `?${params.join('&')}`;
+            }
+
+            // Use fetch directly to handle blob response
+            const response = await api.get(url, { responseType: 'blob' });
+
+            // Create blob link to download
+            const blob = new Blob([response]);
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+
+            // Generate filename with timestamp
+            const date = new Date().toISOString().split('T')[0];
+            link.setAttribute('download', `users_export_${date}.csv`);
+
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (err) {
+            console.error('Export failed:', err);
+            alert('Export failed: ' + err.message);
+        }
+    };
+
     const openCreateModal = () => {
         resetForm();
         setIsModalOpen(true);
@@ -149,7 +190,7 @@ const UserManagement = () => {
                     <p className={styles.subtitle}>Manage system users and their access levels across workstreams.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <Button variant="outline" icon={FileDown} onClick={() => { }}>Export</Button>
+                    <Button variant="outline" icon={FileDown} onClick={handleExport}>Export</Button>
                     <Button variant="primary" icon={UserPlus} onClick={openCreateModal}>
                         {t('users.create')}
                     </Button>
@@ -200,6 +241,19 @@ const UserManagement = () => {
                         </select>
                     </div>
 
+                    <div className={styles.selectWrapper}>
+                        <Filter size={14} className={styles.filterIcon} />
+                        <select
+                            className={styles.filterSelect}
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+
                     {(roleFilter || workstreamFilter || searchTerm) && (
                         <Button
                             variant="ghost"
@@ -207,6 +261,7 @@ const UserManagement = () => {
                             onClick={() => {
                                 setRoleFilter('');
                                 setWorkstreamFilter('');
+                                setStatusFilter('');
                                 setSearchTerm('');
                             }}
                         >
@@ -222,6 +277,7 @@ const UserManagement = () => {
                         <thead>
                             <tr>
                                 <th>{t('users.table.name')}</th>
+                                <th>{t('users.table.email')}</th>
                                 <th>{t('users.table.role')}</th>
                                 <th>{t('users.table.workstream')}</th>
                                 <th>{t('users.table.status')}</th>
@@ -230,7 +286,7 @@ const UserManagement = () => {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</td></tr>
+                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</td></tr>
                             ) : users.length > 0 ? (
                                 users.map((user) => (
                                     <tr key={user.id}>
@@ -241,9 +297,11 @@ const UserManagement = () => {
                                                 </div>
                                                 <div className={styles.userDetails}>
                                                     <span className={styles.userName}>{user.full_name}</span>
-                                                    <span className={styles.userEmail}>{user.email}</span>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td>
+                                            <span className={styles.userEmail}>{user.email}</span>
                                         </td>
                                         <td>
                                             <span className={styles.roleBadge}>
@@ -271,11 +329,11 @@ const UserManagement = () => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="5" style={{ textAlign: 'center', padding: '4rem' }}>
+                                    <td colSpan="6" style={{ textAlign: 'center', padding: '4rem' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                                             <Search size={48} style={{ color: 'var(--slate-300)' }} />
                                             <p style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>{t('users.noUsersFound')}</p>
-                                            <Button variant="outline" size="small" onClick={() => { setSearchTerm(''); setRoleFilter(''); setWorkstreamFilter(''); }}>Reset Filters</Button>
+                                            <Button variant="outline" size="small" onClick={() => { setSearchTerm(''); setRoleFilter(''); setWorkstreamFilter(''); setStatusFilter(''); }}>Reset Filters</Button>
                                         </div>
                                     </td>
                                 </tr>
