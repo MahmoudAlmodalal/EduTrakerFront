@@ -25,32 +25,14 @@ const Login = ({ role }) => {
     const currentRole = role ? roleConfig[role] : null;
     const displayTitle = currentRole ? currentRole.title : t('auth.signInTitle');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
-        let isValid = false;
-
-        if (role) {
-            if (email === currentRole.defaultEmail && password === role.toLowerCase()) {
-                isValid = true;
-            } else if (email === 'admin@edutraker.com' && password === 'admin') {
-                isValid = true;
-            }
-        } else {
-            if (email === 'admin@edutraker.com' && password === 'admin') {
-                isValid = true;
-            }
-        }
-
-        if (isValid) {
-            login({
-                name: currentRole?.title || 'User',
-                role: role || 'SUPER_ADMIN',
-                email
-            });
-        } else {
-            setError(t('auth.error.invalid'));
+        const result = await login(email, password, role);
+        
+        if (!result.success) {
+            setError(result.error);
         }
     };
 

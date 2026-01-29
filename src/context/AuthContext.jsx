@@ -1,32 +1,65 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getRoleConfig, getBasePath } from '../config/roleConfig';
+import api from '../utils/api';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => {
+        const savedUser = localStorage.getItem('user');
+        return savedUser ? JSON.parse(savedUser) : null;
+    });
     const [permissions, setPermissions] = useState([]);
     const navigate = useNavigate();
 
-    const login = useCallback((userData) => {
-        const roleConfig = getRoleConfig(userData.role);
+    useEffect(() => {
+        if (user) {
+            const roleConfig = getRoleConfig(user.role);
+            setPermissions(roleConfig?.permissions || []);
+        }
+    }, [user]);
 
-        // Set user with role config
-        setUser({
-            ...userData,
-            displayName: roleConfig?.displayName || userData.role
-        });
+    const login = useCallback(async (email, password, role) => {
+        try {
+            const response = await api.post('/portal/auth/login/', {
+                email,
+                password
+            });
 
-        // Set permissions from role config
-        setPermissions(roleConfig?.permissions || []);
+            const { access, user: userData } = response.data;
+            
+            // Save token and user data
+            localStorage.setItem('token', access);
+            localStorage.setItem('user', JSON.stringify(userData));
 
-        // Redirect based on role
-        const basePath = getBasePath(userData.role);
-        navigate(basePath);
+            const roleConfig = getRoleConfig(userData.role);
+
+            // Set user with role config
+            setUser({
+                ...userData,
+                displayName: roleConfig?.displayName || userData.role
+            });
+
+            // Set permissions from role config
+            setPermissions(roleConfig?.permissions || []);
+
+            // Redirect based on role
+            const basePath = getBasePath(userData.role);
+            navigate(basePath);
+            return { success: true };
+        } catch (error) {
+            console.error('Login failed:', error);
+            return { 
+                success: false, 
+                error: error.response?.data?.detail || 'Login failed. Please check your credentials.' 
+            };
+        }
     }, [navigate]);
 
     const logout = useCallback(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         setUser(null);
         setPermissions([]);
         navigate('/login');
