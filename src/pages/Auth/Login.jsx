@@ -45,140 +45,141 @@ const Login = ({ role }) => {
     }, [isPortalLogin, workstreamId]);
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        setIsLoading(true);
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            setError('');
+            setIsLoading(true);
 
-        console.log('Login attempt started', { email, role, workstreamId });
+            console.log('Login attempt started', { email, role, workstreamId });
 
-        try {
-            const data = await authService.login(
-                { email, password },
-                role,
-                workstreamId
+            try {
+                const data = await authService.login(
+                    { email, password },
+                    role,
+                    workstreamId
+                );
+
+                console.log('Login response received:', data);
+
+                // Pass user data and tokens to the AuthContext
+                login(data, role, workstreamId);
+
+                console.log('Login context updated');
+            } catch (err) {
+                console.error('Login error:', err);
+                setError(err.message || "Unable to connect to the server. Please try again later.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+
+        // Show error state if workstream not found
+        if (workstreamNotFound) {
+            return (
+                <div className={styles.container}>
+                    <div className={styles.loginWrapper}>
+                        <div className={styles.card}>
+                            <div className={styles.header}>
+                                <div className={styles.logo}>
+                                    <div className={styles.logoIcon}><AlertCircle size={24} /></div>
+                                    <h1 className={styles.title}>EduTraker</h1>
+                                </div>
+                                <p className={styles.subtitle} style={{ color: 'var(--color-error, #ef4444)' }}>
+                                    Workstream Not Found
+                                </p>
+                            </div>
+                            <div className={styles.form}>
+                                <div className={styles.error}>
+                                    Workstream with ID "{workstreamId}" does not exist or is inactive.
+                                </div>
+                                <a href="/" className={styles.backLink} style={{ textAlign: 'center', display: 'block', marginTop: '1rem' }}>
+                                    ← Back to Role Selection
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             );
-
-            console.log('Login response received:', data);
-
-            // Pass user data and tokens to the AuthContext
-            login(data, role, workstreamId);
-
-            console.log('Login context updated');
-        } catch (err) {
-            console.error('Login error:', err);
-            setError(err.message || "Unable to connect to the server. Please try again later.");
-        } finally {
-            setIsLoading(false);
         }
-    };
 
+        // Determine subtitle text
+        const getSubtitle = () => {
+            if (isPortalLogin) return 'Portal Login';
+            if (loadingWorkstream) return 'Loading...';
+            return workstreamName ? `${workstreamName} Login` : `Workstream ${workstreamId} Login`;
+        };
 
-    // Show error state if workstream not found
-    if (workstreamNotFound) {
         return (
             <div className={styles.container}>
                 <div className={styles.loginWrapper}>
                     <div className={styles.card}>
                         <div className={styles.header}>
                             <div className={styles.logo}>
-                                <div className={styles.logoIcon}><AlertCircle size={24} /></div>
+                                <div className={styles.logoIcon}><GraduationCap size={24} /></div>
                                 <h1 className={styles.title}>EduTraker</h1>
                             </div>
-                            <p className={styles.subtitle} style={{ color: 'var(--color-error, #ef4444)' }}>
-                                Workstream Not Found
+                            <p className={styles.subtitle}>
+                                {getSubtitle()}
                             </p>
                         </div>
-                        <div className={styles.form}>
-                            <div className={styles.error}>
-                                Workstream with ID "{workstreamId}" does not exist or is inactive.
+
+                        <form onSubmit={handleSubmit} className={styles.form}>
+                            {error && <div className={styles.error}>{error}</div>}
+
+                            <div className={styles.inputGroup}>
+                                <label className={styles.label} htmlFor="email">{t('auth.email')}</label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    className={styles.input}
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                />
                             </div>
-                            <a href="/" className={styles.backLink} style={{ textAlign: 'center', display: 'block', marginTop: '1rem' }}>
-                                ← Back to Role Selection
-                            </a>
-                        </div>
+
+                            <div className={styles.inputGroup}>
+                                <label className={styles.label} htmlFor="password">{t('auth.password')}</label>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    className={styles.input}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div style={{ textAlign: 'right', marginBottom: 'var(--spacing-4)' }}>
+                                <Link
+                                    to="/password-reset"
+                                    className={styles.backLink}
+                                    style={{ fontSize: 'var(--font-size-sm)' }}
+                                >
+                                    Forgot Password?
+                                </Link>
+                            </div>
+
+                            <Button type="submit" variant="primary" size="large" disabled={isLoading}>
+                                {isLoading ? 'Verifying...' : t('auth.signInBtn')}
+                            </Button>
+
+                            <div className={styles.footer}>
+                                <Link to="/" className={styles.backLink}>{t('auth.backToSelection')}</Link>
+                                <span style={{ margin: '0 0.5rem', color: 'var(--color-text-muted)' }}>•</span>
+                                <Link
+                                    to={isPortalLogin ? "/register/portal" : `/register/workstream/${workstreamId}`}
+                                    className={styles.backLink}
+                                >
+                                    Create Account
+                                </Link>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
         );
-    }
-
-    // Determine subtitle text
-    const getSubtitle = () => {
-        if (isPortalLogin) return 'Portal Login';
-        if (loadingWorkstream) return 'Loading...';
-        return workstreamName ? `${workstreamName} Login` : `Workstream ${workstreamId} Login`;
     };
 
-    return (
-        <div className={styles.container}>
-            <div className={styles.loginWrapper}>
-                <div className={styles.card}>
-                    <div className={styles.header}>
-                        <div className={styles.logo}>
-                            <div className={styles.logoIcon}><GraduationCap size={24} /></div>
-                            <h1 className={styles.title}>EduTraker</h1>
-                        </div>
-                        <p className={styles.subtitle}>
-                            {getSubtitle()}
-                        </p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className={styles.form}>
-                        {error && <div className={styles.error}>{error}</div>}
-
-                        <div className={styles.inputGroup}>
-                            <label className={styles.label} htmlFor="email">{t('auth.email')}</label>
-                            <input
-                                id="email"
-                                type="email"
-                                className={styles.input}
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                        </div>
-
-                        <div className={styles.inputGroup}>
-                            <label className={styles.label} htmlFor="password">{t('auth.password')}</label>
-                            <input
-                                id="password"
-                                type="password"
-                                className={styles.input}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
-                        </div>
-
-                        <div style={{ textAlign: 'right', marginBottom: 'var(--spacing-4)' }}>
-                            <Link
-                                to="/password-reset"
-                                className={styles.backLink}
-                                style={{ fontSize: 'var(--font-size-sm)' }}
-                            >
-                                Forgot Password?
-                            </Link>
-                        </div>
-
-                        <Button type="submit" variant="primary" size="large" disabled={isLoading}>
-                            {isLoading ? 'Verifying...' : t('auth.signInBtn')}
-                        </Button>
-
-                        <div className={styles.footer}>
-                            <Link to="/" className={styles.backLink}>{t('auth.backToSelection')}</Link>
-                            <span style={{ margin: '0 0.5rem', color: 'var(--color-text-muted)' }}>•</span>
-                            <Link
-                                to={isPortalLogin ? "/register/portal" : `/register/workstream/${workstreamId}`}
-                                className={styles.backLink}
-                            >
-                                Create Account
-                            </Link>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default Login;
+    export default Login;

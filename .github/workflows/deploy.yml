@@ -1,0 +1,31 @@
+name: Deploy Frontend to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Navigate to the project root directory on the VPS
+            cd /path/to/your/project/root
+            
+            # Pull the latest changes for the frontend
+            cd EduTrakerFront
+            git pull origin main
+            cd ..
+            
+            # Rebuild and restart the frontend container
+            docker-compose up -d --build frontend

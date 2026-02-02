@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getRoleConfig, getBasePath } from '../config/roleConfig';
 import authService from '../services/authService';
@@ -15,14 +16,16 @@ const ROLE_MAP = {
     'teacher': 'TEACHER',
     'student': 'STUDENT',
     'guardian': 'GUARDIAN',
-    'guest': 'GUEST',
-    'staff': 'SUPER_ADMIN', // Often staff maps to admin capabilities
+    'guest': 'GUEST'
 };
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => {
+        const savedUser = localStorage.getItem('user');
+        return savedUser ? JSON.parse(savedUser) : null;
+    });
     const [permissions, setPermissions] = useState([]);
     const [portalType, setPortalType] = useState(null); // 'PORTAL' or 'WORKSTREAM'
     const [workstreamId, setWorkstreamId] = useState(null);
