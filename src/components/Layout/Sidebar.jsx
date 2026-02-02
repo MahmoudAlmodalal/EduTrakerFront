@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
-const Sidebar = ({ isOpen }) => {
+const Sidebar = ({ isOpen, toggleSidebar }) => {
     const { user, logout } = useAuth();
     const { t } = useTheme();
     const role = user?.role;
@@ -50,8 +50,20 @@ const Sidebar = ({ isOpen }) => {
 
     return (
         <aside id="app-sidebar" className={`${styles.sidebar} ${!isOpen ? styles.closed : ''}`}>
-            <div className={styles.logo}>
-                <div className={styles.logoIcon}>
+            <div className={styles.logo} onClick={toggleSidebar} style={{ cursor: 'pointer' }} title="Close Sidebar">
+                <div className="_logoIcon_lgw59_28" style={{
+                    width: '44px',
+                    height: '44px',
+                    background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
+                    color: 'white',
+                    borderRadius: '14px',
+                    boxShadow: '0 8px 24px rgba(79, 70, 229, 0.35)',
+                    marginInlineEnd: 'var(--spacing-4)',
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}>
                     <GraduationCap size={24} />
                 </div>
                 <span className={styles.logoText}>{t('app.name') || 'EduTraker'}</span>

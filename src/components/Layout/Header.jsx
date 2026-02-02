@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Menu, Bell, LogOut, Sun, Moon, Search, User } from 'lucide-react';
+import { Menu, Bell, LogOut, Sun, Moon, Search, User, GraduationCap } from 'lucide-react';
 import styles from './Header.module.css';
 
 const Header = ({ toggleSidebar }) => {
@@ -20,8 +20,21 @@ const Header = ({ toggleSidebar }) => {
     return (
         <header className={styles.header}>
             <div className={styles.left}>
-                <button onClick={toggleSidebar} className={styles.menuBtn} title="Toggle Sidebar">
-                    <Menu size={20} />
+                <button onClick={toggleSidebar} className={styles.logoIconToggle} title="Toggle Sidebar" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                    <div className="_logoIcon_lgw59_28" style={{
+                        width: '44px',
+                        height: '44px',
+                        background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
+                        color: 'white',
+                        borderRadius: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                        position: 'relative'
+                    }}>
+                        <GraduationCap size={24} />
+                    </div>
                 </button>
 
                 {/* Search Bar - Aesthetic Placeholder */}

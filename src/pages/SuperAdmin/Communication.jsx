@@ -93,7 +93,14 @@ const Communication = () => {
         try {
             // Using the UserListApi endpoint with search param
             const response = await api.get('/users/', { params: { search: term } });
-            setRecipientSearchResults(response.results || response);
+            const results = response.results || response;
+            setRecipientSearchResults(results);
+
+            // Auto-select if exact email match found
+            const exactMatch = results.find(user => user.email.toLowerCase() === term.toLowerCase());
+            if (exactMatch) {
+                handleSelectRecipient(exactMatch);
+            }
         } catch (err) {
             console.error('Error searching users:', err);
         } finally {

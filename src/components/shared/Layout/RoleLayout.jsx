@@ -72,19 +72,22 @@ const RoleLayout = ({ role: propRole, className = '' }) => {
             {/* Mobile Header */}
             <header className="role-mobile-header">
                 <button
-                    className="role-menu-toggle"
+                    className="role-menu-toggle-btn"
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                     title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
-                    style={{ border: 'none', background: 'transparent', boxShadow: 'none', padding: 0, width: 'auto', height: 'auto' }}
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
                 >
-                    <div className="_logoIcon_1y948_34" style={{
-                        color: 'var(--color-primary)',
+                    <div className="_logoIcon_lgw59_28" style={{
+                        width: '44px',
+                        height: '44px',
+                        background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
+                        color: 'white',
+                        borderRadius: '14px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        background: 'var(--color-primary-light)',
-                        padding: '8px',
-                        borderRadius: '12px'
+                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                        position: 'relative'
                     }}>
                         <Icons.GraduationCap size={24} />
                     </div>

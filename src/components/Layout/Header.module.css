@@ -25,26 +25,14 @@
     gap: var(--spacing-4);
 }
 
-.menuBtn {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
+.logoIconToggle {
+    transition: transform 0.2s ease;
     display: flex;
     align-items: center;
-    justify-content: center;
-    color: var(--color-text-muted);
-    background: var(--color-bg-surface);
-    border: 1px solid var(--color-border-subtle);
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.menuBtn:hover {
-    background: linear-gradient(135deg, #4f46e5, #6366f1);
-    color: white;
-    border-color: transparent;
-    transform: scale(1.05);
-    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
+.logoIconToggle:hover {
+    transform: scale(1.1);
 }
 
 .right {

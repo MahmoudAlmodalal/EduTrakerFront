@@ -1,21 +1,80 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { MessageSquare, CheckCircle, Clock, AlertCircle } from 'lucide-react';
-import styles from './Dashboard.module.css';
+import { MessageSquare, CheckCircle, Clock, AlertCircle, Plus, Search, Filter, X } from 'lucide-react';
+import styles from './Dashboard.module.css'; // Reusing some dashboard styles but we might need more
 import { api } from '../../utils/api';
+import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
 
 const SupportHelpdesk = () => {
     const { t } = useTheme();
+    const [tickets, setTickets] = useState([]);
+    const [stats, setStats] = useState({
+        total_tickets: 0,
+        open_tickets: 0,
+        in_progress_tickets: 0,
+        closed_tickets: 0,
+        high_priority_tickets: 0
+    });
+    const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [newTicket, setNewTicket] = useState({ subject: '', description: '', priority: 'medium' });
 
-    const tickets = [
-        { id: 'TKT-001', subject: 'Login Issue at Al-Amal School', priority: 'High', status: 'Open', date: '2025-12-14' },
-        { id: 'TKT-002', subject: 'Data Sync Error', priority: 'Medium', status: 'In Progress', date: '2025-12-13' },
-        { id: 'TKT-003', subject: 'Feature Request: Bulk Upload', priority: 'Low', status: 'Closed', date: '2025-12-10' },
-    ];
+    const fetchStats = async () => {
+        try {
+            const data = await api.get('/custom-admin/support-tickets/stats/');
+            setStats(data);
+        } catch (err) {
+            console.error('Error fetching ticket stats:', err);
+        }
+    };
+
+    const fetchTickets = async () => {
+        setLoading(true);
+        try {
+            const data = await api.get('/custom-admin/support-tickets/');
+            setTickets(data.results || data);
+        } catch (err) {
+            console.error('Error fetching tickets:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchStats();
+        fetchTickets();
+    }, []);
+
+    const handleCreateTicket = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post('/custom-admin/support-tickets/', newTicket);
+            setIsModalOpen(false);
+            setNewTicket({ subject: '', description: '', priority: 'medium' });
+            fetchTickets();
+            fetchStats();
+        } catch (err) {
+            alert('Failed to create ticket: ' + err.message);
+        }
+    };
+
+    const handleUpdateStatus = async (ticketId, newStatus) => {
+        try {
+            await api.patch(`/custom-admin/support-tickets/${ticketId}/`, { status: newStatus });
+            fetchTickets();
+            fetchStats();
+        } catch (err) {
+            alert('Failed to update status: ' + err.message);
+        }
+    };
 
     return (
         <div className={styles.container}>
-            <h1 className={styles.pageTitle}>{t('support.title')}</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h1 className={styles.pageTitle}>{t('support.title')}</h1>
+                <Button variant="primary" icon={Plus} onClick={() => setIsModalOpen(true)}>New Ticket</Button>
+            </div>
 
             <div className={styles.statsGrid}>
                 <div className={styles.statCard}>
@@ -26,7 +85,7 @@ const SupportHelpdesk = () => {
                         </div>
                     </div>
                     <div className={styles.statBody}>
-                        <span className={styles.statValue}>5</span>
+                        <span className={styles.statValue}>{stats.open_tickets}</span>
                     </div>
                 </div>
                 <div className={styles.statCard}>
@@ -37,7 +96,7 @@ const SupportHelpdesk = () => {
                         </div>
                     </div>
                     <div className={styles.statBody}>
-                        <span className={styles.statValue}>12</span>
+                        <span className={styles.statValue}>{stats.in_progress_tickets}</span>
                     </div>
                 </div>
                 <div className={styles.statCard}>
@@ -48,7 +107,7 @@ const SupportHelpdesk = () => {
                         </div>
                     </div>
                     <div className={styles.statBody}>
-                        <span className={styles.statValue}>28</span>
+                        <span className={styles.statValue}>{stats.closed_tickets}</span>
                     </div>
                 </div>
             </div>
@@ -67,34 +126,98 @@ const SupportHelpdesk = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {tickets.map(ticket => (
-                            <tr key={ticket.id}>
-                                <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-main)' }}>{ticket.id}</td>
-                                <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-main)' }}>{ticket.subject}</td>
-                                <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>{ticket.date}</td>
-                                <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
-                                    <span style={{
-                                        padding: '0.25rem 0.5rem',
-                                        borderRadius: '9999px',
-                                        fontSize: '0.75rem',
-                                        background: ticket.priority === 'High' ? 'rgba(239, 68, 68, 0.2)' : 'var(--color-bg-body)',
-                                        color: ticket.priority === 'High' ? 'var(--color-error)' : 'var(--color-text-main)',
-                                        border: ticket.priority !== 'High' ? '1px solid var(--color-border)' : 'none'
-                                    }}>
-                                        {t(`support.priority.${ticket.priority.toLowerCase()}`)}
-                                    </span>
-                                </td>
-                                <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-main)' }}>
-                                    {ticket.status}
-                                </td>
-                                <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
-                                    <button style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>{t('support.view')}</button>
-                                </td>
-                            </tr>
-                        ))}
+                        {loading ? (
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Loading tickets...</td></tr>
+                        ) : tickets.length > 0 ? (
+                            tickets.map(ticket => (
+                                <tr key={ticket.id}>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-main)' }}>{ticket.ticket_id}</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-main)' }}>
+                                        <div>
+                                            <div style={{ fontWeight: 600 }}>{ticket.subject}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>from {ticket.created_by_name}</div>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                                        {new Date(ticket.created_at).toLocaleDateString()}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
+                                        <span style={{
+                                            padding: '0.25rem 0.5rem',
+                                            borderRadius: '9999px',
+                                            fontSize: '0.75rem',
+                                            background: ticket.priority === 'high' ? 'rgba(239, 68, 68, 0.2)' : 'var(--color-bg-body)',
+                                            color: ticket.priority === 'high' ? 'var(--color-error)' : 'var(--color-text-main)',
+                                            border: ticket.priority !== 'high' ? '1px solid var(--color-border)' : 'none'
+                                        }}>
+                                            {ticket.priority.toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
+                                        <select
+                                            value={ticket.status}
+                                            onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}
+                                            style={{ padding: '4px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'transparent' }}
+                                        >
+                                            <option value="open">Open</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="closed">Closed</option>
+                                        </select>
+                                    </td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
+                                        <button style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>{t('support.view')}</button>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>No tickets found</td></tr>
+                        )}
                     </tbody>
                 </table>
             </div>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Ticket">
+                <form onSubmit={handleCreateTicket} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <label style={{ fontWeight: 600 }}>Subject</label>
+                        <input
+                            type="text"
+                            required
+                            placeholder="Brief summary of the issue"
+                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+                            value={newTicket.subject}
+                            onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <label style={{ fontWeight: 600 }}>Description</label>
+                        <textarea
+                            required
+                            placeholder="Detailed description..."
+                            rows={4}
+                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+                            value={newTicket.description}
+                            onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <label style={{ fontWeight: 600 }}>Priority</label>
+                        <select
+                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+                            value={newTicket.priority}
+                            onChange={(e) => setNewTicket({ ...newTicket, priority: e.target.value })}
+                        >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">Cancel</Button>
+                        <Button variant="primary" type="submit">Create Ticket</Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };

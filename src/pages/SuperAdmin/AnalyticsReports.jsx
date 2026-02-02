@@ -43,7 +43,10 @@ const AnalyticsReports = () => {
 
     const handleExport = async (format) => {
         try {
-            await reportService.exportReport(format);
+            // Determine report type based on format
+            // PDF: student_performance, CSV: attendance
+            const reportType = format === 'pdf' ? 'student_performance' : 'attendance';
+            await reportService.exportReport(format, reportType);
         } catch (err) {
             alert('Failed to export report: ' + err.message);
         }
