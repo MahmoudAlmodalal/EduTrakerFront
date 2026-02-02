@@ -91,11 +91,10 @@ const StudentAdmissions = () => {
             const payload = {
                 email: newStudent.email,
                 full_name: `${newStudent.first_name} ${newStudent.last_name}`,
-                password: newStudent.password,
-                school_id: 1, // Mock school id
+                password: newStudent.password || 'Student@123',
+                school_id: user?.school_id,
                 date_of_birth: newStudent.date_of_birth,
                 gender: newStudent.gender,
-                // Add other fields as per backend expectations
             };
             await secretaryService.createStudent(payload);
             alert('Student record created successfully!');

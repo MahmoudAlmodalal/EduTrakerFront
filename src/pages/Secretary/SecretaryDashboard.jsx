@@ -17,11 +17,10 @@ const SecretaryDashboard = () => {
                 setLoading(true);
                 const data = await secretaryService.getDashboardStats();
 
-                // Transform backend stats to frontend format
                 const transformedStats = [
                     {
                         labelKey: 'secretary.dashboard.totalStudents',
-                        value: data.total_students || '0',
+                        value: data.statistics?.total_students || '0',
                         icon: Users,
                         color: '#4F46E5',
                         bgColor: '#EEF2FF',
@@ -29,7 +28,7 @@ const SecretaryDashboard = () => {
                     },
                     {
                         labelKey: 'secretary.dashboard.unreadMessages',
-                        value: data.unread_messages || '0',
+                        value: data.statistics?.unread_messages || '0',
                         icon: FileText,
                         color: '#F59E0B',
                         bgColor: '#FEF3C7',
@@ -37,7 +36,7 @@ const SecretaryDashboard = () => {
                     },
                     {
                         labelKey: 'secretary.dashboard.absentToday',
-                        value: data.absent_today || '0',
+                        value: data.statistics?.absent_today || '0',
                         icon: Clock,
                         color: '#EF4444',
                         bgColor: '#FEE2E2',

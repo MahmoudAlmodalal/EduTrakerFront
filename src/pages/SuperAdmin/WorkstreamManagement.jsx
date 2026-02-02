@@ -4,7 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import styles from './WorkstreamManagement.module.css';
-import { api } from '../../utils/api';
+import workstreamService from '../../services/workstreamService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const WorkstreamManagement = () => {
@@ -26,12 +26,12 @@ const WorkstreamManagement = () => {
     const fetchWorkstreams = async () => {
         setLoading(true);
         try {
-            let query = '/workstream/?';
-            if (searchTerm) query += `search=${encodeURIComponent(searchTerm)}&`;
-            if (statusFilter !== 'all') query += `is_active=${statusFilter === 'active'}&`;
+            const params = {};
+            if (searchTerm) params.search = searchTerm;
+            if (statusFilter !== 'all') params.is_active = statusFilter === 'active';
 
-            const data = await api.get(query);
-            setWorkstreams(data.results || data);
+            const response = await workstreamService.getWorkstreams(params);
+            setWorkstreams(response.results || response);
         } catch (err) {
             console.error('Error fetching workstreams:', err);
             setError(err.message);
@@ -42,8 +42,8 @@ const WorkstreamManagement = () => {
 
     const fetchManagers = async () => {
         try {
-            const data = await api.get('/users/?role=manager_workstream');
-            setManagers(data.results || data);
+            const response = await workstreamService.getManagers();
+            setManagers(response.results || response);
         } catch (err) {
             console.error('Error fetching managers:', err);
         }
@@ -74,9 +74,9 @@ const WorkstreamManagement = () => {
 
         try {
             if (isEditing) {
-                await api.patch(`/workstreams/${currentWorkstreamId}/update/`, payload);
+                await workstreamService.updateWorkstream(currentWorkstreamId, payload);
             } else {
-                await api.post('/workstream/', payload);
+                await workstreamService.createWorkstream(payload);
             }
 
             await fetchWorkstreams();
@@ -91,11 +91,12 @@ const WorkstreamManagement = () => {
         const action = currentStatus ? 'deactivate' : 'activate';
         if (!window.confirm(`Are you sure you want to ${action} this workstream?`)) return;
 
-        // Use update endpoint to toggle is_active
-        const url = `/workstreams/${id}/update/`;
-
         try {
-            await api.patch(url, { is_active: !currentStatus });
+            if (currentStatus) {
+                await workstreamService.deactivateWorkstream(id);
+            } else {
+                await workstreamService.updateWorkstream(id, { is_active: true });
+            }
             await fetchWorkstreams();
         } catch (err) {
             alert('Status update failed: ' + err.message);

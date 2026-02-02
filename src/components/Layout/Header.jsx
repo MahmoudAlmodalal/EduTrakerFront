@@ -5,7 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Menu, Bell, LogOut, Sun, Moon, Search, User, GraduationCap } from 'lucide-react';
 import styles from './Header.module.css';
 
-const Header = ({ toggleSidebar }) => {
+const Header = ({ toggleSidebar, isSidebarOpen }) => {
     const { logout, user } = useAuth();
     const { t, theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
@@ -20,22 +20,24 @@ const Header = ({ toggleSidebar }) => {
     return (
         <header className={styles.header}>
             <div className={styles.left}>
-                <button onClick={toggleSidebar} className={styles.logoIconToggle} title="Toggle Sidebar" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                    <div className="_logoIcon_lgw59_28" style={{
-                        width: '44px',
-                        height: '44px',
-                        background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
-                        color: 'white',
-                        borderRadius: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
-                        position: 'relative'
-                    }}>
-                        <GraduationCap size={24} />
-                    </div>
-                </button>
+                {!isSidebarOpen && (
+                    <button onClick={toggleSidebar} className={styles.logoIconToggle} title="Toggle Sidebar" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                        <div className="_logoIcon_lgw59_28" style={{
+                            width: '44px',
+                            height: '44px',
+                            background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
+                            color: 'white',
+                            borderRadius: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                            position: 'relative'
+                        }}>
+                            <GraduationCap size={24} />
+                        </div>
+                    </button>
+                )}
 
                 {/* Search Bar - Aesthetic Placeholder */}
                 <div className={styles.searchBar} style={{

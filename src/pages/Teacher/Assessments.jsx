@@ -50,17 +50,38 @@ const Assessments = () => {
 
     useEffect(() => {
         if (selectedAssessmentId) {
-            const fetchGrades = async () => {
+            const fetchGradesAndStudents = async () => {
                 try {
-                    const data = await teacherService.getMarks({ assignment_id: selectedAssessmentId });
-                    setGrades(data.results || data || []);
+                    // Fetch both existing marks and students in the school
+                    const [marksData, studentsData] = await Promise.all([
+                        teacherService.getMarks({ assignment_id: selectedAssessmentId }),
+                        teacherService.getStudents({ school_id: user.school_id })
+                    ]);
+
+                    const existingMarks = marksData.results || marksData || [];
+                    const students = studentsData.results || studentsData || [];
+
+                    // Map students to grades: use existing mark if found, otherwise empty
+                    const gradebookData = students.map(student => {
+                        const mark = existingMarks.find(m => m.student_id === student.user_id);
+                        return {
+                            id: student.user_id,
+                            student_name: student.full_name,
+                            score: mark ? mark.score : '',
+                            feedback: mark ? mark.feedback : '',
+                            is_active: mark ? mark.is_active : false,
+                            mark_id: mark ? mark.id : null
+                        };
+                    });
+
+                    setGrades(gradebookData);
                 } catch (error) {
                     console.error("Error fetching grades:", error);
                 }
             };
-            fetchGrades();
+            fetchGradesAndStudents();
         }
-    }, [selectedAssessmentId]);
+    }, [selectedAssessmentId, user.school_id]);
 
     const handleCreateAssessment = async (e) => {
         e.preventDefault();
@@ -89,10 +110,33 @@ const Assessments = () => {
         }
     };
 
+    const handleSaveGrade = async (studentId) => {
+        const gradeData = grades.find(g => g.id === studentId);
+        if (!gradeData || !gradeData.score) return;
+
+        try {
+            const payload = {
+                assignment_id: selectedAssessmentId,
+                student_id: studentId,
+                score: gradeData.score,
+                feedback: gradeData.feedback || '',
+                date_recorded: new Date().toISOString().split('T')[0]
+            };
+
+            await teacherService.recordMark(payload);
+            // Update local state to show as graded
+            setGrades(grades.map(g => g.id === studentId ? { ...g, is_active: true } : g));
+            console.log(`Saved grade for student ${studentId}`);
+        } catch (error) {
+            console.error("Error saving grade:", error);
+            alert("Failed to save grade");
+        }
+    };
+
     const handleGradeChange = (id, value) => {
         setGrades(grades.map(student => {
             if (student.id === id) {
-                return { ...student, grade: value, status: value ? 'Graded' : 'Pending' };
+                return { ...student, score: value };
             }
             return student;
         }));
@@ -107,13 +151,19 @@ const Assessments = () => {
         }));
     };
 
-    const handlePublishResults = () => {
-        const gradedCount = grades.filter(g => g.status === 'Graded').length;
-        if (gradedCount === 0) {
-            alert('No grades to publish!');
-            return;
+    const handlePublishResults = async () => {
+        const ungradedCount = grades.filter(g => !g.is_active && g.score).length;
+        if (ungradedCount > 0) {
+            if (window.confirm(`You have ${ungradedCount} unsaved grades. Save them all before publishing?`)) {
+                try {
+                    const unsaved = grades.filter(g => !g.is_active && g.score);
+                    await Promise.all(unsaved.map(g => handleSaveGrade(g.id)));
+                } catch (error) {
+                    return; // Error handled in handleSaveGrade
+                }
+            }
         }
-        alert(`Results published for ${gradedCount} students in ${selectedClass} for ${selectedAssessment}. Notifications sent to students and parents.`);
+        alert(`Results published for students in ${selectedClass} for the selected assessment. Notifications sent to students and parents.`);
     };
 
     if (loading) {

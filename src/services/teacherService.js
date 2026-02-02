@@ -3,10 +3,10 @@ import { api } from '../utils/api';
 const teacherService = {
     // Teacher Profile/Settings
     getProfile: async (id) => {
-        return api.get(`/teacher/profile/${id}/`);
+        return api.get(`/teacher/teachers/${id}/`);
     },
     updateProfile: async (id, data) => {
-        return api.patch(`/teacher/profile/${id}/`, data);
+        return api.patch(`/teacher/teachers/${id}/`, data);
     },
 
     // Course Allocations / Classes
@@ -21,7 +21,7 @@ const teacherService = {
 
     getStudents: async (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/teacher/students/?${queryParams}`);
+        return api.get(`/student/students/?${queryParams}`);
     },
 
     // Assignments

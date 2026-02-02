@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Clock,
     AlertCircle,
@@ -8,7 +8,8 @@ import {
     Award,
     CheckCircle,
     Target,
-    Zap
+    Zap,
+    RefreshCw
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -18,45 +19,83 @@ import '../Student.css';
 const StudentDashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const [loading, setLoading] = React.useState(true);
-    const [dashboardData, setDashboardData] = React.useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [dashboardData, setDashboardData] = useState(null);
 
-    React.useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                const data = await studentService.getDashboardStats();
+    const fetchDashboardData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await studentService.getDashboardStats();
+            if (data && data.status === 'success') {
                 setDashboardData(data.statistics);
-            } catch (error) {
-                console.error('Error fetching dashboard data:', error);
-            } finally {
-                setLoading(false);
+            } else {
+                setDashboardData(data.statistics || data);
             }
-        };
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+            setError(t('student.dashboard.error') || 'Failed to load dashboard data. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchDashboardData();
     }, []);
 
     if (loading) {
-        return <div className="loading-container">Loading...</div>;
+        return (
+            <div className="dashboard-loading">
+                <div className="loading-spinner">
+                    <RefreshCw className="animate-spin" size={40} />
+                </div>
+                <p>Loading your dashboard...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="dashboard-error">
+                <AlertCircle size={48} color="#ef4444" />
+                <h2>Oops! Something went wrong</h2>
+                <p>{error}</p>
+                <button onClick={fetchDashboardData} className="retry-btn">
+                    <RefreshCw size={18} />
+                    Try Again
+                </button>
+            </div>
+        );
     }
 
     const { profile, courses, grades, attendance, classmates } = dashboardData || {};
 
-    const todaySchedule = dashboardData?.schedule || []; // If schedule added later
+    // Map backend data to UI
     const assignments = grades?.marks?.slice(0, 3).map(m => ({
         id: m.assignment_id,
         title: m.title,
         subject: m.course_name || 'Subject',
         due: m.due_date || 'N/A',
-        status: m.score ? 'graded' : 'pending',
+        status: m.score !== null ? 'graded' : 'pending',
         progress: m.percentage || 0
     })) || [];
 
     const stats = {
         attendance: attendance?.attendance_rate || 0,
-        gpa: grades?.overall_average ? (grades.overall_average / 25).toFixed(2) : '0.0', // Assuming 100 max
+        gpa: grades?.overall_average ? (grades.overall_average / 25).toFixed(2) : '0.00',
         completedTasks: grades?.graded_assignments || 0,
-        rank: classmates?.rank || 'N/A'
+        rank: classmates?.rank || `Top ${classmates?.active_classmates || 'N/A'}`
     };
+
+    // Placeholder schedule since backend doesn't seem to provide it yet
+    const todaySchedule = [
+        { id: 1, time: '08:30 AM', subject: 'Mathematics', teacher: 'Dr. Smith', room: 'Room 302', status: 'done' },
+        { id: 2, time: '10:15 AM', subject: 'Physics', teacher: 'Prof. Johnson', room: 'Lab 1', status: 'now' },
+        { id: 3, time: '01:00 PM', subject: 'English', teacher: 'Ms. Davis', room: 'Room 105', status: 'upcoming' },
+        { id: 4, time: '02:45 PM', subject: 'History', teacher: 'Mr. Wilson', room: 'Room 204', status: 'upcoming' },
+    ];
 
     const getStatusBadge = (status) => {
         switch (status) {
@@ -82,7 +121,7 @@ const StudentDashboard = () => {
                         {t('student.dashboard.welcome') || 'Welcome back'}, <span className="text-gradient">{user?.full_name || 'Student'}!</span>
                     </h1>
                     <p className="dashboard-subtitle">
-                        {t('student.dashboard.subtitle') || "Here's what's happening with your studies today."}
+                        {profile?.current_classroom?.classroom_name || ''} • {profile?.current_grade?.grade_name || ''}
                     </p>
                 </div>
                 <div className="dashboard-date">
@@ -140,7 +179,7 @@ const StudentDashboard = () => {
                             <Clock size={20} />
                             {t('student.dashboard.dailySchedule') || "Today's Schedule"}
                         </h2>
-                        <span className="card-badge">4 Classes</span>
+                        <span className="card-badge">{todaySchedule.length} Classes</span>
                     </div>
                     <div className="schedule-list">
                         {todaySchedule.map((item) => (
@@ -218,21 +257,21 @@ const StudentDashboard = () => {
                         <div className="card-header">
                             <h2 className="card-title">
                                 <BookOpen size={20} />
-                                {t('student.dashboard.assignments') || 'Pending Tasks'}
+                                {t('student.dashboard.assignments') || 'Recent Marks'}
                             </h2>
-                            <span className="card-badge urgent">{assignments.filter(a => a.status === 'urgent').length} Urgent</span>
+                            <span className="card-badge">{grades?.total_assignments || 0} Total</span>
                         </div>
                         <div className="assignment-list">
-                            {assignments.map((assignment) => (
-                                <div key={assignment.id} className={`assignment-item ${assignment.status === 'urgent' ? 'urgent' : ''}`}>
+                            {assignments.length > 0 ? assignments.map((assignment) => (
+                                <div key={assignment.id} className="assignment-item">
                                     <div className="assignment-header">
                                         <div className="assignment-title">{assignment.title}</div>
-                                        {assignment.status === 'urgent' && <AlertCircle size={16} className="text-danger" />}
+                                        {assignment.status === 'pending' && <AlertCircle size={16} className="text-warning" />}
                                     </div>
                                     <div className="assignment-meta">
                                         <span>{assignment.subject}</span>
-                                        <span className={`assignment-due ${assignment.status === 'urgent' ? 'urgent' : ''}`}>
-                                            Due: {assignment.due}
+                                        <span className="assignment-due">
+                                            {assignment.due}
                                         </span>
                                     </div>
                                     <div className="assignment-progress">
@@ -242,14 +281,58 @@ const StudentDashboard = () => {
                                         <span className="progress-text">{assignment.progress}%</span>
                                     </div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="empty-state">No recent marks found.</div>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Additional Styles for Dashboard-specific components */}
             <style>{`
+                .dashboard-loading, .dashboard-error {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 400px;
+                    text-align: center;
+                    gap: 1rem;
+                    background: white;
+                    border-radius: 20px;
+                    padding: 2rem;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+                }
+
+                .animate-spin {
+                    animation: spin 1s linear infinite;
+                    color: var(--student-primary, #0891b2);
+                }
+
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                .retry-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.5rem;
+                    background: var(--student-gradient, linear-gradient(135deg, #0891b2, #06b6d4));
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+
+                .retry-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
+                }
+
                 .dashboard-header {
                     display: flex;
                     justify-content: space-between;
@@ -434,10 +517,6 @@ const StudentDashboard = () => {
                     background: #f0f9ff;
                 }
                 
-                .assignment-item.urgent {
-                    border-left: 3px solid #dc2626;
-                }
-                
                 .assignment-header {
                     display: flex;
                     justify-content: space-between;
@@ -459,11 +538,6 @@ const StudentDashboard = () => {
                     margin-bottom: 0.75rem;
                 }
                 
-                .assignment-due.urgent {
-                    color: #dc2626;
-                    font-weight: 600;
-                }
-                
                 .assignment-progress {
                     display: flex;
                     align-items: center;
@@ -481,10 +555,17 @@ const StudentDashboard = () => {
                     color: var(--color-text-muted, #64748b);
                     min-width: 32px;
                 }
+
+                .empty-state {
+                    text-align: center;
+                    padding: 2rem;
+                    color: var(--color-text-muted, #94a3b8);
+                    font-size: 0.875rem;
+                }
                 
-                .text-danger { color: #dc2626; }
-                
-                [data-theme="dark"] .dashboard-date {
+                [data-theme="dark"] .dashboard-date,
+                [data-theme="dark"] .dashboard-loading,
+                [data-theme="dark"] .dashboard-error {
                     background: #1e293b;
                 }
                 

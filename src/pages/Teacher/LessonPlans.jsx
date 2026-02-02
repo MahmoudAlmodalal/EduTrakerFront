@@ -69,19 +69,25 @@ const LessonPlans = () => {
     const handleSave = async (e) => {
         e.preventDefault();
         try {
+            const payload = {
+                ...formData,
+                teacher_id: user.user_id,
+                classroom_id: parseInt(formData.classroom_id) || null,
+                course_id: parseInt(formData.course_id) || null,
+                academic_year_id: parseInt(formData.academic_year_id) || 1
+            };
+
             if (activeTab === 'plans') {
                 if (editingId) {
-                    const updated = await teacherService.updateLessonPlan(editingId, formData);
+                    const updated = await teacherService.updateLessonPlan(editingId, payload);
                     setPlans(plans.map(p => p.id === editingId ? updated : p));
                     alert(`Lesson Plan "${formData.title}" updated successfully!`);
                 } else {
-                    const payload = { ...formData, teacher: user.user_id };
                     const created = await teacherService.createLessonPlan(payload);
                     setPlans([created, ...plans]);
                     alert(`Lesson Plan "${formData.title}" created successfully!`);
                 }
             } else {
-                // Learning material upload would go here
                 alert(`Resource upload functionality pending file handling.`);
             }
             setIsCreating(false);

@@ -23,26 +23,24 @@ const TeacherDashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 setLoading(true);
-                // Fetch notifications, marks, and dashboard statistics
-                const [notifData, marksData, statsResponse] = await Promise.all([
+                // Fetch notifications and dashboard statistics
+                const [notifData, statsResponse] = await Promise.all([
                     secretaryService.getNotifications(),
-                    teacherService.getMarks({ include_inactive: false }),
                     secretaryService.getDashboardStats()
                 ]);
 
-                setNotifications(notifData.slice(0, 5));
+                setNotifications(Array.isArray(notifData) ? notifData.slice(0, 5) : (notifData.results || []).slice(0, 5));
 
-                if (statsResponse && statsResponse.statistics) {
-                    const s = statsResponse.statistics;
+                if (statsResponse) {
+                    // Map backend stats to UI
                     setStats({
-                        avgAttendance: s.avg_attendance || '85%', // Fallback if not provided
-                        pendingAssignments: s.pending_assignments || 0,
-                        totalToGrade: s.total_to_grade || (marksData ? (marksData.count || marksData.length || 0) : 0)
+                        avgAttendance: statsResponse.average_attendance ? `${Math.round(statsResponse.average_attendance)}%` : '0%',
+                        pendingAssignments: statsResponse.pending_assignments_count || 0,
+                        totalToGrade: statsResponse.total_submissions_to_grade || 0
                     });
                 }
 
                 // Mock schedule for now as there's no direct "schedule" endpoint yet
-                // In future, this could be fetched from /teacher/schedule/ or class lessons
                 setSchedule([
                     { id: 1, day: 'Today', time: '08:00 - 09:30', subject: 'Mathematics', class: 'Grade 10-A', room: 'Room 101', status: 'current' },
                     { id: 2, day: 'Today', time: '10:00 - 11:30', subject: 'Physics', class: 'Grade 11-B', room: 'Lab 2', status: 'upcoming' },

@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { Send, Plus, MessageSquare, Search } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import workstreamService from '../../services/workstreamService';
 import './Workstream.css';
 
 
@@ -20,25 +21,66 @@ const WorkstreamCommunication = () => {
 
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(true);
 
-    const [messages, setMessages] = useState([
-        { id: 1, type: 'internal', sender: "Admin (Super Admin)", subject: "New Policy Update", date: "10:30 AM", preview: "Please review the new attendance policy...", content: "Dear Manager,\n\nPlease review the new attendance policy attached. Ensure all schools in your workstream are updated by next week.\n\nBest,\nAdmin", role: "Super Admin", read: false },
-        { id: 2, type: 'internal', sender: "Principal Skinner (Springfield Elem)", subject: "Budget Request", date: "Yesterday", preview: "We need approval for new science equipment...", content: "We need approval for new science equipment for the upcoming semester.\n\nEstimated cost is $5000.\n\nRegards,\nSkinner", role: "School Manager", read: true },
-        { id: 3, type: 'external', sender: "Ministry of Education", subject: "Annual Inspection", date: "Oct 12", preview: "The annual inspection is scheduled for...", content: "The annual inspection is scheduled for next month. Please prepare all reports.", role: "External", read: false },
-    ]);
+    const [messages, setMessages] = useState([]);
+    const [notifications, setNotifications] = useState([]);
 
-    const [notifications, setNotifications] = useState([
-        { id: 101, title: "School Performance Alert", message: "Springfield stats dropped by 5%", time: "2 hours ago", read: false },
-        { id: 102, title: "New Manager Assigned", message: "You assigned a new manager to Shelbyville High", time: "5 hours ago", read: true },
-    ]);
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [msgsRes, notifsRes] = await Promise.all([
+                workstreamService.getMessages(),
+                workstreamService.getNotifications()
+            ]);
 
-    const handleMessageClick = (msg) => {
-        setSelectedMessage(msg);
-        setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, read: true } : m));
+            // Map backend messages to frontend format
+            const mappedMsgs = (msgsRes.results || msgsRes).map(m => ({
+                id: m.id,
+                type: m.sender_name?.includes('Admin') ? 'internal' : (m.is_external ? 'external' : 'internal'),
+                sender: m.sender_name || 'System',
+                subject: m.subject,
+                date: new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                preview: m.body.substring(0, 50) + '...',
+                content: m.body,
+                role: m.sender_role || 'Staff',
+                read: m.is_read
+            }));
+
+            setMessages(mappedMsgs);
+            setNotifications(notifsRes.results || notifsRes);
+        } catch (error) {
+            console.error('Failed to fetch communications:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleNotificationClick = (notif) => {
-        setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const handleMessageClick = async (msg) => {
+        setSelectedMessage(msg);
+        if (!msg.read) {
+            try {
+                await workstreamService.markMessageRead(msg.id);
+                setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, read: true } : m));
+            } catch (error) {
+                console.error('Failed to mark message as read:', error);
+            }
+        }
+    };
+
+    const handleNotificationClick = async (notif) => {
+        if (!notif.is_read) {
+            try {
+                await workstreamService.markNotificationRead(notif.id);
+                setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+            } catch (error) {
+                console.error('Failed to mark notification as read:', error);
+            }
+        }
     };
 
     const filteredItems = activeTab === 'notifications'
@@ -116,13 +158,13 @@ const WorkstreamCommunication = () => {
                                         padding: '1rem',
                                         borderBottom: '1px solid var(--color-border)',
                                         cursor: 'pointer',
-                                        background: notif.read ? 'transparent' : 'var(--color-bg-body)',
-                                        borderLeft: notif.read ? 'none' : '4px solid var(--color-primary)'
+                                        background: notif.is_read ? 'transparent' : 'var(--color-bg-body)',
+                                        borderLeft: notif.is_read ? 'none' : '4px solid var(--color-primary)'
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
                                         <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-main)' }}>{notif.title}</span>
-                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{notif.time}</span>
+                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                     </div>
                                     <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{notif.message}</div>
                                 </div>

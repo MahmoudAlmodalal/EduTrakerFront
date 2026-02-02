@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { School, Users, GraduationCap, TrendingUp, TrendingDown, Activity, Award } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../utils/api';
+import workstreamService from '../../services/workstreamService';
 import './Workstream.css';
 
 const WorkstreamDashboard = () => {
@@ -15,7 +15,7 @@ const WorkstreamDashboard = () => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const response = await api.get('/reports/statistics/dashboard/');
+                const response = await workstreamService.getDashboardStatistics();
                 setDashboardData(response.statistics);
                 setRecentActivities(response.recent_activity || []);
             } catch (error) {

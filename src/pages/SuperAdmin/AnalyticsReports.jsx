@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Download, FileBarChart, PieChart, TrendingUp, CheckCircle } from 'lucide-react';
+import { Download, FileBarChart, PieChart, TrendingUp, CheckCircle, User } from 'lucide-react';
 import styles from './AnalyticsReports.module.css';
 import reportService from '../../services/reportService';
 
@@ -30,22 +30,26 @@ const AnalyticsReports = () => {
     }, []);
 
     // Map backend workstream data to chart format
-    const chartData = stats?.students_by_workstream?.by_workstream?.map(ws => ({
-        name: ws.workstream_name,
-        students: ws.student_count,
-        schools: ws.school_count
-    })) || [];
+    // Ensure we handle different possible data structures from backend
+    const studentStats = stats?.students_by_workstream;
+    const workstreamData = studentStats?.by_workstream || studentStats || [];
 
-    const teacherData = stats?.teachers_by_workstream?.by_workstream?.map(ws => ({
-        name: ws.workstream_name,
-        teachers: ws.teacher_count
-    })) || [];
+    const chartData = Array.isArray(workstreamData) ? workstreamData.map(ws => ({
+        name: ws.workstream_name || ws.name || 'N/A',
+        students: ws.student_count || 0,
+        schools: ws.school_count || 0
+    })) : [];
 
-    const handleExport = async (format) => {
+    const teacherStats = stats?.teachers_by_workstream;
+    const teacherWsData = teacherStats?.by_workstream || teacherStats || [];
+
+    const teacherData = Array.isArray(teacherWsData) ? teacherWsData.map(ws => ({
+        name: ws.workstream_name || ws.name || 'N/A',
+        teachers: ws.teacher_count || 0
+    })) : [];
+
+    const handleExport = async (format, reportType) => {
         try {
-            // Determine report type based on format
-            // PDF: student_performance, CSV: attendance
-            const reportType = format === 'pdf' ? 'student_performance' : 'attendance';
             await reportService.exportReport(format, reportType);
         } catch (err) {
             alert('Failed to export report: ' + err.message);
@@ -66,7 +70,7 @@ const AnalyticsReports = () => {
                     <p style={{ margin: '0 0 8px 0', fontWeight: 800, color: 'var(--color-text-main)' }}>{label}</p>
                     {payload.map((entry, index) => (
                         <p key={index} style={{ margin: '4px 0', fontSize: '0.875rem', fontWeight: 600, color: entry.color }}>
-                            {entry.name}: {entry.value}%
+                            {entry.name}: {entry.value}
                         </p>
                     ))}
                 </div>
@@ -77,23 +81,59 @@ const AnalyticsReports = () => {
 
     return (
         <div className={styles.container}>
-            <header style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <header style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem' }}>
                 <h1 className={styles.title}>{t('analytics.title')}</h1>
                 <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '1.1rem', fontWeight: 500 }}>
                     Real-time academic performance and system metrics across all workstreams
                 </p>
             </header>
 
+            {/* Quick Stats Overview */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '2rem'
+            }}>
+                <div className={styles.card} style={{ gap: '0.5rem', padding: '1.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Students</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                            {stats?.global?.total_students || 0}
+                        </span>
+                        <TrendingUp size={32} color="var(--color-primary)" opacity={0.2} />
+                    </div>
+                </div>
+                <div className={styles.card} style={{ gap: '0.5rem', padding: '1.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Teachers</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '2rem', fontWeight: 800, color: '#0ea5e9' }}>
+                            {stats?.global?.total_teachers || 0}
+                        </span>
+                        <User size={32} color="#0ea5e9" opacity={0.2} />
+                    </div>
+                </div>
+                <div className={styles.card} style={{ gap: '0.5rem', padding: '1.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Schools</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b' }}>
+                            {stats?.global?.total_schools || 0}
+                        </span>
+                        <CheckCircle size={32} color="#f59e0b" opacity={0.2} />
+                    </div>
+                </div>
+            </div>
+
             <div className={styles.grid}>
                 <div className={`${styles.card} ${styles.fullWidth}`}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ background: 'var(--color-primary-light)', padding: '10px', borderRadius: '12px' }}>
+                            <div style={{ background: 'rgba(79, 70, 229, 0.1)', padding: '10px', borderRadius: '12px' }}>
                                 <TrendingUp size={24} color="var(--color-primary)" />
                             </div>
-                            <h2 className={styles.cardTitle}>{t('analytics.academic')}</h2>
+                            <h2 className={styles.cardTitle}>Student Distribution</h2>
                         </div>
-                        {loading && <span className={styles.loadingPulse}>Syncing Data...</span>}
+                        {loading && <span className={styles.loadingPulse}>Refreshing...</span>}
                     </div>
 
                     <div className={styles.chartContainer}>
@@ -103,38 +143,63 @@ const AnalyticsReports = () => {
                             <div className={styles.errorState}>{error}</div>
                         ) : (
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
                                     <XAxis
                                         dataKey="name"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600 }}
+                                        angle={-45}
+                                        textAnchor="end"
+                                        interval={0}
+                                        tick={{ fill: 'var(--color-text-muted)', fontSize: 11, fontWeight: 600 }}
                                     />
                                     <YAxis
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600 }}
+                                        tick={{ fill: 'var(--color-text-muted)', fontSize: 11, fontWeight: 600 }}
                                     />
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(79, 70, 229, 0.05)' }} />
-                                    <Legend
-                                        verticalAlign="top"
-                                        align="right"
-                                        iconType="circle"
-                                        wrapperStyle={{ paddingBottom: '20px' }}
-                                    />
-                                    <Bar dataKey="students" fill="url(#gradMath)" name="Students" radius={[6, 6, 0, 0]} />
-                                    <Bar dataKey="schools" fill="url(#gradScience)" name="Schools" radius={[6, 6, 0, 0]} />
+                                    <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '20px' }} />
+                                    <Bar dataKey="students" fill="url(#gradStudents)" name="Students" radius={[6, 6, 0, 0]} />
+                                    <Bar dataKey="schools" fill="url(#gradSchools)" name="Schools" radius={[6, 6, 0, 0]} />
                                     <defs>
-                                        <linearGradient id="gradMath" x1="0" y1="0" x2="0" y2="1">
+                                        <linearGradient id="gradStudents" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="0%" stopColor="#4f46e5" />
                                             <stop offset="100%" stopColor="#818cf8" />
                                         </linearGradient>
-                                        <linearGradient id="gradScience" x1="0" y1="0" x2="0" y2="1">
+                                        <linearGradient id="gradSchools" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="0%" stopColor="#0ea5e9" />
                                             <stop offset="100%" stopColor="#7dd3fc" />
                                         </linearGradient>
                                     </defs>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                </div>
+
+                <div className={styles.card}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+                        <div style={{ background: 'rgba(14, 165, 233, 0.1)', padding: '10px', borderRadius: '12px' }}>
+                            <User size={24} color="#0ea5e9" />
+                        </div>
+                        <h2 className={styles.cardTitle}>Teacher Metrics</h2>
+                    </div>
+                    <div className={styles.chartContainer} style={{ height: '300px' }}>
+                        {loading ? (
+                            <div className={styles.loaderPlaceholder} />
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={teacherData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                                    <XAxis
+                                        dataKey="name"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: 'var(--color-text-muted)', fontSize: 10, fontWeight: 600 }}
+                                    />
+                                    <Tooltip cursor={{ fill: 'rgba(14, 165, 233, 0.05)' }} />
+                                    <Bar dataKey="teachers" fill="#0ea5e9" name="Teachers" radius={[4, 4, 0, 0]} barSize={30} />
                                 </BarChart>
                             </ResponsiveContainer>
                         )}
@@ -157,7 +222,7 @@ const AnalyticsReports = () => {
                                 </div>
                                 <span className={styles.reportName}>{t('analytics.globalReport')}</span>
                             </div>
-                            <button className={styles.downloadBtn} onClick={() => handleExport('pdf')}>
+                            <button className={styles.downloadBtn} onClick={() => handleExport('pdf', 'comprehensive_academic')}>
                                 <Download size={16} /> PDF
                             </button>
                         </div>
@@ -168,7 +233,7 @@ const AnalyticsReports = () => {
                                 </div>
                                 <span className={styles.reportName}>{t('analytics.systemUsage')}</span>
                             </div>
-                            <button className={styles.downloadBtn} onClick={() => handleExport('csv')}>
+                            <button className={styles.downloadBtn} onClick={() => handleExport('csv', 'system_usage')}>
                                 <Download size={16} /> CSV
                             </button>
                         </div>

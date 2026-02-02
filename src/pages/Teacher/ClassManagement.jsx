@@ -20,14 +20,11 @@ const ClassManagement = () => {
         const fetchInitialData = async () => {
             try {
                 setLoading(true);
-                // Fetch teacher profile to get course allocations
-                const profile = await teacherService.getProfile(user.user_id);
-                // Assuming profile contains allocations or we use a fallback
-                // For now, let's fetch students directly if we can't find specific class list
+                // Fetch students directly for now
                 const studentsData = await teacherService.getStudents({ school_id: user.school_id });
                 setStudents(studentsData.results || studentsData || []);
 
-                // Mock classes if not found in profile for now to keep UI working
+                // Mock classes for now
                 setClasses(['Grade 10-A', 'Grade 10-B', 'Grade 11-A', 'Grade 11-B']);
                 setSelectedClass('Grade 10-A');
             } catch (error) {
@@ -38,27 +35,35 @@ const ClassManagement = () => {
         };
 
         fetchInitialData();
-    }, [user.user_id, user.school_id]);
+    }, [user.school_id]);
 
-    const handleAttendanceStatus = async (studentId, status) => {
-        try {
-            // Optimistic update
-            setStudents(prev => prev.map(s => s.user_id === studentId ? { ...s, attendance_status: status } : s));
-
-            // In a real scenario, we'd call recordAttendance here or on "Save Changes"
-            // For now, just local state to match UI
-        } catch (error) {
-            console.error("Error updating attendance:", error);
-        }
+    const handleAttendanceStatus = (studentId, status) => {
+        setStudents(prev => prev.map(s => s.user_id === studentId ? { ...s, attendance_status: status } : s));
     };
 
     const handleSaveAttendance = async () => {
         try {
-            alert('Saving attendance records...');
-            // Loop through students and record attendance
-            // This would normally be a bulk operation if the backend supports it
+            const attendanceRecords = students
+                .filter(s => s.attendance_status)
+                .map(s => ({
+                    student_id: s.user_id,
+                    status: s.attendance_status.toLowerCase(),
+                    date: attendanceDate,
+                    // Assuming we need a course_allocation_id or similar, 
+                    // this might need adjustment based on real backend requirements
+                }));
+
+            if (attendanceRecords.length === 0) {
+                alert('No attendance marked yet.');
+                return;
+            }
+
+            // Record each attendance (if backend doesn't support bulk)
+            await Promise.all(attendanceRecords.map(record => teacherService.recordAttendance(record)));
+            alert('Attendance records saved successfully!');
         } catch (error) {
             console.error("Error saving attendance:", error);
+            alert("Failed to save attendance");
         }
     };
 

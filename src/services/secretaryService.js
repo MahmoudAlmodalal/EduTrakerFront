@@ -17,7 +17,7 @@ const secretaryService = {
     // Admissions & Students
     getApplications: async (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/manager/enrollments/?${queryParams}`);
+        return api.get(`/manager/enrollments/${queryParams ? `?${queryParams}` : ''}`);
     },
     approveApplication: async (id) => {
         return api.post(`/manager/enrollments/${id}/activate/`);

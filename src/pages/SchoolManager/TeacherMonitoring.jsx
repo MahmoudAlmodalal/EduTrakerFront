@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../utils/api';
+import managerService from '../../services/managerService';
 import './SchoolManager.css';
 
 const TeacherMonitoring = () => {
@@ -32,8 +32,8 @@ const TeacherMonitoring = () => {
             setLoading(true);
             try {
                 const [teachersData, evaluationsData] = await Promise.all([
-                    api.get(`/teacher/teachers/`),
-                    api.get('/manager/staff-evaluations/')
+                    managerService.getTeachers(),
+                    managerService.getStaffEvaluations()
                 ]);
                 setTeachers(teachersData.results || teachersData);
                 setEvaluations(evaluationsData.results || evaluationsData);
@@ -46,13 +46,22 @@ const TeacherMonitoring = () => {
         fetchData();
     }, [schoolId]);
 
+    const fetchEvaluations = async () => {
+        try {
+            const data = await managerService.getStaffEvaluations();
+            setEvaluations(data.results || data);
+        } catch (error) {
+            console.error('Failed to fetch evaluations:', error);
+        }
+    }
+
     const renderTabContent = () => {
         if (loading) return <div>Loading...</div>;
         switch (activeTab) {
             case 'directory':
                 return <TeacherDirectory teachers={teachers} setTeachers={setTeachers} t={t} />;
             case 'performance':
-                return <PerformanceEvaluation evaluations={evaluations} setEvaluations={setEvaluations} teachers={teachers} t={t} />;
+                return <PerformanceEvaluation evaluations={evaluations} onEvaluationAdded={fetchEvaluations} teachers={teachers} t={t} />;
             case 'activity':
                 return <ActivityLogs teachers={teachers} t={t} />;
             default:
@@ -137,7 +146,7 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
     const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to deactivate this teacher?')) {
             try {
-                await api.post(`/teacher/teachers/${id}/deactivate/`);
+                await managerService.deactivateTeacher(id);
                 setTeachers(teachers.filter(t => t.id !== id));
             } catch (error) {
                 console.error('Failed to deactivate teacher:', error);
@@ -202,17 +211,20 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
     );
 };
 
-const PerformanceEvaluation = ({ evaluations, setEvaluations, teachers, t }) => {
+const PerformanceEvaluation = ({ evaluations, onEvaluationAdded, teachers, t }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ staff_id: '', score: 5, comments: '' });
+    const [formData, setFormData] = useState({ reviewee_id: '', rating_score: 5, comments: '' });
 
     const handleSave = async (e) => {
         e.preventDefault();
         try {
-            const response = await api.post('/manager/staff-evaluations/create/', formData);
-            setEvaluations([...evaluations, response]);
+            await managerService.createStaffEvaluation({
+                ...formData,
+                evaluation_date: new Date().toISOString().split('T')[0]
+            });
+            onEvaluationAdded();
             setIsModalOpen(false);
-            setFormData({ staff_id: '', score: 5, comments: '' });
+            setFormData({ reviewee_id: '', rating_score: 5, comments: '' });
         } catch (error) {
             console.error('Failed to create evaluation:', error);
         }
@@ -239,17 +251,17 @@ const PerformanceEvaluation = ({ evaluations, setEvaluations, teachers, t }) => 
                 <tbody>
                     {evaluations.map((evalItem) => (
                         <tr key={evalItem.id}>
-                            <td className="font-medium text-gray-900">{evalItem.staff_name}</td>
+                            <td className="font-medium text-gray-900">{evalItem.reviewee_name || evalItem.reviewee_email}</td>
                             <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <Star size={16} fill="gold" stroke="gold" />
-                                    <span style={{ fontWeight: 'bold' }}>{evalItem.score}</span>
+                                    <span style={{ fontWeight: 'bold' }}>{evalItem.rating_score}</span>
                                 </div>
                             </td>
                             <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {evalItem.comments}
                             </td>
-                            <td>{new Date(evalItem.created_at).toLocaleDateString()}</td>
+                            <td>{new Date(evalItem.evaluation_date).toLocaleDateString()}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -271,8 +283,8 @@ const PerformanceEvaluation = ({ evaluations, setEvaluations, teachers, t }) => 
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Select Staff</label>
                                 <select
                                     required
-                                    value={formData.staff_id}
-                                    onChange={e => setFormData({ ...formData, staff_id: e.target.value })}
+                                    value={formData.reviewee_id}
+                                    onChange={e => setFormData({ ...formData, reviewee_id: e.target.value })}
                                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
                                 >
                                     <option value="">Select Staff Member</option>
@@ -288,8 +300,8 @@ const PerformanceEvaluation = ({ evaluations, setEvaluations, teachers, t }) => 
                                     min="1"
                                     max="10"
                                     required
-                                    value={formData.score}
-                                    onChange={e => setFormData({ ...formData, score: e.target.value })}
+                                    value={formData.rating_score}
+                                    onChange={e => setFormData({ ...formData, rating_score: e.target.value })}
                                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
                                 />
                             </div>

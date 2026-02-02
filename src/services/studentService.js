@@ -8,11 +8,11 @@ const studentService = {
 
     // Get student profile
     getProfile: async (studentId) => {
-        return api.get(`/student/profile/${studentId}/`);
+        return api.get(`/manager/students/${studentId}/`);
     },
 
     updateProfile: async (studentId, data) => {
-        return api.patch(`/student/profile/${studentId}/`, data);
+        return api.patch(`/manager/students/${studentId}/`, data);
     },
 
     // Get attendance history
@@ -21,8 +21,9 @@ const studentService = {
     },
 
     // Get assignments
-    getAssignments: async (studentId) => {
-        return api.get(`/student/assignments/?student_id=${studentId}`);
+    getAssignments: async (filters = {}) => {
+        const queryParams = new URLSearchParams(filters).toString();
+        return api.get(`/teacher/assignments/?${queryParams}`);
     },
 
     // Get marks/results
@@ -31,9 +32,9 @@ const studentService = {
     },
 
     // Get learning materials
-    getLearningMaterials: async (studentId, filters = {}) => {
-        const queryParams = new URLSearchParams({ ...filters, student_id: studentId }).toString();
-        return api.get(`/student/learning-materials/?${queryParams}`);
+    getLearningMaterials: async (filters = {}) => {
+        const queryParams = new URLSearchParams(filters).toString();
+        return api.get(`/teacher/learning-materials/?${queryParams}`);
     },
 
     // Messages

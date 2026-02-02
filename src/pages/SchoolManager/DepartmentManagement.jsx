@@ -9,7 +9,7 @@ import {
     Trash
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import { api } from '../../utils/api';
+import managerService from '../../services/managerService';
 import './SchoolManager.css';
 
 const DepartmentManagement = () => {
@@ -21,19 +21,20 @@ const DepartmentManagement = () => {
     const [formData, setFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
 
     useEffect(() => {
-        const fetchGrades = async () => {
-            setLoading(true);
-            try {
-                const response = await api.get('/school/grades/');
-                setGrades(response.results || response);
-            } catch (error) {
-                console.error('Failed to fetch grades:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchGrades();
     }, []);
+
+    const fetchGrades = async () => {
+        setLoading(true);
+        try {
+            const data = await managerService.getGrades();
+            setGrades(data.results || data);
+        } catch (error) {
+            console.error('Failed to fetch grades:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const openModal = (grade = null) => {
         if (grade) {
@@ -55,12 +56,11 @@ const DepartmentManagement = () => {
         e.preventDefault();
         try {
             if (currentGrade) {
-                const response = await api.patch(`/school/grades/${currentGrade.id}/`, formData);
-                setGrades(grades.map(g => g.id === currentGrade.id ? response : g));
+                await managerService.updateGrade(currentGrade.id, formData);
             } else {
-                const response = await api.post('/school/grades/create/', formData);
-                setGrades([...grades, response]);
+                await managerService.createGrade(formData);
             }
+            fetchGrades();
             setIsModalOpen(false);
         } catch (error) {
             console.error('Failed to save grade:', error);
@@ -71,8 +71,8 @@ const DepartmentManagement = () => {
     const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to deactivate this grade?')) {
             try {
-                await api.post(`/school/grades/${id}/deactivate/`);
-                setGrades(grades.filter(g => g.id !== id));
+                await managerService.deactivateGrade(id);
+                fetchGrades();
             } catch (error) {
                 console.error('Failed to deactivate grade:', error);
             }
@@ -225,4 +225,3 @@ const DepartmentManagement = () => {
 };
 
 export default DepartmentManagement;
-

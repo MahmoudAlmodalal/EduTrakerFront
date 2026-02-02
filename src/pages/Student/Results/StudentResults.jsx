@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Award,
     TrendingUp,
@@ -8,7 +8,10 @@ import {
     Star,
     Target,
     Medal,
-    Minus
+    Minus,
+    RefreshCw,
+    AlertCircle,
+    BookOpen
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -19,8 +22,9 @@ const StudentResults = () => {
     const { t } = useTheme();
     const { user } = useAuth();
     const [expandedSubject, setExpandedSubject] = useState(null);
-    const [loading, setLoading] = React.useState(true);
-    const [resultsData, setResultsData] = React.useState({
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [resultsData, setResultsData] = useState({
         overallAverage: 0,
         totalAssignments: 0,
         gradedAssignments: 0,
@@ -28,12 +32,14 @@ const StudentResults = () => {
         byType: {}
     });
 
-    React.useEffect(() => {
-        const fetchResults = async () => {
-            if (!user?.id) return;
-            try {
-                const data = await studentService.getDashboardStats();
-                const grades = data.statistics.grades;
+    const fetchResults = async () => {
+        if (!user?.id) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await studentService.getDashboardStats();
+            const grades = data.statistics?.grades;
+            if (grades) {
                 setResultsData({
                     overallAverage: grades.overall_average || 0,
                     totalAssignments: grades.total_assignments || 0,
@@ -41,14 +47,83 @@ const StudentResults = () => {
                     marks: grades.marks || [],
                     byType: grades.by_type || {}
                 });
-            } catch (error) {
-                console.error('Error fetching results:', error);
-            } finally {
-                setLoading(false);
             }
-        };
+        } catch (error) {
+            console.error('Error fetching results:', error);
+            setError('Failed to load academic results. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchResults();
     }, [user?.id]);
+
+    const groupedResults = useMemo(() => {
+        if (!resultsData.marks.length) return [];
+
+        const groups = {};
+        const colors = ['#0891b2', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'];
+
+        resultsData.marks.forEach(m => {
+            const courseName = m.course_name || 'General';
+            if (!groups[courseName]) {
+                groups[courseName] = {
+                    subject: courseName,
+                    color: colors[Object.keys(groups).length % colors.length],
+                    assessments: [],
+                    totalScore: 0,
+                    totalFullMark: 0
+                };
+            }
+            groups[courseName].assessments.push({
+                title: m.title,
+                date: m.due_date ? new Date(m.due_date).toLocaleDateString() : 'N/A',
+                grade: m.score,
+                total: m.full_mark,
+                percentage: m.percentage,
+                type: m.exam_type
+            });
+            groups[courseName].totalScore += m.score;
+            groups[courseName].totalFullMark += m.full_mark;
+        });
+
+        return Object.values(groups).map(group => {
+            const finalGrade = group.totalFullMark > 0
+                ? Math.round((group.totalScore / group.totalFullMark) * 100)
+                : 0;
+
+            return {
+                ...group,
+                finalGrade,
+                letterGrade: finalGrade >= 90 ? 'A' : finalGrade >= 80 ? 'B' : finalGrade >= 70 ? 'C' : finalGrade >= 60 ? 'D' : 'F',
+                trend: 'stable' // Can be logic-based if we have historical data
+            };
+        });
+    }, [resultsData.marks]);
+
+    if (loading) {
+        return (
+            <div className="dashboard-loading">
+                <RefreshCw className="animate-spin" size={40} />
+                <p>Loading your academic performance...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="dashboard-error">
+                <AlertCircle size={48} color="#ef4444" />
+                <p>{error}</p>
+                <button onClick={fetchResults} className="retry-btn">
+                    <RefreshCw size={18} />
+                    Try Again
+                </button>
+            </div>
+        );
+    }
 
     const getTrendIcon = (trend) => {
         switch (trend) {
@@ -66,33 +141,19 @@ const StudentResults = () => {
         }
     };
 
-    const getGradeColor = (grade) => {
-        if (grade >= 90) return '#10b981';
-        if (grade >= 80) return '#0891b2';
-        if (grade >= 70) return '#f59e0b';
+    const getGradeColor = (percentage) => {
+        if (percentage >= 90) return '#10b981';
+        if (percentage >= 80) return '#0891b2';
+        if (percentage >= 70) return '#f59e0b';
         return '#ef4444';
     };
-
-    if (loading) return <div className="loading-container">Loading...</div>;
 
     const overallStats = {
         gpa: (resultsData.overallAverage / 25).toFixed(2),
         rank: 'N/A',
-        totalCredits: resultsData.gradedAssignments,
+        totalAssessments: resultsData.gradedAssignments,
         successRate: resultsData.overallAverage
     };
-
-    // Group marks by course/subject if needed, but for now we'll use them as is
-    const results = resultsData.marks.map(m => ({
-        subject: m.course_name || m.title,
-        color: '#0891b2', // Can be dynamic
-        assessments: [
-            { title: m.title, date: m.due_date, grade: m.score, total: 100, average: 80 } // Mock average
-        ],
-        finalGrade: m.percentage,
-        letterGrade: m.score >= 90 ? 'A' : m.score >= 80 ? 'B' : 'C',
-        trend: 'stable'
-    }));
 
     return (
         <div className="student-results">
@@ -133,17 +194,17 @@ const StudentResults = () => {
                     </div>
                     <div className="result-stat-content">
                         <span className="result-stat-value">{overallStats.rank}</span>
-                        <span className="result-stat-label">{t('student.results.classRanking') || 'Class Ranking'}</span>
+                        <span className="result-stat-label">{t('student.results.classRanking') || 'Class Rank'}</span>
                     </div>
                 </div>
 
                 <div className="result-stat-card">
                     <div className="result-stat-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' }}>
-                        <Star size={28} />
+                        <BarChart2 size={28} />
                     </div>
                     <div className="result-stat-content">
-                        <span className="result-stat-value">{overallStats.totalCredits}</span>
-                        <span className="result-stat-label">Credits Earned</span>
+                        <span className="result-stat-value">{overallStats.totalAssessments}</span>
+                        <span className="result-stat-label">Graded Tasks</span>
                     </div>
                 </div>
 
@@ -153,105 +214,168 @@ const StudentResults = () => {
                     </div>
                     <div className="result-stat-content">
                         <span className="result-stat-value">{overallStats.successRate}%</span>
-                        <span className="result-stat-label">{t('student.results.overallSuccessRate') || 'Success Rate'}</span>
+                        <span className="result-stat-label">Average Score</span>
                     </div>
                 </div>
             </div>
 
             <div className="results-list">
-                {results.map((result, index) => (
-                    <div
-                        key={index}
-                        className={`result-card ${expandedSubject === index ? 'expanded' : ''}`}
-                        style={{ '--subject-color': result.color }}
-                    >
+                {groupedResults.length > 0 ? (
+                    groupedResults.map((result, index) => (
                         <div
-                            className="result-card-header"
-                            onClick={() => setExpandedSubject(expandedSubject === index ? null : index)}
+                            key={index}
+                            className={`result-card ${expandedSubject === index ? 'expanded' : ''}`}
+                            style={{ '--subject-color': result.color }}
                         >
-                            <div className="result-subject-info">
-                                <div className="result-subject-indicator" style={{ background: result.color }}></div>
-                                <div>
-                                    <h3 className="result-subject-name">{result.subject}</h3>
-                                    <div className="result-assessments-count">
-                                        {result.assessments.length} assessments completed
+                            <div
+                                className="result-card-header"
+                                onClick={() => setExpandedSubject(expandedSubject === index ? null : index)}
+                            >
+                                <div className="result-subject-info">
+                                    <div className="result-subject-indicator" style={{ background: result.color }}></div>
+                                    <div>
+                                        <h3 className="result-subject-name">{result.subject}</h3>
+                                        <div className="result-assessments-count">
+                                            {result.assessments.length} assessment{result.assessments.length !== 1 ? 's' : ''} completed
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="result-grade-section">
-                                <div className="result-letter-grade" style={{ color: result.color }}>
-                                    {result.letterGrade}
+                                <div className="result-grade-section">
+                                    <div className="result-letter-grade" style={{ color: result.color }}>
+                                        {result.letterGrade}
+                                    </div>
+                                    <div className="result-percentage">
+                                        <span className="grade-value">{result.finalGrade}%</span>
+                                        <span className={`trend-badge ${getTrendClass(result.trend)}`}>
+                                            {getTrendIcon(result.trend)}
+                                            <span>{result.trend === 'up' ? 'Improving' : result.trend === 'down' ? 'Declining' : 'Stable'}</span>
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="result-percentage">
-                                    <span className="grade-value">{result.finalGrade}%</span>
-                                    <span className={`trend-badge ${getTrendClass(result.trend)}`}>
-                                        {getTrendIcon(result.trend)}
-                                        <span>{result.trend === 'up' ? 'Improving' : result.trend === 'down' ? 'Declining' : 'Stable'}</span>
-                                    </span>
+
+                                <div className="result-progress-ring">
+                                    <svg viewBox="0 0 36 36">
+                                        <path
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="#e0f2fe" strokeWidth="3"
+                                        />
+                                        <path
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke={result.color} strokeWidth="3" strokeLinecap="round"
+                                            strokeDasharray={`${result.finalGrade}, 100`}
+                                        />
+                                    </svg>
                                 </div>
+
+                                <button className="expand-btn">
+                                    <ChevronDown size={20} />
+                                </button>
                             </div>
 
-                            <div className="result-progress-ring">
-                                <svg viewBox="0 0 36 36">
-                                    <path
-                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                        fill="none" stroke="#e0f2fe" strokeWidth="3"
-                                    />
-                                    <path
-                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                        fill="none" stroke={result.color} strokeWidth="3" strokeLinecap="round"
-                                        strokeDasharray={`${result.finalGrade}, 100`}
-                                    />
-                                </svg>
-                            </div>
-
-                            <button className="expand-btn">
-                                <ChevronDown size={20} />
-                            </button>
-                        </div>
-
-                        <div className="result-card-details">
-                            <table className="assessments-table">
-                                <thead>
-                                    <tr>
-                                        <th>{t('student.results.assessment') || 'Assessment'}</th>
-                                        <th>{t('student.results.date') || 'Date'}</th>
-                                        <th>{t('student.results.score') || 'Score'}</th>
-                                        <th>{t('student.results.average') || 'Class Avg'}</th>
-                                        <th>{t('student.results.status') || 'Status'}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {result.assessments.map((assessment, aIndex) => (
-                                        <tr key={aIndex}>
-                                            <td className="assessment-title">{assessment.title}</td>
-                                            <td className="assessment-date">{assessment.date}</td>
-                                            <td>
-                                                <span className="assessment-score" style={{ color: getGradeColor(assessment.grade) }}>
-                                                    {assessment.grade}/100
-                                                </span>
-                                            </td>
-                                            <td className="assessment-average">{assessment.average}</td>
-                                            <td>
-                                                <span className={`status-badge ${assessment.grade >= assessment.average ? 'above' : 'below'}`}>
-                                                    {assessment.grade >= assessment.average ? (
-                                                        <>{t('student.results.aboveAvg') || 'Above Avg'}</>
-                                                    ) : (
-                                                        <>{t('student.results.belowAvg') || 'Below Avg'}</>
-                                                    )}
-                                                </span>
-                                            </td>
+                            <div className="result-card-details">
+                                <table className="assessments-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t('student.results.assessment') || 'Title'}</th>
+                                            <th>Type</th>
+                                            <th>{t('student.results.date') || 'Date'}</th>
+                                            <th>{t('student.results.score') || 'Score'}</th>
+                                            <th>Percentage</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {result.assessments.map((assessment, aIndex) => (
+                                            <tr key={aIndex}>
+                                                <td className="assessment-title">{assessment.title}</td>
+                                                <td><span className="type-badge">{assessment.type}</span></td>
+                                                <td className="assessment-date">{assessment.date}</td>
+                                                <td>
+                                                    <span className="assessment-score">
+                                                        {assessment.grade}/{assessment.total}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="percentage-display">
+                                                        <div className="percentage-bar-bg">
+                                                            <div
+                                                                className="percentage-bar-fill"
+                                                                style={{
+                                                                    width: `${assessment.percentage}%`,
+                                                                    backgroundColor: getGradeColor(assessment.percentage)
+                                                                }}
+                                                            ></div>
+                                                        </div>
+                                                        <span className="percentage-text">{assessment.percentage}%</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
+                    ))
+                ) : (
+                    <div className="empty-results">
+                        <BookOpen size={48} />
+                        <p>No graded assignments found yet.</p>
                     </div>
-                ))}
+                )}
             </div>
 
             <style>{`
+                .dashboard-loading, .dashboard-error {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 400px;
+                    text-align: center;
+                    gap: 1rem;
+                    background: white;
+                    border-radius: 20px;
+                    padding: 2rem;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+                }
+
+                .animate-spin {
+                    animation: spin 1s linear infinite;
+                    color: var(--student-primary, #0891b2);
+                }
+
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                .retry-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.5rem;
+                    background: var(--student-gradient, linear-gradient(135deg, #0891b2, #06b6d4));
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    cursor: pointer;
+                }
+
+                .empty-results {
+                    text-align: center;
+                    padding: 4rem 2rem;
+                    background: white;
+                    border-radius: 20px;
+                    color: #64748b;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+                }
+
+                .empty-results svg {
+                    margin-bottom: 1rem;
+                    opacity: 0.5;
+                }
+
                 .results-stats-grid {
                     display: grid;
                     grid-template-columns: repeat(4, 1fr);
@@ -287,10 +411,6 @@ const StudentResults = () => {
                 .result-stat-card:hover {
                     transform: translateY(-3px);
                     box-shadow: 0 8px 30px rgba(8, 145, 178, 0.1);
-                }
-                
-                .gpa-card {
-                    grid-column: span 1;
                 }
                 
                 .result-stat-icon {
@@ -478,7 +598,8 @@ const StudentResults = () => {
                 }
                 
                 .result-card.expanded .result-card-details {
-                    max-height: 500px;
+                    max-height: 800px;
+                    overflow-y: auto;
                 }
                 
                 .assessments-table {
@@ -518,40 +639,60 @@ const StudentResults = () => {
                 
                 .assessment-score {
                     font-weight: 700;
-                    font-size: 0.9375rem;
+                    color: var(--color-text-main, #1e293b);
                 }
-                
-                .assessment-average {
-                    color: var(--color-text-muted, #64748b);
-                }
-                
-                .status-badge {
-                    display: inline-flex;
-                    padding: 0.25rem 0.625rem;
-                    border-radius: 20px;
+
+                .type-badge {
                     font-size: 0.6875rem;
                     font-weight: 600;
+                    padding: 0.125rem 0.5rem;
+                    border-radius: 4px;
+                    background: #f1f5f9;
+                    color: #64748b;
+                    text-transform: capitalize;
                 }
-                
-                .status-badge.above {
-                    background: #dcfce7;
-                    color: #16a34a;
+
+                .percentage-display {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
                 }
-                
-                .status-badge.below {
-                    background: #fef3c7;
-                    color: #d97706;
+
+                .percentage-bar-bg {
+                    flex: 1;
+                    height: 6px;
+                    background: #f1f5f9;
+                    border-radius: 3px;
+                    overflow: hidden;
+                    min-width: 60px;
+                }
+
+                .percentage-bar-fill {
+                    height: 100%;
+                    border-radius: 3px;
+                    transition: width 0.5s ease;
+                }
+
+                .percentage-text {
+                    font-size: 0.8125rem;
+                    font-weight: 600;
+                    min-width: 35px;
                 }
                 
                 [data-theme="dark"] .result-stat-card,
-                [data-theme="dark"] .result-card {
+                [data-theme="dark"] .result-card,
+                [data-theme="dark"] .dashboard-loading,
+                [data-theme="dark"] .dashboard-error,
+                [data-theme="dark"] .empty-results {
                     background: #1e293b;
                 }
                 
                 [data-theme="dark"] .result-stat-value,
                 [data-theme="dark"] .result-subject-name,
                 [data-theme="dark"] .grade-value,
-                [data-theme="dark"] .assessment-title {
+                [data-theme="dark"] .assessment-title,
+                [data-theme="dark"] .assessment-score,
+                [data-theme="dark"] .percentage-text {
                     color: #f1f5f9;
                 }
                 
@@ -561,6 +702,11 @@ const StudentResults = () => {
                 
                 [data-theme="dark"] .result-card-header:hover {
                     background: rgba(30, 41, 59, 0.8);
+                }
+
+                [data-theme="dark"] .type-badge,
+                [data-theme="dark"] .percentage-bar-bg {
+                    background: #334155;
                 }
             `}</style>
         </div>

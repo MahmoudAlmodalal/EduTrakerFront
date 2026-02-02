@@ -41,9 +41,10 @@ const Communication = () => {
         e.preventDefault();
         try {
             const payload = {
-                recipient_id: newMessage.to,
+                receiver_id: parseInt(newMessage.to),
                 subject: newMessage.subject,
-                content: newMessage.body
+                content: newMessage.body,
+                message_type: 'direct'
             };
             const sent = await secretaryService.sendMessage(payload);
             setMessages([sent, ...messages]);
@@ -52,7 +53,7 @@ const Communication = () => {
             alert('Message sent successfully!');
         } catch (error) {
             console.error("Error sending message:", error);
-            alert("Failed to send message");
+            alert("Failed to send message: " + (error.message || 'Unknown error'));
         }
     };
 

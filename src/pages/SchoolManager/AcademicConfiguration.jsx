@@ -5,13 +5,12 @@ import {
     Calendar,
     AlertTriangle,
     Plus,
-    Save,
     CheckCircle,
     Search
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../utils/api';
+import managerService from '../../services/managerService';
 import './SchoolManager.css';
 
 const AcademicConfiguration = () => {
@@ -30,8 +29,8 @@ const AcademicConfiguration = () => {
             setLoading(true);
             try {
                 const [coursesData, teachersData] = await Promise.all([
-                    api.get(`/school/school/${schoolId}/courses/`),
-                    api.get('/teacher/teachers/')
+                    managerService.getCourses(schoolId),
+                    managerService.getTeachers()
                 ]);
                 setCourses(coursesData.results || coursesData);
                 setTeachers(teachersData.results || teachersData);
@@ -44,8 +43,18 @@ const AcademicConfiguration = () => {
         fetchData();
     }, [schoolId]);
 
-    // Mock conflicts
-    const [conflicts, setConflicts] = useState([
+    const fetchCourses = async () => {
+        if (!schoolId) return;
+        try {
+            const data = await managerService.getCourses(schoolId);
+            setCourses(data.results || data);
+        } catch (error) {
+            console.error('Failed to fetch courses:', error);
+        }
+    }
+
+    // Mock conflicts - keep for UI demonstration until backend supports it
+    const [conflicts] = useState([
         { id: 1, type: 'Room Double Booking', description: 'Room 101 booked for Math 1-A and Sci 1-B at Monday 9:00 AM', severity: 'High' },
         { id: 2, type: 'Teacher Overlap', description: 'Mr. Smith assigned to 1-A and 1-B at Tuesday 10:00 AM', severity: 'High' },
     ]);
@@ -54,15 +63,15 @@ const AcademicConfiguration = () => {
         if (loading) return <div>Loading...</div>;
         switch (activeTab) {
             case 'subjects':
-                return <SubjectAllocation initialCourses={courses} schoolId={schoolId} />;
+                return <SubjectAllocation courses={courses} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
             case 'teachers':
-                return <TeacherAllocation initialAllocations={[]} teachers={teachers} />;
+                return <TeacherAllocation courses={courses} teachers={teachers} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
             case 'timetable':
                 return <TimetableGenerator />;
             case 'conflicts':
                 return <ConflictDetection conflicts={conflicts} />;
             default:
-                return <SubjectAllocation initialCourses={courses} schoolId={schoolId} />;
+                return <SubjectAllocation courses={courses} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
         }
     };
 
@@ -76,7 +85,6 @@ const AcademicConfiguration = () => {
             {/* Tabs */}
             <div className="flex border-b border-gray-200 mb-6 w-full" style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '1.5rem', display: 'flex', gap: '2rem' }}>
                 <button
-                    className={`pb-2 px-1 ${activeTab === 'subjects' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
                     style={{
                         paddingBottom: '0.5rem',
                         color: activeTab === 'subjects' ? 'var(--color-primary)' : 'var(--color-text-muted)',
@@ -94,7 +102,6 @@ const AcademicConfiguration = () => {
                     </div>
                 </button>
                 <button
-                    className={`pb-2 px-1 ${activeTab === 'teachers' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
                     style={{
                         paddingBottom: '0.5rem',
                         color: activeTab === 'teachers' ? 'var(--color-primary)' : 'var(--color-text-muted)',
@@ -112,7 +119,6 @@ const AcademicConfiguration = () => {
                     </div>
                 </button>
                 <button
-                    className={`pb-2 px-1 ${activeTab === 'timetable' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
                     style={{
                         paddingBottom: '0.5rem',
                         color: activeTab === 'timetable' ? 'var(--color-primary)' : 'var(--color-text-muted)',
@@ -130,7 +136,6 @@ const AcademicConfiguration = () => {
                     </div>
                 </button>
                 <button
-                    className={`pb-2 px-1 ${activeTab === 'conflicts' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
                     style={{
                         paddingBottom: '0.5rem',
                         color: activeTab === 'conflicts' ? 'var(--color-error)' : 'var(--color-text-muted)',
@@ -156,8 +161,7 @@ const AcademicConfiguration = () => {
 };
 
 // Sub-components for Tabs
-const SubjectAllocation = ({ initialCourses, schoolId }) => {
-    const [courses, setCourses] = useState(initialCourses);
+const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [grades, setGrades] = useState([]);
     const [formData, setFormData] = useState({ grade_id: '', course_code: '', name: '' });
@@ -165,8 +169,8 @@ const SubjectAllocation = ({ initialCourses, schoolId }) => {
     useEffect(() => {
         const fetchGrades = async () => {
             try {
-                const response = await api.get('/school/grades/');
-                setGrades(response.results || response);
+                const data = await managerService.getGrades();
+                setGrades(data.results || data);
             } catch (error) {
                 console.error('Failed to fetch grades:', error);
             }
@@ -177,8 +181,8 @@ const SubjectAllocation = ({ initialCourses, schoolId }) => {
     const handleSave = async (e) => {
         e.preventDefault();
         try {
-            const response = await api.post(`/school/school/${schoolId}/courses/create/`, formData);
-            setCourses([...courses, response]);
+            await managerService.createCourse(schoolId, formData);
+            onCourseUpdated();
             setIsModalOpen(false);
             setFormData({ grade_id: '', course_code: '', name: '' });
         } catch (error) {
@@ -190,8 +194,8 @@ const SubjectAllocation = ({ initialCourses, schoolId }) => {
     const handleRemove = async (id) => {
         if (!window.confirm('Are you sure you want to deactivate this subject?')) return;
         try {
-            await api.post(`/school/school/${schoolId}/courses/${id}/deactivate/`);
-            setCourses(courses.filter(c => c.id !== id));
+            await managerService.deactivateCourse(schoolId, id);
+            onCourseUpdated();
         } catch (error) {
             console.error('Failed to deactivate course:', error);
         }
@@ -219,7 +223,7 @@ const SubjectAllocation = ({ initialCourses, schoolId }) => {
                 <tbody>
                     {courses.map((item) => (
                         <tr key={item.id}>
-                            <td className="font-medium text-gray-900">{item.grade_name}</td>
+                            <td className="font-medium text-gray-900">{item.grade_name || item.grade}</td>
                             <td>{item.course_code}</td>
                             <td>{item.name}</td>
                             <td>
@@ -234,7 +238,7 @@ const SubjectAllocation = ({ initialCourses, schoolId }) => {
                                 </span>
                             </td>
                             <td>
-                                <button onClick={() => handleRemove(item.id)} className="text-red-600 hover:text-red-900" style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer' }}>Deactivate</button>
+                                <button onClick={() => handleRemove(item.id)} style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer' }}>Deactivate</button>
                             </td>
                         </tr>
                     ))}
@@ -299,20 +303,29 @@ const SubjectAllocation = ({ initialCourses, schoolId }) => {
     );
 };
 
-const TeacherAllocation = ({ initialAllocations, teachers }) => {
-    const [allocations, setAllocations] = useState(initialAllocations);
-    const [editingId, setEditingId] = useState(null);
+const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated }) => {
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [selectedCourse, setSelectedCourse] = useState(null);
     const [selectedTeacher, setSelectedTeacher] = useState('');
 
-    const handleEdit = (item) => {
-        setEditingId(item.id);
-        setSelectedTeacher(item.teacher_id || '');
+    const handleOpenAssign = (course) => {
+        setSelectedCourse(course);
+        setSelectedTeacher('');
+        setIsAssignModalOpen(true);
     };
 
-    const handleSave = (id) => {
-        const teacher = teachers.find(t => String(t.id) === String(selectedTeacher));
-        setAllocations(allocations.map(a => a.id === id ? { ...a, teacher: teacher ? teacher.full_name : 'Unassigned', teacher_id: selectedTeacher } : a));
-        setEditingId(null);
+    const handleAssign = async (e) => {
+        e.preventDefault();
+        if (!selectedCourse || !selectedTeacher) return;
+
+        try {
+            await managerService.assignTeacherToCourse(schoolId, selectedCourse.id, selectedTeacher);
+            setIsAssignModalOpen(false);
+            onCourseUpdated();
+        } catch (error) {
+            console.error('Failed to assign teacher:', error);
+            alert('Failed to assign teacher.');
+        }
     };
 
     return (
@@ -323,58 +336,81 @@ const TeacherAllocation = ({ initialAllocations, teachers }) => {
             <table className="data-table">
                 <thead>
                     <tr>
-                        <th>Class</th>
                         <th>Subject</th>
+                        <th>Grade</th>
                         <th>Assigned Teacher</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {allocations.length === 0 ? (
+                    {courses.length === 0 ? (
                         <tr>
                             <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                No teacher allocations found. Configure subjects first.
+                                No subjects found. Configure subjects first.
                             </td>
                         </tr>
-                    ) : allocations.map((item) => (
+                    ) : courses.map((item) => (
                         <tr key={item.id}>
-                            <td>{item.class}</td>
-                            <td>{item.subject}</td>
+                            <td>{item.name}</td>
+                            <td>{item.grade_name || item.grade}</td>
                             <td>
-                                {editingId === item.id ? (
-                                    <select
-                                        value={selectedTeacher}
-                                        onChange={e => setSelectedTeacher(e.target.value)}
-                                        style={{ padding: '0.25rem', borderRadius: '0.25rem', border: '1px solid var(--color-border)' }}
-                                    >
-                                        <option value="">Select Teacher</option>
-                                        {teachers.map(t => (
-                                            <option key={t.id} value={t.id}>{t.full_name}</option>
-                                        ))}
-                                    </select>
-                                ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--color-bg-body)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--color-text-main)' }}>
-                                            {item.teacher ? item.teacher.charAt(0) : 'U'}
-                                        </div>
-                                        {item.teacher || 'Unassigned'}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--color-bg-body)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--color-text-main)' }}>
+                                        {item.teacher_name ? item.teacher_name.charAt(0) : 'U'}
                                     </div>
-                                )}
+                                    {item.teacher_name || 'Unassigned'}
+                                </div>
                             </td>
                             <td>
-                                {editingId === item.id ? (
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button onClick={() => handleSave(item.id)} style={{ color: 'var(--color-success)', background: 'none', border: 'none', cursor: 'pointer' }}>Save</button>
-                                        <button onClick={() => setEditingId(null)} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                                    </div>
-                                ) : (
-                                    <button onClick={() => handleEdit(item)} style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', marginRight: '10px' }}>Edit</button>
-                                )}
+                                <button
+                                    onClick={() => handleOpenAssign(item)}
+                                    style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                                >
+                                    Assign
+                                </button>
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            {/* Assign Teacher Modal */}
+            {isAssignModalOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '400px',
+                        border: '1px solid var(--color-border)'
+                    }}>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>Assign Teacher</h2>
+                        <p style={{ marginBottom: '1rem', color: 'var(--color-text-muted)' }}>
+                            Assigning teacher for <strong>{selectedCourse?.name} ({selectedCourse?.grade_name})</strong>
+                        </p>
+                        <form onSubmit={handleAssign} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Select Teacher</label>
+                                <select
+                                    required
+                                    value={selectedTeacher}
+                                    onChange={e => setSelectedTeacher(e.target.value)}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                >
+                                    <option value="">Select a teacher...</option>
+                                    {teachers.map(t => (
+                                        <option key={t.id} value={t.id}>{t.full_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                                <button type="button" onClick={() => setIsAssignModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
+                                <button type="submit" className="btn-primary">Assign Teacher</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -414,7 +450,7 @@ const TimetableGenerator = () => {
 
             <div className="management-card">
                 <div className="table-header-actions">
-                    <h3 className="chart-title">Generated Timetable Preview (Grade 1-A)</h3>
+                    <h3 className="chart-title">Generated Timetable Preview</h3>
                 </div>
                 <div className="p-6" style={{ padding: '1.5rem', overflowX: 'auto' }}>
                     {!isGenerated ? (
@@ -505,4 +541,3 @@ const ConflictDetection = ({ conflicts }) => (
 );
 
 export default AcademicConfiguration;
-
