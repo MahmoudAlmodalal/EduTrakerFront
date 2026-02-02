@@ -1,324 +1,225 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     FileText,
     TrendingUp,
     Users,
     Download,
-    Search,
     Filter,
-    X,
-    Eye
+    Search,
+    ChevronRight,
+    Calendar,
+    ArrowUpRight,
+    ArrowDownRight,
+    BookOpen
 } from 'lucide-react';
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
-    LineChart,
-    Line
-} from 'recharts';
 import { useTheme } from '../../context/ThemeContext';
+import managerService from '../../services/managerService';
 import './SchoolManager.css';
 
 const AcademicReports = () => {
     const { t } = useTheme();
-    const [activeTab, setActiveTab] = useState('performance');
+    const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    // Helper to safe parse from local storage
-    const safeParse = (key, fallback) => {
-        try {
-            const saved = localStorage.getItem(key);
-            return saved ? JSON.parse(saved) : fallback;
-        } catch { return fallback; }
-    };
+    useEffect(() => {
+        const fetchStats = async () => {
+            setLoading(true);
+            try {
+                const data = await managerService.getDashboardStats();
+                setStats(data);
+            } catch (error) {
+                console.error('Failed to fetch stats:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStats();
+    }, []);
 
-    const students = safeParse('sec_students', []);
-    const allocations = safeParse('school_allocations', []);
+    const reportTypes = [
+        { id: 'attendance', name: 'Attendance Trends', description: 'Monthly student and teacher attendance overview.', icon: Calendar, color: 'blue' },
+        { id: 'performance', name: 'Academic Performance', description: 'Grade distribution and subject performance metrics.', icon: TrendingUp, color: 'green' },
+        { id: 'enrollment', name: 'Enrollment Report', description: 'New admissions and student retention statistics.', icon: Users, color: 'purple' },
+        { id: 'teacher', name: 'Teacher Evaluations', description: 'Summary of annual teacher performance reviews.', icon: FileText, color: 'orange' }
+    ];
 
-    // "Export All" Functionality
-    const handleExportAll = () => {
-        const csvContent = "data:text/csv;charset=utf-8," 
-            + "ID,Name,Grade,Class,Guardian,Contact\n"
-            + students.map(s => `${s.id},${s.name},${s.grade},${s.class || 'Unassigned'},${s.guardian},${s.contact}`).join("\n");
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "school_database_export.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const renderTabContent = () => {
-        switch (activeTab) {
-            case 'performance':
-                return <StudentPerformance students={students} />;
-            case 'class-comparison':
-                return <ClassComparison students={students} allocations={allocations} />;
-            case 'progress':
-                return <StudentProgress />;
-            default:
-                return <StudentPerformance students={students} />;
-        }
-    };
+    if (loading) return <div className="academic-reports-page">Loading...</div>;
 
     return (
         <div className="academic-reports-page">
             <div className="school-manager-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div>
-                        <h1 className="school-manager-title">Academic & Performance Reports</h1>
-                        <p className="school-manager-subtitle">Analyze student performance, class statistics, and progress.</p>
+                <h1 className="school-manager-title">{t('school.reports.title') || 'Academic Insights & Reports'}</h1>
+                <p className="school-manager-subtitle">{t('school.reports.subtitle') || 'Generate and analyze school performance data and metrics.'}</p>
+            </div>
+
+            {/* Overview Stats */}
+            <div className="stats-grid">
+                <div className="stat-card">
+                    <div className="stat-header">
+                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                            <TrendingUp size={20} />
+                        </div>
+                        <span className="stat-trend trend-up">
+                            <ArrowUpRight size={14} />
+                            +12%
+                        </span>
                     </div>
-                    <button className="btn-primary" onClick={handleExportAll} style={{ background: 'var(--color-bg-surface)', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}>
-                        <Download size={18} />
-                        Export All Data
-                    </button>
+                    <div className="stat-value">{stats?.averge_performance || '84%'}</div>
+                    <div className="stat-label">Average Performance</div>
                 </div>
-            </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200 mb-6 w-full" style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '1.5rem', display: 'flex', gap: '2rem' }}>
-                <TabButton active={activeTab === 'performance'} onClick={() => setActiveTab('performance')} icon={FileText} label="Student Performance" />
-                <TabButton active={activeTab === 'class-comparison'} onClick={() => setActiveTab('class-comparison')} icon={Users} label="Class Comparison" />
-                <TabButton active={activeTab === 'progress'} onClick={() => setActiveTab('progress')} icon={TrendingUp} label="Student Progress" />
-            </div>
-
-            <div className="tab-content">
-                {renderTabContent()}
-            </div>
-        </div>
-    );
-};
-
-const TabButton = ({ active, onClick, icon: Icon, label }) => (
-    <button
-        onClick={onClick}
-        style={{
-            paddingBottom: '0.5rem',
-            color: active ? 'var(--color-primary)' : 'var(--color-text-muted)',
-            fontWeight: 500,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            borderBottom: active ? '2px solid var(--color-primary)' : '2px solid transparent',
-            display: 'flex', alignItems: 'center', gap: '8px'
-        }}
-    >
-        <Icon size={18} />
-        {label}
-    </button>
-);
-
-
-// --- Sub-components ---
-
-const StudentPerformance = ({ students }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [classFilter, setClassFilter] = useState('All Classes');
-    const [selectedStudent, setSelectedStudent] = useState(null);
-
-    // Get unique classes for filter dropdown
-    const uniqueClasses = ['All Classes', ...new Set(students.map(s => s.class).filter(Boolean))];
-
-    // Filter Logic
-    const filteredStudents = students.filter(s => {
-        const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                              s.id.toString().includes(searchTerm);
-        const matchesClass = classFilter === 'All Classes' || s.class === classFilter;
-        return matchesSearch && matchesClass;
-    });
-
-    // Determine status logic (mocked based on random logic or ID for stability in demo)
-    const getStatus = (id) => {
-        const val = id % 4;
-        if (val === 0) return { label: 'Top Performer', color: '#166534', bg: '#dcfce7' };
-        if (val === 1) return { label: 'Excellent', color: '#15803d', bg: '#f0fdf4' };
-        if (val === 2) return { label: 'Average', color: '#854d0e', bg: '#fef9c3' };
-        return { label: 'At Risk', color: '#991b1b', bg: '#fee2e2' };
-    };
-
-    return (
-        <div className="management-card">
-            <div className="table-header-actions" style={{gap: '1rem', flexWrap: 'wrap'}}>
-                <div style={{ position: 'relative', width: '300px' }}>
-                    <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
-                    <input
-                        type="text"
-                        placeholder="Search student by name or ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={inputStyle}
-                    />
-                </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <Filter size={18} style={{color: 'var(--color-text-muted)'}} />
-                    <select 
-                        value={classFilter} 
-                        onChange={(e) => setClassFilter(e.target.value)}
-                        style={{ padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                    >
-                        {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                </div>
-            </div>
-            
-            <div style={{overflowX: 'auto'}}>
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Student Name</th>
-                            <th>Class</th>
-                            <th>GPA (Est.)</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredStudents.length > 0 ? filteredStudents.map((std) => {
-                            const status = getStatus(std.id);
-                            return (
-                                <tr key={std.id}>
-                                    <td className="text-gray-500">#{std.id}</td>
-                                    <td className="font-medium text-gray-900">{std.name}</td>
-                                    <td>{std.class || <span className="text-gray-400 italic">Unassigned</span>}</td>
-                                    <td style={{ fontWeight: 'bold' }}>{(3.0 + (std.id % 10)/10).toFixed(1)}</td>
-                                    <td>
-                                        <span style={{
-                                            padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: '500',
-                                            backgroundColor: status.bg, color: status.color
-                                        }}>
-                                            {status.label}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <button onClick={() => setSelectedStudent(std)} className="text-blue-600 hover:text-blue-900" style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', items: 'center', gap: '4px' }}>
-                                            <Eye size={16}/> Details
-                                        </button>
-                                    </td>
-                                </tr>
-                            );
-                        }) : (
-                            <tr><td colSpan="6" style={{textAlign: 'center', padding: '2rem'}}>No students found matching filters.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Detail Modal */}
-            {selectedStudent && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-                    <div style={{ backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '500px', border: '1px solid var(--color-border)', position: 'relative' }}>
-                        <button onClick={() => setSelectedStudent(null)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', cursor: 'pointer' }}><X size={20}/></button>
-                        <h2 style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Student Details: {selectedStudent.name}</h2>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                            <div><strong>ID:</strong> {selectedStudent.id}</div>
-                            <div><strong>Grade:</strong> {selectedStudent.grade}</div>
-                            <div><strong>Class:</strong> {selectedStudent.class || 'N/A'}</div>
-                            <div><strong>Gender:</strong> {selectedStudent.gender}</div>
-                            <div><strong>Guardian:</strong> {selectedStudent.guardian}</div>
-                            <div><strong>Contact:</strong> {selectedStudent.contact}</div>
-                            <div><strong>DOB:</strong> {selectedStudent.dob}</div>
+                <div className="stat-card">
+                    <div className="stat-header">
+                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-success-light)', color: 'var(--color-success)' }}>
+                            <Users size={20} />
                         </div>
-                        <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-                            <button className="btn-primary" onClick={() => setSelectedStudent(null)}>Close</button>
+                        <span className="stat-trend trend-up">
+                            <ArrowUpRight size={14} />
+                            +5%
+                        </span>
+                    </div>
+                    <div className="stat-value">{stats?.total_students || '1,248'}</div>
+                    <div className="stat-label">Total Students</div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-header">
+                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-warning-light)', color: 'var(--color-warning)' }}>
+                            <FileText size={20} />
                         </div>
+                        <span className="stat-trend trend-down">
+                            <ArrowDownRight size={14} />
+                            -2%
+                        </span>
+                    </div>
+                    <div className="stat-value">{stats?.active_teachers || '86'}</div>
+                    <div className="stat-label">Active Teachers</div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-header">
+                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-error-light)', color: 'var(--color-error)' }}>
+                            <BookOpen size={20} />
+                        </div>
+                        <span className="stat-trend trend-up">
+                            <ArrowUpRight size={14} />
+                            +3%
+                        </span>
+                    </div>
+                    <div className="stat-value">{stats?.total_courses || '42'}</div>
+                    <div className="stat-label">Active Courses</div>
+                </div>
+            </div>
+
+            {/* Quick Reports Section */}
+            <div className="reports-section">
+                <div className="section-header">
+                    <h2 className="section-title">Available Reports</h2>
+                    <div className="header-actions">
+                        <button className="btn-secondary">
+                            <Filter size={18} />
+                            Manage Reports
+                        </button>
                     </div>
                 </div>
-            )}
-        </div>
-    );
-};
 
-const ClassComparison = ({ students }) => {
-    // Dynamically calculate class stats
-    const classStats = {};
-    students.forEach(s => {
-        if (!s.class) return;
-        if (!classStats[s.class]) classStats[s.class] = { name: s.class, count: 0, Math: 0, Science: 0, English: 0 };
-        classStats[s.class].count++;
-        // Simulate varying averages per class based on class name char code
-        const bias = s.class.charCodeAt(s.class.length - 1); 
-        classStats[s.class].Math += 70 + (bias % 20);
-        classStats[s.class].Science += 72 + (bias % 18);
-        classStats[s.class].English += 75 + (bias % 15);
-    });
-
-    const data = Object.values(classStats).map(c => ({
-        name: c.name,
-        Math: Math.round(c.Math / c.count),
-        Science: Math.round(c.Science / c.count),
-        English: Math.round(c.English / c.count)
-    }));
-
-    return (
-        <div className="management-card p-6" style={{ padding: '1.5rem' }}>
-            <h3 className="chart-title mb-6" style={{ marginBottom: '1.5rem' }}>Class Performance Comparison (Math, Science, English)</h3>
-            {data.length > 0 ? (
-                <div style={{ width: '100%', height: 400 }}>
-                    <ResponsiveContainer>
-                        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                            <XAxis dataKey="name" />
-                            <YAxis domain={[0, 100]} />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="Math" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="Science" fill="#10b981" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="English" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                <div className="reports-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                    {reportTypes.map((report) => (
+                        <div key={report.id} className="report-type-card" style={{
+                            backgroundColor: 'var(--color-bg-surface)',
+                            padding: '1.5rem',
+                            borderRadius: '0.75rem',
+                            border: '1px solid var(--color-border)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1rem',
+                            transition: 'all 0.2s ease'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div style={{
+                                    padding: '10px',
+                                    borderRadius: '10px',
+                                    backgroundColor: `var(--color-${report.color}-light)`,
+                                    color: `var(--color-${report.color})`
+                                }}>
+                                    <report.icon size={24} />
+                                </div>
+                                <button style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
+                                    <Download size={18} />
+                                </button>
+                            </div>
+                            <div>
+                                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{report.name}</h3>
+                                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', lineHeight: '1.5' }}>{report.description}</p>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Last updated: 2 days ago</span>
+                                <button style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    color: 'var(--color-primary)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer'
+                                }}>
+                                    View Report
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            ) : (
-                <div className="text-center p-8 text-gray-500">No class data available for comparison. Assign students to classes first.</div>
-            )}
-        </div>
-    );
-};
-
-const StudentProgress = () => {
-    // Mock longitudinal data (hard to derive from snapshot state without history DB)
-    const data = [
-        { term: 'Term 1', 'Grade 1': 75, 'Grade 2': 78, 'Grade 3': 82 },
-        { term: 'Term 2', 'Grade 1': 78, 'Grade 2': 80, 'Grade 3': 81 },
-        { term: 'Term 3', 'Grade 1': 82, 'Grade 2': 84, 'Grade 3': 85 },
-        { term: 'Term 4', 'Grade 1': 85, 'Grade 2': 88, 'Grade 3': 89 },
-    ];
-
-    return (
-        <div className="management-card p-6" style={{ padding: '1.5rem' }}>
-            <h3 className="chart-title mb-6" style={{ marginBottom: '1.5rem' }}>Average Performance Trend (Historical)</h3>
-            <div style={{ width: '100%', height: 400 }}>
-                <ResponsiveContainer>
-                    <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="term" />
-                        <YAxis domain={[60, 100]} />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="Grade 1" stroke="#3b82f6" strokeWidth={2} />
-                        <Line type="monotone" dataKey="Grade 2" stroke="#10b981" strokeWidth={2} />
-                        <Line type="monotone" dataKey="Grade 3" stroke="#f59e0b" strokeWidth={2} />
-                    </LineChart>
-                </ResponsiveContainer>
             </div>
-            <p className="text-sm text-gray-500 mt-4 text-center">
-                * Note: Historical progress data is simulated for demonstration purposes as term history is not yet populated.
-            </p>
+
+            {/* Performance Insights */}
+            <div className="management-card" style={{ marginTop: '2rem' }}>
+                <div className="table-header-actions">
+                    <h3 className="chart-title">Subject Performance Distribution</h3>
+                    <div style={{ position: 'relative' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                        <input
+                            type="text"
+                            placeholder="Filter subjects..."
+                            style={{ padding: '0.4rem 0.4rem 0.4rem 2rem', border: '1px solid var(--color-border)', borderRadius: '0.375rem', fontSize: '0.875rem' }}
+                        />
+                    </div>
+                </div>
+                <div style={{ padding: '1.5rem' }}>
+                    {/* Placeholder for a real chart component */}
+                    <div style={{ height: '300px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 1rem' }}>
+                        {[65, 82, 45, 91, 74, 58, 88].map((height, i) => (
+                            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '12%' }}>
+                                <div style={{
+                                    width: '100%',
+                                    height: `${height}%`,
+                                    backgroundColor: 'var(--color-primary)',
+                                    opacity: 0.8,
+                                    borderRadius: '4px 4px 0 0',
+                                    position: 'relative'
+                                }}>
+                                    <div className="chart-tooltip" style={{
+                                        position: 'absolute',
+                                        top: '-30px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        backgroundColor: '#000',
+                                        color: '#fff',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        fontSize: '10px'
+                                    }}>{height}%</div>
+                                </div>
+                                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', textAlign: 'center' }}>Subject {i + 1}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
         </div>
     );
-};
-
-const inputStyle = {
-    width: '100%',
-    padding: '0.5rem 0.5rem 0.5rem 2.5rem',
-    borderRadius: '0.375rem',
-    border: '1px solid var(--color-border)'
 };
 
 export default AcademicReports;

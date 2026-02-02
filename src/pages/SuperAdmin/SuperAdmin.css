@@ -5,6 +5,11 @@
 
 @import '../../styles/global-design.css';
 
+:root {
+    --sa-sidebar-width: 280px;
+    --sa-header-height: 80px;
+}
+
 /* ========================================================================
    SUPER ADMIN LAYOUT
    ======================================================================== */
@@ -14,52 +19,79 @@
     min-height: 100vh;
     background: var(--color-bg-body);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    position: relative;
+    overflow-x: hidden;
 }
 
 /* Sidebar */
 .superadmin-sidebar {
-    width: 280px;
-    background: linear-gradient(180deg, var(--color-bg-surface) 0%, var(--color-bg-body) 100%);
-    border-right: 1px solid var(--color-border);
+    width: var(--sa-sidebar-width);
+    background: var(--grad-surface);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-right: 1px solid var(--glass-border);
     display: flex;
     flex-direction: column;
     padding: var(--spacing-6);
     position: fixed;
     height: 100vh;
     z-index: var(--z-fixed);
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.02);
+    box-shadow: var(--glass-shadow);
+    transition: transform var(--transition-slow);
 }
 
 [dir="rtl"] .superadmin-sidebar {
     left: auto;
     right: 0;
     border-right: none;
-    border-left: 1px solid var(--color-border);
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.02);
-}
-
-[data-theme='dark'] .superadmin-sidebar {
-    background: linear-gradient(180deg, var(--color-bg-surface) 0%, var(--color-bg-body) 100%);
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
-}
-
-[dir="rtl"][data-theme='dark'] .superadmin-sidebar {
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+    border-left: 1px solid var(--glass-border);
 }
 
 /* Main Content */
 .superadmin-main {
     flex: 1;
-    margin-left: 280px;
+    margin-left: var(--sa-sidebar-width);
     padding: var(--spacing-8);
+    min-height: 100vh;
     background-image:
-        radial-gradient(circle at top right, rgba(79, 70, 229, 0.03), transparent 40%),
-        radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.03), transparent 40%);
+        radial-gradient(circle at top right, rgba(79, 70, 229, 0.05), transparent 40%),
+        radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.05), transparent 40%);
+    transition: all var(--transition-normal);
 }
 
 [dir="rtl"] .superadmin-main {
     margin-left: 0;
-    margin-right: 280px;
+    margin-right: var(--sa-sidebar-width);
+}
+
+/* Responsive Layout */
+@media (max-width: 1024px) {
+    .superadmin-sidebar {
+        transform: translateX(-100%);
+    }
+
+    [dir="rtl"] .superadmin-sidebar {
+        transform: translateX(100%);
+    }
+
+    .superadmin-sidebar.open {
+        transform: translateX(0);
+    }
+
+    .superadmin-main {
+        margin-left: 0;
+        padding: var(--spacing-6);
+    }
+
+    [dir="rtl"] .superadmin-main {
+        margin-right: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .superadmin-main {
+        padding: var(--spacing-4);
+    }
 }
 
 /* ========================================================================

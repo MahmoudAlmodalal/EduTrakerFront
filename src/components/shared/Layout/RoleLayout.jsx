@@ -49,6 +49,7 @@ const RoleLayout = ({ role: propRole, className = '' }) => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
     const { role: authRole, config, navigation, basePath, displayName, brandIcon } = useRole();
+    const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
     const navigate = useNavigate();
     const currentRole = propRole || authRole;
@@ -68,14 +69,54 @@ const RoleLayout = ({ role: propRole, className = '' }) => {
 
     return (
         <div className={`role-layout ${className}`} data-role={currentRole}>
-            {/* Sidebar */}
-            <aside className="role-sidebar">
-                {/* Brand */}
-                <div className="role-brand">
-                    <div className="role-brand-icon">
-                        <DynamicIcon name={brandIcon} size={28} />
+            {/* Mobile Header */}
+            <header className="role-mobile-header">
+                <button
+                    className="role-menu-toggle-btn"
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                >
+                    <div className="_logoIcon_lgw59_28" style={{
+                        width: '44px',
+                        height: '44px',
+                        background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
+                        color: 'white',
+                        borderRadius: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                        position: 'relative'
+                    }}>
+                        <Icons.GraduationCap size={24} />
                     </div>
+                </button>
+                <div className="role-mobile-brand">
                     <span className="role-brand-text">{t('app.name') || 'EduTraker'}</span>
+                </div>
+                <div style={{ width: 40 }} /> {/* Spacer */}
+            </header>
+
+            {/* Sidebar Overlay */}
+            {isSidebarOpen && (
+                <div className="role-sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+            )}
+
+            {/* Sidebar */}
+            <aside className={`role-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+                {/* Sidebar Header (Brand + Close Button) */}
+                <div className="role-sidebar-header-container">
+                    <div className="role-brand" onClick={() => setIsSidebarOpen(false)} style={{ cursor: 'pointer' }}>
+                        <div className="role-brand-icon">
+                            <Icons.GraduationCap size={28} />
+                        </div>
+                        <span className="role-brand-text">{t('app.name') || 'EduTraker'}</span>
+                    </div>
+
+                    <button className="role-sidebar-close" onClick={() => setIsSidebarOpen(false)}>
+                        <Icons.X size={24} />
+                    </button>
                 </div>
 
                 {/* Navigation */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Calendar,
     AlertCircle,
@@ -8,129 +8,117 @@ import {
     TrendingUp,
     Filter,
     CalendarDays,
-    AlertTriangle
+    AlertTriangle,
+    RefreshCw,
+    Search
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentAttendance = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const [filterStatus, setFilterStatus] = useState('all');
     const [loading, setLoading] = useState(true);
-    const [attendanceStats, setAttendanceStats] = useState({
+    const [error, setError] = useState(null);
+    const [attendanceHistory, setAttendanceHistory] = useState([]);
+    const [stats, setStats] = useState({
         present: 0,
         absent: 0,
         late: 0,
         excused: 0,
         totalDays: 0,
-        attendanceRate: 100
+        attendanceRate: 0
     });
-    const [monthlyData, setMonthlyData] = useState([]);
-    const [attendanceHistory, setAttendanceHistory] = useState([]);
 
-    const safeJSONParse = (key, fallback) => {
+    const fetchAttendanceData = async () => {
+        if (!user?.id) return;
+        setLoading(true);
+        setError(null);
         try {
-            const item = localStorage.getItem(key);
-            return item ? JSON.parse(item) : fallback;
-        } catch (e) {
-            console.error(`Error parsing ${key}:`, e);
-            return fallback;
+            // Fetch both dashboard stats for summary and full attendance for history
+            const [dashboardRes, attendanceRes] = await Promise.all([
+                studentService.getDashboardStats(),
+                studentService.getAttendance(user.id)
+            ]);
+
+            // Process Dashboard Stats for summary cards
+            const attendanceSummary = dashboardRes?.statistics?.attendance;
+            if (attendanceSummary) {
+                setStats({
+                    present: attendanceSummary.by_status?.present || 0,
+                    absent: attendanceSummary.by_status?.absent || 0,
+                    late: attendanceSummary.by_status?.late || 0,
+                    excused: attendanceSummary.by_status?.excused || 0,
+                    totalDays: attendanceSummary.total_records || 0,
+                    attendanceRate: attendanceSummary.attendance_rate || 0
+                });
+            }
+
+            // Process Attendance History
+            const records = attendanceRes.results || attendanceRes || [];
+            setAttendanceHistory(records.map(r => ({
+                id: r.id,
+                date: r.date,
+                subject: r.course_name || 'Subject',
+                statusKey: r.status,
+                time: r.created_at ? new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'
+            })));
+
+        } catch (error) {
+            console.error('Error fetching attendance:', error);
+            setError('Failed to load attendance records. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        try {
-            // 1. Identify Current Student
-            const students = safeJSONParse('sec_students', []);
-            const user = students.length > 0 ? students[0] : { 
-                id: 999, 
-                firstName: 'Student', 
-                lastName: 'Demo',
-                assignedClass: 'Grade 10-A' 
-            };
-            const studentName = `${user.firstName} ${user.lastName}`;
+        fetchAttendanceData();
+    }, [user?.id]);
 
-            // 2. Fetch Attendance
-            const allAttendance = safeJSONParse('sec_attendance', []);
-            const myAttendance = allAttendance.filter(r => 
-                (r.studentId === user.id) || (r.studentName === studentName)
-            );
+    const monthlyData = useMemo(() => {
+        if (!attendanceHistory.length) return [];
 
-            // 3. Calculate Stats
-            const present = myAttendance.filter(r => r.status === 'Present').length;
-            const absent = myAttendance.filter(r => r.status === 'Absent').length;
-            const late = myAttendance.filter(r => r.status === 'Late').length;
-            const excused = myAttendance.filter(r => r.status === 'Excused').length;
-            const totalDays = myAttendance.length;
-            const attendanceRate = totalDays > 0 
-                ? Math.round(((present + late + excused) / totalDays) * 100) // Assuming Late/Excused count towards presence or partial? Usually Present/Total. Let's use Present / Total for strict rate, or (Present+Late)/Total.
-                : 100;
-            
-            // Re-calculating rate based on "Present" only for strictness, or strictly non-absent
-            // Standard: (Present + Late) / Total usually, or just Present.
-            // Let's stick to (Total - Absent) / Total for "Attendance Rate" generally
-            const effectivePresent = totalDays - absent;
-            const rate = totalDays > 0 ? Math.round((effectivePresent / totalDays) * 100) : 100;
+        const months = {};
+        attendanceHistory.forEach(record => {
+            const date = new Date(record.date);
+            const monthName = date.toLocaleDateString('en', { month: 'short' });
+            if (!months[monthName]) {
+                months[monthName] = { month: monthName, present: 0, total: 0 };
+            }
+            months[monthName].total++;
+            if (record.statusKey === 'present' || record.statusKey === 'late') {
+                months[monthName].present++;
+            }
+        });
 
+        return Object.values(months).reverse().slice(0, 6); // Last 6 months
+    }, [attendanceHistory]);
 
-            setAttendanceStats({
-                present,
-                absent,
-                late,
-                excused,
-                totalDays,
-                attendanceRate: rate
-            });
+    if (loading) {
+        return (
+            <div className="dashboard-loading">
+                <RefreshCw className="animate-spin" size={40} />
+                <p>Loading attendance records...</p>
+            </div>
+        );
+    }
 
-            // 4. Generate Monthly Data
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            const monthlyCounts = {};
-
-            myAttendance.forEach(r => {
-                const date = new Date(r.date);
-                const month = months[date.getMonth()];
-                if (!monthlyCounts[month]) {
-                    monthlyCounts[month] = { present: 0, total: 0 };
-                }
-                monthlyCounts[month].total++;
-                if (r.status !== 'Absent') {
-                    monthlyCounts[month].present++;
-                }
-            });
-
-            // Convert to array and sort (mocking sort order for now or just taking last 4 months)
-            // Let's just take the formatted data directly
-            const mData = Object.keys(monthlyCounts).map(m => ({
-                month: m,
-                present: monthlyCounts[m].present,
-                total: monthlyCounts[m].total,
-                absent: monthlyCounts[m].total - monthlyCounts[m].present,
-                late: 0 // Simplified for chart
-            }));
-            
-            // If empty, show some placeholders or empty
-            setMonthlyData(mData.length > 0 ? mData : [
-                { month: 'Sep', present: 0, absent: 0, late: 0, total: 0 },
-                { month: 'Oct', present: 0, absent: 0, late: 0, total: 0 }
-            ]);
-
-            // 5. Generate History
-            const history = myAttendance.map((r, index) => ({
-                id: r.id || index,
-                date: r.date,
-                subject: r.subject || 'General', // Attendance might be day-based or subject-based
-                statusKey: r.status.toLowerCase(),
-                time: '08:00 AM' // Mock time if not in record
-            })).sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            setAttendanceHistory(history);
-            setLoading(false);
-
-        } catch (err) {
-            console.error("Error loading attendance:", err);
-            setLoading(false);
-        }
-    }, []);
+    if (error) {
+        return (
+            <div className="dashboard-error">
+                <AlertCircle size={48} color="#ef4444" />
+                <p>{error}</p>
+                <button onClick={fetchAttendanceData} className="retry-btn">
+                    <RefreshCw size={18} />
+                    Try Again
+                </button>
+            </div>
+        );
+    }
 
     const getStatusBadge = (statusKey) => {
         const configs = {
@@ -157,19 +145,16 @@ const StudentAttendance = () => {
         { key: 'all', label: 'All' },
         { key: 'present', label: 'Present' },
         { key: 'absent', label: 'Absent' },
-        { key: 'late', label: 'Late' }
+        { key: 'late', label: 'Late' },
+        { key: 'excused', label: 'Excused' }
     ];
 
     const filteredHistory = filterStatus === 'all'
         ? attendanceHistory
         : attendanceHistory.filter(record => record.statusKey === filterStatus);
 
-    if (loading) {
-        return <div className="p-8 text-center text-slate-500">Loading attendance data...</div>;
-    }
-
     return (
-        <div className="student-attendance animate-fade-in">
+        <div className="student-attendance">
             {/* Header */}
             <header className="page-header">
                 <div>
@@ -179,13 +164,13 @@ const StudentAttendance = () => {
                 <div className="header-stats">
                     <div className="header-stat">
                         <CalendarDays size={18} />
-                        <span>{attendanceStats.totalDays} Days Recorded</span>
+                        <span>{stats.totalDays} Total Records</span>
                     </div>
                 </div>
             </header>
 
             {/* Warning Banner */}
-            {attendanceStats.attendanceRate < 90 && (
+            {stats.attendanceRate < 90 && stats.totalDays > 0 && (
                 <div className="attendance-warning-banner">
                     <div className="warning-icon">
                         <AlertTriangle size={24} />
@@ -193,8 +178,8 @@ const StudentAttendance = () => {
                     <div className="warning-content">
                         <h4>{t('student.attendance.attendanceAlert') || 'Attendance Alert'}</h4>
                         <p>
-                            {t('student.attendance.lowAttendanceWarning') || 'Your attendance rate is'} <strong>{attendanceStats.attendanceRate}%</strong>.
-                            {' '}{t('student.attendance.lowAttendanceAction') || 'Please improve your attendance to meet the 90% requirement.'}
+                            {t('student.attendance.lowAttendanceWarning') || 'Your attendance rate is'} <strong>{stats.attendanceRate}%</strong>.
+                            {' '}{t('student.attendance.lowAttendanceAction') || 'Please improve your attendance to meet the requirement.'}
                         </p>
                     </div>
                 </div>
@@ -209,21 +194,21 @@ const StudentAttendance = () => {
                             <circle
                                 cx="50" cy="50" r="40"
                                 fill="none"
-                                stroke={attendanceStats.attendanceRate >= 90 ? '#10b981' : '#f59e0b'}
+                                stroke={stats.attendanceRate >= 90 ? '#10b981' : stats.attendanceRate >= 75 ? '#f59e0b' : '#ef4444'}
                                 strokeWidth="8"
                                 strokeLinecap="round"
-                                strokeDasharray={`${attendanceStats.attendanceRate * 2.51} 251`}
+                                strokeDasharray={`${stats.attendanceRate * 2.51} 251`}
                                 transform="rotate(-90 50 50)"
                             />
                         </svg>
                         <div className="ring-value">
-                            <span className="ring-percentage">{attendanceStats.attendanceRate}%</span>
+                            <span className="ring-percentage">{stats.attendanceRate}%</span>
                             <span className="ring-label">Rate</span>
                         </div>
                     </div>
                     <div className="stat-card-meta">
                         <TrendingUp size={16} />
-                        <span>Current Term</span>
+                        <span>Overview of your presence</span>
                     </div>
                 </div>
 
@@ -232,7 +217,7 @@ const StudentAttendance = () => {
                         <CheckCircle size={24} />
                     </div>
                     <div className="stat-info">
-                        <span className="stat-value">{attendanceStats.present}</span>
+                        <span className="stat-value">{stats.present}</span>
                         <span className="stat-label">{t('student.attendance.totalPresent') || 'Days Present'}</span>
                     </div>
                 </div>
@@ -242,7 +227,7 @@ const StudentAttendance = () => {
                         <XCircle size={24} />
                     </div>
                     <div className="stat-info">
-                        <span className="stat-value">{attendanceStats.absent}</span>
+                        <span className="stat-value">{stats.absent}</span>
                         <span className="stat-label">{t('student.attendance.totalAbsent') || 'Days Absent'}</span>
                     </div>
                 </div>
@@ -252,7 +237,7 @@ const StudentAttendance = () => {
                         <Clock size={24} />
                     </div>
                     <div className="stat-info">
-                        <span className="stat-value">{attendanceStats.late}</span>
+                        <span className="stat-value">{stats.late}</span>
                         <span className="stat-label">{t('student.attendance.late') || 'Late Arrivals'}</span>
                     </div>
                 </div>
@@ -261,61 +246,61 @@ const StudentAttendance = () => {
             {/* Main Content Grid */}
             <div className="attendance-content-grid">
                 {/* Monthly Breakdown */}
-                <div className="attendance-card monthly-chart">
-                    <div className="card-header-premium">
-                        <h3>
-                            <Calendar size={20} />
-                            {t('student.attendance.monthlyBreakdown') || 'Monthly Overview'}
-                        </h3>
-                    </div>
-                    <div className="monthly-bars">
-                        {monthlyData.length > 0 ? monthlyData.map((data, index) => {
-                            const rate = data.total > 0 ? Math.round((data.present / data.total) * 100) : 0;
-                            return (
-                                <div key={index} className="month-bar-item">
-                                    <div className="month-bar-container">
-                                        <div
-                                            className="month-bar-fill"
-                                            style={{
-                                                height: `${rate}%`,
-                                                background: rate >= 90
-                                                    ? 'linear-gradient(180deg, #10b981, #34d399)'
-                                                    : rate >= 80
-                                                        ? 'linear-gradient(180deg, #f59e0b, #fbbf24)'
-                                                        : 'linear-gradient(180deg, #ef4444, #f87171)'
-                                            }}
-                                        ></div>
+                {monthlyData.length > 0 && (
+                    <div className="attendance-card monthly-chart">
+                        <div className="card-header-premium">
+                            <h3>
+                                <Calendar size={20} />
+                                {t('student.attendance.monthlyBreakdown') || 'Monthly Overview'}
+                            </h3>
+                        </div>
+                        <div className="monthly-bars">
+                            {monthlyData.map((data, index) => {
+                                const rate = Math.round((data.present / data.total) * 100);
+                                return (
+                                    <div key={index} className="month-bar-item">
+                                        <div className="month-bar-container">
+                                            <div
+                                                className="month-bar-fill"
+                                                style={{
+                                                    height: `${rate}%`,
+                                                    background: rate >= 90
+                                                        ? 'linear-gradient(180deg, #10b981, #34d399)'
+                                                        : rate >= 80
+                                                            ? 'linear-gradient(180deg, #f59e0b, #fbbf24)'
+                                                            : 'linear-gradient(180deg, #ef4444, #f87171)'
+                                                }}
+                                            ></div>
+                                        </div>
+                                        <span className="month-label">{data.month}</span>
+                                        <span className="month-rate">{rate}%</span>
                                     </div>
-                                    <span className="month-label">{data.month}</span>
-                                    <span className="month-rate">{rate}%</span>
-                                </div>
-                            );
-                        }) : (
-                            <p className="text-center text-slate-400 w-full">No data available</p>
-                        )}
-                    </div>
-                    <div className="chart-legend">
-                        <div className="legend-item">
-                            <span className="legend-dot" style={{ background: '#10b981' }}></span>
-                            <span>≥90% Excellent</span>
+                                );
+                            })}
                         </div>
-                        <div className="legend-item">
-                            <span className="legend-dot" style={{ background: '#f59e0b' }}></span>
-                            <span>80-89% Good</span>
-                        </div>
-                        <div className="legend-item">
-                            <span className="legend-dot" style={{ background: '#ef4444' }}></span>
-                            <span>&lt;80% Needs Improvement</span>
+                        <div className="chart-legend">
+                            <div className="legend-item">
+                                <span className="legend-dot" style={{ background: '#10b981' }}></span>
+                                <span>≥90% Excellent</span>
+                            </div>
+                            <div className="legend-item">
+                                <span className="legend-dot" style={{ background: '#f59e0b' }}></span>
+                                <span>80-89% Good</span>
+                            </div>
+                            <div className="legend-item">
+                                <span className="legend-dot" style={{ background: '#ef4444' }}></span>
+                                <span>&lt;80% Poor</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* Attendance History */}
-                <div className="attendance-card history-table">
+                <div className="attendance-card history-table" style={{ gridColumn: monthlyData.length === 0 ? 'span 2' : 'auto' }}>
                     <div className="card-header-premium">
                         <h3>
-                            <CalendarDays size={20} />
-                            {t('student.attendance.recentHistory') || 'Recent Attendance'}
+                            <Search size={20} />
+                            {t('student.attendance.recentHistory') || 'Attendance History'}
                         </h3>
                         <div className="filter-tabs">
                             {filterOptions.map((option) => (
@@ -357,6 +342,49 @@ const StudentAttendance = () => {
             </div>
 
             <style>{`
+                .dashboard-loading, .dashboard-error {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 400px;
+                    text-align: center;
+                    gap: 1rem;
+                    background: white;
+                    border-radius: 20px;
+                    padding: 2rem;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+                }
+
+                .animate-spin {
+                    animation: spin 1s linear infinite;
+                    color: var(--student-primary, #0891b2);
+                }
+
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                .retry-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.5rem;
+                    background: var(--student-gradient, linear-gradient(135deg, #0891b2, #06b6d4));
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+
+                .retry-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
+                }
+
                 .attendance-warning-banner {
                     display: flex;
                     align-items: flex-start;
@@ -469,8 +497,8 @@ const StudentAttendance = () => {
                     align-items: center;
                     gap: 0.375rem;
                     font-size: 0.75rem;
-                    color: #10b981;
-                    background: #dcfce7;
+                    color: var(--color-text-muted, #64748b);
+                    background: #f1f5f9;
                     padding: 0.375rem 0.75rem;
                     border-radius: 20px;
                 }
@@ -737,7 +765,9 @@ const StudentAttendance = () => {
                 }
                 
                 [data-theme="dark"] .attendance-stat-card,
-                [data-theme="dark"] .attendance-card {
+                [data-theme="dark"] .attendance-card,
+                [data-theme="dark"] .dashboard-loading,
+                [data-theme="dark"] .dashboard-error {
                     background: #1e293b;
                 }
                 
@@ -761,6 +791,16 @@ const StudentAttendance = () => {
                 
                 [data-theme="dark"] .filter-tab.active {
                     background: #334155;
+                }
+                
+                [data-theme="dark"] .attendance-warning-banner {
+                    background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
+                    border-color: #b91c1c;
+                }
+                
+                [data-theme="dark"] .warning-content h4,
+                [data-theme="dark"] .warning-content p {
+                    color: #fca5a5;
                 }
             `}</style>
         </div>

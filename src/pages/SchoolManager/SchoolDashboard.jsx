@@ -1,175 +1,160 @@
-import React from 'react';
-import { useTheme } from '../../context/ThemeContext';
-import { Users, GraduationCap, BookOpen, UserCheck, TrendingUp, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, AreaChart, Area
-} from 'recharts';
-import styles from './SchoolDashboard.module.css';
-
-const StatCard = ({ title, value, change, icon: Icon, color, isPositive, fromLastMonthText }) => (
-    <div className={styles.statCard}>
-        <div className={styles.statHeader}>
-            <span className={styles.statTitle}>{title}</span>
-            <div className={`${styles.iconWrapper} ${styles[color]}`}>
-                <Icon size={22} strokeWidth={2} />
-            </div>
-        </div>
-        <div className={styles.statBody}>
-            <span className={styles.statValue}>{value}</span>
-            <span className={styles.statChange}>
-                <span className={isPositive ? styles.positive : styles.negative}>
-                    {isPositive ? '+' : ''}{change}%
-                </span>
-                <span style={{ color: 'var(--color-text-muted)', marginLeft: '4px' }}>{fromLastMonthText}</span>
-            </span>
-        </div>
-    </div>
-);
+    Users,
+    GraduationCap,
+    Clock,
+    TrendingUp,
+    Calendar,
+    AlertCircle,
+    ChevronRight,
+    ArrowUpRight,
+    ArrowDownRight,
+    UserCheck,
+    Briefcase
+} from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
+import managerService from '../../services/managerService';
+import './SchoolManager.css';
 
 const SchoolDashboard = () => {
-    const { t, theme } = useTheme();
+    const { t } = useTheme();
+    const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    const isDark = theme === 'dark';
-    const textMuted = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? '#334155' : '#e2e8f0';
-    const tooltipBg = isDark ? '#1e293b' : '#ffffff';
+    useEffect(() => {
+        const fetchStats = async () => {
+            setLoading(true);
+            try {
+                const data = await managerService.getDashboardStats();
+                setStats(data);
+            } catch (error) {
+                console.error('Failed to fetch dashboard stats:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStats();
+    }, []);
 
-    const safeParse = (key, fallback) => {
-        try {
-            const saved = localStorage.getItem(key);
-            return saved ? JSON.parse(saved) : fallback;
-        } catch (e) {
-            console.error(`Error parsing ${key}:`, e);
-            return fallback;
-        }
-    };
-
-    // --- Dynamic Data Calculation ---
-
-    // 1. Students
-    const students = safeParse('sec_students', []);
-    const totalStudents = students.length;
-
-    // 2. Teachers (Assuming stored in edutraker_users with role 'TEACHER' or separate key)
-    // Fallback to checking a direct teachers key if users not fully populated
-    const allUsers = safeParse('edutraker_users', []);
-    const teachers = allUsers.filter(u => u.role === 'TEACHER');
-    // If no teachers found in main user base (demo mode), use a mock fall back or 0
-    // Realistically for this demo, we might need to check if there's a specific 'school_teachers' key from a different module
-    // For now, let's trust edutraker_users or default to a reasonable number if empty for demo appearance
-    const totalTeachers = teachers.length > 0 ? teachers.length : 12; // Default for demo if empty
-
-    // 3. Classes
-    // Check if there's a classes key. If not, derive from students' assigned classes
-    const classesList = safeParse('school_classes', []); // Potential key from Academic Config
-    const derivedClasses = new Set(students.map(s => s.class).filter(c => c));
-    const totalClasses = classesList.length > 0 ? classesList.length : derivedClasses.size || 6; // Default 6 if 0
-
-    // 4. Attendance
-    const attendanceData = safeParse('sec_attendance', {});
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayAttendance = attendanceData[todayStr] || {};
-    const presentCount = Object.values(todayAttendance).filter(r => r.status === 'Present').length;
-    const attendanceRate = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
-    
-    // 5. Success Rate & Grades (Mocked logic based on students or random for demo vitality)
-    // In a real app, we'd fetch 'student_grades'. Here we'll simulate based on 'sec_students' count to keep it looking dynamic
-    const passedStart = Math.floor(totalStudents * 0.9);
-    const failedStart = totalStudents - passedStart;
-    
-    const successData = [
-        { name: 'Passed', value: passedStart || 1150 },
-        { name: 'Failed', value: failedStart || 100 },
+    const dashboardCards = [
+        { title: 'Total Students', value: stats?.statistics?.total_students || '0', icon: Users, trend: '+0%', isUp: true, color: 'blue' },
+        { title: 'Active Teachers', value: stats?.statistics?.total_teachers || '0', icon: UserCheck, trend: '+0%', isUp: true, color: 'green' },
+        { title: 'Secretaries', value: stats?.statistics?.total_secretaries || '0', icon: Briefcase, trend: '0%', isUp: true, color: 'purple' },
+        { title: 'Classrooms', value: stats?.statistics?.classroom_count || '0', icon: GraduationCap, trend: '0%', isUp: true, color: 'orange' }
     ];
 
-    // Mock grade averages derived (or static if no data source exists yet)
-    const gradeData = [
-        { name: 'Grade 1', avg: 85 + Math.random() * 5 },
-        { name: 'Grade 2', avg: 82 + Math.random() * 5 },
-        { name: 'Grade 3', avg: 88 + Math.random() * 5 },
-        { name: 'Grade 4', avg: 79 + Math.random() * 5 },
-    ];
+    if (loading) return <div className="school-dashboard-page">Loading...</div>;
 
-    // --- Stats Array ---
-    const fromLastMonth = "from last month";
-    const stats = [
-        { title: "Total Students", value: totalStudents.toLocaleString(), change: 5.2, icon: Users, color: 'blue', isPositive: true, fromLastMonthText: fromLastMonth },
-        { title: "Total Teachers", value: totalTeachers.toString(), change: 2.1, icon: GraduationCap, color: 'green', isPositive: true, fromLastMonthText: fromLastMonth },
-        { title: "Total Classes", value: totalClasses.toString(), change: 0, icon: BookOpen, color: 'purple', isPositive: true, fromLastMonthText: fromLastMonth },
-        { title: "Attendance Rate", value: `${attendanceRate}%`, change: -1.5, icon: UserCheck, color: 'orange', isPositive: false, fromLastMonthText: fromLastMonth },
-    ];
-
-    const COLORS = ['#10b981', '#ef4444'];
-    
-    // ... Render (Keep existing render logic) ... 
     return (
-        <div className={styles.container}>
-            <div className={styles.pageHeader}>
-                <h1 className={styles.pageTitle}>Overview Dashboard</h1>
+        <div className="school-dashboard-page">
+            <div className="school-manager-header">
+                <div>
+                    <h1 className="school-manager-title">{t('school.dashboard.title') || 'Command Center'}</h1>
+                    <p className="school-manager-subtitle">Real-time overview of school operations and academic status.</p>
+                </div>
+                <div className="header-actions">
+                    <button className="btn-secondary">
+                        <Calendar size={18} />
+                        Academic Year: 2024-2025
+                    </button>
+                    <button className="btn-primary">Generate Report</button>
+                </div>
             </div>
 
-            <div className={styles.statsGrid}>
-                {stats.map((stat, index) => (
-                    <StatCard key={index} {...stat} />
+            {/* Quick Stats Grid */}
+            <div className="stats-grid">
+                {dashboardCards.map((card, index) => (
+                    <div key={index} className="stat-card">
+                        <div className="stat-header">
+                            <div className={`stat-icon-wrapper color-${card.color}`} style={{
+                                backgroundColor: `var(--color-${card.color}-light)`,
+                                color: `var(--color-${card.color})`,
+                                padding: '10px',
+                                borderRadius: '12px'
+                            }}>
+                                <card.icon size={24} />
+                            </div>
+                            <span className={`stat-trend ${card.isUp ? 'trend-up' : 'trend-down'}`} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                color: card.isUp ? 'var(--color-success)' : 'var(--color-error)'
+                            }}>
+                                {card.isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                                {card.trend}
+                            </span>
+                        </div>
+                        <div className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', marginTop: '1rem', color: 'var(--color-text-main)' }}>{card.value}</div>
+                        <div className="stat-label" style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>{card.title}</div>
+                    </div>
                 ))}
             </div>
 
-            <div className={styles.contentGrid}>
-                <div className={styles.mainChartSection}>
-                    <div className={styles.chartCard}>
-                        <h2 className={styles.cardTitle}>Average Grades by Class</h2>
-                        <div className={styles.chartContainer}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={gradeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: textMuted, fontSize: 12 }}
-                                        dy={10}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        domain={[0, 100]}
-                                        tick={{ fill: textMuted, fontSize: 12 }}
-                                    />
-                                    <Tooltip
-                                        cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9' }}
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', background: tooltipBg, color: isDark ? '#f8fafc' : '#0f172a' }}
-                                    />
-                                    <Bar dataKey="avg" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={50} />
-                                </BarChart>
-                            </ResponsiveContainer>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '2rem', marginTop: '2rem' }}>
+                {/* Performance Chart Placeholder */}
+                <div className="management-card">
+                    <div className="table-header-actions">
+                        <h3 className="chart-title">Academic Performance Trend</h3>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', cursor: 'pointer' }}>Weekly</button>
+                            <button style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '6px', border: 'none', background: 'var(--color-primary)', color: '#fff', cursor: 'pointer' }}>Monthly</button>
                         </div>
+                    </div>
+                    <div style={{ padding: '1.5rem', height: '350px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                        {[45, 52, 48, 61, 58, 72, 68, 81, 75, 84, 79, 88].map((val, i) => (
+                            <div key={i} style={{ width: '6%', height: `${val}%`, backgroundColor: 'var(--color-primary)', borderRadius: '4px 4px 0 0', opacity: 0.8, position: 'relative' }}>
+                                <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: '8px', fontSize: '10px', color: 'var(--color-text-muted)' }}>M{i + 1}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
-                <div className={styles.secondaryCharts}>
-                    <div className={styles.chartCard}>
-                        <h2 className={styles.cardTitle}>Overall Success Rate</h2>
-                        <div className={styles.chartContainer}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={successData}
-                                        innerRadius={80}
-                                        outerRadius={110}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                        stroke="none"
-                                    >
-                                        {successData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', background: tooltipBg, color: isDark ? '#f8fafc' : '#0f172a' }}
-                                    />
-                                </PieChart>
-                            </ResponsiveContainer>
+                {/* Notifications/Alerts Sidebar */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div className="management-card">
+                        <div className="table-header-actions">
+                            <h3 className="chart-title">Attention Needed</h3>
+                        </div>
+                        <div style={{ padding: '0' }}>
+                            <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '1rem' }}>
+                                <div style={{ minWidth: '40px', height: '40px', borderRadius: '10px', background: 'var(--color-error-light)', color: 'var(--color-error)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <AlertCircle size={20} />
+                                </div>
+                                <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', margin: 0, color: 'var(--color-text-main)' }}>Teacher Certification Expiring</h4>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '4px 0' }}>3 teachers need to renew credentials within 30 days.</p>
+                                </div>
+                            </div>
+                            <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '1rem' }}>
+                                <div style={{ minWidth: '40px', height: '40px', borderRadius: '10px', background: 'var(--color-warning-light)', color: 'var(--color-warning)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Clock size={20} />
+                                </div>
+                                <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', margin: 0, color: 'var(--color-text-main)' }}>Unsubmitted Grade Reports</h4>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '4px 0' }}>Grade submission deadline is in 48 hours for Q2.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ padding: '1rem', textAlign: 'center' }}>
+                            <button style={{ color: 'var(--color-primary)', background: 'none', border: 'none', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }}>
+                                View All Alerts
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="management-card" style={{ background: 'var(--color-primary)', color: '#fff' }}>
+                        <div style={{ padding: '1.5rem' }}>
+                            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', margin: '0 0 1rem 0' }}>System Health</h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+                                <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span style={{ fontSize: '0.875rem', fontWeight: '700' }}>98%</span>
+                                </div>
+                                <p style={{ fontSize: '0.875rem', opacity: 0.9, lineHeight: '1.4' }}>All services are running smoothly within optimal parameters.</p>
+                            </div>
+                            <button style={{ width: '100%', padding: '0.75rem', background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>System Monitor</button>
                         </div>
                     </div>
                 </div>

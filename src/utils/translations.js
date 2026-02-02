@@ -44,6 +44,7 @@ export const translations = {
         'settings.announcementPlaceholder': 'Type a message to broadcast to all users...',
         'settings.announcementHint': 'This message will be displayed on all user dashboards.',
         'settings.saveAndBroadcast': 'Save & Broadcast',
+        'settings.saveAndBroadcast': 'Save & Broadcast',
         'settings.generalSettings': 'General Settings',
         'settings.profileInformation': 'Profile Information',
         'settings.securitySettings': 'Security Settings',
@@ -69,8 +70,11 @@ export const translations = {
         'settings.savePreferences': 'Save Preferences',
         'settings.changeAvatar': 'Change Avatar',
         'settings.avatarHint': 'JPG, GIF or PNG. Max size of 800K',
+        'settings.fullName': 'Full Name',
         'settings.emailAddress': 'Email Address',
+        'settings.currentPassword': 'Current Password',
         'settings.currentPasswordPlaceholder': 'Enter current password to save changes',
+        'settings.updateProfile': 'Update Profile',
 
         // Dashboard
         'dashboard.title': 'Dashboard Overview',
@@ -189,7 +193,7 @@ export const translations = {
         'auth.backToSelection': '← Back to Role Selection',
         'auth.error.invalid': 'Invalid credentials. Please try again.',
         'auth.role.superAdmin': 'Super Admin',
-        'auth.role.workstreamManager': 'WorkStream Manager',
+        'auth.role.workstreamManager': 'Workstream Manager',
         'auth.role.schoolManager': 'School Manager',
         'auth.role.secretary': 'Secretary',
         'auth.role.teacher': 'Teacher',
@@ -477,22 +481,11 @@ export const translations = {
         // School Manager Navigation
         'school.nav.overview': 'Overview',
         'school.nav.academicConfig': 'Academic Config',
+        'school.nav.reports': 'Reports',
         'school.nav.teacherMonitoring': 'Teacher Monitoring',
+        'school.nav.departments': 'Departments',
         'school.nav.secretaryMonitoring': 'Secretary Monitoring',
-        'school.nav.communication': 'Communication',
         'school.nav.settings': 'Settings',
-
-        // School Communication
-        'school.communication.title': 'Communication Center',
-        'school.communication.subtitle': 'Stay connected with staff and administration.',
-        'school.communication.compose': 'Compose New',
-        'school.communication.search': 'Search messages...',
-        'school.communication.internal': 'Internal',
-        'school.communication.external': 'External',
-        'school.communication.notifications': 'Alerts',
-        'school.communication.empty': 'No messages found',
-        'school.communication.typeReply': 'Type your reply...',
-        'school.communication.send': 'Send Reply',
 
         // School Dashboard
         'school.dashboard.title': 'School Overview',
@@ -742,20 +735,6 @@ export const translations = {
         'guardian.nav.communication': 'Communication',
         'guardian.nav.settings': 'Settings',
 
-        // Guardian Communication
-        'guardian.communication.title': 'Communication Center',
-        'guardian.communication.subtitle': 'Stay in touch with teachers and school administration.',
-        'guardian.communication.compose': 'New Message',
-        'guardian.communication.search': 'Search messages...',
-        'guardian.communication.internal': 'With Teachers',
-        'guardian.communication.external': 'With Admin',
-        'guardian.communication.notifications': 'Alerts',
-        'guardian.communication.empty': 'No messages found',
-        'guardian.communication.typeReply': 'Type your message...',
-        'guardian.communication.send': 'Send Message',
-        'guardian.communication.welcome': 'Welcome to the Communication Hub',
-        'guardian.communication.desc': 'View messages from teachers and official school alerts here.',
-
         // Guardian Settings
         'guardian.settings.title': 'Settings',
         'guardian.settings.subtitle': 'Manage your account and preferences.',
@@ -844,7 +823,8 @@ export const translations = {
         'guardian.monitoring.positive': 'Positive',
         'guardian.monitoring.negative': 'Negative',
 
-        // Guardian Communication (additional keys)
+        // Guardian Communication
+        'guardian.communication.title': 'Communication Center',
         'guardian.communication.messages': 'Messages',
         'guardian.communication.newMessage': 'New Message',
         'guardian.communication.teachers': 'Teachers',
@@ -975,6 +955,7 @@ export const translations = {
         'settings.announcementPlaceholder': 'اكتب رسالة لبثها لجميع المستخدمين...',
         'settings.announcementHint': 'سيتم عرض هذه الرسالة في لوحات تحكم جميع المستخدمين.',
         'settings.saveAndBroadcast': 'حفظ وبث',
+        'settings.saveAndBroadcast': 'حفظ وبث',
         'settings.generalSettings': 'الإعدادات العامة',
         'settings.profileInformation': 'معلومات الملف الشخصي',
         'settings.securitySettings': 'إعدادات الأمان',
@@ -1000,8 +981,11 @@ export const translations = {
         'settings.savePreferences': 'حفظ التفضيلات',
         'settings.changeAvatar': 'تغيير الصورة الرمزية',
         'settings.avatarHint': 'JPG, GIF أو PNG. الحد الأقصى 800K',
+        'settings.fullName': 'الاسم الكامل',
         'settings.emailAddress': 'البريد الإلكتروني',
+        'settings.currentPassword': 'كلمة المرور الحالية',
         'settings.currentPasswordPlaceholder': 'أدخل كلمة المرور الحالية لحفظ التغييرات',
+        'settings.updateProfile': 'تحديث الملف الشخصي',
 
         // Dashboard
         'dashboard.title': 'نظرة عامة على لوحة المعلومات',
@@ -1120,7 +1104,7 @@ export const translations = {
         'auth.backToSelection': '← العودة لاختيار الدور',
         'auth.error.invalid': 'بيانات الاعتماد غير صالحة. حاول مرة أخرى.',
         'auth.role.superAdmin': 'المسؤول الممتاز',
-        'auth.role.workstreamManager': '',
+        'auth.role.workstreamManager': 'مدير مسار العمل',
         'auth.role.schoolManager': 'مدير المدرسة',
         'auth.role.secretary': 'السكرتير',
         'auth.role.teacher': 'المعلم',
@@ -1408,22 +1392,11 @@ export const translations = {
         // School Manager Navigation
         'school.nav.overview': 'نظرة عامة',
         'school.nav.academicConfig': 'الإعداد الأكاديمي',
+        'school.nav.reports': 'التقارير',
         'school.nav.teacherMonitoring': 'متابعة المعلمين',
+        'school.nav.departments': 'الأقسام',
         'school.nav.secretaryMonitoring': 'متابعة السكرتارية',
-        'school.nav.communication': 'التواصل',
         'school.nav.settings': 'الإعدادات',
-
-        // School Communication
-        'school.communication.title': 'مركز التواصل',
-        'school.communication.subtitle': 'ابق على تواصل مع الموظفين والإدارة.',
-        'school.communication.compose': 'إنشاء جديد',
-        'school.communication.search': 'البحث عن الرسائل...',
-        'school.communication.internal': 'داخلي',
-        'school.communication.external': 'خارجي',
-        'school.communication.notifications': 'تنبيهات',
-        'school.communication.empty': 'لا توجد رسائل',
-        'school.communication.typeReply': 'اكتب ردك...',
-        'school.communication.send': 'إرسال الرد',
 
         // School Dashboard
         'school.dashboard.title': 'نظرة عامة على المدرسة',
@@ -1670,20 +1643,6 @@ export const translations = {
         'guardian.nav.communication': 'التواصل',
         'guardian.nav.settings': 'الإعدادات',
 
-        // Guardian Communication
-        'guardian.communication.title': 'مركز التواصل',
-        'guardian.communication.subtitle': 'ابق على تواصل مع المعلمين وإدارة المدرسة.',
-        'guardian.communication.compose': 'رسالة جديدة',
-        'guardian.communication.search': 'البحث عن الرسائل...',
-        'guardian.communication.internal': 'مع المعلمين',
-        'guardian.communication.external': 'مع الإدارة',
-        'guardian.communication.notifications': 'تنبيهات',
-        'guardian.communication.empty': 'لا توجد رسائل',
-        'guardian.communication.typeReply': 'اكتب رسالتك...',
-        'guardian.communication.send': 'إرسال الرسالة',
-        'guardian.communication.welcome': 'مرحباً بك في مركز التواصل',
-        'guardian.communication.desc': 'عرض الرسائل من المعلمين والتنبيهات المدرسية الرسمية هنا.',
-
         // Guardian Settings
         'guardian.settings.title': 'الإعدادات',
         'guardian.settings.subtitle': 'إدارة حسابك وتفضيلاتك.',
@@ -1772,7 +1731,8 @@ export const translations = {
         'guardian.monitoring.positive': 'إيجابي',
         'guardian.monitoring.negative': 'سلبي',
 
-        // Guardian Communication (additional keys)
+        // Guardian Communication
+        'guardian.communication.title': 'مركز التواصل',
         'guardian.communication.messages': 'الرسائل',
         'guardian.communication.newMessage': 'رسالة جديدة',
         'guardian.communication.teachers': 'المعلمون',

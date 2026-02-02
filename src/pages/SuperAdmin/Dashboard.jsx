@@ -1,5 +1,4 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { Users, School, Briefcase, TrendingUp, TrendingDown, Bell, Activity as ActivityIcon, UserPlus, ShieldCheck } from 'lucide-react';
@@ -8,6 +7,9 @@ import {
     LineChart, Line, PieChart, Pie, Cell
 } from 'recharts';
 import styles from './Dashboard.module.css';
+import { api } from '../../utils/api';
+import reportService from '../../services/reportService';
+import secretaryService from '../../services/secretaryService';
 
 const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) => {
     return (
@@ -32,37 +34,91 @@ const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) =
 };
 
 const Dashboard = () => {
+    console.log('Dashboard component rendering...');
+
     const { t } = useTheme();
     const { user } = useAuth();
-    const navigate = useNavigate();
+    const [statsData, setStatsData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Dynamic Data
-    const workstreams = JSON.parse(localStorage.getItem('edutraker_workstreams') || '[]');
-    const schools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
-    const users = JSON.parse(localStorage.getItem('edutraker_users') || '[]');
+    const [activities, setActivities] = useState([]);
+    const [chartData, setChartData] = useState([]);
 
-    // Calculate Stats
-    const totalWorkstreams = workstreams.length;
-    const totalSchools = schools.length;
-    const totalUsers = users.length;
-    const totalRegistrants = schools.reduce((acc, s) => acc + (s.students || 0), 0); // Sum of students in all schools as proxy for registrants
+    console.log('Dashboard - user:', user);
 
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                console.log('Fetching dashboard data...');
+
+                const statsRes = await reportService.getDashboardStats().catch(err => {
+                    console.warn('Failed to fetch stats:', err);
+                    return { statistics: {}, recent_activity: [], activity_chart: [] };
+                });
+
+                console.log('Dashboard data fetched:', statsRes);
+                setStatsData(statsRes.statistics || {});
+                setActivities(statsRes.recent_activity || []);
+                setChartData(statsRes.activity_chart || []);
+
+                setError(null);
+            } catch (err) {
+                console.error('Error fetching dashboard data:', err);
+                setError(err.message);
+                // Set default values even on error
+                setStatsData({});
+                setActivities([]);
+                setChartData([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Map Backend Stats to UI
     const stats = [
-        { title: t('dashboard.stats.workstreams'), value: totalWorkstreams.toString(), change: 0, icon: Briefcase, color: 'blue' },
-        { title: t('dashboard.stats.schools'), value: totalSchools.toString(), change: totalSchools > 0 ? 12.3 : 0, icon: School, color: 'green' },
-        { title: t('dashboard.stats.users'), value: totalUsers.toLocaleString(), change: totalUsers > 0 ? 8.1 : 0, icon: Users, color: 'purple' },
-        { title: 'Total Students', value: totalRegistrants.toLocaleString(), change: 15.4, icon: Users, color: 'indigo' },
-        { title: t('dashboard.stats.notifications'), value: '5', change: 0, icon: 'Bell', color: 'orange', isNotification: true },
+        {
+            title: t('dashboard.stats.workstreams'),
+            value: loading ? '...' : (statsData?.total_workstreams || '0'),
+            change: statsData?.workstreams_change || 0,
+            icon: Briefcase,
+            color: 'blue'
+        },
+        {
+            title: t('dashboard.stats.schools'),
+            value: loading ? '...' : (statsData?.total_schools || '0'),
+            change: statsData?.schools_change || 0,
+            icon: School,
+            color: 'green'
+        },
+        {
+            title: t('dashboard.stats.users'),
+            value: loading ? '...' : (statsData?.total_users || '0').toLocaleString(),
+            change: statsData?.users_change || 0,
+            icon: Users,
+            color: 'purple'
+        },
+        {
+            title: t('dashboard.stats.notifications'),
+            value: '5',
+            icon: 'Bell',
+            color: 'orange',
+            isNotification: true
+        },
     ];
 
-    const activityData = [
-        { name: 'Mon', logins: 4000 },
-        { name: 'Tue', logins: 3000 },
-        { name: 'Wed', logins: 5000 },
-        { name: 'Thu', logins: 2780 },
-        { name: 'Fri', logins: 1890 },
-        { name: 'Sat', logins: 2390 },
-        { name: 'Sun', logins: 3490 },
+    const activityData = chartData.length > 0 ? chartData : [
+        { name: 'Mon', logins: 0 },
+        { name: 'Tue', logins: 0 },
+        { name: 'Wed', logins: 0 },
+        { name: 'Thu', logins: 0 },
+        { name: 'Fri', logins: 0 },
+        { name: 'Sat', logins: 0 },
+        { name: 'Sun', logins: 0 },
     ];
 
     const distributionData = [
@@ -79,7 +135,7 @@ const Dashboard = () => {
         <div className={styles.container}>
             <div className={styles.header}>
                 <div>
-                    <h1 className={styles.pageTitle}>Good morning, {user?.name || 'Admin'}</h1>
+                    <h1 className={styles.pageTitle}>Good morning, {user?.displayName || user?.email || 'Admin'}</h1>
                     <p className={styles.subtitle}>Here's what's happening across EduTraker today.</p>
                 </div>
             </div>
@@ -142,34 +198,23 @@ const Dashboard = () => {
                 <div className={styles.activityCard}>
                     <h2 className={styles.cardTitle}>{t('dashboard.activity.title')}</h2>
                     <div className={styles.activityList}>
-                        <div className={styles.activityItem}>
-                            <div className={styles.activityIcon}><UserPlus size={16} /></div>
-                            <div className={styles.activityContent}>
-                                <p className={styles.activityText}>{t('mock.activity.1')}</p>
-                                <span className={styles.activityTime}>2 mins ago</span>
-                            </div>
-                        </div>
-                        <div className={styles.activityItem}>
-                            <div className={styles.activityIcon}><ShieldCheck size={16} /></div>
-                            <div className={styles.activityContent}>
-                                <p className={styles.activityText}>{t('mock.activity.2')}</p>
-                                <span className={styles.activityTime}>15 mins ago</span>
-                            </div>
-                        </div>
-                        <div className={styles.activityItem}>
-                            <div className={styles.activityIcon}><ActivityIcon size={16} /></div>
-                            <div className={styles.activityContent}>
-                                <p className={styles.activityText}>{t('mock.activity.3')}</p>
-                                <span className={styles.activityTime}>1 hr ago</span>
-                            </div>
-                        </div>
-                        <div className={styles.activityItem}>
-                            <div className={styles.activityIcon}><Bell size={16} /></div>
-                            <div className={styles.activityContent}>
-                                <p className={styles.activityText}>{t('mock.activity.4')}</p>
-                                <span className={styles.activityTime}>3 hrs ago</span>
-                            </div>
-                        </div>
+                        {loading ? (
+                            <div className={styles.loadingPulse}>Fetching updates...</div>
+                        ) : !Array.isArray(activities) || activities.length === 0 ? (
+                            <div className={styles.emptyActivity}>No recent activity</div>
+                        ) : (
+                            activities.slice(0, 5).map((activity, index) => (
+                                <div key={activity.id || index} className={styles.activityItem}>
+                                    <div className={styles.activityIcon}>
+                                        {activity.type === 'alert' ? <ShieldCheck size={16} /> : <Bell size={16} />}
+                                    </div>
+                                    <div className={styles.activityContent}>
+                                        <p className={styles.activityText}>{activity.message || activity.title}</p>
+                                        <span className={styles.activityTime}>{activity.created_at_human || 'Just now'}</span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>

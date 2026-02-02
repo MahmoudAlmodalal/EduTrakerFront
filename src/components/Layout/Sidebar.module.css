@@ -7,51 +7,11 @@
     top: 0;
     display: flex;
     flex-direction: column;
-    transition: transform var(--transition-normal) cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 1040;
+    transition: transform var(--transition-slow) cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: var(--z-sidebar);
     box-shadow: 10px 0 40px rgba(0, 0, 0, 0.15);
     border: none;
-    overflow-y: auto;
-    overflow-x: hidden;
 }
-
-/* Desktop Sidebar - Visible by default */
-@media (min-width: 769px) {
-    .sidebar {
-        transform: translateX(0);
-    }
-}
-
-/* Tablet and Mobile Sidebar - Slide drawer behavior */
-@media (max-width: 768px) {
-    .sidebar {
-        transform: translateX(-100%);
-        width: 72vw;
-        max-width: 260px;
-        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
-    }
-
-    .openMobile {
-        transform: translateX(0);
-    }
-
-    .mobileToggle {
-        display: flex;
-    }
-
-    .mobileToggle {
-        display: flex;
-    }
-
-    [dir="rtl"] .sidebar {
-        transform: translateX(100%);
-    }
-
-    [dir="rtl"] .openMobile {
-        transform: translateX(0);
-    }
-}
-
 
 .closed {
     transform: translateX(-100%);
@@ -63,13 +23,12 @@
 
 /* Brand Section */
 .logo {
-    height: 70px;
+    height: 80px;
     display: flex;
     align-items: center;
     padding: 0 var(--spacing-6);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(14, 165, 233, 0.05));
-    flex-shrink: 0;
 }
 
 .logoIcon {
@@ -84,18 +43,6 @@
     box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
     margin-inline-end: var(--spacing-4);
     position: relative;
-    flex-shrink: 0;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.logoIcon:hover {
-    transform: scale(1.1) rotate(5deg);
-    filter: brightness(1.1);
-}
-
-.logoIcon:active {
-    transform: scale(0.95);
 }
 
 .logoIcon::after {
@@ -111,60 +58,20 @@
 
 .logoText {
     font-weight: 800;
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-xl);
     color: white;
     letter-spacing: -0.025em;
     background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.mobileToggle {
-    display: none;
-    width: 36px;
-    height: 36px;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 10px;
-    cursor: pointer;
-    margin-inline-start: auto;
-    transition: all 0.2s ease;
-    z-index: 1050;
-}
-
-.mobileToggle:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
-}
-
-.mobileToggle:active {
-    transform: scale(0.95);
-}
-
-@media (max-width: 480px) {
-    .logo {
-        height: 60px;
-        padding: 0 var(--spacing-4);
-    }
-
-    .logoText {
-        font-size: var(--font-size-base);
-    }
 }
 
 /* Navigation */
 .nav {
     flex: 1;
-    padding: var(--spacing-5) var(--spacing-3);
+    padding: var(--spacing-6) var(--spacing-4);
     overflow-y: auto;
-    min-width: 0;
 }
 
 .nav::-webkit-scrollbar {
@@ -174,10 +81,6 @@
 .nav::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
     border-radius: var(--radius-full);
-}
-
-.nav::-webkit-scrollbar-track {
-    background: transparent;
 }
 
 .nav ul {
@@ -190,18 +93,15 @@
 .link {
     display: flex;
     align-items: center;
-    padding: 0.75rem var(--spacing-3);
+    padding: 0.875rem var(--spacing-4);
     color: rgba(226, 232, 240, 0.7);
     font-weight: 500;
-    font-size: var(--font-size-sm);
     border-radius: 12px;
     transition: all 0.2s ease;
     gap: var(--spacing-3);
     text-decoration: none;
     position: relative;
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
 }
 
 .link::before {
@@ -224,17 +124,11 @@
 .link svg {
     position: relative;
     z-index: 1;
-    min-width: 20px;
-    width: 20px;
-    height: 20px;
 }
 
 .linkText {
     position: relative;
     z-index: 1;
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 [dir="rtl"] .link:hover {
@@ -271,11 +165,10 @@
 
 /* User Profile Footer */
 .footer {
-    padding: var(--spacing-4) var(--spacing-3);
+    padding: var(--spacing-5) var(--spacing-4);
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(8px);
-    flex-shrink: 0;
 }
 
 .userProfile {
@@ -287,7 +180,6 @@
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.05);
     transition: all 0.2s ease;
-    min-width: 0;
 }
 
 .userProfile:hover {
@@ -296,8 +188,8 @@
 }
 
 .avatar {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     background: linear-gradient(135deg, #4f46e5, #8b5cf6);
     color: white;
     border-radius: 12px;
@@ -307,7 +199,6 @@
     font-weight: 700;
     font-size: var(--font-size-sm);
     box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
-    flex-shrink: 0;
 }
 
 .userInfo {
@@ -318,7 +209,7 @@
 }
 
 .userName {
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: white;
     overflow: hidden;
@@ -327,13 +218,10 @@
 }
 
 .userRole {
-    font-size: 0.6rem;
+    font-size: 0.6875rem;
     color: rgba(148, 163, 184, 0.8);
     text-transform: capitalize;
     font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .logoutBtn {
@@ -348,35 +236,16 @@
     color: rgba(148, 163, 184, 0.8) !important;
     cursor: pointer;
     transition: all 0.2s ease;
-    flex-shrink: 0;
-    padding: 0;
-    min-width: 36px;
+    margin-left: auto;
 }
 
 .logoutBtn:hover {
     background: rgba(239, 68, 68, 0.15) !important;
     border-color: rgba(239, 68, 68, 0.3) !important;
     color: #ef4444 !important;
-    transform: scale(1.05);
 }
 
 [dir="rtl"] .logoutBtn {
     margin-left: 0;
     margin-right: auto;
-}
-
-.overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    z-index: calc(var(--z-sidebar) - 1);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--transition-normal);
-}
-
-.overlayOpen {
-    opacity: 1;
-    pointer-events: auto;
 }

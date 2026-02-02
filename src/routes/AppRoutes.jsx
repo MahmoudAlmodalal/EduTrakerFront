@@ -2,6 +2,9 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import Login from '../pages/Auth/Login';
+import Register from '../pages/Auth/Register';
+import RequestPasswordReset from '../pages/Auth/RequestPasswordReset';
+import ConfirmPasswordReset from '../pages/Auth/ConfirmPasswordReset';
 import RoleSelection from '../pages/Auth/RoleSelection';
 import Unauthorized from '../pages/Unauthorized';
 
@@ -37,7 +40,6 @@ import TeacherMonitoring from '../pages/SchoolManager/TeacherMonitoring';
 import DepartmentManagement from '../pages/SchoolManager/DepartmentManagement';
 import SecretaryMonitoring from '../pages/SchoolManager/SecretaryMonitoring';
 import SchoolManagerSettings from '../pages/SchoolManager/SchoolManagerSettings';
-import SchoolCommunication from '../pages/SchoolManager/SchoolCommunication';
 
 // Secretary Pages
 import SecretaryLayout from '../components/SecretaryLayout';
@@ -79,14 +81,27 @@ const AppRoutes = () => {
         <Routes>
             {/* Public Routes */}
             <Route path="/unauthorized" element={<Unauthorized />} />
-            <Route path="/login" element={<RoleSelection />} />
-            <Route path="/login/super-admin" element={<Login role="SUPER_ADMIN" />} />
-            <Route path="/login/workstream-manager" element={<Login role="WORKSTREAM_MANAGER" />} />
-            <Route path="/login/school-manager" element={<Login role="SCHOOL_MANAGER" />} />
-            <Route path="/login/secretary" element={<Login role="SECRETARY" />} />
-            <Route path="/login/teacher" element={<Login role="TEACHER" />} />
-            <Route path="/login/student" element={<Login role="STUDENT" />} />
-            <Route path="/login/guardian" element={<Login role="GUARDIAN" />} />
+
+            {/* Role Selection (Home) */}
+            <Route path="/" element={<RoleSelection />} />
+
+            {/* Portal Login - for Admin & Workstream Manager */}
+            <Route path="/login/portal" element={<Login role="PORTAL" />} />
+            <Route path="/login" element={<Navigate to="/login/portal" replace />} />
+
+            {/* Portal Registration */}
+            <Route path="/register/portal" element={<Register role="PORTAL" />} />
+            <Route path="/register" element={<Navigate to="/register/portal" replace />} />
+
+            {/* Workstream Login - URL: /login/workstream/:id */}
+            <Route path="/login/workstream/:workstreamId" element={<Login role="WORKSTREAM" />} />
+
+            {/* Workstream Registration */}
+            <Route path="/register/workstream/:workstreamId" element={<Register role="WORKSTREAM" />} />
+
+            {/* Password Reset */}
+            <Route path="/password-reset" element={<RequestPasswordReset />} />
+            <Route path="/password-reset/confirm" element={<ConfirmPasswordReset />} />
 
             {/* Protected Routes - Super Admin */}
             <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
@@ -125,7 +140,6 @@ const AppRoutes = () => {
                     <Route path="teachers" element={<TeacherMonitoring />} />
                     <Route path="departments" element={<DepartmentManagement />} />
                     <Route path="secretaries" element={<SecretaryMonitoring />} />
-                    <Route path="communication" element={<SchoolCommunication />} />
                     <Route path="settings" element={<SchoolManagerSettings />} />
                 </Route>
             </Route>

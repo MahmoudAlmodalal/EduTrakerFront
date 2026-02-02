@@ -2,7 +2,6 @@
     display: flex;
     min-height: 100vh;
     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    flex-direction: row;
 }
 
 [data-theme='dark'] .layout {
@@ -17,7 +16,6 @@
     margin-inline-start: 280px;
     min-width: 0;
     position: relative;
-    width: 100%;
 }
 
 .mainContent::before {
@@ -67,10 +65,8 @@
     flex: 1;
     position: relative;
     z-index: 1;
-    overflow-x: hidden;
 }
 
-/* Tablet Responsiveness (1024px and below) */
 @media (max-width: 1024px) {
     .mainContent {
         margin-inline-start: 0;
@@ -86,40 +82,6 @@
     }
 
     .contentArea {
-        padding: var(--spacing-6);
-    }
-}
-
-/* Mobile Responsiveness (768px and below) */
-@media (max-width: 768px) {
-    .layout {
-        flex-direction: column;
-    }
-
-    .mainContent {
-        margin-inline-start: 0;
-        width: 100%;
-        min-height: calc(100vh - 70px);
-    }
-
-    .mainContent::before {
-        display: none;
-    }
-
-    .mainContent::after {
-        display: none;
-    }
-
-    .contentArea {
         padding: var(--spacing-4);
-        padding-bottom: var(--spacing-8);
-    }
-}
-
-/* Small Mobile (480px and below) */
-@media (max-width: 480px) {
-    .contentArea {
-        padding: var(--spacing-3);
-        padding-bottom: var(--spacing-6);
     }
 }

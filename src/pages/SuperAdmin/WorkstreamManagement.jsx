@@ -1,69 +1,117 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Settings, Edit, Trash2, MapPin, Users, School, Layers, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import styles from './WorkstreamManagement.module.css';
+import workstreamService from '../../services/workstreamService';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const WorkstreamManagement = () => {
     const { t } = useTheme();
     const [isModalOpen, setIsModalOpen] = useState(false);
-
-    // Mock Data
-    const [workstreams, setWorkstreams] = useState(() => {
-        const savedWorkstreams = localStorage.getItem('edutraker_workstreams');
-        return savedWorkstreams ? JSON.parse(savedWorkstreams) : [
-            { id: 1, name: 'Gaza North', schools: 12, users: 4500, manager: 'John Doe', status: 'Active', location: 'Jabalia, Gaza North' },
-            { id: 2, name: 'Gaza South', schools: 8, users: 3200, manager: 'Jane Smith', status: 'Active', location: 'Rafah, Gaza South' },
-            { id: 3, name: 'Khan Younis', schools: 15, users: 5100, manager: 'Pending', status: 'Inactive', location: 'Khan Younis Center' },
-            { id: 4, name: 'Mid Area', schools: 10, users: 2800, manager: 'Ahmad Khalil', status: 'Active', location: 'Deir al-Balah' },
-        ];
-    });
-
-    React.useEffect(() => {
-        localStorage.setItem('edutraker_workstreams', JSON.stringify(workstreams));
-    }, [workstreams]);
+    const [workstreams, setWorkstreams] = useState([]);
+    const [managers, setManagers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
     const [selectedWorkstream, setSelectedWorkstream] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [currentWorkstreamId, setCurrentWorkstreamId] = useState(null);
-    const [formData, setFormData] = useState({ name: '', quota: '', manager: '', location: '' });
+    const [formData, setFormData] = useState({ name: '', quota: '100', managerId: '', location: '', description: '' });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
 
-    const handleCreateWorkstream = (e) => {
+    const fetchWorkstreams = async () => {
+        setLoading(true);
+        try {
+            const params = {};
+            if (searchTerm) params.search = searchTerm;
+            if (statusFilter !== 'all') params.is_active = statusFilter === 'active';
+
+            const response = await workstreamService.getWorkstreams(params);
+            setWorkstreams(response.results || response);
+        } catch (err) {
+            console.error('Error fetching workstreams:', err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchManagers = async () => {
+        try {
+            const response = await workstreamService.getManagers();
+            setManagers(response.results || response);
+        } catch (err) {
+            console.error('Error fetching managers:', err);
+        }
+    };
+
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            fetchWorkstreams();
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, statusFilter]);
+
+    useEffect(() => {
+        fetchManagers();
+    }, []);
+
+    const handleCreateWorkstream = async (e) => {
         e.preventDefault();
 
-        if (isEditing) {
-            setWorkstreams(workstreams.map(ws =>
-                ws.id === currentWorkstreamId
-                    ? { ...ws, name: formData.name, manager: formData.manager, location: formData.location }
-                    : ws
-            ));
-        } else {
-            const newWorkstream = {
-                id: Date.now(),
-                name: formData.name,
-                schools: 0,
-                users: 0,
-                manager: formData.manager || 'Pending',
-                status: 'Active',
-                location: formData.location || 'Unknown'
-            };
-            setWorkstreams([...workstreams, newWorkstream]);
-        }
+        const payload = {
+            workstream_name: formData.name,
+            capacity: parseInt(formData.quota),
+            manager_id: formData.managerId ? parseInt(formData.managerId) : null,
+            description: formData.description || '',
+            location: formData.location || '',
+        };
 
-        setIsModalOpen(false);
-        resetForm();
+        try {
+            if (isEditing) {
+                await workstreamService.updateWorkstream(currentWorkstreamId, payload);
+            } else {
+                await workstreamService.createWorkstream(payload);
+            }
+
+            await fetchWorkstreams();
+            setIsModalOpen(false);
+            resetForm();
+        } catch (err) {
+            alert('Operation failed: ' + err.message);
+        }
+    };
+
+    const handleToggleStatus = async (id, currentStatus) => {
+        const action = currentStatus ? 'deactivate' : 'activate';
+        if (!window.confirm(`Are you sure you want to ${action} this workstream?`)) return;
+
+        try {
+            if (currentStatus) {
+                await workstreamService.deactivateWorkstream(id);
+            } else {
+                await workstreamService.updateWorkstream(id, { is_active: true });
+            }
+            await fetchWorkstreams();
+        } catch (err) {
+            alert('Status update failed: ' + err.message);
+        }
     };
 
     const handleEditWorkstream = (ws) => {
         setIsEditing(true);
         setCurrentWorkstreamId(ws.id);
         setFormData({
-            name: ws.name,
-            quota: 5000,
-            manager: ws.manager !== 'Pending' ? ws.manager : '',
-            location: ws.location || ''
+            name: ws.workstream_name,
+            quota: ws.capacity.toString(),
+            managerId: ws.manager_id ? ws.manager_id.toString() : '',
+            location: ws.location || '',
+            description: ws.description || ''
         });
         setIsModalOpen(true);
     };
@@ -71,26 +119,12 @@ const WorkstreamManagement = () => {
     const resetForm = () => {
         setIsEditing(false);
         setCurrentWorkstreamId(null);
-        setFormData({ name: '', quota: '', manager: '', location: '' });
+        setFormData({ name: '', quota: '100', managerId: '', location: '', description: '' });
     };
 
     const openCreateModal = () => {
         resetForm();
         setIsModalOpen(true);
-    };
-
-    const handleDeleteWorkstream = (id) => {
-        if (window.confirm(t('Are you sure you want to delete this workstream?'))) {
-            setWorkstreams(workstreams.filter(ws => ws.id !== id));
-        }
-    };
-
-    const handleToggleStatus = (id) => {
-        setWorkstreams(workstreams.map(ws =>
-            ws.id === id
-                ? { ...ws, status: ws.status === 'Active' ? 'Inactive' : 'Active' }
-                : ws
-        ));
     };
 
     const openConfigModal = (workstream) => {
@@ -110,80 +144,135 @@ const WorkstreamManagement = () => {
                 </Button>
             </div>
 
-            <div className={styles.grid}>
-                {workstreams.map((ws) => {
-                    // Dynamic counts calculation
-                    const allSchools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
-                    const allUsers = JSON.parse(localStorage.getItem('edutraker_users') || '[]');
-
-                    // Count schools in this workstream (matching by name or location snippet)
-                    const schoolCount = allSchools.filter(s =>
-                        (s.workstream === ws.name) ||
-                        (s.location && s.location.includes(ws.name))
-                    ).length;
-
-                    // Count users in this workstream
-                    const userCount = allUsers.filter(u => u.workstream === ws.name).length;
-
-                    return (
-                        <div key={ws.id} className={styles.card}>
-                            <div className={styles.cardHeader}>
-                                <div className={styles.workstreamInfo}>
-                                    <h3 className={styles.cardTitle}>{ws.name}</h3>
-                                    <div className={styles.locationLabel}>
-                                        <MapPin size={12} />
-                                        <span>{ws.location}</span>
-                                    </div>
-                                </div>
-                                <span
-                                    className={`${styles.statusBadge} ${ws.status === 'Active' ? styles.active : styles.inactive}`}
-                                    onClick={() => handleToggleStatus(ws.id)}
-                                >
-                                    {ws.status === 'Active' ? t('common.active') : t('common.inactive')}
-                                </span>
-                            </div>
-
-                            <div className={styles.cardBody}>
-                                <div className={styles.statsContainer}>
-                                    <div className={styles.statItem}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            <School size={14} style={{ color: 'var(--color-primary)' }} />
-                                            <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
-                                        </div>
-                                        <span className={styles.statValue}>{schoolCount}</span>
-                                    </div>
-                                    <div className={styles.statItem}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                            <Users size={14} style={{ color: '#8b5cf6' }} />
-                                            <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
-                                        </div>
-                                        <span className={styles.statValue}>{userCount.toLocaleString()}</span>
-                                    </div>
-                                </div>
-
-                                <div className={styles.managerSection}>
-                                    <div className={styles.managerAvatar}>
-                                        {ws.manager !== 'Pending' ? ws.manager.charAt(0) : '?'}
-                                    </div>
-                                    <div>
-                                        <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager</p>
-                                        <p className={styles.managerName}>{ws.manager}</p>
-                                    </div>
-                                    <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
-                                </div>
-                            </div>
-
-                            <div className={styles.cardFooter}>
-                                <div className={styles.actions}>
-                                    <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
-                                    <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
-                                    <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleDeleteWorkstream(ws.id)} title="Delete"><Trash2 size={18} /></button>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
+            {/* Filters Section */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                    <input
+                        type="text"
+                        placeholder="Search workstreams..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-bg-surface)',
+                            color: 'var(--color-text-primary)'
+                        }}
+                    />
+                </div>
+                <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-bg-surface)',
+                        color: 'var(--color-text-primary)',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <option value="all">All Status</option>
+                    <option value="active">Active Only</option>
+                    <option value="inactive">Inactive Only</option>
+                </select>
             </div>
+
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '3rem' }}>Loading workstreams...</div>
+            ) : (
+                <>
+                    {/* Analytics Section */}
+                    <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: 'var(--color-bg-surface)', borderRadius: '12px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--color-text-primary)' }}>User Distribution by Workstream</h3>
+                        <div style={{ width: '100%', height: 300 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                    data={workstreams}
+                                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                                    <XAxis dataKey="workstream_name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: 'var(--color-bg-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }}
+                                        itemStyle={{ color: 'var(--color-text-primary)' }}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="total_users" name="Total Users" fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Bar dataKey="capacity" name="Capacity" fill="var(--slate-300)" radius={[4, 4, 0, 0]} barSize={40} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    <div className={styles.grid}>
+                        {workstreams.map((ws) => (
+                            <div key={ws.id} className={styles.card}>
+                                <div className={styles.cardHeader}>
+                                    <div className={styles.workstreamInfo}>
+                                        <h3 className={styles.cardTitle}>{ws.workstream_name}</h3>
+                                        <div className={styles.locationLabel}>
+                                            <MapPin size={12} />
+                                            <span>{ws.location || 'Not Specified'}</span>
+                                        </div>
+                                    </div>
+                                    <span className={`${styles.statusBadge} ${ws.is_active ? styles.active : styles.inactive}`}>
+                                        {ws.is_active ? t('common.active') : t('common.inactive')}
+                                    </span>
+                                </div>
+
+                                <div className={styles.cardBody}>
+                                    <div className={styles.statsContainer}>
+                                        <div className={styles.statItem}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                                <School size={14} style={{ color: 'var(--color-primary)' }} />
+                                                <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
+                                            </div>
+                                            <span className={styles.statValue}>{ws.total_schools || 0} Schools</span>
+                                        </div>
+                                        <div className={styles.statItem}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                                <Users size={14} style={{ color: '#8b5cf6' }} />
+                                                <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
+                                            </div>
+                                            <span className={styles.statValue}>{ws.total_users || 0} Clients</span>
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.managerSection}>
+                                        <div className={styles.managerAvatar}>
+                                            {ws.manager_name?.charAt(0) || '?'}
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager</p>
+                                            <p className={styles.managerName}>{ws.manager_name || 'Pending'}</p>
+                                        </div>
+                                        <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
+                                    </div>
+                                </div>
+
+                                <div className={styles.cardFooter}>
+                                    <div className={styles.actions}>
+                                        <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
+                                        <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
+                                        <button
+                                            className={`${styles.actionBtn} ${styles.danger}`}
+                                            title={ws.is_active ? "Deactivate" : "Activate"}
+                                            onClick={() => handleToggleStatus(ws.id, ws.is_active)}
+                                            style={{ backgroundColor: ws.is_active ? undefined : 'var(--color-success)', color: ws.is_active ? undefined : 'white' }}
+                                        >
+                                            {ws.is_active ? <Trash2 size={18} /> : <div style={{ fontWeight: 'bold', fontSize: '12px' }}>ACTIVATE</div>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? t('workstreams.modal.editTitle') : t('workstreams.modal.createTitle')}>
                 <form className={styles.form} onSubmit={handleCreateWorkstream}>
@@ -203,9 +292,17 @@ const WorkstreamManagement = () => {
                             <input
                                 type="text"
                                 placeholder="e.g. Gaza City, Center"
-                                required
                                 value={formData.location}
                                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                            />
+                        </div>
+                        <div className={styles.formGroup}>
+                            <label>Description (Optional)</label>
+                            <textarea
+                                placeholder="Workstream description"
+                                value={formData.description}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                style={{ minHeight: '80px', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)' }}
                             />
                         </div>
                         <div className={styles.formGroup}>
@@ -215,25 +312,21 @@ const WorkstreamManagement = () => {
                                 value={formData.quota}
                                 onChange={(e) => setFormData({ ...formData, quota: e.target.value })}
                             >
-                                <option value="">Select quota limit</option>
-                                <option value="5000">5,000 Users</option>
-                                <option value="10000">10,000 Users</option>
-                                <option value="25000">25,000 Users</option>
+                                <option value="100">100 Schools (Basic)</option>
+                                <option value="500">500 Schools (Standard)</option>
+                                <option value="1000">1000 Schools (Premium)</option>
                             </select>
                         </div>
                         <div className={styles.formGroup}>
                             <label>{t('workstreams.form.assignManager')}</label>
                             <select
-                                value={formData.manager}
-                                onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                                value={formData.managerId}
+                                onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
                             >
                                 <option value="">{t('workstreams.form.selectManager')}</option>
-                                {JSON.parse(localStorage.getItem('edutraker_users') || '[]')
-                                    .filter(u => u.role === 'Workstream Manager')
-                                    .map(u => (
-                                        <option key={u.id} value={u.name}>{u.name}</option>
-                                    ))
-                                }
+                                {managers.map(manager => (
+                                    <option key={manager.id} value={manager.id}>{manager.full_name}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
@@ -244,7 +337,7 @@ const WorkstreamManagement = () => {
                 </form>
             </Modal>
 
-            <Modal isOpen={isConfigModalOpen} onClose={() => setIsConfigModalOpen(false)} title={`${t('workstreams.config.title')}: ${selectedWorkstream?.name}`}>
+            <Modal isOpen={isConfigModalOpen} onClose={() => setIsConfigModalOpen(false)} title={`${t('workstreams.config.title')}: ${selectedWorkstream?.workstream_name}`}>
                 <form className={styles.form} onSubmit={(e) => { e.preventDefault(); setIsConfigModalOpen(false); }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         <div className={styles.formGroup}>

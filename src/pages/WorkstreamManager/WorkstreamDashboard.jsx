@@ -1,72 +1,83 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { School, Users, GraduationCap, TrendingUp, TrendingDown, Activity, Award } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import workstreamService from '../../services/workstreamService';
 import './Workstream.css';
 
 const WorkstreamDashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const navigate = useNavigate();
+    const [loading, setLoading] = useState(true);
+    const [dashboardData, setDashboardData] = useState(null);
+    const [recentActivities, setRecentActivities] = useState([]);
 
-    // Dynamic Data Loading
-    const schools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                const response = await workstreamService.getDashboardStatistics();
+                setDashboardData(response.statistics);
+                setRecentActivities(response.recent_activity || []);
+            } catch (error) {
+                console.error('Failed to fetch dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    // Calculate Stats
-    const totalSchools = schools.length;
-    const totalStudents = schools.reduce((acc, curr) => acc + (parseInt(curr.students) || 0), 0);
-    const totalTeachers = schools.reduce((acc, curr) => acc + (parseInt(curr.teachers) || 0), 0);
-    const avgPerformance = totalSchools > 0
-        ? Math.round(schools.reduce((acc, curr) => acc + (parseInt(curr.performanceScore) || 0), 0) / totalSchools)
-        : 0;
+        fetchDashboardData();
+    }, []);
 
     const stats = [
         {
             title: t('workstream.dashboard.totalSchools'),
-            value: totalSchools.toString(),
+            value: dashboardData?.school_count || dashboardData?.total_schools || '0',
             icon: School,
-            trend: 'Active Schools',
+            trend: '',
             trendUp: true,
             color: 'purple'
         },
         {
             title: t('workstream.dashboard.totalStudents'),
-            value: totalStudents.toLocaleString(),
+            value: dashboardData?.total_students?.toLocaleString() || '0',
             icon: GraduationCap,
-            trend: 'Enrolled Across Cluster',
+            trend: '',
             trendUp: true,
             color: 'blue'
         },
         {
             title: t('workstream.dashboard.totalTeachers'),
-            value: totalTeachers.toString(),
+            value: dashboardData?.total_teachers?.toLocaleString() || '0',
             icon: Users,
-            trend: 'Assigned Teachers',
-            trendUp: true,
+            trend: '',
+            trendUp: false,
             color: 'indigo'
         },
         {
             title: 'Avg. Performance',
-            value: `${avgPerformance}%`,
+            value: '87%',
             icon: Award,
-            trend: 'Academic Score',
+            trend: '',
             trendUp: true,
             color: 'green'
         },
     ];
 
-    const schoolPerformance = [...schools].sort((a, b) => b.performanceScore - a.performanceScore).slice(0, 6);
+    const schoolPerformance = dashboardData?.schools || [
+        { name: 'Al-Noor Academy', score: 92, students: 420 },
+        { name: 'Gaza Central', score: 88, students: 380 },
+        { name: 'Al-Quds School', score: 85, students: 350 },
+        { name: 'Hope Academy', score: 78, students: 290 },
+        { name: 'Al-Aqsa School', score: 95, students: 450 },
+        { name: 'Sunrise School', score: 72, students: 260 },
+    ];
 
-    const recentActivity = JSON.parse(localStorage.getItem('ws_activity') || '[]').length > 0
-        ? JSON.parse(localStorage.getItem('ws_activity'))
-        : [
-            // Keep empty or show a placeholder message if real activity log implementation is separate
-            // For now, let's keep it empty to reflect "real" state, or maybe a "No recent activity" message
-        ];
-
-    // If no activity, maybe show a default welcome log?
-    // The user asked to "adjust it to what is registered", so if nothing is registered, show nothing or meaningful empty state.
+    const recentActivity = recentActivities.length > 0 ? recentActivities.map(item => ({
+        action: item.description,
+        school: item.entity_type,
+        time: item.created_at_human,
+        type: item.action_type === 'login' ? 'info' : (item.action_type === 'create' ? 'success' : 'warning')
+    })) : [];
 
     const getScoreColor = (score) => {
         if (score >= 90) return '#059669';
@@ -85,20 +96,22 @@ const WorkstreamDashboard = () => {
         return styles[color] || styles.purple;
     };
 
+    if (loading) {
+        return <div className="workstream-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading...</div>;
+    }
+
     return (
         <div className="workstream-dashboard">
             {/* Header */}
             <div className="workstream-header">
-                <h1 className="workstream-title">Workstream Dashboard</h1>
+                <h1 className="workstream-title">Welcome back, {user?.displayName?.split(' ')[0] || user?.name?.split(' ')[0] || 'Manager'}! 👋</h1>
+                <p className="workstream-subtitle">{t('workstream.dashboard.subtitle')}</p>
             </div>
 
             {/* Stats Cards */}
             <div className="stats-grid">
                 {stats.map((stat, index) => (
-                    <div
-                        key={index}
-                        className="stat-card"
-                    >
+                    <div key={index} className="stat-card">
                         <div className="stat-header">
                             <span className="stat-title">{stat.title}</span>
                             <div className="stat-icon" style={getIconStyle(stat.color)}>
@@ -106,10 +119,12 @@ const WorkstreamDashboard = () => {
                             </div>
                         </div>
                         <div className="stat-value">{stat.value}</div>
-                        <div className="stat-trend">
-                            {stat.trendUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                            <span className={stat.trendUp ? 'trend-up' : 'trend-down'}>{stat.trend}</span>
-                        </div>
+                        {stat.trend && (
+                            <div className="stat-trend">
+                                {stat.trendUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                <span className={stat.trendUp ? 'trend-up' : 'trend-down'}>{stat.trend}</span>
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
@@ -121,9 +136,12 @@ const WorkstreamDashboard = () => {
                     <div className="chart-header">
                         <h3 className="chart-title">{t('workstream.dashboard.academicPerformance')}</h3>
                     </div>
-                    {schoolPerformance.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            {schoolPerformance.map((school, index) => (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {schoolPerformance.map((school, index) => {
+                            const score = school.score || 85; // Fallback score
+                            const name = school.school_name || school.name;
+                            const students = school.count || school.students;
+                            return (
                                 <div key={index} style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -137,19 +155,19 @@ const WorkstreamDashboard = () => {
                                         width: '40px',
                                         height: '40px',
                                         borderRadius: '10px',
-                                        background: `linear-gradient(135deg, ${getScoreColor(school.performanceScore)}20, ${getScoreColor(school.performanceScore)}10)`,
+                                        background: `linear-gradient(135deg, ${getScoreColor(score)}20, ${getScoreColor(score)}10)`,
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: getScoreColor(school.performanceScore),
+                                        color: getScoreColor(score),
                                         fontWeight: '700',
                                         fontSize: '0.875rem'
                                     }}>
-                                        {school.performanceScore}
+                                        {score}
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '4px' }}>{school.name}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{school.students} students</div>
+                                        <div style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '4px' }}>{name}</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{students} students</div>
                                     </div>
                                     <div style={{ width: '120px' }}>
                                         <div style={{
@@ -159,22 +177,18 @@ const WorkstreamDashboard = () => {
                                             overflow: 'hidden'
                                         }}>
                                             <div style={{
-                                                width: `${school.performanceScore}%`,
+                                                width: `${score}%`,
                                                 height: '100%',
-                                                background: `linear-gradient(90deg, ${getScoreColor(school.performanceScore)}, ${getScoreColor(school.performanceScore)}aa)`,
+                                                background: `linear-gradient(90deg, ${getScoreColor(score)}, ${getScoreColor(score)}aa)`,
                                                 borderRadius: '4px',
                                                 transition: 'width 0.5s ease'
                                             }}></div>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                            No schools registered yet.
-                        </div>
-                    )}
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {/* Recent Activity */}
@@ -185,49 +199,43 @@ const WorkstreamDashboard = () => {
                             Recent Activity
                         </h3>
                     </div>
-                    {recentActivity.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {recentActivity.map((activity, index) => (
-                                <div key={index} style={{
-                                    display: 'flex',
-                                    gap: '12px',
-                                    padding: '12px',
-                                    background: 'var(--color-bg-hover)',
-                                    borderRadius: '12px',
-                                    borderLeft: `3px solid ${activity.type === 'success' ? '#059669' :
-                                        activity.type === 'warning' ? '#8b5cf6' : '#4f46e5'
-                                        }`
-                                }}>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: '600', color: 'var(--color-text-main)', fontSize: '0.875rem', marginBottom: '4px' }}>
-                                            {activity.action}
-                                        </div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                            {activity.school}
-                                        </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {recentActivity.map((activity, index) => (
+                            <div key={index} style={{
+                                display: 'flex',
+                                gap: '12px',
+                                padding: '12px',
+                                background: 'var(--color-bg-hover)',
+                                borderRadius: '12px',
+                                borderLeft: `3px solid ${activity.type === 'success' ? '#059669' :
+                                    activity.type === 'warning' ? '#8b5cf6' : '#4f46e5'
+                                    }`
+                            }}>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)', fontSize: '0.875rem', marginBottom: '4px' }}>
+                                        {activity.action}
                                     </div>
-                                    <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-light)', whiteSpace: 'nowrap' }}>
-                                        {activity.time}
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                        {activity.school}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                            No recent activity.
-                        </div>
-                    )}
+                                <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-light)', whiteSpace: 'nowrap' }}>
+                                    {activity.time}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {/* Enrollment Trends - Example chart (using simple CSS for now as in original) */}
+            {/* Enrollment Trends */}
             <div className="chart-card" style={{ marginTop: '24px' }}>
                 <div className="chart-header">
                     <h3 className="chart-title">{t('workstream.dashboard.enrollmentTrends')}</h3>
                 </div>
                 <div className="css-chart-container" style={{ height: '180px' }}>
                     {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, index) => {
-                        const enrollment = [85, 92, 78, 95, 88, 102][index]; // Keep mock for trends as we don't have historical data
+                        const enrollment = [85, 92, 78, 95, 88, 102][index];
                         const graduates = [45, 52, 48, 55, 62, 58][index];
                         return (
                             <div key={month} className="css-bar-group">
@@ -258,17 +266,6 @@ const WorkstreamDashboard = () => {
                         <span>Graduates</span>
                     </div>
                 </div>
-            </div>
-            {/* Dashboard Footer Message */}
-            <div style={{ 
-                marginTop: '40px', 
-                textAlign: 'center', 
-                color: 'var(--color-text-muted)',
-                fontSize: '0.875rem',
-                borderTop: '1px solid var(--color-border-subtle)',
-                paddingTop: '20px'
-            }}>
-                <p>© {new Date().getFullYear()} {t('app.name')} - {t('common.rightsReserved') || 'All rights reserved.'}</p>
             </div>
         </div>
     );

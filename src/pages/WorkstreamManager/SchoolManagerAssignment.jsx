@@ -1,84 +1,100 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Shield, School, Mail, Trash2, Edit, X } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { api } from '../../utils/api';
 import './Workstream.css';
 
 const SchoolManagerAssignment = () => {
     const { t } = useTheme();
+    const [loading, setLoading] = useState(true);
     const [showAssignForm, setShowAssignForm] = useState(false);
-    const [managers, setManagers] = useState(() => {
-        const saved = localStorage.getItem('ws_manager_assignments');
-        return saved ? JSON.parse(saved) : [];
-    });
-
-    React.useEffect(() => {
-        localStorage.setItem('ws_manager_assignments', JSON.stringify(managers));
-    }, [managers]);
-
-    const [newManager, setNewManager] = useState({ name: '', email: '', schoolId: '', isEditing: false, id: null });
+    const [managers, setManagers] = useState([]);
+    const [schools, setSchools] = useState([]);
+    const [newManager, setNewManager] = useState({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Load Schools from Shared Storage for dropdown
-    const schools = JSON.parse(localStorage.getItem('ws_schools') || '[]');
-
-    const handleAssignManager = (e) => {
-        e.preventDefault();
-        const schoolName = schools.find(s => s.id === parseInt(newManager.schoolId))?.name || 'Unassigned';
-
-        if (newManager.isEditing) {
-            setManagers(managers.map(manager =>
-                manager.id === newManager.id
-                    ? {
-                        ...manager,
-                        name: newManager.name,
-                        email: newManager.email,
-                        school: schoolName,
-                        status: newManager.schoolId ? 'Assigned' : 'Available'
-                    }
-                    : manager
-            ));
-        } else {
-            const manager = {
-                id: managers.length + 1,
-                name: newManager.name,
-                email: newManager.email,
-                school: schoolName,
-                status: newManager.schoolId ? 'Assigned' : 'Available'
-            };
-            setManagers([manager, ...managers]);
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [managersData, schoolsData] = await Promise.all([
+                api.get('/users/?role=manager_school'),
+                api.get('/school/school/')
+            ]);
+            setManagers(managersData.results || managersData || []);
+            setSchools(schoolsData || []);
+        } catch (error) {
+            console.error('Failed to fetch data:', error);
+        } finally {
+            setLoading(false);
         }
-
-        setNewManager({ name: '', email: '', schoolId: '', isEditing: false, id: null });
-        setShowAssignForm(false);
     };
 
-    const handleDeleteManager = (id) => {
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const handleAssignManager = async (e) => {
+        e.preventDefault();
+        try {
+            if (newManager.isEditing) {
+                await api.patch(`/users/${newManager.id}/`, {
+                    full_name: newManager.full_name,
+                    email: newManager.email,
+                    school: newManager.schoolId || null
+                });
+            } else {
+                await api.post('/users/create/', {
+                    full_name: newManager.full_name,
+                    email: newManager.email,
+                    password: newManager.password || 'TemporaryPassword123!',
+                    role: 'manager_school',
+                    school: newManager.schoolId || null
+                });
+            }
+            fetchData();
+            setNewManager({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
+            setShowAssignForm(false);
+        } catch (error) {
+            console.error('Failed to save manager:', error);
+            alert(`Error: ${error.message}`);
+        }
+    };
+
+    const handleDeleteManager = async (id) => {
         if (window.confirm(t('workstream.assignments.confirmDelete'))) {
-            setManagers(managers.filter(m => m.id !== id));
+            try {
+                await api.post(`/users/${id}/deactivate/`);
+                fetchData();
+            } catch (error) {
+                console.error('Failed to deactivate manager:', error);
+            }
         }
     };
 
     const handleEditManager = (id) => {
         const manager = managers.find(m => m.id === id);
         if (manager) {
-            // Find school ID from name for the dropdown
-            const foundSchool = schools.find(s => s.name === manager.school);
             setNewManager({
-                name: manager.name,
+                full_name: manager.full_name,
                 email: manager.email,
-                schoolId: foundSchool ? foundSchool.id : '',
+                schoolId: manager.school || '',
                 isEditing: true,
-                id: manager.id
+                id: manager.id,
+                password: '' // Don't show password on edit
             });
             setShowAssignForm(true);
         }
     };
 
     const filteredManagers = managers.filter(manager =>
-        manager.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        manager.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        manager.school.toLowerCase().includes(searchTerm.toLowerCase())
+        (manager.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (manager.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (manager.school_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
+
+    if (loading && managers.length === 0) {
+        return <div className="workstream-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading...</div>;
+    }
 
     return (
         <div className="workstream-dashboard">
@@ -104,8 +120,8 @@ const SchoolManagerAssignment = () => {
                             <input
                                 type="text"
                                 required
-                                value={newManager.name}
-                                onChange={(e) => setNewManager({ ...newManager, name: e.target.value })}
+                                value={newManager.full_name}
+                                onChange={(e) => setNewManager({ ...newManager, full_name: e.target.value })}
                                 style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
                                 placeholder={t('workstream.assignments.form.managerName')}
                             />
@@ -121,6 +137,18 @@ const SchoolManagerAssignment = () => {
                                 placeholder="email@example.com"
                             />
                         </div>
+                        {!newManager.isEditing && (
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Password</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={newManager.password}
+                                    onChange={(e) => setNewManager({ ...newManager, password: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                                />
+                            </div>
+                        )}
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.assignTo')}</label>
                             <select
@@ -130,17 +158,17 @@ const SchoolManagerAssignment = () => {
                             >
                                 <option value="">{t('workstream.assignments.form.selectSchool')}</option>
                                 {schools.map(school => (
-                                    <option key={school.id} value={school.id}>{school.name}</option>
+                                    <option key={school.id} value={school.id}>{school.school_name}</option>
                                 ))}
                             </select>
                         </div>
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                            <button type="submit" className="btn-primary">{newManager.isEditing ? t('workstream.assignments.updateBtn') : t('workstream.assignments.assignBtn')}</button>
+                            <button type="submit" className="btn-primary" disabled={loading}>{newManager.isEditing ? t('workstream.assignments.updateBtn') : t('workstream.assignments.assignBtn')}</button>
                             <button
                                 type="button"
                                 onClick={() => {
                                     setShowAssignForm(false);
-                                    setNewManager({ name: '', email: '', schoolId: '', isEditing: false, id: null });
+                                    setNewManager({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
                                 }}
                                 style={{
                                     padding: '0.5rem 1rem',
@@ -168,30 +196,11 @@ const SchoolManagerAssignment = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
                                 width: '100%',
-                                padding: '0.5rem 2.5rem 0.5rem 2.5rem', // Added padding right for X button
+                                padding: '0.5rem 0.5rem 0.5rem 2.25rem',
                                 borderRadius: '0.375rem',
                                 border: '1px solid var(--color-border)'
                             }}
                         />
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm('')}
-                                style={{
-                                    position: 'absolute',
-                                    right: '10px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: 'var(--color-text-muted)',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                }}
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
                     </div>
                 </div>
 
@@ -210,10 +219,10 @@ const SchoolManagerAssignment = () => {
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                                            {manager.name.charAt(0)}
+                                            {manager.full_name?.charAt(0) || 'U'}
                                         </div>
                                         <div>
-                                            <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{manager.name}</div>
+                                            <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{manager.full_name}</div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <Mail size={12} /> {manager.email}
                                             </div>
@@ -223,14 +232,14 @@ const SchoolManagerAssignment = () => {
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         <School size={16} color="var(--color-text-muted)" />
-                                        <span style={{ color: manager.school === 'Unassigned' ? 'var(--color-text-muted)' : 'var(--color-text-main)' }}>
-                                            {manager.school}
+                                        <span style={{ color: !manager.school ? 'var(--color-text-muted)' : 'var(--color-text-main)' }}>
+                                            {manager.school_name || 'Unassigned'}
                                         </span>
                                     </div>
                                 </td>
                                 <td>
-                                    <span className={`status-badge ${manager.status === 'Assigned' ? 'status-active' : 'status-inactive'}`}>
-                                        {manager.status}
+                                    <span className={`status-badge ${manager.is_active ? 'status-active' : 'status-inactive'}`}>
+                                        {manager.is_active ? 'Active' : 'Inactive'}
                                     </span>
                                 </td>
                                 <td>
@@ -245,7 +254,7 @@ const SchoolManagerAssignment = () => {
                                         <button
                                             onClick={() => handleDeleteManager(manager.id)}
                                             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
-                                            title="Remove Manager"
+                                            title="Deactivate Manager"
                                         >
                                             <Trash2 size={18} />
                                         </button>

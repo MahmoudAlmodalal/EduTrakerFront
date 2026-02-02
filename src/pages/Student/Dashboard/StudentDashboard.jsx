@@ -8,211 +8,121 @@ import {
     Award,
     CheckCircle,
     Target,
-    Zap
+    Zap,
+    RefreshCw
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentDashboard = () => {
     const { t } = useTheme();
-
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
-    const [currentUser, setCurrentUser] = useState(null);
-    const [stats, setStats] = useState({
-        attendance: 0,
-        gpa: 0,
-        completedTasks: 0,
-        rank: 'N/A'
-    });
-    const [todaySchedule, setTodaySchedule] = useState([]);
-    const [assignments, setAssignments] = useState([]);
+    const [error, setError] = useState(null);
+    const [dashboardData, setDashboardData] = useState(null);
 
-    const safeJSONParse = (key, fallback) => {
+    const fetchDashboardData = async () => {
+        setLoading(true);
+        setError(null);
         try {
-            const item = localStorage.getItem(key);
-            return item ? JSON.parse(item) : fallback;
-        } catch (e) {
-            console.error(`Error parsing ${key}:`, e);
-            return fallback;
+            const data = await studentService.getDashboardStats();
+            if (data && data.status === 'success') {
+                setDashboardData(data.statistics);
+            } else {
+                setDashboardData(data.statistics || data);
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+            setError(t('student.dashboard.error') || 'Failed to load dashboard data. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        try {
-            // 1. Identify Current Student (Simulate Login)
-            const students = safeJSONParse('sec_students', []);
-            // Default to first student or create a dummy one if none exist
-            const user = students.length > 0 ? students[0] : {
-                id: 999,
-                firstName: 'Student',
-                lastName: 'Demo',
-                assignedClass: 'Grade 10-A',
-                gender: 'Male'
-            };
-            setCurrentUser(user);
-
-            const studentName = `${user.firstName} ${user.lastName}`;
-            const studentClass = user.assignedClass;
-
-            // 2. Calculate Attendance
-            const attendanceRecords = safeJSONParse('sec_attendance', []);
-            // Filter attendance for this student
-            const myAttendance = attendanceRecords.filter(r =>
-                (r.studentId === user.id) || (r.studentName === studentName)
-            );
-
-            const totalDays = myAttendance.length || 1; // Avoid division by zero
-            const presentDays = myAttendance.filter(r => r.status === 'Present').length;
-            const attendancePct = Math.round((presentDays / totalDays) * 100) || 100; // Default to 100 if no records
-
-            // 3. Calculate GPA & Tasks Done
-            const allGrades = safeJSONParse('teacher_grades', []);
-            const myGrades = allGrades.filter(g => g.name === studentName || g.studentId === user.id);
-
-            let totalScore = 0;
-            let gradedCount = 0;
-            myGrades.forEach(g => {
-                const score = parseFloat(g.grade);
-                if (!isNaN(score)) {
-                    totalScore += score;
-                    gradedCount++;
-                }
-            });
-
-            // Rough GPA calculation (assuming 100 scale -> 4.0 scale)
-            // >=90: 4.0, >=80: 3.0, >=70: 2.0, >=60: 1.0
-            const averageScore = gradedCount > 0 ? totalScore / gradedCount : 0;
-            let gpa = 0.0;
-            if (averageScore >= 90) gpa = 4.0;
-            else if (averageScore >= 80) gpa = 3.0;
-            else if (averageScore >= 70) gpa = 2.0;
-            else if (averageScore >= 60) gpa = 1.0;
-
-            // Tasks Done = Graded Assignments
-            const tasksDone = gradedCount;
-
-            // 4. Calculate Rank
-            // This is complex without processing all students. 
-            // Simplified: If avg > 90 -> Top 10%, > 80 -> Top 20%
-            let rank = 'Top 50%';
-            if (averageScore >= 95) rank = 'Top 5%';
-            else if (averageScore >= 90) rank = 'Top 10%';
-            else if (averageScore >= 80) rank = 'Top 25%';
-
-            setStats({
-                attendance: attendancePct,
-                gpa: gpa.toFixed(1),
-                completedTasks: tasksDone,
-                rank: rank
-            });
-
-            // 5. Daily Schedule (From Lesson Plans for Today)
-            const lessonPlans = safeJSONParse('teacher_lesson_plans', []);
-            const todayStr = new Date().toISOString().split('T')[0];
-
-            // Find plans for this student's class for TODAY
-            const todaysPlans = lessonPlans.filter(p =>
-                p.date === todayStr && p.class === studentClass
-            );
-
-            if (todaysPlans.length > 0) {
-                setTodaySchedule(todaysPlans.map((p, index) => ({
-                    id: p.id,
-                    time: '08:00 AM', // Mock time as Plans don't have time yet
-                    subject: p.title, // Use Title as Subject proxy
-                    room: 'Room 101',
-                    teacher: 'Mr. Teacher',
-                    status: 'upcoming'
-                })));
-            } else {
-                // Fallback if no specific plans today
-                setTodaySchedule([
-                    { id: 1, time: '08:00', subject: 'Mathematics', room: 'Room 101', teacher: 'Mrs. Huda', status: 'upcoming' },
-                    { id: 2, time: '09:45', subject: 'English', room: 'Room 203', teacher: 'Mr. Waleed', status: 'upcoming' },
-                    { id: 3, time: '11:45', subject: 'Science', room: 'Lab 1', teacher: 'Ms. Layla', status: 'upcoming' }
-                ]);
-            }
-
-            // 6. Assignments (From Teacher Assessments)
-            const allAssessments = safeJSONParse('teacher_assessments', []);
-            // Filter for student's grade/class
-            // Assuming assessments are for 'Grade 10', 'Grade 11' etc. match part of the class name
-            const myAssessments = allAssessments.filter(a =>
-                studentClass.includes(a.gradeLevel) || a.gradeLevel === 'All' || !a.gradeLevel
-            );
-
-            const processedAssignments = myAssessments.map(a => {
-                // Check if submitted/graded
-                const myGrade = allGrades.find(g => g.assessmentId === a.id && (g.studentId === user.id || g.name === studentName));
-                let status = 'pending';
-                let progress = 0;
-
-                if (myGrade) {
-                    if (myGrade.grade) {
-                        status = 'done';
-                        progress = 100;
-                    } else {
-                        status = 'submitted'; // Or simulate in progress
-                        progress = 50;
-                    }
-                } else {
-                    // Check due date
-                    const dueDate = new Date(a.date);
-                    const now = new Date();
-                    const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-                    if (diffDays <= 1 && diffDays >= 0) status = 'urgent';
-                }
-
-                return {
-                    id: a.id,
-                    title: a.title,
-                    subject: a.type, // Use Type as Subject proxy or generic
-                    due: a.date,
-                    status: status,
-                    progress: progress
-                };
-            }).slice(0, 5); // Show top 5
-
-            setAssignments(processedAssignments);
-            setLoading(false);
-
-        } catch (error) {
-            console.error("Error loading dashboard data:", error);
-            setLoading(false);
-        }
+        fetchDashboardData();
     }, []);
+
+    if (loading) {
+        return (
+            <div className="dashboard-loading">
+                <div className="loading-spinner">
+                    <RefreshCw className="animate-spin" size={40} />
+                </div>
+                <p>Loading your dashboard...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="dashboard-error">
+                <AlertCircle size={48} color="#ef4444" />
+                <h2>Oops! Something went wrong</h2>
+                <p>{error}</p>
+                <button onClick={fetchDashboardData} className="retry-btn">
+                    <RefreshCw size={18} />
+                    Try Again
+                </button>
+            </div>
+        );
+    }
+
+    const { profile, courses, grades, attendance, classmates } = dashboardData || {};
+
+    // Map backend data to UI
+    const assignments = grades?.marks?.slice(0, 3).map(m => ({
+        id: m.assignment_id,
+        title: m.title,
+        subject: m.course_name || 'Subject',
+        due: m.due_date || 'N/A',
+        status: m.score !== null ? 'graded' : 'pending',
+        progress: m.percentage || 0
+    })) || [];
+
+    const stats = {
+        attendance: attendance?.attendance_rate || 0,
+        gpa: grades?.overall_average ? (grades.overall_average / 25).toFixed(2) : '0.00',
+        completedTasks: grades?.graded_assignments || 0,
+        rank: classmates?.rank || `Top ${classmates?.active_classmates || 'N/A'}`
+    };
+
+    // Placeholder schedule since backend doesn't seem to provide it yet
+    const todaySchedule = [
+        { id: 1, time: '08:30 AM', subject: 'Mathematics', teacher: 'Dr. Smith', room: 'Room 302', status: 'done' },
+        { id: 2, time: '10:15 AM', subject: 'Physics', teacher: 'Prof. Johnson', room: 'Lab 1', status: 'now' },
+        { id: 3, time: '01:00 PM', subject: 'English', teacher: 'Ms. Davis', room: 'Room 105', status: 'upcoming' },
+        { id: 4, time: '02:45 PM', subject: 'History', teacher: 'Mr. Wilson', room: 'Room 204', status: 'upcoming' },
+    ];
 
     const getStatusBadge = (status) => {
         switch (status) {
             case 'done':
+            case 'graded':
                 return <span className="status-badge status-done"><CheckCircle size={12} /> Completed</span>;
             case 'now':
                 return <span className="status-badge status-now"><Zap size={12} /> In Progress</span>;
             case 'upcoming':
-                return <span className="status-badge status-upcoming"><Clock size={12} /> Upcoming</span>;
-            case 'urgent':
-                return <span className="status-badge status-urgent" style={{ background: '#fef2f2', color: '#dc2626' }}><AlertCircle size={12} /> Urgent</span>;
+            case 'pending':
+                return <span className="status-badge status-upcoming"><Clock size={12} /> Pending</span>;
             default:
                 return null;
         }
     };
 
-    if (loading) {
-        return <div className="p-8 text-center text-slate-500">Loading your dashboard...</div>;
-    }
-
     return (
-        <div className="student-dashboard animate-fade-in">
+        <div className="student-dashboard">
             {/* Welcome Header */}
             <header className="dashboard-header">
                 <div className="dashboard-header-content">
                     <h1 className="dashboard-title">
-                        {t('student.dashboard.welcome') || 'Welcome back'}, <span className="text-gradient">{currentUser?.firstName || 'Student'}!</span>
+                        {t('student.dashboard.welcome') || 'Welcome back'}, <span className="text-gradient">{user?.full_name || 'Student'}!</span>
                     </h1>
                     <p className="dashboard-subtitle">
-                        {t('student.dashboard.subtitle') || "Here's what's happening with your studies today."}
+                        {profile?.current_classroom?.classroom_name || ''} • {profile?.current_grade?.grade_name || ''}
                     </p>
-                    <p className="text-sm text-slate-500 mt-1">Class: {currentUser?.assignedClass || 'Not Assigned'}</p>
                 </div>
                 <div className="dashboard-date">
                     <Calendar size={18} />
@@ -272,7 +182,7 @@ const StudentDashboard = () => {
                         <span className="card-badge">{todaySchedule.length} Classes</span>
                     </div>
                     <div className="schedule-list">
-                        {todaySchedule.length > 0 ? todaySchedule.map((item) => (
+                        {todaySchedule.map((item) => (
                             <div key={item.id} className={`schedule-item ${item.status === 'now' ? 'current' : ''}`}>
                                 <div className="schedule-time">
                                     <span className="schedule-time-text">{item.time}</span>
@@ -285,9 +195,7 @@ const StudentDashboard = () => {
                                 </div>
                                 {getStatusBadge(item.status)}
                             </div>
-                        )) : (
-                            <p className="text-center text-slate-500 py-4">No classes scheduled for today.</p>
-                        )}
+                        ))}
                     </div>
                 </div>
 
@@ -316,7 +224,7 @@ const StudentDashboard = () => {
                                         stroke="url(#gradient)"
                                         strokeWidth="10"
                                         strokeLinecap="round"
-                                        strokeDasharray={`${(stats.attendance || 100) * 2.51} 251`}
+                                        strokeDasharray={`${stats.attendance * 2.51} 251`}
                                         transform="rotate(-90 50 50)"
                                     />
                                     <defs>
@@ -334,8 +242,12 @@ const StudentDashboard = () => {
                         </div>
                         <div className="attendance-stats">
                             <div className="attendance-stat">
-                                <span className="attendance-stat-value text-success">Good</span>
-                                <span className="attendance-stat-label">Status</span>
+                                <span className="attendance-stat-value text-success">{attendance?.by_status?.present || 0}</span>
+                                <span className="attendance-stat-label">Days Present</span>
+                            </div>
+                            <div className="attendance-stat">
+                                <span className="attendance-stat-value text-danger">{attendance?.by_status?.absent || 0}</span>
+                                <span className="attendance-stat-label">Days Absent</span>
                             </div>
                         </div>
                     </div>
@@ -345,21 +257,21 @@ const StudentDashboard = () => {
                         <div className="card-header">
                             <h2 className="card-title">
                                 <BookOpen size={20} />
-                                {t('student.dashboard.assignments') || 'Pending Tasks'}
+                                {t('student.dashboard.assignments') || 'Recent Marks'}
                             </h2>
-                            <span className="card-badge urgent">{assignments.filter(a => a.status === 'urgent').length} Urgent</span>
+                            <span className="card-badge">{grades?.total_assignments || 0} Total</span>
                         </div>
                         <div className="assignment-list">
                             {assignments.length > 0 ? assignments.map((assignment) => (
-                                <div key={assignment.id} className={`assignment-item ${assignment.status === 'urgent' ? 'urgent' : ''}`}>
+                                <div key={assignment.id} className="assignment-item">
                                     <div className="assignment-header">
                                         <div className="assignment-title">{assignment.title}</div>
-                                        {assignment.status === 'urgent' && <AlertCircle size={16} className="text-danger" />}
+                                        {assignment.status === 'pending' && <AlertCircle size={16} className="text-warning" />}
                                     </div>
                                     <div className="assignment-meta">
                                         <span>{assignment.subject}</span>
-                                        <span className={`assignment-due ${assignment.status === 'urgent' ? 'urgent' : ''}`}>
-                                            Due: {assignment.due}
+                                        <span className="assignment-due">
+                                            {assignment.due}
                                         </span>
                                     </div>
                                     <div className="assignment-progress">
@@ -370,15 +282,57 @@ const StudentDashboard = () => {
                                     </div>
                                 </div>
                             )) : (
-                                <p className="text-center text-slate-500 py-4">No pending assignments.</p>
+                                <div className="empty-state">No recent marks found.</div>
                             )}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Additional Styles for Dashboard-specific components */}
             <style>{`
+                .dashboard-loading, .dashboard-error {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 400px;
+                    text-align: center;
+                    gap: 1rem;
+                    background: white;
+                    border-radius: 20px;
+                    padding: 2rem;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+                }
+
+                .animate-spin {
+                    animation: spin 1s linear infinite;
+                    color: var(--student-primary, #0891b2);
+                }
+
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                .retry-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.5rem;
+                    background: var(--student-gradient, linear-gradient(135deg, #0891b2, #06b6d4));
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+
+                .retry-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
+                }
+
                 .dashboard-header {
                     display: flex;
                     justify-content: space-between;
@@ -563,10 +517,6 @@ const StudentDashboard = () => {
                     background: #f0f9ff;
                 }
                 
-                .assignment-item.urgent {
-                    border-left: 3px solid #dc2626;
-                }
-                
                 .assignment-header {
                     display: flex;
                     justify-content: space-between;
@@ -588,11 +538,6 @@ const StudentDashboard = () => {
                     margin-bottom: 0.75rem;
                 }
                 
-                .assignment-due.urgent {
-                    color: #dc2626;
-                    font-weight: 600;
-                }
-                
                 .assignment-progress {
                     display: flex;
                     align-items: center;
@@ -610,10 +555,17 @@ const StudentDashboard = () => {
                     color: var(--color-text-muted, #64748b);
                     min-width: 32px;
                 }
+
+                .empty-state {
+                    text-align: center;
+                    padding: 2rem;
+                    color: var(--color-text-muted, #94a3b8);
+                    font-size: 0.875rem;
+                }
                 
-                .text-danger { color: #dc2626; }
-                
-                [data-theme="dark"] .dashboard-date {
+                [data-theme="dark"] .dashboard-date,
+                [data-theme="dark"] .dashboard-loading,
+                [data-theme="dark"] .dashboard-error {
                     background: #1e293b;
                 }
                 

@@ -1,356 +1,265 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-    Clock,
-    Calendar,
-    AlertCircle,
-    CheckCircle,
-    Bell,
-    Plus,
-    FileText,
-    UserCheck,
-    Search,
-    ChevronRight,
-    X,
-    Info,
-    TrendingUp,
-    Users,
-    Activity
-} from 'lucide-react';
-import {
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    BarChart, Bar, Cell, Legend
-} from 'recharts';
+import { Clock, Calendar, AlertCircle, CheckCircle, Bell, Plus, FileText, UserCheck, Search, ChevronRight, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import './Teacher.css';
+import { useAuth } from '../../context/AuthContext';
+import teacherService from '../../services/teacherService';
+import secretaryService from '../../services/secretaryService';
 
 const TeacherDashboard = () => {
     const navigate = useNavigate();
     const { t } = useTheme();
-
-    const [currentDate, setCurrentDate] = useState(new Date());
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
     const [schedule, setSchedule] = useState([]);
     const [notifications, setNotifications] = useState([]);
-    const [stats, setStats] = useState({ avgAttendance: '0%', toGrade: 0, performance: '84%' });
-    const [error, setError] = useState(null);
+    const [stats, setStats] = useState({
+        avgAttendance: '0%',
+        pendingAssignments: 0,
+        totalToGrade: 0
+    });
 
-    // Modals State
-    const [selectedScheduleItem, setSelectedScheduleItem] = useState(null);
-    const [selectedNotification, setSelectedNotification] = useState(null);
-    const [showAllNotifications, setShowAllNotifications] = useState(false);
-    const [showFullSchedule, setShowFullSchedule] = useState(false);
-
-    // Mock Chart Data
-    const attendanceTrendData = [
-        { day: 'Mon', rate: 92 },
-        { day: 'Tue', rate: 88 },
-        { day: 'Wed', rate: 95 },
-        { day: 'Thu', rate: 91 },
-        { day: 'Fri', rate: 94 },
-    ];
-
-    const performanceData = [
-        { class: 'Grade 10-A', score: 82 },
-        { class: 'Grade 11-B', score: 75 },
-        { class: 'Grade 12-C', score: 88 },
-        { class: 'Grade 9-D', score: 79 },
-    ];
-
-    // Safe Persistence Helper
-    const safeJSONParse = (key, fallback) => {
-        try {
-            const item = localStorage.getItem(key);
-            if (!item || item === 'undefined' || item === 'null') return fallback;
-            return JSON.parse(item);
-        } catch (e) {
-            console.error(`Error parsing ${key}:`, e);
-            return fallback;
-        }
-    };
-
-    // Load Dashboard Data
     useEffect(() => {
-        try {
-            const interval = setInterval(() => setCurrentDate(new Date()), 60000);
+        const fetchDashboardData = async () => {
+            try {
+                setLoading(true);
+                // Fetch notifications and dashboard statistics
+                const [notifData, statsResponse] = await Promise.all([
+                    secretaryService.getNotifications(),
+                    secretaryService.getDashboardStats()
+                ]);
 
-            // Schedule Construction
-            const classes = safeJSONParse('school_classes', []);
-            const lessonPlans = safeJSONParse('teacher_lesson_plans', []);
-            const todayStr = new Date().toISOString().split('T')[0];
-            const timeSlots = ['08:00 - 09:30', '10:00 - 11:30', '12:00 - 01:30', '02:00 - 03:30'];
-            const rooms = ['Room 101', 'Lab A', 'Room 102', 'Hall B'];
+                setNotifications(Array.isArray(notifData) ? notifData.slice(0, 5) : (notifData.results || []).slice(0, 5));
 
-            const builtSchedule = Array.isArray(classes) ? classes.map((cls, index) => {
-                const todayPlan = Array.isArray(lessonPlans) ? lessonPlans.find(p => p.date === todayStr && p.class === cls.name) : null;
-                return {
-                    id: index,
-                    time: timeSlots[index % timeSlots.length] || 'TBD',
-                    subject: todayPlan ? todayPlan.title : `General Session`,
-                    topic: todayPlan ? todayPlan.objectives : 'Regular curriculum activities',
-                    class: cls.name,
-                    room: rooms[index % rooms.length],
-                    status: index === 0 ? 'current' : 'upcoming',
-                    studentsCount: 25
-                };
-            }).slice(0, 4) : [];
-            setSchedule(builtSchedule);
+                if (statsResponse) {
+                    // Map backend stats to UI
+                    setStats({
+                        avgAttendance: statsResponse.average_attendance ? `${Math.round(statsResponse.average_attendance)}%` : '0%',
+                        pendingAssignments: statsResponse.pending_assignments_count || 0,
+                        totalToGrade: statsResponse.total_submissions_to_grade || 0
+                    });
+                }
 
-            // Stats Calculation
-            const students = safeJSONParse('sec_students', []);
-            const attendanceData = safeJSONParse('sec_attendance', []);
-            const assessments = safeJSONParse('teacher_assessments', []);
-            const allGrades = safeJSONParse('teacher_grades', {});
+                // Mock schedule for now as there's no direct "schedule" endpoint yet
+                setSchedule([
+                    { id: 1, day: 'Today', time: '08:00 - 09:30', subject: 'Mathematics', class: 'Grade 10-A', room: 'Room 101', status: 'current' },
+                    { id: 2, day: 'Today', time: '10:00 - 11:30', subject: 'Physics', class: 'Grade 11-B', room: 'Lab 2', status: 'upcoming' },
+                ]);
 
-            let avgAtt = 0;
-            if (Array.isArray(attendanceData) && attendanceData.length > 0) {
-                const presentCount = attendanceData.filter(r => r && r.status === 'Present').length;
-                avgAtt = Math.round((presentCount / attendanceData.length) * 100);
+            } catch (error) {
+                console.error("Error fetching dashboard data:", error);
+            } finally {
+                setLoading(false);
             }
+        };
 
-            let pendingCount = 0;
-            if (Array.isArray(assessments)) {
-                assessments.forEach(assessment => {
-                    if (assessment && assessment.class && assessment.id) {
-                        const classStudents = Array.isArray(students) ? students.filter(s => s.class === assessment.class) : [];
-                        const gradedCount = Object.keys(allGrades[assessment.id] || {}).length;
-                        const needed = Math.max(0, classStudents.length - gradedCount);
-                        pendingCount += needed;
-                    }
-                });
-            }
-
-            setStats({
-                avgAttendance: Array.isArray(attendanceData) && attendanceData.length ? `${avgAtt}%` : '94%',
-                toGrade: pendingCount,
-                performance: '84.2%'
-            });
-
-            // Notifications
-            const newNotifs = [
-                { id: 'grading', type: 'info', message: `Pending: ${pendingCount} assignments to grade.`, details: 'Grade before weekend.', time: 'Today', read: false },
-                { id: 'att', type: 'alert', message: 'High absence in Grade 11-B.', details: '4 students missing today.', time: '2h ago', read: false },
-                { id: 'sys', type: 'success', message: 'Term plans approved.', details: 'Your curriculum has been verified.', time: 'Yesterday', read: true }
-            ];
-            setNotifications(newNotifs);
-
-            return () => clearInterval(interval);
-        } catch (err) {
-            setError(err.message);
-        }
+        fetchDashboardData();
     }, []);
 
-    const markAllRead = () => {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    };
-
-    if (error) {
-        return <div className="p-4 text-red-500 bg-red-50 border border-red-200 rounded m-4">Dashboard Error: {error}</div>;
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="animate-spin text-teacher-primary" size={48} />
+            </div>
+        );
     }
 
     return (
-        <div className="teacher-dashboard-container animate-fade-in">
-            {/* Top Bar / Header */}
-            <header className="dashboard-header-premium">
-                <div className="welcome-section">
-                    <h1>{t('teacher.dashboard.title')}</h1>
-                    <p>{t('teacher.dashboard.welcome')}</p>
+        <div className="space-y-6 animate-fade-in">
+            {/* Header Section */}
+            <header className="dashboard-header">
+                <div>
+                    <h1 className="dashboard-header-title">
+                        {t('teacher.dashboard.title')}
+                    </h1>
+                    <p className="text-slate-500 mt-1">{t('teacher.dashboard.welcome')}</p>
                 </div>
-                <div className="header-actions">
-                    <div className="date-display-glass">
-                        <Calendar size={18} />
-                        <span>{currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+
+                <div className="glass-panel dashboard-date-widget">
+                    <div style={{ paddingRight: '1rem', borderRight: '1px solid var(--teacher-border)', marginRight: '1rem' }}>
+                        <p className="font-bold text-slate-800">Monday, Dec 15</p>
+                        <p className="text-xs text-slate-500">2025</p>
+                    </div>
+
+                    <div style={{ position: 'relative', cursor: 'pointer' }}>
+                        <Bell size={24} className="text-slate-500" />
+                        <span style={{
+                            position: 'absolute', top: 0, right: 0,
+                            height: '10px', width: '10px',
+                            backgroundColor: 'red', borderRadius: '50%',
+                            border: '2px solid white'
+                        }}></span>
                     </div>
                 </div>
             </header>
 
-            {/* Stats Grid */}
-            <div className="teacher-stats-grid">
-                <div className="premium-stat-card" onClick={() => navigate('/teacher/classes')}>
-                    <div className="stat-icon-blob" style={{ backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--teacher-primary)' }}>
-                        <UserCheck size={24} />
-                    </div>
-                    <div className="stat-info">
-                        <p>{t('teacher.dashboard.avgAttendance')}</p>
-                        <h3>{stats.avgAttendance}</h3>
-                        <span className="trend positive">+2.4% vs last week</span>
-                    </div>
-                </div>
-
-                <div className="premium-stat-card" onClick={() => navigate('/teacher/assessments')}>
-                    <div className="stat-icon-blob" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--teacher-warning)' }}>
-                        <FileText size={24} />
-                    </div>
-                    <div className="stat-info">
-                        <p>{t('teacher.dashboard.assignmentsToGrade')}</p>
-                        <h3>{stats.toGrade}</h3>
-                        <span className="trend warning">Due by Friday</span>
-                    </div>
-                </div>
-
-                <div className="premium-stat-card">
-                    <div className="stat-icon-blob" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--teacher-success)' }}>
-                        <TrendingUp size={24} />
-                    </div>
-                    <div className="stat-info">
-                        <p>Class Performance</p>
-                        <h3>{stats.performance}</h3>
-                        <span className="trend positive">Excellent progress</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Analytics Section */}
-            <div className="teacher-analytics-layout">
-                <div className="analytics-main-column">
-                    {/* Charts Grid */}
-                    <div className="charts-grid-two">
-                        <div className="glass-widget-card">
-                            <div className="widget-header">
-                                <h3>Attendance Trend</h3>
-                                <TrendingUp size={18} />
-                            </div>
-                            <div className="chart-container">
-                                <ResponsiveContainer width="100%" height={240}>
-                                    <AreaChart data={attendanceTrendData}>
-                                        <defs>
-                                            <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="var(--teacher-primary)" stopOpacity={0.1} />
-                                                <stop offset="95%" stopColor="var(--teacher-primary)" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--teacher-border)" opacity={0.5} />
-                                        <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: 'var(--teacher-text-muted)', fontSize: 12 }} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--teacher-text-muted)', fontSize: 12 }} domain={[80, 100]} />
-                                        <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid var(--teacher-border)', background: 'var(--teacher-surface)' }} />
-                                        <Area type="monotone" dataKey="rate" stroke="var(--teacher-primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorRate)" />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-
-                        <div className="glass-widget-card">
-                            <div className="widget-header">
-                                <h3>Performance by Class</h3>
-                                <Activity size={18} />
-                            </div>
-                            <div className="chart-container">
-                                <ResponsiveContainer width="100%" height={240}>
-                                    <BarChart data={performanceData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--teacher-border)" opacity={0.5} />
-                                        <XAxis dataKey="class" axisLine={false} tickLine={false} tick={{ fill: 'var(--teacher-text-muted)', fontSize: 11 }} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--teacher-text-muted)', fontSize: 12 }} />
-                                        <Tooltip cursor={{ fill: 'rgba(79, 70, 229, 0.05)' }} contentStyle={{ borderRadius: '12px', border: '1px solid var(--teacher-border)', background: 'var(--teacher-surface)' }} />
-                                        <Bar dataKey="score" fill="var(--teacher-primary)" radius={[4, 4, 0, 0]} barSize={25} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-
+            <div className="dashboard-grid">
+                {/* Main Content Area */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     {/* Schedule Section */}
-                    <div className="glass-widget-card schedule-widget">
-                        <div className="widget-header">
-                            <div className="header-title">
-                                <Calendar size={20} className="primary-icon" />
-                                <h3>{t('teacher.dashboard.mySchedule')}</h3>
-                            </div>
-                            <button className="text-btn" onClick={() => setShowFullSchedule(true)}>
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontWeight: '700', color: 'var(--teacher-text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.25rem' }}>
+                                <span style={{ padding: '0.5rem', backgroundColor: 'var(--teacher-primary-light)', borderRadius: '0.5rem', color: 'var(--teacher-primary)', display: 'flex' }}>
+                                    <Calendar size={20} />
+                                </span>
+                                {t('teacher.dashboard.mySchedule')}
+                            </h2>
+                            <button
+                                onClick={() => alert('Opening full timetable view...')}
+                                style={{ color: 'var(--teacher-primary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer' }}
+                            >
                                 {t('teacher.dashboard.viewTimetable')} <ChevronRight size={16} />
                             </button>
                         </div>
-                        <div className="schedule-list-horizontal">
+
+                        <div className="space-y-4">
                             {schedule.map((slot) => (
                                 <div
                                     key={slot.id}
-                                    className={`schedule-card-compact ${slot.status === 'current' ? 'active' : ''}`}
-                                    onClick={() => setSelectedScheduleItem(slot)}
+                                    className={`schedule-item ${slot.status === 'current' ? 'current' : ''}`}
                                 >
-                                    <div className="time-indicator">{slot.time.split(' ')[0]}</div>
-                                    <div className="class-name">{slot.class}</div>
-                                    <div className="subject-name">{slot.subject}</div>
-                                    <div className="room-info">{slot.room}</div>
-                                    {slot.status === 'current' && <span className="now-badge">LIVE</span>}
+                                    <div className="schedule-time-box">
+                                        {slot.time.split(' ')[0]}
+                                    </div>
+
+                                    <div className="flex-1">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
+                                            <h3 style={{ fontWeight: '700', color: 'var(--teacher-text-main)', fontSize: '1.125rem' }}>{slot.subject}</h3>
+                                            {slot.status === 'current' && (
+                                                <span style={{ padding: '0.25rem 0.75rem', backgroundColor: '#DCFCE7', color: '#15803D', fontSize: '0.75rem', fontWeight: '700', borderRadius: '999px' }}>
+                                                    {t('teacher.dashboard.now')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                <UserCheck size={16} />
+                                                {slot.class}
+                                            </span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                {slot.room}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {slot.status === 'current' && (
+                                        <div style={{ marginLeft: '1rem', paddingLeft: '1rem', borderLeft: '1px solid var(--teacher-primary-light)' }}>
+                                            <button
+                                                onClick={() => alert(`Starting class: ${slot.subject} - ${slot.class}`)}
+                                                style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--teacher-primary)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '500', cursor: 'pointer' }}
+                                            >
+                                                {t('teacher.dashboard.start')}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
+                        </div>
+                    </div>
+
+                    {/* Quick Stats / Overview Panels */}
+                    <div className="stat-card">
+                        <div className="glass-panel card-hover" style={{ padding: '1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                <div style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--teacher-success)', borderRadius: '0.75rem' }}>
+                                    <UserCheck size={24} />
+                                </div>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--teacher-success)', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '0.25rem 0.5rem', borderRadius: '999px' }}>+0%</span>
+                            </div>
+                            <h3 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '0.25rem' }}>{stats.avgAttendance}</h3>
+                            <p style={{ color: 'var(--teacher-text-muted)', fontSize: '0.875rem' }}>{t('teacher.dashboard.avgAttendance')}</p>
+                        </div>
+
+                        <div className="glass-panel card-hover" style={{ padding: '1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                <div style={{ padding: '0.75rem', backgroundColor: 'rgba(234, 88, 12, 0.2)', color: 'var(--teacher-warning)', borderRadius: '0.75rem' }}>
+                                    <FileText size={24} />
+                                </div>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--teacher-warning)', backgroundColor: 'rgba(234, 88, 12, 0.15)', padding: '0.25rem 0.5rem', borderRadius: '999px' }}>{stats.pendingAssignments} {t('teacher.dashboard.pending')}</span>
+                            </div>
+                            <h3 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '0.25rem' }}>{stats.totalToGrade}</h3>
+                            <p style={{ color: 'var(--teacher-text-muted)', fontSize: '0.875rem' }}>{t('teacher.dashboard.assignmentsToGrade')}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="analytics-side-column">
+                {/* Sidebar Area */}
+                <div className="space-y-6">
                     {/* Quick Actions */}
-                    <div className="glass-widget-card">
-                        <h3>Quick Actions</h3>
-                        <div className="quick-actions-grid">
-                            <button className="action-tile" onClick={() => navigate('/teacher/assessments')}>
-                                <Plus size={20} />
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <h2 style={{ fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ width: '4px', height: '1.5rem', backgroundColor: 'var(--teacher-primary)', borderRadius: '999px' }}></span>
+                            {t('teacher.dashboard.quickActions')}
+                        </h2>
+                        <div className="space-y-4">
+                            <button className="action-btn" onClick={() => navigate('/teacher/assessments')}>
+                                <div style={{ padding: '0.5rem', backgroundColor: 'var(--teacher-primary-light)', color: 'var(--teacher-primary)', borderRadius: '0.5rem' }}>
+                                    <Plus size={18} />
+                                </div>
                                 <span>{t('teacher.dashboard.createAssessment')}</span>
                             </button>
-                            <button className="action-tile" onClick={() => navigate('/teacher/classes')}>
-                                <UserCheck size={20} />
-                                <span>Attendance</span>
+                            <button className="action-btn" onClick={() => navigate('/teacher/classes')}>
+                                <div style={{ padding: '0.5rem', backgroundColor: '#F3E8FF', color: '#9333EA', borderRadius: '0.5rem' }}>
+                                    <UserCheck size={18} />
+                                </div>
+                                <span>{t('teacher.dashboard.recordAttendance')}</span>
                             </button>
-                            <button className="action-tile" onClick={() => navigate('/teacher/communication')}>
-                                <Bell size={20} />
-                                <span>Announce</span>
+                            <button className="action-btn" onClick={() => navigate('/teacher/classes')}>
+                                <div style={{ padding: '0.5rem', backgroundColor: '#DBEAFE', color: '#2563EB', borderRadius: '0.5rem' }}>
+                                    <Search size={18} />
+                                </div>
+                                <span>{t('teacher.dashboard.findStudent')}</span>
                             </button>
                         </div>
                     </div>
 
-                    {/* Notifications / Activity */}
-                    <div className="glass-widget-card activity-feed">
-                        <div className="widget-header">
-                            <h3>Updates</h3>
-                            <button onClick={markAllRead} className="read-all-btn">Mark Read</button>
+                    {/* Notifications */}
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontWeight: '700', color: 'var(--teacher-text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ width: '4px', height: '1.5rem', backgroundColor: 'var(--teacher-warning)', borderRadius: '999px' }}></span>
+                                {t('teacher.dashboard.notifications')}
+                            </h2>
+                            <button
+                                onClick={() => alert('All notifications marked as read!')}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '700', color: 'var(--teacher-text-muted)' }}
+                            >
+                                {t('teacher.dashboard.markAllRead')}
+                            </button>
                         </div>
-                        <div className="activity-list">
+
+                        <div className="space-y-6">
                             {notifications.map((notif) => (
-                                <div key={notif.id} className={`activity-item ${notif.read ? 'read' : 'unread'}`} onClick={() => setSelectedNotification(notif)}>
-                                    <div className={`activity-icon-shell ${notif.type}`}>
-                                        {notif.type === 'alert' ? <AlertCircle size={14} /> : <CheckCircle size={14} />}
+                                <div key={notif.id} className="notification-item">
+                                    <div style={{
+                                        width: '2rem', height: '2rem', borderRadius: '50%',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        backgroundColor: notif.type === 'alert' ? 'rgba(239, 68, 68, 0.4)' : notif.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)',
+                                        color: notif.type === 'alert' ? 'var(--teacher-danger)' : notif.type === 'success' ? 'var(--teacher-success)' : 'var(--teacher-secondary)',
+                                        zIndex: 10,
+                                        boxShadow: '0 0 0 2px var(--teacher-surface)'
+                                    }}>
+                                        {notif.type === 'alert' ? <AlertCircle size={14} /> :
+                                            notif.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
                                     </div>
-                                    <div className="activity-text">
-                                        <p>{notif.message}</p>
-                                        <span>{notif.time}</span>
+                                    <div>
+                                        <p style={{ fontSize: '0.875rem', color: 'var(--teacher-text-main)', fontWeight: '700', marginBottom: '0.25rem' }}>{notif.message}</p>
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--teacher-text-muted)' }}>{notif.time}</p>
                                     </div>
-                                    {!notif.read && <div className="unread-dot" />}
                                 </div>
                             ))}
                         </div>
+
+                        <button
+                            onClick={() => alert('Opening all notifications...')}
+                            style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--teacher-text-muted)', backgroundColor: 'var(--teacher-bg)', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
+                        >
+                            {t('teacher.dashboard.viewAllNotifications')}
+                        </button>
                     </div>
                 </div>
             </div>
-
-            {/* Modals preserved from original */}
-            {selectedScheduleItem && (
-                <div className="modal-overlay" onClick={() => setSelectedScheduleItem(null)}>
-                    <div className="modal-content glass-panel" onClick={e => e.stopPropagation()}>
-                        <button className="close-btn" onClick={() => setSelectedScheduleItem(null)}><X size={20} /></button>
-                        <div className="modal-header-accent" />
-                        <h2>{selectedScheduleItem.subject}</h2>
-                        <div className="modal-body-details">
-                            <div className="detail-row"><span>Time:</span> {selectedScheduleItem.time}</div>
-                            <div className="detail-row"><span>Class:</span> {selectedScheduleItem.class}</div>
-                            <div className="detail-row"><span>Room:</span> {selectedScheduleItem.room}</div>
-                            <div className="detail-row"><span>Topic:</span> {selectedScheduleItem.topic}</div>
-                            <button className="btn-primary-large" onClick={() => { setSelectedScheduleItem(null); navigate('/teacher/classes'); }}>Start Session</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {selectedNotification && (
-                <div className="modal-overlay" onClick={() => setSelectedNotification(null)}>
-                    <div className="modal-content glass-panel" onClick={e => e.stopPropagation()}>
-                        <button className="close-btn" onClick={() => setSelectedNotification(null)}><X size={20} /></button>
-                        <h2 className="modal-title-with-icon"><Info size={20} /> Details</h2>
-                        <div className="modal-body-simple">
-                            <p className="main-msg">{selectedNotification.message}</p>
-                            <p className="sub-msg">{selectedNotification.details}</p>
-                            <p className="timestamp">{selectedNotification.time}</p>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

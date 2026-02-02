@@ -643,40 +643,25 @@
 /* ========================================================================
    RESPONSIVE
    ======================================================================== */
-/* Mobile responsiveness enhancements */
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
     .workstream-sidebar {
         transform: translateX(-100%);
-        box-shadow: none; /* Remove shadow when hidden to avoid artifacts */
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* RTL Support */
     [dir="rtl"] .workstream-sidebar {
         transform: translateX(100%);
-    }
-
-    .workstream-sidebar.open {
-        transform: translateX(0);
-        box-shadow: 10px 0 40px rgba(0, 0, 0, 0.25);
     }
 
     .workstream-main {
         margin-left: 0;
         margin-right: 0;
-        padding-top: 80px; /* Add space for the toggle button */
     }
-    
-    .stats-grid, .charts-grid {
+
+    .stats-grid {
         grid-template-columns: 1fr;
     }
 
-    .mobile-toggle-btn {
-        display: flex !important;
+    .charts-grid {
+        grid-template-columns: 1fr;
     }
-}
-
-/* Default state for toggle button (hidden on desktop) */
-.mobile-toggle-btn {
-    display: none;
 }

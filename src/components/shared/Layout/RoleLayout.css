@@ -21,11 +21,9 @@
 
 /* ==================== Sidebar ==================== */
 .role-sidebar {
-    width: 260px;
+    width: 280px;
     min-height: 100vh;
-    background: linear-gradient(180deg,
-            var(--color-primary, #4f46e5) 0%,
-            var(--color-primary-dark, #3730a3) 100%);
+    background: var(--grad-primary);
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
@@ -33,8 +31,44 @@
     left: 0;
     top: 0;
     bottom: 0;
-    z-index: 100;
-    transition: transform 0.3s ease;
+    z-index: 1000;
+    transition: transform var(--transition-normal);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
+}
+
+.role-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.role-sidebar-header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.role-sidebar-close {
+    display: none;
+    /* Hidden on desktop by default */
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.role-sidebar-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
 }
 
 [dir="rtl"] .role-sidebar {
@@ -47,8 +81,6 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 2rem;
     color: white;
 }
 
@@ -56,24 +88,19 @@
     width: 44px;
     height: 44px;
     background: rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(10px);
 }
 
-.role-brand-text {
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-}
-
 /* ==================== Navigation ==================== */
 .role-nav {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 0.5rem;
     flex: 1;
 }
 
@@ -81,13 +108,13 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-radius: 10px;
-    color: rgba(255, 255, 255, 0.85);
+    padding: 0.875rem 1.25rem;
+    border-radius: 14px;
+    color: rgba(255, 255, 255, 0.8);
     text-decoration: none;
     font-size: 0.9375rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    font-weight: 600;
+    transition: all var(--transition-fast);
     cursor: pointer;
     background: transparent;
     border: none;
@@ -95,160 +122,107 @@
     text-align: left;
 }
 
-[dir="rtl"] .role-nav-item {
-    text-align: right;
-}
-
 .role-nav-item:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
     color: white;
     transform: translateX(4px);
 }
 
-[dir="rtl"] .role-nav-item:hover {
-    transform: translateX(-4px);
-}
-
 .role-nav-item.active {
-    background: rgba(255, 255, 255, 0.25);
-    color: white;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: white;
+    color: var(--color-primary);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-.role-nav-item svg {
-    flex-shrink: 0;
-    opacity: 0.9;
-}
-
-.role-nav-item.active svg {
-    opacity: 1;
-}
-
-/* ==================== Logout Section ==================== */
-.role-logout-section {
-    margin-top: auto;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.role-logout-btn {
-    color: rgba(255, 255, 255, 0.8);
-    margin-bottom: 1rem;
-}
-
-.role-logout-btn:hover {
-    background: rgba(239, 68, 68, 0.2);
-    color: #fecaca;
-}
-
-/* ==================== User Profile ==================== */
-.role-profile {
-    display: flex;
+/* ==================== Mobile Header ==================== */
+.role-mobile-header {
+    display: none;
+    height: 64px;
+    background: var(--color-bg-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 1rem;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    backdrop-filter: blur(10px);
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 9000;
+    width: 100%;
 }
 
-.role-avatar {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
-    color: var(--color-primary, #4f46e5);
-    border-radius: 10px;
+.role-menu-toggle {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
-    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border-subtle);
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    padding: 0;
+    cursor: pointer;
 }
 
-.role-profile-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.role-profile-name {
+.role-menu-toggle:hover {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
     color: white;
-    font-weight: 600;
-    font-size: 0.875rem;
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.role-profile-email {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.75rem;
-    margin: 0.125rem 0 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    border-color: transparent;
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
 }
 
 /* ==================== Main Content ==================== */
 .role-main {
     flex: 1;
-    margin-left: 260px;
+    margin-left: 280px;
     min-height: 100vh;
-    background-color: var(--color-bg-body, #f5f7fa);
+    background-color: var(--color-bg-body);
 }
 
 [dir="rtl"] .role-main {
     margin-left: 0;
-    margin-right: 260px;
+    margin-right: 280px;
 }
 
 .role-content {
-    padding: 2rem;
-    max-width: 1600px;
+    padding: 2.5rem;
+    max-width: 1400px;
     margin: 0 auto;
 }
 
-/* ==================== Responsive ==================== */
 @media (max-width: 1024px) {
-    .role-sidebar {
-        width: 240px;
+    .role-layout {
+        flex-direction: column;
     }
 
-    .role-main {
-        margin-left: 240px;
-    }
-
-    [dir="rtl"] .role-main {
-        margin-left: 0;
-        margin-right: 240px;
-    }
-}
-
-@media (max-width: 768px) {
     .role-sidebar {
         transform: translateX(-100%);
         width: 280px;
-    }
-
-    [dir="rtl"] .role-sidebar {
-        transform: translateX(100%);
+        z-index: 20000;
     }
 
     .role-sidebar.open {
         transform: translateX(0);
     }
 
-    .role-main {
-        margin-left: 0;
+    .role-sidebar-close {
+        display: flex !important;
+        /* Force show as flex item on mobile/tablet */
     }
 
-    [dir="rtl"] .role-main {
-        margin-right: 0;
+    .role-mobile-header {
+        display: flex;
+    }
+
+    .role-main {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
     }
 
     .role-content {
-        padding: 1rem;
+        padding: 1.5rem;
     }
 }
 

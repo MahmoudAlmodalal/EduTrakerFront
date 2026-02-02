@@ -29,7 +29,7 @@ export const roleConfigs = {
     WORKSTREAM_MANAGER: {
         basePath: '/workstream',
         brandIcon: 'Briefcase',
-        displayName: '',
+        displayName: 'Workstream Manager',
         permissions: [
             'view-schools', 'manage-schools',
             'view-school-managers', 'assign-school-managers',

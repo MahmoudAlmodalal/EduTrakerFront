@@ -1,11 +1,59 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { Save, Bell, Lock, Globe, Mail, Moon, Sun, Monitor, Users } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import workstreamService from '../../services/workstreamService';
 import './Workstream.css';
 
 const WorkstreamSettings = () => {
     const [activeTab, setActiveTab] = useState('profile');
     const { theme, toggleTheme, language, changeLanguage, t } = useTheme();
+    const { user } = useAuth();
+    const [profileData, setProfileData] = useState({
+        first_name: '',
+        last_name: '',
+        email: ''
+    });
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            if (!user?.id) return;
+            setLoading(true);
+            try {
+                const response = await workstreamService.getUserProfile(user.id);
+                const nameParts = response.full_name?.split(' ') || ['', ''];
+                setProfileData({
+                    first_name: nameParts[0] || '',
+                    last_name: nameParts.slice(1).join(' ') || '',
+                    email: response.email || ''
+                });
+            } catch (error) {
+                console.error('Failed to fetch profile:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProfile();
+    }, [user?.id]);
+
+    const handleSaveProfile = async () => {
+        setSaving(true);
+        try {
+            const payload = {
+                full_name: `${profileData.first_name} ${profileData.last_name}`.trim(),
+                email: profileData.email
+            };
+            await workstreamService.updateUserProfile(user.id, payload);
+            alert('Profile updated successfully!');
+        } catch (error) {
+            alert('Failed to update profile: ' + error.message);
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
         <div className="workstream-dashboard">
@@ -86,28 +134,49 @@ const WorkstreamSettings = () => {
                     {activeTab === 'profile' && (
                         <div>
                             <h3 className="chart-title" style={{ marginBottom: '1.5rem' }}>{t('workstream.settings.profile.title')}</h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>{t('workstream.settings.profile.firstName')}</label>
-                                    <input type="text" defaultValue="Mahmoud" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }} />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>{t('workstream.settings.profile.lastName')}</label>
-                                    <input type="text" defaultValue="Almodalal" style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }} />
-                                </div>
-                                <div style={{ gridColumn: '1 / -1' }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>{t('workstream.settings.profile.email')}</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
-                                        <input type="email" defaultValue="admin@edutraker.com" style={{ width: '100%', padding: '0.75rem 0.75rem 0.75rem 2.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }} />
+                            {loading ? (
+                                <div>Loading profile...</div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>{t('workstream.settings.profile.firstName')}</label>
+                                            <input
+                                                type="text"
+                                                value={profileData.first_name}
+                                                onChange={(e) => setProfileData({ ...profileData, first_name: e.target.value })}
+                                                style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>{t('workstream.settings.profile.lastName')}</label>
+                                            <input
+                                                type="text"
+                                                value={profileData.last_name}
+                                                onChange={(e) => setProfileData({ ...profileData, last_name: e.target.value })}
+                                                style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                                            />
+                                        </div>
+                                        <div style={{ gridColumn: '1 / -1' }}>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>{t('workstream.settings.profile.email')}</label>
+                                            <div style={{ position: 'relative' }}>
+                                                <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                                                <input
+                                                    type="email"
+                                                    value={profileData.email}
+                                                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                                                    style={{ width: '100%', padding: '0.75rem 0.75rem 0.75rem 2.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-                                <button className="btn-primary">
-                                    <Save size={18} /> {t('workstream.settings.profile.saveBtn')}
-                                </button>
-                            </div>
+                                    <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
+                                        <button className="btn-primary" onClick={handleSaveProfile} disabled={saving}>
+                                            <Save size={18} /> {saving ? 'Saving...' : t('workstream.settings.profile.saveBtn')}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
 

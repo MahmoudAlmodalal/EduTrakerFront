@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     ChevronUp,
     ChevronDown,
@@ -50,30 +50,6 @@ const DataTable = ({
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedRows, setSelectedRows] = useState(new Set());
     const [showFilters, setShowFilters] = useState(false);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
-    const tableWrapperRef = useRef(null);
-
-    // Check scroll position
-    const checkScroll = () => {
-        if (tableWrapperRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = tableWrapperRef.current;
-            setCanScrollLeft(scrollLeft > 0);
-            setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-        }
-    };
-
-    // Scroll handler
-    const handleScroll = (direction) => {
-        if (tableWrapperRef.current) {
-            const scrollAmount = 300;
-            tableWrapperRef.current.scrollBy({
-                left: direction === 'left' ? -scrollAmount : scrollAmount,
-                behavior: 'smooth'
-            });
-            setTimeout(checkScroll, 300);
-        }
-    };
 
     // Sorting
     const handleSort = (columnKey) => {
@@ -84,29 +60,6 @@ const DataTable = ({
             direction: prev.key === columnKey && prev.direction === 'asc' ? 'desc' : 'asc'
         }));
     };
-
-    // Monitor scroll state on mount and resize
-    useEffect(() => {
-        const wrapper = tableWrapperRef.current;
-        if (!wrapper) return;
-
-        // Check initial scroll state
-        setTimeout(checkScroll, 100);
-
-        // Add scroll listener
-        wrapper.addEventListener('scroll', checkScroll);
-
-        // Add resize observer
-        const resizeObserver = new ResizeObserver(() => {
-            checkScroll();
-        });
-        resizeObserver.observe(wrapper);
-
-        return () => {
-            wrapper.removeEventListener('scroll', checkScroll);
-            resizeObserver.disconnect();
-        };
-    }, []);
 
     // Filtering and sorting data
     const processedData = useMemo(() => {
@@ -147,11 +100,6 @@ const DataTable = ({
         (currentPage - 1) * pageSize,
         currentPage * pageSize
     );
-
-    // Check scroll when processed data changes
-    useEffect(() => {
-        setTimeout(checkScroll, 50);
-    }, [processedData.length, data.length]);
 
     // Selection
     const handleSelectAll = () => {
@@ -251,22 +199,8 @@ const DataTable = ({
             </div>
 
             {/* Table */}
-            <div className="data-table-wrapper-container">
-                {canScrollLeft && (
-                    <button
-                        className="data-table-scroll-btn data-table-scroll-btn--left"
-                        onClick={() => handleScroll('left')}
-                        aria-label="Scroll left"
-                    >
-                        <ChevronLeft size={20} />
-                    </button>
-                )}
-                <div 
-                    className="data-table-wrapper"
-                    ref={tableWrapperRef}
-                    onScroll={checkScroll}
-                >
-                    <table className="data-table">
+            <div className="data-table-wrapper">
+                <table className="data-table">
                     <thead>
                         <tr>
                             {selectable && (
@@ -368,16 +302,6 @@ const DataTable = ({
                         )}
                     </tbody>
                 </table>
-                </div>
-                {canScrollRight && (
-                    <button
-                        className="data-table-scroll-btn data-table-scroll-btn--right"
-                        onClick={() => handleScroll('right')}
-                        aria-label="Scroll right"
-                    >
-                        <ChevronRight size={20} />
-                    </button>
-                )}
             </div>
 
             {/* Pagination */}

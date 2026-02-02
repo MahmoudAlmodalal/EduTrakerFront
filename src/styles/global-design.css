@@ -137,6 +137,16 @@
     --z-modal: 1050;
     --z-popover: 1060;
     --z-tooltip: 1070;
+
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --glass-blur: 12px;
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+
+    /* Vibrant Gradients */
+    --grad-primary: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    --grad-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6));
 }
 
 /* ========================================================================
@@ -202,11 +212,30 @@
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
     --shadow-glow: 0 0 20px rgba(129, 140, 248, 0.3);
     --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3);
+
+    /* Glassmorphism Dark */
+    --glass-bg: rgba(30, 41, 59, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-blur: 12px;
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+
+    /* Vibrant Gradients Dark */
+    --grad-primary: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+    --grad-surface: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.6));
 }
 
 /* ========================================================================
    PREMIUM COMPONENTS
    ======================================================================== */
+
+/* Glassmorphism Utility */
+.glass-premium {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
 
 /* Premium Card Component */
 .premium-card {
@@ -1012,214 +1041,7 @@
 }
 
 /* ========================================================================
-   RESPONSIVE DESIGN IMPROVEMENTS
-   ======================================================================== */
-
-/* Ensure proper touch targets on mobile */
-@media (max-width: 768px) {
-    :root {
-        /* Reduce spacing on mobile for better mobile experience */
-        --spacing-8: 1.5rem;
-        --spacing-12: 2rem;
-        --spacing-16: 2.5rem;
-        
-        /* Adjust typography for mobile */
-        --font-size-3xl: 1.5rem;
-        --font-size-4xl: 1.875rem;
-    }
-
-    /* Make sure all interactive elements are at least 44px for touch */
-    button,
-    a,
-    input,
-    select,
-    textarea {
-        min-height: 44px;
-        min-width: 44px;
-    }
-
-    .premium-btn {
-        min-height: 44px;
-        padding: var(--spacing-3) var(--spacing-5);
-    }
-}
-
-/* Small mobile devices optimization */
-@media (max-width: 480px) {
-    :root {
-        --spacing-4: 0.875rem;
-        --spacing-6: 1.125rem;
-        --font-size-2xl: 1.25rem;
-        --font-size-3xl: 1.375rem;
-    }
-
-    .premium-card {
-        border-radius: var(--radius-lg);
-    }
-
-    .premium-card-header,
-    .premium-card-body,
-    .premium-card-footer {
-        padding: var(--spacing-4);
-    }
-
-    .premium-btn {
-        padding: var(--spacing-2) var(--spacing-4);
-        font-size: var(--font-size-xs);
-    }
-}
-
-/* ========================================================================
-   HORIZONTAL SCROLLING SUPPORT - MOBILE FRIENDLY
-   ======================================================================== */
-
-/* Horizontal Scrollable Containers */
-.scrollable-horizontal,
-.horizontal-scroll {
-    overflow-x: auto;
-    overflow-y: hidden;
-    position: relative;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Custom scrollbar for horizontal scrolling */
-.scrollable-horizontal::-webkit-scrollbar,
-.horizontal-scroll::-webkit-scrollbar {
-    height: 6px;
-}
-
-.scrollable-horizontal::-webkit-scrollbar-track,
-.horizontal-scroll::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.scrollable-horizontal::-webkit-scrollbar-thumb,
-.horizontal-scroll::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 3px;
-}
-
-.scrollable-horizontal::-webkit-scrollbar-thumb:hover,
-.horizontal-scroll::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-muted);
-}
-
-/* Firefox scrollbar */
-.scrollable-horizontal,
-.horizontal-scroll {
-    scrollbar-color: var(--color-border) transparent;
-    scrollbar-width: thin;
-}
-
-/* Scroll hint indicator - shows that content can be scrolled */
-.scrollable-horizontal::after,
-.horizontal-scroll::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 20px;
-    background: linear-gradient(90deg, transparent, var(--color-bg-surface) 80%);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.scrollable-horizontal.has-overflow::after,
-.horizontal-scroll.has-overflow::after {
-    opacity: 1;
-}
-
-/* Left scroll indicator for RTL */
-[dir="rtl"] .scrollable-horizontal::after,
-[dir="rtl"] .horizontal-scroll::after {
-    left: 0;
-    right: auto;
-    background: linear-gradient(270deg, transparent, var(--color-bg-surface) 80%);
-}
-
-/* Smooth scroll for all scrollable elements */
-html {
-    scroll-behavior: smooth;
-}
-
-/* Cards with horizontal scroll */
-.scrollable-card {
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-}
-
-.scrollable-card-content {
-    display: flex;
-    gap: var(--spacing-4);
-    min-width: min-content;
-}
-
-/* Grid with horizontal overflow support */
-.scrollable-grid {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(250px, 1fr);
-    gap: var(--spacing-4);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Mobile: Make scrollable containers more responsive */
-@media (max-width: 768px) {
-    .scrollable-horizontal,
-    .horizontal-scroll,
-    .scrollable-card,
-    .scrollable-grid {
-        gap: var(--spacing-3);
-    }
-
-    .scrollable-card-content {
-        gap: var(--spacing-3);
-    }
-
-    .scrollable-grid {
-        grid-auto-columns: minmax(200px, 1fr);
-    }
-
-    /* Show scroll hint on mobile */
-    .scrollable-horizontal::after,
-    .horizontal-scroll::after {
-        opacity: 0.7;
-    }
-}
-
-/* Prevent horizontal scroll momentum on iOS */
-.scrollable-horizontal,
-.horizontal-scroll {
-    -webkit-user-select: none;
-    user-select: none;
-}
-
-/* Ensure touch events work properly */
-.scrollable-horizontal > *,
-.horizontal-scroll > *,
-.scrollable-card-content > * {
-    -webkit-user-select: auto;
-    user-select: auto;
-}
-
-/* Hide scrollbar while keeping functionality */
-.scrollable-horizontal.hide-scrollbar,
-.horizontal-scroll.hide-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-
-.scrollable-horizontal.hide-scrollbar::-webkit-scrollbar,
-.horizontal-scroll.hide-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-
-/* Responsive BREAKPOINTS
+   RESPONSIVE BREAKPOINTS
    ======================================================================== */
 
 /* Mobile First Approach */

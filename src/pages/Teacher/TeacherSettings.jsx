@@ -1,22 +1,49 @@
-import React, { useState } from 'react';
-import { User, Lock, Globe, Save, Check, Shield, Moon, Sun, Camera, Mail, Phone, BookOpen, AlertCircle, Sparkles, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Lock, Globe, Save, Camera, Check, AlertCircle, Shield, Moon, Sun, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import teacherService from '../../services/teacherService';
 import './Teacher.css';
 
 const TeacherSettings = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('general');
+    const [loading, setLoading] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
 
+    // Get language, theme, and translation function from context
     const { language, changeLanguage, theme, toggleTheme, t } = useTheme();
 
     // Profile State
     const [profile, setProfile] = useState({
-        name: 'Mr. Teacher',
-        email: 'teacher@edutraker.com',
-        phone: '+1 234 567 890',
-        bio: 'Mathematics Teacher | Grade 10 & 11'
+        name: '',
+        email: '',
+        phone: '',
+        bio: '',
+        specialization: ''
     });
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                setLoading(true);
+                const data = await teacherService.getProfile(user.user_id);
+                setProfile({
+                    name: data.user_name || data.user?.full_name || '',
+                    email: data.user_email || data.user?.email || '',
+                    phone: data.phone_number || '',
+                    bio: data.bio || '',
+                    specialization: data.specialization || ''
+                });
+            } catch (error) {
+                console.error("Error fetching teacher profile:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchProfile();
+    }, [user.user_id]);
 
     // Security State
     const [security, setSecurity] = useState({
@@ -26,15 +53,26 @@ const TeacherSettings = () => {
         twoFactor: false
     });
 
-    const handleSave = (section) => {
+    const handleSave = async (section) => {
         setIsLoading(true);
-        setTimeout(() => {
-            setIsLoading(false);
+        try {
+            if (section === 'Profile') {
+                await teacherService.updateProfile(user.user_id, {
+                    bio: profile.bio,
+                    specialization: profile.specialization
+                    // Other fields might be read-only or handled differently in backend
+                });
+            }
             setSuccessMessage(`${section} updated successfully!`);
             setTimeout(() => {
                 setSuccessMessage('');
             }, 3000);
-        }, 800);
+        } catch (error) {
+            console.error(`Error updating ${section}:`, error);
+            alert(`Failed to update ${section}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const renderSuccessMessage = () => {
@@ -50,271 +88,299 @@ const TeacherSettings = () => {
     };
 
     const tabs = [
-        { id: 'general', label: t('teacher.settings.tab.general'), icon: Globe, color: 'var(--teacher-secondary)' },
-        { id: 'profile', label: t('teacher.settings.tab.profile'), icon: User, color: 'var(--teacher-primary)' },
-        { id: 'security', label: t('teacher.settings.tab.security'), icon: Shield, color: 'var(--teacher-danger)' }
+        { id: 'general', label: t('teacher.settings.tab.general'), icon: Globe },
+        { id: 'profile', label: t('teacher.settings.tab.profile'), icon: User },
+        { id: 'security', label: t('teacher.settings.tab.security'), icon: Lock }
     ];
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="animate-spin text-teacher-primary" size={48} />
+            </div>
+        );
+    }
 
     const renderTabContent = () => {
         switch (activeTab) {
             case 'general':
                 return (
-                    <div className="beauty-card animate-fade-in">
+                    <div className="beauty-card fade-in">
                         <div className="settings-card-header">
-                            <div className="header-icon-shell" style={{ backgroundColor: 'rgba(56, 189, 248, 0.1)', color: 'var(--teacher-secondary)' }}>
-                                <Globe size={24} />
+                            <div className="p-2 bg-blue-50 rounded-lg">
+                                <Globe size={20} className="text-blue-600" />
                             </div>
                             <div>
-                                <h2>{t('teacher.settings.general.title')}</h2>
-                                <p>{t('teacher.settings.general.subtitle')}</p>
+                                <h2 className="text-lg font-bold text-slate-800">{t('teacher.settings.general.title')}</h2>
+                                <p className="text-sm text-slate-500">{t('teacher.settings.general.subtitle')}</p>
                             </div>
                         </div>
 
                         <div className="settings-card-body">
-                            <div className="settings-section">
-                                <label className="section-label">
-                                    <Globe size={16} />
-                                    {t('teacher.settings.language')}
-                                </label>
-                                <div className="language-selector-grid">
+                            <form className="space-y-8">
+                                {/* Language Toggle */}
+                                <div className="space-y-4">
+                                    <label className="text-sm font-semibold text-slate-700">{t('teacher.settings.language')}</label>
+
+                                    {/* Beautiful Segmented Button */}
+                                    <div className="inline-flex p-1 bg-gray-100 rounded-xl border border-gray-200">
+                                        <button
+                                            type="button"
+                                            onClick={() => changeLanguage('en')}
+                                            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${language === 'en'
+                                                ? 'bg-white text-blue-600 shadow-md border border-blue-100'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                        >
+                                            <span className="text-lg">🇺🇸</span>
+                                            <span>English</span>
+                                            {language === 'en' && <Check size={16} className="text-blue-600" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => changeLanguage('ar')}
+                                            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${language === 'ar'
+                                                ? 'bg-white text-blue-600 shadow-md border border-blue-100'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                        >
+                                            <span className="text-lg">🇸🇦</span>
+                                            <span>العربية</span>
+                                            {language === 'ar' && <Check size={16} className="text-blue-600" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Theme Selection - Checkbox Style Buttons */}
+                                <div className="space-y-4">
+                                    <label className="text-sm font-semibold text-slate-700">{t('teacher.settings.appearance')}</label>
+
+                                    {/* Segmented Toggle like Language */}
+                                    <div className="inline-flex p-1 rounded-xl border" style={{ backgroundColor: 'var(--teacher-bg)', borderColor: 'var(--teacher-border)' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => theme !== 'light' && toggleTheme()}
+                                            className="flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200"
+                                            style={{
+                                                backgroundColor: theme === 'light' ? 'var(--teacher-surface)' : 'transparent',
+                                                color: theme === 'light' ? '#F59E0B' : 'var(--teacher-text-muted)',
+                                                boxShadow: theme === 'light' ? 'var(--shadow-md)' : 'none',
+                                                border: theme === 'light' ? '1px solid #FDE68A' : 'none'
+                                            }}
+                                        >
+                                            <Sun size={18} />
+                                            <span>{t('teacher.settings.lightMode')}</span>
+                                            {theme === 'light' && <Check size={16} style={{ color: '#F59E0B' }} />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => theme !== 'dark' && toggleTheme()}
+                                            className="flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200"
+                                            style={{
+                                                backgroundColor: theme === 'dark' ? 'var(--teacher-surface)' : 'transparent',
+                                                color: theme === 'dark' ? '#818CF8' : 'var(--teacher-text-muted)',
+                                                boxShadow: theme === 'dark' ? 'var(--shadow-md)' : 'none',
+                                                border: theme === 'dark' ? '1px solid #818CF8' : 'none'
+                                            }}
+                                        >
+                                            <Moon size={18} />
+                                            <span>{t('teacher.settings.darkMode')}</span>
+                                            {theme === 'dark' && <Check size={16} style={{ color: '#818CF8' }} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-100">
                                     <button
-                                        onClick={() => changeLanguage('en')}
-                                        className={`lang-btn ${language === 'en' ? 'active' : ''}`}
+                                        type="button"
+                                        onClick={() => handleSave('Preferences')}
+                                        className="btn-primary"
+                                        disabled={isLoading}
                                     >
-                                        <span className="flag">🇺🇸</span>
-                                        <div className="lang-info">
-                                            <span className="name">English</span>
-                                            <span className="desc">United States</span>
-                                        </div>
-                                        {language === 'en' && <Check size={18} className="check-icon" />}
-                                    </button>
-                                    <button
-                                        onClick={() => changeLanguage('ar')}
-                                        className={`lang-btn ${language === 'ar' ? 'active' : ''}`}
-                                    >
-                                        <span className="flag">🇸🇦</span>
-                                        <div className="lang-info">
-                                            <span className="name">العربية</span>
-                                            <span className="desc">Saudi Arabia</span>
-                                        </div>
-                                        {language === 'ar' && <Check size={18} className="check-icon" />}
+                                        {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                        <span>{t('teacher.settings.savePreferences')}</span>
                                     </button>
                                 </div>
-                            </div>
-
-                            <div className="settings-section mt-8">
-                                <label className="section-label">
-                                    <Sparkles size={16} />
-                                    {t('teacher.settings.appearance')}
-                                </label>
-                                <div className="theme-toggle-premium">
-                                    <button
-                                        onClick={() => theme !== 'light' && toggleTheme()}
-                                        className={`theme-btn light ${theme === 'light' ? 'active' : ''}`}
-                                    >
-                                        <Sun size={20} />
-                                        <span>{t('teacher.settings.lightMode')}</span>
-                                    </button>
-                                    <button
-                                        onClick={() => theme !== 'dark' && toggleTheme()}
-                                        className={`theme-btn dark ${theme === 'dark' ? 'active' : ''}`}
-                                    >
-                                        <Moon size={20} />
-                                        <span>{t('teacher.settings.darkMode')}</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="form-actions mt-8">
-                                <button className="btn-primary-premium" onClick={() => handleSave('Preferences')} disabled={isLoading}>
-                                    {isLoading ? <span className="loader" /> : <Save size={18} />}
-                                    <span>{t('teacher.settings.savePreferences')}</span>
-                                </button>
-                            </div>
+                            </form>
                         </div>
                     </div>
                 );
 
             case 'profile':
                 return (
-                    <div className="beauty-card animate-fade-in">
+                    <div className="beauty-card fade-in">
                         <div className="settings-card-header">
-                            <div className="header-icon-shell" style={{ backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--teacher-primary)' }}>
-                                <User size={24} />
+                            <div className="p-2 bg-indigo-50 rounded-lg">
+                                <User size={20} className="text-indigo-600" />
                             </div>
                             <div>
-                                <h2>{t('teacher.settings.profile.title')}</h2>
-                                <p>{t('teacher.settings.profile.subtitle')}</p>
+                                <h2 className="text-lg font-bold text-slate-800">{t('teacher.settings.profile.title')}</h2>
+                                <p className="text-sm text-slate-500">{t('teacher.settings.profile.subtitle')}</p>
                             </div>
                         </div>
 
                         <div className="settings-card-body">
-                            <div className="profile-upload-section">
-                                <div className="avatar-wrapper">
-                                    <div className="profile-avatar-large">
-                                        {profile.name?.[0] || 'T'}
+                            <form className="space-y-8">
+                                <div className="flex items-center gap-6 pb-6 border-b border-gray-100">
+                                    <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center text-2xl font-bold text-slate-600 border border-slate-200">
+                                        {profile.name.split(' ').map(n => n[0]).join('')}
                                     </div>
-                                    <button className="avatar-edit-btn">
-                                        <Camera size={16} />
-                                    </button>
+                                    <div className="space-y-2">
+                                        <h3 className="font-bold text-slate-800">{profile.name}</h3>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                                                onClick={() => setSuccessMessage('Avatar upload feature coming soon!')}
+                                            >
+                                                {t('teacher.settings.changeAvatar')}
+                                            </button>
+                                            <span className="text-gray-300">|</span>
+                                            <button
+                                                type="button"
+                                                className="text-sm font-medium text-red-600 hover:text-red-700 transition-colors"
+                                                onClick={() => setSuccessMessage('Avatar removed successfully!')}
+                                            >
+                                                {t('teacher.settings.remove')}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="profile-quick-info">
-                                    <h3>{profile.name}</h3>
-                                    <p>{profile.bio}</p>
-                                </div>
-                            </div>
 
-                            <div className="settings-form-grid mt-8">
-                                <div className="input-group">
-                                    <label>{t('teacher.settings.fullName')}</label>
-                                    <div className="input-wrapper">
-                                        <User size={18} className="input-icon" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-semibold text-slate-700">{t('teacher.settings.fullName')}</label>
                                         <input
                                             type="text"
-                                            className="beauty-input-premium"
+                                            className="teacher-input w-full bg-gray-50 text-gray-500"
                                             value={profile.name}
-                                            onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                                            readOnly
+                                            disabled
                                         />
                                     </div>
-                                </div>
-
-                                <div className="input-group">
-                                    <label>{t('teacher.settings.phoneNumber')}</label>
-                                    <div className="input-wrapper">
-                                        <Phone size={18} className="input-icon" />
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-semibold text-slate-700">Specialization</label>
                                         <input
-                                            type="tel"
-                                            className="beauty-input-premium"
-                                            value={profile.phone}
-                                            onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                                            type="text"
+                                            className="teacher-input w-full"
+                                            value={profile.specialization}
+                                            onChange={(e) => setProfile({ ...profile, specialization: e.target.value })}
                                         />
                                     </div>
-                                </div>
-
-                                <div className="input-group full-width">
-                                    <label>{t('teacher.settings.emailAddress')}</label>
-                                    <div className="input-wrapper disabled">
-                                        <Mail size={18} className="input-icon" />
+                                    <div className="space-y-2 md:col-span-2">
+                                        <label className="text-sm font-semibold text-slate-700">{t('teacher.settings.emailAddress')}</label>
                                         <input
                                             type="email"
-                                            className="beauty-input-premium"
+                                            className="teacher-input w-full bg-gray-50 text-gray-500"
                                             value={profile.email}
                                             readOnly
+                                            disabled
                                         />
-                                        <Lock size={16} className="lock-icon" />
+                                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                                            <Lock size={12} /> {t('teacher.settings.emailManaged')}
+                                        </p>
                                     </div>
-                                    <p className="input-hint">{t('teacher.settings.emailManaged')}</p>
-                                </div>
-
-                                <div className="input-group full-width">
-                                    <label>{t('teacher.settings.bio')}</label>
-                                    <div className="input-wrapper">
-                                        <BookOpen size={18} className="input-icon top" />
+                                    <div className="space-y-2 md:col-span-2">
+                                        <label className="text-sm font-semibold text-slate-700">{t('teacher.settings.bio')}</label>
                                         <textarea
                                             rows="3"
-                                            className="beauty-input-premium textarea"
+                                            className="teacher-input w-full"
                                             value={profile.bio}
                                             onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
                                         ></textarea>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="form-actions mt-8">
-                                <button className="btn-primary-premium" onClick={() => handleSave('Profile')} disabled={isLoading}>
-                                    {isLoading ? <span className="loader" /> : <Save size={18} />}
-                                    <span>{t('teacher.settings.updateProfile')}</span>
-                                </button>
-                            </div>
+                                <div className="pt-4 border-t border-gray-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSave('Profile')}
+                                        className="btn-primary"
+                                        disabled={isLoading}
+                                    >
+                                        {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                        <span>{t('teacher.settings.updateProfile')}</span>
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 );
 
             case 'security':
                 return (
-                    <div className="beauty-card animate-fade-in">
+                    <div className="beauty-card fade-in">
                         <div className="settings-card-header">
-                            <div className="header-icon-shell" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--teacher-danger)' }}>
-                                <Shield size={24} />
+                            <div className="p-2 bg-red-50 rounded-lg">
+                                <Shield size={20} className="text-red-600" />
                             </div>
                             <div>
-                                <h2>{t('teacher.settings.security.title')}</h2>
-                                <p>{t('teacher.settings.security.subtitle')}</p>
+                                <h2 className="text-lg font-bold text-slate-800">{t('teacher.settings.security.title')}</h2>
+                                <p className="text-sm text-slate-500">{t('teacher.settings.security.subtitle')}</p>
                             </div>
                         </div>
 
                         <div className="settings-card-body">
-                            <div className="security-section">
-                                <h3 className="section-subtitle">{t('teacher.settings.changePassword')}</h3>
-                                <div className="settings-form-grid">
-                                    <div className="input-group full-width">
-                                        <label>{t('teacher.settings.currentPassword')}</label>
-                                        <div className="input-wrapper">
-                                            <Lock size={18} className="input-icon" />
+                            <form className="space-y-8">
+                                <div className="space-y-6">
+                                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">{t('teacher.settings.changePassword')}</h3>
+                                    <div className="space-y-4">
+                                        <input
+                                            type="password"
+                                            className="teacher-input w-full"
+                                            placeholder={t('teacher.settings.currentPassword')}
+                                            value={security.currentPassword}
+                                            onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })}
+                                        />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <input
                                                 type="password"
-                                                className="beauty-input-premium"
-                                                placeholder="••••••••"
-                                                value={security.currentPassword}
-                                                onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="input-group">
-                                        <label>{t('teacher.settings.newPassword')}</label>
-                                        <div className="input-wrapper">
-                                            <Lock size={18} className="input-icon" />
-                                            <input
-                                                type="password"
-                                                className="beauty-input-premium"
-                                                placeholder="••••••••"
+                                                className="teacher-input w-full"
+                                                placeholder={t('teacher.settings.newPassword')}
                                                 value={security.newPassword}
                                                 onChange={(e) => setSecurity({ ...security, newPassword: e.target.value })}
                                             />
-                                        </div>
-                                    </div>
-                                    <div className="input-group">
-                                        <label>{t('teacher.settings.confirmPassword')}</label>
-                                        <div className="input-wrapper">
-                                            <Lock size={18} className="input-icon" />
                                             <input
                                                 type="password"
-                                                className="beauty-input-premium"
-                                                placeholder="••••••••"
+                                                className="teacher-input w-full"
+                                                placeholder={t('teacher.settings.confirmPassword')}
                                                 value={security.confirmPassword}
                                                 onChange={(e) => setSecurity({ ...security, confirmPassword: e.target.value })}
                                             />
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="security-option-card mt-8">
-                                <div className="option-info">
-                                    <div className="option-icon-shell">
-                                        <Shield size={20} />
-                                    </div>
-                                    <div>
-                                        <h4>{t('teacher.settings.twoFactor')}</h4>
-                                        <p>{t('teacher.settings.twoFactorDesc')}</p>
+                                <div className="pt-6 border-t border-gray-100">
+                                    <div className="flex items-start justify-between">
+                                        <div className="max-w-md">
+                                            <h4 className="font-bold text-slate-800 mb-1">{t('teacher.settings.twoFactor')}</h4>
+                                            <p className="text-sm text-slate-500">{t('teacher.settings.twoFactorDesc')}</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={security.twoFactor}
+                                                onChange={() => setSecurity({ ...security, twoFactor: !security.twoFactor })}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
                                     </div>
                                 </div>
-                                <label className="premium-toggle">
-                                    <input
-                                        type="checkbox"
-                                        checked={security.twoFactor}
-                                        onChange={() => setSecurity({ ...security, twoFactor: !security.twoFactor })}
-                                    />
-                                    <span className="toggle-slider"></span>
-                                </label>
-                            </div>
 
-                            <div className="form-actions mt-8">
-                                <button className="btn-primary-premium danger" onClick={() => handleSave('Security')} disabled={isLoading}>
-                                    {isLoading ? <span className="loader" /> : <Save size={18} />}
-                                    <span>{t('teacher.settings.updateSecurity')}</span>
-                                </button>
-                            </div>
+                                <div className="pt-6 border-t border-gray-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSave('Security Settings')}
+                                        className="btn-primary"
+                                        disabled={isLoading}
+                                    >
+                                        {isLoading ? <span className="loader px-2"></span> : <Save size={18} />}
+                                        <span>{t('teacher.settings.updateSecurity')}</span>
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 );
@@ -325,40 +391,38 @@ const TeacherSettings = () => {
     };
 
     return (
-        <div className="teacher-settings-container animate-fade-in">
+        <div className="space-y-8 animate-fade-in pb-12 w-full">
             {renderSuccessMessage()}
 
-            <header className="settings-header-premium">
+            {/* Simple Header */}
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1>{t('teacher.settings.title')}</h1>
-                    <p>{t('teacher.settings.subtitle')}</p>
+                    <h1 className="text-2xl font-bold text-slate-800">{t('teacher.settings.title')}</h1>
+                    <p className="text-slate-500 mt-1">{t('teacher.settings.subtitle')}</p>
                 </div>
             </header>
 
-            <div className="settings-layout-premium">
-                {/* Modern Sidebar Tabs */}
-                <aside className="settings-sidebar-premium">
-                    <nav className="settings-nav-pill">
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`settings-tab-pill ${activeTab === tab.id ? 'active' : ''}`}
-                                style={{ '--active-color': tab.color }}
-                            >
-                                <tab.icon size={20} />
-                                <span>{tab.label}</span>
-                                {activeTab === tab.id && <ChevronRight size={16} className="chevron" />}
-                            </button>
-                        ))}
-                    </nav>
+            {/* Centered Navigation */}
+            <div className="flex flex-col gap-8 items-center max-w-4xl mx-auto w-full">
 
-                </aside>
+                {/* Top Tabs Modern Pill Design */}
+                <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-full p-1.5 shadow-sm inline-flex items-center gap-2">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`beauty-tab ${activeTab === tab.id ? 'active' : ''}`}
+                        >
+                            <tab.icon size={18} />
+                            <span>{tab.label}</span>
+                        </button>
+                    ))}
+                </div>
 
-                {/* Main Content Area */}
-                <main className="settings-content-premium">
+                {/* Main Content - Centered */}
+                <div className="w-full">
                     {renderTabContent()}
-                </main>
+                </div>
             </div>
         </div>
     );

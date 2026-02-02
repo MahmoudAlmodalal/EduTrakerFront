@@ -5,6 +5,8 @@ import Header from './Header';
 import styles from './MainLayout.module.css';
 
 const MainLayout = () => {
+    console.log('MainLayout rendering...');
+
     const [isSidebarOpen, setSidebarOpen] = useState(true);
 
     const toggleSidebar = () => {
@@ -15,7 +17,7 @@ const MainLayout = () => {
         <div className={styles.layout}>
             <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
             <div className={`${styles.mainContent} ${isSidebarOpen ? '' : styles.expanded}`}>
-                <Header toggleSidebar={toggleSidebar} />
+                <Header toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
                 <main className={styles.contentArea}>
                     <div className="fade-in">
                         <Outlet />

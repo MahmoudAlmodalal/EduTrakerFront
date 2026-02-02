@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Book,
     FileText,
@@ -14,141 +14,71 @@ import {
     TrendingUp
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import studentService from '../../../services/studentService';
 import '../Student.css';
 
 const StudentSubjects = () => {
     const { t } = useTheme();
-    const [selectedSubject, setSelectedSubject] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [subjects, setSubjects] = useState([]);
+    const { user } = useAuth();
+    const [selectedSubject, setSelectedSubject] = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
+    const [subjects, setSubjects] = React.useState([]);
 
-    const safeJSONParse = (key, fallback) => {
-        try {
-            const item = localStorage.getItem(key);
-            return item ? JSON.parse(item) : fallback;
-        } catch (e) {
-            console.error(`Error parsing ${key}:`, e);
-            return fallback;
-        }
-    };
+    React.useEffect(() => {
+        const fetchSubjects = async () => {
+            try {
+                const data = await studentService.getDashboardStats();
+                const courseData = data.statistics.courses.courses || [];
 
-    useEffect(() => {
-        try {
-            // 1. Identify User
-            const students = safeJSONParse('sec_students', []);
-            const user = students.length > 0 ? students[0] : {
-                id: 999,
-                firstName: 'Student',
-                lastName: 'Demo',
-                assignedClass: 'Grade 10-A'
-            };
-            const studentClass = user.assignedClass;
-            const studentName = `${user.firstName} ${user.lastName}`;
-
-            // 2. Fetch Data
-            const lessonPlans = safeJSONParse('teacher_lesson_plans', []);
-            const assessments = safeJSONParse('teacher_assessments', []);
-            const grades = safeJSONParse('teacher_grades', []);
-
-            // 3. Identify Distinct Subjects for this Class
-            // We look at lesson plans and assessments to find unique "Subject" names for this class
-            // Assuming `teacher_lesson_plans` has `subject` or `title` implies subject? 
-            // Actually, in `LessonPlans.jsx`, `formData` had `subject` (dropdown from school_classes). 
-            // So plans should have `subject`.
-            // `teacher_assessments` has `type` (e.g. Exam, Quiz) but maybe not explicit subject if not stored.
-            // Let's assume `subject` is a key field. If missing, we might group by `type` or similar.
-
-            const classPlans = lessonPlans.filter(p => p.class === studentClass);
-            // Assessments might store gradeLevel/class.
-            const classAssessments = assessments.filter(a =>
-                (a.gradeLevel && studentClass.includes(a.gradeLevel)) || a.gradeLevel === 'All'
-            );
-
-            // Collect unique subjects
-            const subjectSet = new Set();
-            classPlans.forEach(p => { if (p.subject) subjectSet.add(p.subject); });
-            // Assessments might not have "subject" field in previous schema, let's check.
-            // In `Assessments.jsx`, it seemed to have `subject`? No, it had `title`, `type`, `date`, `gradeLevel`.
-            // We might have to map `type` to subject or add a subject field?
-            // Or assume `teacher` implies subject if we had that mapping.
-            // For now, let's just use subjects found in Lesson Plans as the "Courses".
-            // If no lesson plans, we fallback to specific defaults or empty.
-
-            if (subjectSet.size === 0) {
-                // Fallback subjects if none found to avoid empty screen
-                ['Mathematics', 'Physics', 'English', 'Computer Science'].forEach(s => subjectSet.add(s));
-            }
-
-            const processedSubjects = Array.from(subjectSet).map((subjectName, index) => {
-                // Find materials
-                const subjectMaterials = classPlans
-                    .filter(p => p.subject === subjectName && p.file)
-                    .map(p => ({
-                        id: p.id,
-                        title: p.title,
-                        type: 'resource', // or infer from extension
-                        date: p.date,
-                        size: 'Unknown', // File size not stored?
-                        fileData: p.file // Base64 data
-                    }));
-
-                // Find assignments (filtering by title containing subject or type?)
-                // Since assessments didn't explicitly store subject in my previous edit (it was `type` = Exam/Quiz),
-                // this is tricky. I'll search if assessment title contains subject name strictly or loosely.
-                const subjectAssignments = classAssessments.filter(a =>
-                    a.title.toLowerCase().includes(subjectName.toLowerCase()) ||
-                    (a.type && a.type.toLowerCase().includes(subjectName.toLowerCase()))
-                );
-
-                const mappedAssignments = subjectAssignments.map(a => {
-                    const myGrade = grades.find(g => g.assessmentId === a.id && (g.studentId === user.id || g.name === studentName));
-                    let status = 'pending';
-                    let points = 100; // Mock max points
-
-                    if (myGrade) {
-                        if (myGrade.grade) status = 'submitted'; // graded
-                        else status = 'submitted';
-                        // if we want 'graded', we can add that status
-                    } else {
-                        // Pending
-                    }
-
-                    return {
-                        id: a.id,
-                        title: a.title,
-                        due: a.date,
-                        status: status,
-                        points: 100
-                    };
-                });
-
-                // Calculate Progress (Mock logic)
-                const totalTasks = mappedAssignments.length;
-                const completedTasks = mappedAssignments.filter(a => a.status === 'submitted').length;
-                const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-                return {
-                    id: index + 1,
-                    name: subjectName,
-                    teacher: 'Mr. Teacher', // Mock or fetch if available
-                    description: `${subjectName} Course`,
-                    progress: progress,
-                    grade: 'A', // Mock current grade or calc from `grades`
-                    nextClass: '9:00 AM', // Mock schedule
+                // Map API courses to UI subjects
+                const mappedSubjects = courseData.map((c, index) => ({
+                    id: c.course_id,
+                    classroom_id: c.classroom_id,
+                    name: c.course_name,
+                    teacher: c.teacher_name,
+                    description: `${c.course_code} - ${c.grade_name}`,
+                    progress: 0, // Need to implement progress logic or fetch separately
+                    grade: 'N/A', // Potentially from grades summary
+                    nextClass: 'Scheduled',
                     color: ['#0891b2', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'][index % 5],
-                    materials: subjectMaterials,
-                    assignments: mappedAssignments
-                };
+                    materials: [],
+                    assignments: []
+                }));
+                setSubjects(mappedSubjects);
+            } catch (error) {
+                console.error('Error fetching subjects:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSubjects();
+    }, []);
+
+    const fetchSubjectDetails = async (subject) => {
+        try {
+            setSelectedSubject({ ...subject, loading: true });
+            const materialsData = await studentService.getLearningMaterials({
+                course: subject.id,
+                classroom: subject.classroom_id
             });
 
-            setSubjects(processedSubjects);
-            setLoading(false);
+            // Map materials
+            const materials = (materialsData.results || materialsData || []).map(m => ({
+                id: m.id,
+                title: m.title,
+                type: m.file_type || 'resource',
+                date: new Date(m.created_at).toLocaleDateString(),
+                size: m.file_size ? `${(m.file_size / 1024 / 1024).toFixed(1)} MB` : 'N/A',
+                url: m.file_url
+            }));
 
-        } catch (err) {
-            console.error("Error loading subjects:", err);
-            setLoading(false);
+            setSelectedSubject({ ...subject, materials, loading: false });
+        } catch (error) {
+            console.error('Error fetching subject details:', error);
+            setSelectedSubject({ ...subject, loading: false });
         }
-    }, []);
+    };
 
     const getTypeIcon = (type) => {
         switch (type) {
@@ -158,10 +88,6 @@ const StudentSubjects = () => {
             default: return <FileText size={18} />;
         }
     };
-
-    if (loading) {
-        return <div className="p-8 text-center text-slate-500">Loading subjects...</div>;
-    }
 
     if (selectedSubject) {
         return (
@@ -221,19 +147,12 @@ const StudentSubjects = () => {
                                         <div className="material-meta">
                                             <span className="material-type">{material.type}</span>
                                             <span className="material-date">{material.date}</span>
-                                            {material.size && <span className="material-size">{material.size}</span>}
+                                            <span className="material-size">{material.size}</span>
                                         </div>
                                     </div>
-                                    {material.fileData && (
-                                        <a
-                                            href={material.fileData}
-                                            download={material.title}
-                                            className="download-btn"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <Download size={16} />
-                                        </a>
-                                    )}
+                                    <button className="download-btn">
+                                        <Download size={16} />
+                                    </button>
                                 </div>
                             )) : (
                                 <div className="empty-state-mini">
@@ -514,7 +433,6 @@ const StudentSubjects = () => {
                         color: var(--color-text-muted, #64748b);
                         cursor: pointer;
                         transition: all 0.2s ease;
-                        text-decoration: none;
                     }
                     
                     .download-btn:hover {
@@ -651,7 +569,7 @@ const StudentSubjects = () => {
     }
 
     return (
-        <div className="student-subjects animate-fade-in">
+        <div className="student-subjects">
             {/* Header */}
             <header className="page-header">
                 <div>
@@ -671,7 +589,7 @@ const StudentSubjects = () => {
                 {subjects.map((subject, index) => (
                     <div
                         key={subject.id}
-                        onClick={() => setSelectedSubject(subject)}
+                        onClick={() => fetchSubjectDetails(subject)}
                         className="subject-card-premium"
                         style={{ '--subject-color': subject.color, animationDelay: `${index * 0.05}s` }}
                     >

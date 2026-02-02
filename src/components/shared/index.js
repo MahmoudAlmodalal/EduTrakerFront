@@ -6,6 +6,3 @@ export { StatsCard, StatsCardGrid } from './Cards/StatsCard';
 
 // Table exports
 export { default as DataTable } from './Tables/DataTable';
-
-// Horizontal Scroll exports
-export { default as HorizontalScroll } from './HorizontalScroll';
