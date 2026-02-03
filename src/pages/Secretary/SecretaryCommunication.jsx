@@ -84,6 +84,13 @@ const SecretaryCommunication = () => {
 
     const handleSendMessage = async () => {
         if (!newMessage || !selectedMessage) return;
+
+        console.log('=== DEBUG: Sending Reply ===');
+        console.log('Selected Message:', selectedMessage);
+        console.log('User ID:', user?.id);
+        console.log('Sender ID:', selectedMessage.sender?.id);
+        console.log('Receipts:', selectedMessage.receipts);
+
         try {
             let targetRecipientId = null;
 
@@ -91,36 +98,50 @@ const SecretaryCommunication = () => {
             if (selectedMessage.sender?.id === user?.id) {
                 // User is the sender - reply to the first recipient
                 const receipts = selectedMessage.receipts || [];
+                console.log('User is sender, receipts array:', receipts);
+
                 if (receipts.length > 0 && receipts[0]?.recipient?.id) {
                     targetRecipientId = receipts[0].recipient.id;
+                    console.log('Target recipient ID from receipts:', targetRecipientId);
                 } else {
                     alert('Could not determine recipient for reply. This message has no recipients.');
-                    console.error('Message receipts:', selectedMessage.receipts);
+                    console.error('FAILED: No recipients found in receipts array');
+                    console.error('Receipts data:', JSON.stringify(selectedMessage.receipts, null, 2));
                     return;
                 }
             } else {
                 // User is the recipient - reply to the sender
+                console.log('User is recipient, replying to sender');
                 if (selectedMessage.sender?.id) {
                     targetRecipientId = selectedMessage.sender.id;
+                    console.log('Target recipient ID (sender):', targetRecipientId);
                 } else {
                     alert('Could not determine sender for reply. Sender information is missing.');
-                    console.error('Message sender:', selectedMessage.sender);
+                    console.error('FAILED: No sender found');
+                    console.error('Sender data:', JSON.stringify(selectedMessage.sender, null, 2));
                     return;
                 }
             }
 
-            await secretaryService.sendMessage({
-                recipient_ids: [targetRecipientId], // Changed to recipient_ids array
-                body: newMessage, // Changed content to body
+            console.log('Sending message to recipient:', targetRecipientId);
+            const response = await secretaryService.sendMessage({
+                recipient_ids: [targetRecipientId],
+                body: newMessage,
                 subject: `Re: ${selectedMessage.subject}`,
-                thread_id: selectedMessage.thread_id, // Added thread_id
-                parent_message: selectedMessage.id // Added parent_message
+                thread_id: selectedMessage.thread_id,
+                parent_message: selectedMessage.id
             });
+
+            console.log('Message sent successfully, response:', response);
             setNewMessage('');
             alert('Message sent!');
-            fetchData(); // Added fetchData call
+            await fetchData();
         } catch (error) {
-            alert('Error sending message: ' + (error.response?.data?.detail || error.message)); // Updated error handling
+            console.error('=== ERROR Sending Message ===');
+            console.error('Error object:', error);
+            console.error('Error response:', error.response);
+            console.error('Error response data:', error.response?.data);
+            alert('Error sending message: ' + (error.response?.data?.detail || error.message));
         }
     };
 
