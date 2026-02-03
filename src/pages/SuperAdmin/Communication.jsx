@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import { Send, Plus, MessageSquare, Search, ChevronLeft } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import styles from './Communication.module.css';
@@ -9,6 +10,7 @@ import { api } from '../../utils/api';
 
 const Communication = () => {
     const { t } = useTheme();
+    const { showSuccess, showError, showWarning, showInfo } = useToast();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState('received');
     const [selectedMessage, setSelectedMessage] = useState(null);
@@ -41,10 +43,23 @@ const Communication = () => {
             ]);
 
             const rawMessages = msgsData.results || msgsData;
+
+            console.log('=== ADMIN: DEBUG Fetched Messages ===');
+            console.log('Total messages:', rawMessages.length);
+            console.log('First message:', rawMessages[0]);
+            console.log('Current user ID:', user?.id);
+
             // Map read status based on current user's receipt
             const mappedMessages = rawMessages.map(m => {
                 const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
                 const isSentByMe = m.sender?.id === user?.id;
+
+                console.log(`Message ${m.id}:`, {
+                    sender: m.sender,
+                    senderName: m.sender?.full_name,
+                    receipts: m.receipts,
+                    isSentByMe
+                });
 
                 return {
                     ...m,
@@ -57,6 +72,7 @@ const Communication = () => {
             setNotifications(notifsData.results || notifsData);
         } catch (err) {
             console.error('Error fetching communication data:', err);
+            showError('Failed to load messages');
         } finally {
             setLoading(false);
         }
@@ -146,11 +162,11 @@ const Communication = () => {
     const handleSendNewMessage = async () => {
         console.log('Sending message:', newMessage);
         if (!newMessage.recipient_id) {
-            alert('Please select a recipient from the search results.');
+            showWarning('Please select a recipient from the search results.');
             return;
         }
         if (!newMessage.body || !newMessage.body.trim()) {
-            alert('Please enter a message body.');
+            showWarning('Please enter a message body.');
             return;
         }
 
@@ -165,7 +181,7 @@ const Communication = () => {
 
             handleCloseCompose();
             fetchData(); // Refresh list to show sent message if applicable
-            alert('Message sent successfully!');
+            showSuccess('Message sent successfully!');
         } catch (err) {
             console.error('Error sending message:', err);
             console.error('Error details:', err.response?.data);
@@ -189,12 +205,18 @@ const Communication = () => {
                 errorMessage = err.message;
             }
 
-            alert('Failed to send message. ' + errorMessage);
+            showError('Failed to send message. ' + errorMessage);
         }
     };
 
     const handleSendReply = async () => {
         if (!replyBody.trim()) return;
+
+        console.log('=== ADMIN: DEBUG Reply ===');
+        console.log('Selected Message:', selectedMessage);
+        console.log('User ID:', user?.id);
+        console.log('Sender:', selectedMessage.sender);
+        console.log('Receipts:', selectedMessage.receipts);
 
         try {
             // Re-use current message details for reply
@@ -204,14 +226,34 @@ const Communication = () => {
 
             if (selectedMessage.sender?.id === user?.id) {
                 // I am the sender, find the recipient from receipts
-                targetRecipientId = selectedMessage.receipts?.[0]?.recipient?.id;
+                const receipts = selectedMessage.receipts || [];
+                console.log('Admin is sender, looking at receipts:', receipts);
+
+                if (receipts.length > 0 && receipts[0]?.recipient?.id) {
+                    targetRecipientId = receipts[0].recipient.id;
+                    console.log('Target recipient from receipts:', targetRecipientId);
+                } else {
+                    showError('Could not determine recipient. This message has no recipients.');
+                    console.error('No recipients found in receipts array');
+                    return;
+                }
             } else {
                 // I am a recipient, reply to the sender
-                targetRecipientId = selectedMessage.sender?.id;
+                console.log('Admin is recipient, replying to sender');
+
+                if (selectedMessage.sender?.id) {
+                    targetRecipientId = selectedMessage.sender.id;
+                    console.log('Target recipient (sender):', targetRecipientId);
+                } else {
+                    showError('Could not determine sender. Sender information is missing from this message.');
+                    console.error('Sender is missing:', selectedMessage.sender);
+                    console.error('Full message data:', JSON.stringify(selectedMessage, null, 2));
+                    return;
+                }
             }
 
             if (!targetRecipientId) {
-                alert('Could not determine recipient for reply.');
+                showError('Could not determine recipient for reply.');
                 return;
             }
 
@@ -226,11 +268,11 @@ const Communication = () => {
             await api.post('/user-messages/', payload);
 
             setReplyBody('');
-            alert('Reply sent!');
+            showSuccess('Reply sent successfully!');
             fetchData();
         } catch (err) {
             console.error('Error sending reply:', err);
-            alert('Failed to send reply. ' + (err.response?.data?.detail || ''));
+            showError('Failed to send reply. ' + (err.response?.data?.detail || 'Please try again.'));
         }
     };
 
