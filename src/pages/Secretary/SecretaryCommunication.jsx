@@ -3,10 +3,12 @@ import { useLocation } from 'react-router-dom';
 import { Send, Plus, MessageSquare, Search } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import secretaryService from '../../services/secretaryService';
 
 const SecretaryCommunication = () => {
     const { t } = useTheme();
+    const { showSuccess, showError, showWarning, showInfo } = useToast();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState('internal');
     const [selectedMessage, setSelectedMessage] = useState(null);
@@ -28,9 +30,15 @@ const SecretaryCommunication = () => {
             ]);
 
             const rawMessages = msgsRes.results || msgsRes;
+            console.log('=== DEBUG: Fetched Messages ===');
+            console.log('Raw messages:', rawMessages);
+            console.log('First message sample:', rawMessages[0]);
+
             const mappedMsgs = rawMessages.map(m => {
                 const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
                 const isSentByMe = m.sender?.id === user?.id;
+
+                console.log(`Message ${m.id}: sender=${m.sender?.id}, isSentByMe=${isSentByMe}`);
 
                 return {
                     ...m,
@@ -104,7 +112,7 @@ const SecretaryCommunication = () => {
                     targetRecipientId = receipts[0].recipient.id;
                     console.log('Target recipient ID from receipts:', targetRecipientId);
                 } else {
-                    alert('Could not determine recipient for reply. This message has no recipients.');
+                    showError('Could not determine recipient for reply. This message has no recipients.');
                     console.error('FAILED: No recipients found in receipts array');
                     console.error('Receipts data:', JSON.stringify(selectedMessage.receipts, null, 2));
                     return;
@@ -116,7 +124,7 @@ const SecretaryCommunication = () => {
                     targetRecipientId = selectedMessage.sender.id;
                     console.log('Target recipient ID (sender):', targetRecipientId);
                 } else {
-                    alert('Could not determine sender for reply. Sender information is missing.');
+                    showError('Could not determine sender for reply. Sender information is missing.');
                     console.error('FAILED: No sender found');
                     console.error('Sender data:', JSON.stringify(selectedMessage.sender, null, 2));
                     return;
@@ -134,14 +142,14 @@ const SecretaryCommunication = () => {
 
             console.log('Message sent successfully, response:', response);
             setNewMessage('');
-            alert('Message sent!');
+            showSuccess('Message sent successfully!');
             await fetchData();
         } catch (error) {
             console.error('=== ERROR Sending Message ===');
             console.error('Error object:', error);
             console.error('Error response:', error.response);
             console.error('Error response data:', error.response?.data);
-            alert('Error sending message: ' + (error.response?.data?.detail || error.message));
+            showError('Error sending message: ' + (error.response?.data?.detail || error.message));
         }
     };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import { Send, Plus, MessageSquare, Search } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import workstreamService from '../../services/workstreamService';
@@ -12,6 +13,7 @@ import './Workstream.css';
 const WorkstreamCommunication = () => {
     const { t } = useTheme();
     const { user } = useAuth();
+    const { showSuccess, showError, showWarning, showInfo } = useToast();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState('received');
 
@@ -106,7 +108,7 @@ const WorkstreamCommunication = () => {
                 if (receipts.length > 0 && receipts[0]?.recipient?.id) {
                     targetRecipientId = receipts[0].recipient.id;
                 } else {
-                    alert('Could not determine recipient for reply. This message has no recipients.');
+                    showError('Could not determine recipient for reply. This message has no recipients.');
                     console.error('Message receipts:', selectedMessage.receipts);
                     return;
                 }
@@ -115,7 +117,7 @@ const WorkstreamCommunication = () => {
                 if (selectedMessage.sender?.id) {
                     targetRecipientId = selectedMessage.sender.id;
                 } else {
-                    alert('Could not determine sender for reply. Sender information is missing.');
+                    showError('Could not determine sender for reply. Sender information is missing.');
                     console.error('Message sender:', selectedMessage.sender);
                     return;
                 }
@@ -130,11 +132,11 @@ const WorkstreamCommunication = () => {
             });
 
             setReplyBody('');
-            alert('Reply sent!');
+            showSuccess('Reply sent successfully!');
             fetchData();
         } catch (err) {
             console.error('Error sending reply:', err);
-            alert('Failed to send reply. ' + (err.response?.data?.detail || ''));
+            showError('Failed to send reply. ' + (err.response?.data?.detail || 'Please try again.'));
         }
     };
 
