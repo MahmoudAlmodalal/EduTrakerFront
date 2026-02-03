@@ -266,7 +266,12 @@ const WorkstreamCommunication = () => {
                                             </div>
                                             <div>
                                                 <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-main)' }}>{selectedMessage.sender}</div>
-                                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{t('workstream.communication.toYou')} &bull; {selectedMessage.date}</div>
+                                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                                    {selectedMessage.type === 'sent'
+                                                        ? `${t('communication.to')}: ${selectedMessage.receipts?.[0]?.recipient?.full_name || selectedMessage.receipts?.[0]?.recipient?.email || '...'}`
+                                                        : `${t('communication.from')}: ${selectedMessage.sender}`}
+                                                    &bull; {selectedMessage.date}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

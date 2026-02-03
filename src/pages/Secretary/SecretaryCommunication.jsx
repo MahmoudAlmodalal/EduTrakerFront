@@ -12,9 +12,40 @@ const SecretaryCommunication = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const { user } = useAuth(); // Added useAuth hook
     const [messages, setMessages] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [newMessage, setNewMessage] = useState('');
+
+    const fetchData = async () => {
+        if (!user) return; // Added user check
+        try {
+            setLoading(true);
+            const [msgsRes, notifsRes] = await Promise.all([ // Changed to Promise.all
+                secretaryService.getMessages(),
+                secretaryService.getNotifications()
+            ]);
+
+            const rawMessages = msgsRes.results || msgsRes;
+            const mappedMsgs = rawMessages.map(m => {
+                const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
+                const isSentByMe = m.sender?.id === user?.id;
+
+                return {
+                    ...m,
+                    type: isSentByMe ? 'sent' : 'received',
+                    read: myReceipt ? myReceipt.is_read : true
+                };
+            });
+
+            setMessages(mappedMsgs);
+            setNotifications(notifsRes.results || notifsRes);
+        } catch (error) {
+            console.error('Error fetching communication data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (location.state?.activeTab) {
@@ -24,66 +55,72 @@ const SecretaryCommunication = () => {
 
     useEffect(() => {
         fetchData();
-    }, [activeTab]);
+    }, [user, activeTab]); // Added user to dependencies
 
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            if (activeTab === 'notifications') {
-                const data = await secretaryService.getNotifications();
-                setNotifications(data.results || data);
-            } else {
-                const data = await secretaryService.getMessages();
-                // Filter messages based on internal/external if backend doesn't
-                const allMessages = data.results || data;
-                setMessages(allMessages);
+    const handleMessageClick = async (msg) => { // Made async
+        setSelectedMessage(msg);
+        const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
+        if (activeTab !== 'notifications' && !msg.read && myReceipt) {
+            try {
+                await secretaryService.markMessageRead(msg.id);
+                setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, read: true } : m));
+            } catch (err) {
+                console.error('Error marking message read:', err);
             }
-        } catch (error) {
-            console.error('Error fetching communication data:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
-    const handleMessageClick = (msg) => {
-        setSelectedMessage(msg);
-        // Mark as read if needed
-    };
-
-    const handleNotificationClick = async (notif) => {
-        try {
-            await secretaryService.markNotificationRead(notif.id);
-            fetchData();
-        } catch (error) {
-            console.error('Error marking notification read:', error);
+    const handleNotificationClick = async (notif) => { // Made async
+        if (!notif.read) { // Changed condition
+            try {
+                await secretaryService.markNotificationRead(notif.id);
+                setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, read: true } : n));
+            } catch (error) {
+                console.error('Error marking notification read:', error);
+            }
         }
     };
 
     const handleSendMessage = async () => {
         if (!newMessage || !selectedMessage) return;
         try {
+            let targetRecipientId = null;
+            if (selectedMessage.sender?.id === user?.id) {
+                targetRecipientId = selectedMessage.receipts?.[0]?.recipient?.id;
+            } else {
+                targetRecipientId = selectedMessage.sender?.id;
+            }
+
+            if (!targetRecipientId) {
+                alert('Could not determine recipient for reply.');
+                return;
+            }
+
             await secretaryService.sendMessage({
-                recipient_id: selectedMessage.sender_id || selectedMessage.user?.id,
-                content: newMessage,
-                subject: `Re: ${selectedMessage.subject}`
+                recipient_ids: [targetRecipientId], // Changed to recipient_ids array
+                body: newMessage, // Changed content to body
+                subject: `Re: ${selectedMessage.subject}`,
+                thread_id: selectedMessage.thread_id, // Added thread_id
+                parent_message: selectedMessage.id // Added parent_message
             });
             setNewMessage('');
             alert('Message sent!');
+            fetchData(); // Added fetchData call
         } catch (error) {
-            alert('Error sending message: ' + error.message);
+            alert('Error sending message: ' + (error.response?.data?.detail || error.message)); // Updated error handling
         }
     };
 
     const filteredItems = activeTab === 'notifications'
         ? notifications
         : messages.filter(m => {
-            // Internal vs External logic here if applicable
-            const isInternal = m.sender_role !== 'Guardian';
-            const matchesTab = activeTab === 'internal' ? isInternal : !isInternal;
-            return matchesTab && (
-                (m.sender_name || m.user?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (m.subject || '').toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            const typeMatch = m.type === activeTab;
+            const searchLower = searchTerm.toLowerCase();
+            const senderName = (m.sender?.full_name || m.sender?.email || '');
+            const senderMatch = senderName.toLowerCase().includes(searchLower);
+            const subjectMatch = (m.subject || '').toLowerCase().includes(searchLower);
+
+            return typeMatch && (senderMatch || subjectMatch);
         });
 
     return (
@@ -95,7 +132,7 @@ const SecretaryCommunication = () => {
                 </div>
                 <button className="btn-primary">
                     <Plus size={18} style={{ marginRight: '8px' }} />
-                    {t('secretary.communication.compose')}
+                    {t('communication.compose')}
                 </button>
             </header>
 
@@ -107,14 +144,14 @@ const SecretaryCommunication = () => {
                             <Search size={16} className="search-icon" />
                             <input
                                 type="text"
-                                placeholder={activeTab === 'notifications' ? t('secretary.communication.searchMessages') : t('secretary.communication.searchMessages')}
+                                placeholder={activeTab === 'notifications' ? t('communication.searchNotifications') : t('communication.searchMessages')}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="search-input"
                             />
                         </div>
                         <div style={{ display: 'flex', gap: '0.25rem', padding: '0.25rem', background: 'var(--sec-border)', borderRadius: '0.5rem' }}>
-                            {['internal', 'external', 'notifications'].map(tab => (
+                            {['received', 'sent', 'notifications'].map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => { setActiveTab(tab); setSelectedMessage(null); }}
@@ -132,8 +169,9 @@ const SecretaryCommunication = () => {
                                         boxShadow: activeTab === tab ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                                     }}
                                 >
-                                    {tab === 'internal' ? t('secretary.communication.messages') :
-                                        tab === 'notifications' ? t('secretary.communication.notifications') : tab}
+                                    {tab === 'received' ? t('communication.received') :
+                                        tab === 'sent' ? t('communication.sent') :
+                                            tab === 'notifications' ? t('communication.notifications') : tab}
                                 </button>
                             ))}
                         </div>
@@ -141,7 +179,7 @@ const SecretaryCommunication = () => {
 
                     <div style={{ flex: 1, overflowY: 'auto' }}>
                         {loading ? <p className="p-4 text-center">Loading...</p> : filteredItems.length === 0 && (
-                            <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No items found</div>
+                            <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>{t('communication.noItems')}</div>
                         )}
 
                         {activeTab === 'notifications' ? (
@@ -153,8 +191,8 @@ const SecretaryCommunication = () => {
                                         padding: '1rem',
                                         borderBottom: '1px solid var(--sec-border)',
                                         cursor: 'pointer',
-                                        background: notif.is_read ? 'var(--sec-surface)' : 'var(--sec-border)',
-                                        borderLeft: notif.is_read ? 'none' : '4px solid var(--sec-primary)'
+                                        background: notif.read ? 'var(--sec-surface)' : 'var(--sec-border)',
+                                        borderLeft: notif.read ? 'none' : '4px solid var(--sec-primary)'
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
@@ -173,22 +211,22 @@ const SecretaryCommunication = () => {
                                         padding: '1rem',
                                         borderBottom: '1px solid var(--sec-border)',
                                         cursor: 'pointer',
-                                        background: selectedMessage?.id === msg.id ? 'rgba(79, 70, 229, 0.1)' : (msg.is_read ? 'var(--sec-surface)' : 'var(--sec-border)'),
-                                        borderLeft: !msg.is_read ? '4px solid var(--sec-primary)' : (selectedMessage?.id === msg.id ? '4px solid var(--sec-border)' : 'none')
+                                        background: selectedMessage?.id === msg.id ? 'rgba(79, 70, 229, 0.1)' : (msg.read ? 'var(--sec-surface)' : 'var(--sec-border)'),
+                                        borderLeft: !msg.read ? '4px solid var(--sec-primary)' : (selectedMessage?.id === msg.id ? '4px solid var(--sec-border)' : 'none')
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                        <span style={{ fontWeight: msg.is_read ? 400 : 700, fontSize: '0.9rem', color: 'var(--sec-text-main)' }}>
-                                            {msg.sender_name || msg.user?.full_name}
+                                        <span style={{ fontWeight: msg.read ? 400 : 700, fontSize: '0.9rem', color: 'var(--sec-text-main)' }}>
+                                            {msg.sender?.full_name || msg.sender?.email}
                                         </span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--sec-text-muted)' }}>{msg.created_at?.split('T')[0]}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--sec-text-muted)' }}>{new Date(msg.sent_at || msg.created_at).toLocaleDateString()}</span>
                                     </div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--sec-primary)', marginBottom: '0.25rem' }}>
-                                        {msg.sender_role}
+                                        {msg.sender?.role}
                                     </div>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: msg.is_read ? 400 : 600, color: 'var(--sec-text-main)', marginBottom: '0.25rem' }}>{msg.subject}</div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: msg.read ? 400 : 600, color: 'var(--sec-text-main)', marginBottom: '0.25rem' }}>{msg.subject}</div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--sec-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {msg.content}
+                                        {msg.body?.substring(0, 50)}...
                                     </div>
                                 </div>
                             ))
@@ -201,8 +239,8 @@ const SecretaryCommunication = () => {
                     {activeTab === 'notifications' ? (
                         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--sec-text-muted)', marginTop: '3rem' }}>
                             <MessageSquare size={48} style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
-                            <h3 style={{ color: 'var(--sec-text-main)' }}>Notification Center</h3>
-                            <p>Here you can view all your system alerts and notifications.</p>
+                            <h3 style={{ color: 'var(--sec-text-main)' }}>{t('communication.notificationCenter')}</h3>
+                            <p>{t('communication.notificationDesc')}</p>
                         </div>
                     ) : selectedMessage ? (
                         <>
@@ -214,11 +252,18 @@ const SecretaryCommunication = () => {
                                         </h2>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--sec-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: 'var(--sec-text-muted)', fontSize: '1.2rem' }}>
-                                                {(selectedMessage.sender_name || selectedMessage.user?.full_name || 'U').charAt(0)}
+                                                {(selectedMessage.sender?.full_name || 'U').charAt(0)}
                                             </div>
                                             <div>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--sec-text-main)' }}>{selectedMessage.sender_name || selectedMessage.user?.full_name}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--sec-text-muted)' }}>to me &bull; {selectedMessage.created_at}</div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--sec-text-main)' }}>
+                                                    {selectedMessage.sender?.full_name || selectedMessage.sender?.email}
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--sec-text-muted)' }}>
+                                                    {selectedMessage.type === 'sent'
+                                                        ? `${t('communication.to')}: ${selectedMessage.receipts?.[0]?.recipient?.full_name || selectedMessage.receipts?.[0]?.recipient?.email || '...'}`
+                                                        : `${t('communication.from')}: ${selectedMessage.sender?.full_name || selectedMessage.sender?.email}`}
+                                                    &bull; {new Date(selectedMessage.sent_at || selectedMessage.created_at).toLocaleString()}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -227,7 +272,7 @@ const SecretaryCommunication = () => {
 
                             <div style={{ padding: '2rem', flex: 1, overflowY: 'auto' }}>
                                 <p style={{ color: 'var(--sec-text-main)', lineHeight: '1.8', whiteSpace: 'pre-line' }}>
-                                    {selectedMessage.content}
+                                    {selectedMessage.body}
                                 </p>
                             </div>
 
@@ -235,14 +280,15 @@ const SecretaryCommunication = () => {
                                 <div style={{ display: 'flex', gap: '1rem' }}>
                                     <input
                                         type="text"
-                                        placeholder={t('secretary.communication.typeMessage')}
+                                        placeholder={t('communication.typeReply')}
                                         value={newMessage}
                                         onChange={(e) => setNewMessage(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                                         style={{ flex: 1, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--sec-border)', background: 'var(--sec-surface)', color: 'var(--sec-text-main)' }}
                                     />
                                     <button className="btn-primary" onClick={handleSendMessage}>
                                         <Send size={18} style={{ marginRight: '8px' }} />
-                                        {t('secretary.communication.sendMessage')}
+                                        {t('communication.send')}
                                     </button>
                                 </div>
                             </div>
@@ -250,7 +296,7 @@ const SecretaryCommunication = () => {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--sec-text-muted)' }}>
                             <MessageSquare size={64} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                            <p style={{ fontSize: '1.1rem' }}>Select a message to view details</p>
+                            <p style={{ fontSize: '1.1rem' }}>{t('communication.selectMessage')}</p>
                         </div>
                     )}
                 </div>

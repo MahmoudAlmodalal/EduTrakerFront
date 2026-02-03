@@ -10,7 +10,7 @@ import { api } from '../../utils/api';
 const Communication = () => {
     const { t } = useTheme();
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState('internal');
+    const [activeTab, setActiveTab] = useState('received');
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [messages, setMessages] = useState([]);
@@ -136,6 +136,13 @@ const Communication = () => {
         setRecipientSearchResults([]);
     };
 
+    const handleCloseCompose = () => {
+        setIsComposeOpen(false);
+        setSearchQuery('');
+        setSearchResults([]);
+        setNewMessage({ recipient_id: '', recipient_name: '', subject: '', body: '' });
+    };
+
     const handleSendNewMessage = async () => {
         console.log('Sending message:', newMessage);
         if (!newMessage.recipient_id) {
@@ -160,8 +167,7 @@ const Communication = () => {
             console.log('Payload:', payload);
             await api.post('/user-messages/', payload);
 
-            setIsComposeOpen(false);
-            setNewMessage({ recipient_id: '', recipient_name: '', subject: '', body: '' });
+            handleCloseCompose();
             fetchData(); // Refresh list to show sent message if applicable
             alert('Message sent successfully!');
         } catch (err) {
@@ -255,7 +261,7 @@ const Communication = () => {
                                 <button
                                     key={tab}
                                     onClick={() => { setActiveTab(tab); setSelectedMessage(null); }}
-                                    className={`${styles.tabButton} ${activeTab === tab ? styles.active : ''}`}
+                                    className={`${styles.tabBtn} ${activeTab === tab ? styles.active : ''}`}
                                 >
                                     {t(`communication.${tab}`)}
                                 </button>
@@ -320,7 +326,10 @@ const Communication = () => {
                                     <div>
                                         <div className={styles.itemSender}>{selectedMessage.sender?.full_name || selectedMessage.sender?.email}</div>
                                         <div className={styles.itemDate}>
-                                            {t('communication.to')} Super Admin &bull; {new Date(selectedMessage.sent_at || selectedMessage.created_at).toLocaleString()}
+                                            {selectedMessage.type === 'sent'
+                                                ? `${t('communication.to')}: ${selectedMessage.receipts?.[0]?.recipient?.full_name || selectedMessage.receipts?.[0]?.recipient?.email || '...'}`
+                                                : `${t('communication.from')}: ${selectedMessage.sender?.full_name || selectedMessage.sender?.email}`}
+                                            &bull; {new Date(selectedMessage.sent_at || selectedMessage.created_at).toLocaleString()}
                                         </div>
                                     </div>
                                 </div>
@@ -359,8 +368,8 @@ const Communication = () => {
                     <div className={styles.modalOverlay}>
                         <div className={styles.modalContent}>
                             <div className={styles.modalHeader}>
-                                <h2>{t('communication.newMessage')}</h2>
-                                <button onClick={() => setIsComposeOpen(false)} className={styles.closeBtn}>×</button>
+                                <h2>{t('communication.compose')}</h2>
+                                <button className={styles.closeBtn} onClick={handleCloseCompose}>&times;</button>
                             </div>
                             <div className={styles.modalBody}>
                                 <div className={styles.formGroup}>
@@ -372,12 +381,13 @@ const Communication = () => {
                                         </div>
                                     ) : (
                                         <div className={styles.searchContainer}>
+                                            <Search size={18} className={styles.searchIcon} />
                                             <input
                                                 type="text"
-                                                placeholder="Search user by name or email..."
-                                                value={recipientSearchTerm}
-                                                onChange={(e) => handleUserSearch(e.target.value)}
-                                                className={styles.input}
+                                                className={styles.searchInput}
+                                                placeholder={t('communication.searchPlaceholder')}
+                                                value={recipientSearchTerm} // Assuming recipientSearchTerm and handleUserSearch are still used
+                                                onChange={(e) => handleUserSearch(e.target.value)} // Assuming recipientSearchTerm and handleUserSearch are still used
                                             />
                                             {recipientSearchResults.length > 0 && (
                                                 <div className={styles.searchResults}>

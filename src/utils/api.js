@@ -98,7 +98,12 @@ apiClient.interceptors.response.use(
             }
         }
 
-        return Promise.reject(new Error(message));
+        const errorToThrow = new Error(message);
+        errorToThrow.response = error.response; // Re-attach for compatibility with catch blocks
+        errorToThrow.status = error.response?.status;
+        errorToThrow.data = data;
+
+        return Promise.reject(errorToThrow);
     }
 );
 
