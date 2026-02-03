@@ -86,15 +86,27 @@ const SecretaryCommunication = () => {
         if (!newMessage || !selectedMessage) return;
         try {
             let targetRecipientId = null;
-            if (selectedMessage.sender?.id === user?.id) {
-                targetRecipientId = selectedMessage.receipts?.[0]?.recipient?.id;
-            } else {
-                targetRecipientId = selectedMessage.sender?.id;
-            }
 
-            if (!targetRecipientId) {
-                alert('Could not determine recipient for reply.');
-                return;
+            // Determine recipient based on message direction
+            if (selectedMessage.sender?.id === user?.id) {
+                // User is the sender - reply to the first recipient
+                const receipts = selectedMessage.receipts || [];
+                if (receipts.length > 0 && receipts[0]?.recipient?.id) {
+                    targetRecipientId = receipts[0].recipient.id;
+                } else {
+                    alert('Could not determine recipient for reply. This message has no recipients.');
+                    console.error('Message receipts:', selectedMessage.receipts);
+                    return;
+                }
+            } else {
+                // User is the recipient - reply to the sender
+                if (selectedMessage.sender?.id) {
+                    targetRecipientId = selectedMessage.sender.id;
+                } else {
+                    alert('Could not determine sender for reply. Sender information is missing.');
+                    console.error('Message sender:', selectedMessage.sender);
+                    return;
+                }
             }
 
             await secretaryService.sendMessage({

@@ -67,6 +67,9 @@ const secretaryService = {
     },
     sendMessage: async (data) => {
         return api.post('/user-messages/', data);
+    },
+    markMessageRead: async (messageId) => {
+        return api.post(`/user-messages/${messageId}/read/`);
     }
 };
 
