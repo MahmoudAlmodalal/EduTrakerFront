@@ -138,9 +138,9 @@ const Communication = () => {
 
     const handleCloseCompose = () => {
         setIsComposeOpen(false);
-        setSearchQuery('');
-        setSearchResults([]);
-        setNewMessage({ recipient_id: '', recipient_name: '', subject: '', body: '' });
+        setRecipientSearchTerm('');
+        setRecipientSearchResults([]);
+        setNewMessage({ recipient_id: null, recipient_name: '', subject: '', body: '' });
     };
 
     const handleSendNewMessage = async () => {
@@ -149,11 +149,7 @@ const Communication = () => {
             alert('Please select a recipient from the search results.');
             return;
         }
-        if (!newMessage.subject) {
-            alert('Please enter a subject.');
-            return;
-        }
-        if (!newMessage.body) {
+        if (!newMessage.body || !newMessage.body.trim()) {
             alert('Please enter a message body.');
             return;
         }
@@ -161,7 +157,7 @@ const Communication = () => {
         try {
             const payload = {
                 recipient_ids: [newMessage.recipient_id],
-                subject: newMessage.subject,
+                subject: newMessage.subject || '',
                 body: newMessage.body
             };
             console.log('Payload:', payload);
@@ -172,7 +168,28 @@ const Communication = () => {
             alert('Message sent successfully!');
         } catch (err) {
             console.error('Error sending message:', err);
-            alert('Failed to send message. ' + (err.response?.data?.detail || 'Please try again.'));
+            console.error('Error details:', err.response?.data);
+
+            // Handle different error formats from backend
+            let errorMessage = 'Please try again.';
+            if (err.response?.data) {
+                const errorData = err.response.data;
+                if (typeof errorData === 'string') {
+                    errorMessage = errorData;
+                } else if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                } else if (errorData.recipient_ids) {
+                    errorMessage = `Recipient error: ${Array.isArray(errorData.recipient_ids) ? errorData.recipient_ids[0] : errorData.recipient_ids}`;
+                } else if (errorData.body) {
+                    errorMessage = `Body error: ${Array.isArray(errorData.body) ? errorData.body[0] : errorData.body}`;
+                } else {
+                    errorMessage = JSON.stringify(errorData);
+                }
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+
+            alert('Failed to send message. ' + errorMessage);
         }
     };
 
