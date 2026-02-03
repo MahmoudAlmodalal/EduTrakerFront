@@ -160,7 +160,9 @@ const Communication = () => {
     };
 
     const handleSendNewMessage = async () => {
-        console.log('Sending message:', newMessage);
+        console.log('=== SENDING NEW MESSAGE ===');
+        console.log('Message data:', newMessage);
+
         if (!newMessage.recipient_id) {
             showWarning('Please select a recipient from the search results.');
             return;
@@ -176,15 +178,23 @@ const Communication = () => {
                 subject: newMessage.subject || '',
                 body: newMessage.body
             };
-            console.log('Payload:', payload);
-            await api.post('/user-messages/', payload);
 
+            console.log('Sending payload:', JSON.stringify(payload, null, 2));
+            console.log('API endpoint: /user-messages/');
+
+            const response = await api.post('/user-messages/', payload);
+
+            console.log('SUCCESS! Response:', response);
             handleCloseCompose();
             fetchData(); // Refresh list to show sent message if applicable
             showSuccess('Message sent successfully!');
         } catch (err) {
-            console.error('Error sending message:', err);
-            console.error('Error details:', err.response?.data);
+            console.error('=== ERROR SENDING MESSAGE ===');
+            console.error('Full error object:', err);
+            console.error('Error response:', err.response);
+            console.error('Error response status:', err.response?.status);
+            console.error('Error response data:', err.response?.data);
+            console.error('Error message:', err.message);
 
             // Handle different error formats from backend
             let errorMessage = 'Please try again.';
