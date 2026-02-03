@@ -40,16 +40,23 @@ const WorkstreamCommunication = () => {
                 workstreamService.getNotifications()
             ]);
 
+            console.log('=== WORKSTREAM: Fetched Messages ===');
+            console.log('Raw messages from API:', msgsRes.results || msgsRes);
+
             // Map backend messages to frontend format
             const mappedMsgs = (msgsRes.results || msgsRes).map(m => {
                 const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
                 const isSentByMe = m.sender?.id === user?.id;
 
+                console.log(`Message ${m.id}: sender object =`, m.sender);
+
                 return {
                     ...m,
                     id: m.id,
                     type: isSentByMe ? 'sent' : 'received',
-                    sender: m.sender?.full_name || m.sender?.email || 'System',
+                    // KEEP the sender object, don't overwrite it!
+                    sender: m.sender, // ← FIXED: Keep the full sender object with id
+                    senderName: m.sender?.full_name || m.sender?.email || 'System', // ← NEW: Display name
                     subject: m.subject,
                     date: new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     preview: (m.body || '').substring(0, 50) + '...',
@@ -59,6 +66,7 @@ const WorkstreamCommunication = () => {
                 };
             });
 
+            console.log('Mapped messages:', mappedMsgs);
             setMessages(mappedMsgs);
             setNotifications(notifsRes.results || notifsRes);
         } catch (error) {
@@ -97,6 +105,15 @@ const WorkstreamCommunication = () => {
 
     const handleSendReply = async () => {
         if (!replyBody.trim()) return;
+
+        console.log('=== WORKSTREAM: ATTEMPTING TO REPLY ===');
+        console.log('Full selectedMessage object:', selectedMessage);
+        console.log('selectedMessage.id:', selectedMessage?.id);
+        console.log('selectedMessage.sender:', selectedMessage?.sender);
+        console.log('selectedMessage.sender?.id:', selectedMessage?.sender?.id);
+        console.log('selectedMessage.receipts:', selectedMessage?.receipts);
+        console.log('Current user.id:', user?.id);
+        console.log('Am I the sender?', selectedMessage?.sender?.id === user?.id);
 
         try {
             let targetRecipientId = null;
@@ -142,7 +159,7 @@ const WorkstreamCommunication = () => {
 
     const filteredItems = activeTab === 'notifications'
         ? notifications
-        : messages.filter(m => m.type === activeTab && (m.sender.toLowerCase().includes(searchTerm.toLowerCase()) || m.subject.toLowerCase().includes(searchTerm.toLowerCase())));
+        : messages.filter(m => m.type === activeTab && (m.senderName.toLowerCase().includes(searchTerm.toLowerCase()) || m.subject.toLowerCase().includes(searchTerm.toLowerCase())));
 
     return (
         <div className="workstream-dashboard" style={{ height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
@@ -241,7 +258,7 @@ const WorkstreamCommunication = () => {
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
                                         <span style={{ fontWeight: msg.read ? 400 : 700, fontSize: '0.9rem', color: 'var(--color-text-main)' }}>
-                                            {msg.sender.split('(')[0]}
+                                            {msg.senderName}
                                         </span>
                                         <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{msg.date}</span>
                                     </div>
@@ -276,14 +293,14 @@ const WorkstreamCommunication = () => {
                                         </h2>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--color-bg-body)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: '#64748b', fontSize: '1.2rem' }}>
-                                                {selectedMessage.sender.charAt(0)}
+                                                {selectedMessage.senderName?.charAt(0) || 'U'}
                                             </div>
                                             <div>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-main)' }}>{selectedMessage.sender}</div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-main)' }}>{selectedMessage.senderName}</div>
                                                 <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
                                                     {selectedMessage.type === 'sent'
                                                         ? `${t('communication.to')}: ${selectedMessage.receipts?.[0]?.recipient?.full_name || selectedMessage.receipts?.[0]?.recipient?.email || '...'}`
-                                                        : `${t('communication.from')}: ${selectedMessage.sender}`}
+                                                        : `${t('communication.from')}: ${selectedMessage.senderName}`}
                                                     &bull; {selectedMessage.date}
                                                 </div>
                                             </div>
