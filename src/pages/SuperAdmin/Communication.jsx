@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { Send, Plus, MessageSquare, Search, ChevronLeft } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import styles from './Communication.module.css';
@@ -15,6 +16,8 @@ const Communication = () => {
     const [messages, setMessages] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [replyBody, setReplyBody] = useState('');
+    const { user } = useAuth();
 
     // Compose Modal State
     const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -29,13 +32,28 @@ const Communication = () => {
     });
 
     const fetchData = async () => {
+        if (!user) return;
         setLoading(true);
         try {
             const [msgsData, notifsData] = await Promise.all([
                 api.get('/user-messages/'),
                 api.get('/notifications/')
             ]);
-            setMessages(msgsData.results || msgsData);
+
+            const rawMessages = msgsData.results || msgsData;
+            // Map read status based on current user's receipt
+            const mappedMessages = rawMessages.map(m => {
+                const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
+                const isSentByMe = m.sender?.id === user?.id;
+
+                return {
+                    ...m,
+                    type: isSentByMe ? 'sent' : 'received',
+                    read: myReceipt ? myReceipt.is_read : true // If I'm sender, treat as read
+                };
+            });
+
+            setMessages(mappedMessages);
             setNotifications(notifsData.results || notifsData);
         } catch (err) {
             console.error('Error fetching communication data:', err);
@@ -49,11 +67,15 @@ const Communication = () => {
             setActiveTab(location.state.activeTab);
         }
         fetchData();
-    }, [location.state]);
+    }, [location.state, user]);
 
     const handleMessageClick = async (msg) => {
         setSelectedMessage(msg);
-        if (!msg.read) {
+
+        // Only mark read if current user is a recipient and it's unread
+        const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
+
+        if (activeTab !== 'notifications' && !msg.read && myReceipt) {
             try {
                 await api.post(`/user-messages/${msg.id}/read/`);
                 setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, read: true } : m));
@@ -115,6 +137,7 @@ const Communication = () => {
     };
 
     const handleSendNewMessage = async () => {
+        console.log('Sending message:', newMessage);
         if (!newMessage.recipient_id) {
             alert('Please select a recipient from the search results.');
             return;
@@ -129,27 +152,79 @@ const Communication = () => {
         }
 
         try {
-            await api.post('/user-messages/', {
+            const payload = {
                 recipient_ids: [newMessage.recipient_id],
                 subject: newMessage.subject,
                 body: newMessage.body
-            });
+            };
+            console.log('Payload:', payload);
+            await api.post('/user-messages/', payload);
 
             setIsComposeOpen(false);
+            setNewMessage({ recipient_id: '', recipient_name: '', subject: '', body: '' });
             fetchData(); // Refresh list to show sent message if applicable
             alert('Message sent successfully!');
         } catch (err) {
             console.error('Error sending message:', err);
-            alert('Failed to send message. Please try again.');
+            alert('Failed to send message. ' + (err.response?.data?.detail || 'Please try again.'));
+        }
+    };
+
+    const handleSendReply = async () => {
+        if (!replyBody.trim()) return;
+
+        try {
+            // Re-use current message details for reply
+            // If I am the sender, I reply to the first recipient (for simple 1-1)
+            // If I am not the sender, I reply to the sender
+            let targetRecipientId = null;
+
+            if (selectedMessage.sender?.id === user?.id) {
+                // I am the sender, find the recipient from receipts
+                targetRecipientId = selectedMessage.receipts?.[0]?.recipient?.id;
+            } else {
+                // I am a recipient, reply to the sender
+                targetRecipientId = selectedMessage.sender?.id;
+            }
+
+            if (!targetRecipientId) {
+                alert('Could not determine recipient for reply.');
+                return;
+            }
+
+            const payload = {
+                recipient_ids: [targetRecipientId],
+                subject: `Re: ${selectedMessage.subject}`,
+                body: replyBody,
+                thread_id: selectedMessage.thread_id,
+                parent_message: selectedMessage.id
+            };
+            console.log('Reply Payload:', payload);
+            await api.post('/user-messages/', payload);
+
+            setReplyBody('');
+            alert('Reply sent!');
+            fetchData();
+        } catch (err) {
+            console.error('Error sending reply:', err);
+            alert('Failed to send reply. ' + (err.response?.data?.detail || ''));
         }
     };
 
     const filteredItems = activeTab === 'notifications'
         ? notifications
-        : messages.filter(m => (m.type === activeTab || !m.type) && (
-            (m.sender_name || m.sender_email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (m.subject || '').toLowerCase().includes(searchTerm.toLowerCase())
-        ));
+        : messages.filter(m => {
+            // Filter by tab type (sent/received)
+            const typeMatch = m.type === activeTab;
+
+            // Filter by search query
+            const searchLower = searchTerm.toLowerCase();
+            const senderMatch = (m.sender?.full_name || m.sender?.email || '').toLowerCase().includes(searchLower);
+            const subjectMatch = (m.subject || '').toLowerCase().includes(searchLower);
+            const bodyMatch = (m.body || '').toLowerCase().includes(searchLower);
+
+            return typeMatch && (senderMatch || subjectMatch || bodyMatch);
+        });
 
     return (
         <div className={styles.container}>
@@ -176,13 +251,13 @@ const Communication = () => {
                             />
                         </div>
                         <div className={styles.tabs}>
-                            {['internal', 'external', 'notifications'].map(tab => (
+                            {['received', 'sent', 'notifications'].map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => { setActiveTab(tab); setSelectedMessage(null); }}
-                                    className={`${styles.tabBtn} ${activeTab === tab ? styles.active : ''}`}
+                                    className={`${styles.tabButton} ${activeTab === tab ? styles.active : ''}`}
                                 >
-                                    {t(`communication.tabs.${tab}`)}
+                                    {t(`communication.${tab}`)}
                                 </button>
                             ))}
                         </div>
@@ -215,8 +290,8 @@ const Communication = () => {
                                     className={`${styles.listItem} ${selectedMessage?.id === msg.id ? styles.active : ''} ${!msg.read ? styles.unread : ''}`}
                                 >
                                     <div className={styles.itemHeader}>
-                                        <span className={styles.itemSender}>{msg.sender_name || msg.sender_email}</span>
-                                        <span className={styles.itemDate}>{new Date(msg.created_at).toLocaleDateString()}</span>
+                                        <span className={styles.itemSender}>{msg.sender?.full_name || msg.sender?.email || 'System'}</span>
+                                        <span className={styles.itemDate}>{new Date(msg.sent_at || msg.created_at).toLocaleDateString()}</span>
                                     </div>
                                     <div className={styles.itemSubject}>{msg.subject}</div>
                                     <div className={styles.itemPreview}>{msg.body}</div>
@@ -240,12 +315,12 @@ const Communication = () => {
                                 <h2 className={styles.subjectLine}>{selectedMessage.subject}</h2>
                                 <div className={styles.senderProfile}>
                                     <div className={styles.senderAvatar}>
-                                        {(selectedMessage.sender_name || selectedMessage.sender_email || '?').charAt(0)}
+                                        {(selectedMessage.sender?.full_name || selectedMessage.sender?.email || '?').charAt(0)}
                                     </div>
                                     <div>
-                                        <div className={styles.itemSender}>{selectedMessage.sender_name || selectedMessage.sender_email}</div>
+                                        <div className={styles.itemSender}>{selectedMessage.sender?.full_name || selectedMessage.sender?.email}</div>
                                         <div className={styles.itemDate}>
-                                            {t('communication.to')} Super Admin &bull; {new Date(selectedMessage.created_at).toLocaleString()}
+                                            {t('communication.to')} Super Admin &bull; {new Date(selectedMessage.sent_at || selectedMessage.created_at).toLocaleString()}
                                         </div>
                                     </div>
                                 </div>
@@ -261,8 +336,11 @@ const Communication = () => {
                                         type="text"
                                         placeholder={t('communication.typeReply')}
                                         className={styles.replyInput}
+                                        value={replyBody}
+                                        onChange={(e) => setReplyBody(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleSendReply()}
                                     />
-                                    <Button variant="primary" icon={Send}>{t('communication.send')}</Button>
+                                    <Button variant="primary" icon={Send} onClick={handleSendReply}>{t('communication.send')}</Button>
                                 </div>
                             </div>
                         </>

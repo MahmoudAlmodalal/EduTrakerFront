@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { Send, Plus, MessageSquare, Search } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import workstreamService from '../../services/workstreamService';
@@ -10,8 +11,9 @@ import './Workstream.css';
 
 const WorkstreamCommunication = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState('internal');
+    const [activeTab, setActiveTab] = useState('received');
 
     useEffect(() => {
         if (location.state?.activeTab) {
@@ -22,11 +24,13 @@ const WorkstreamCommunication = () => {
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
+    const [replyBody, setReplyBody] = useState('');
 
     const [messages, setMessages] = useState([]);
     const [notifications, setNotifications] = useState([]);
 
     const fetchData = async () => {
+        if (!user) return;
         setLoading(true);
         try {
             const [msgsRes, notifsRes] = await Promise.all([
@@ -35,17 +39,23 @@ const WorkstreamCommunication = () => {
             ]);
 
             // Map backend messages to frontend format
-            const mappedMsgs = (msgsRes.results || msgsRes).map(m => ({
-                id: m.id,
-                type: m.sender_name?.includes('Admin') ? 'internal' : (m.is_external ? 'external' : 'internal'),
-                sender: m.sender_name || 'System',
-                subject: m.subject,
-                date: new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                preview: m.body.substring(0, 50) + '...',
-                content: m.body,
-                role: m.sender_role || 'Staff',
-                read: m.is_read
-            }));
+            const mappedMsgs = (msgsRes.results || msgsRes).map(m => {
+                const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
+                const isSentByMe = m.sender?.id === user?.id;
+
+                return {
+                    ...m,
+                    id: m.id,
+                    type: isSentByMe ? 'sent' : 'received',
+                    sender: m.sender?.full_name || m.sender?.email || 'System',
+                    subject: m.subject,
+                    date: new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    preview: (m.body || '').substring(0, 50) + '...',
+                    content: m.body,
+                    role: m.sender?.role || 'Staff',
+                    read: myReceipt ? myReceipt.is_read : true
+                };
+            });
 
             setMessages(mappedMsgs);
             setNotifications(notifsRes.results || notifsRes);
@@ -58,7 +68,7 @@ const WorkstreamCommunication = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [user]);
 
     const handleMessageClick = async (msg) => {
         setSelectedMessage(msg);
@@ -80,6 +90,39 @@ const WorkstreamCommunication = () => {
             } catch (error) {
                 console.error('Failed to mark notification as read:', error);
             }
+        }
+    };
+
+    const handleSendReply = async () => {
+        if (!replyBody.trim()) return;
+
+        try {
+            let targetRecipientId = null;
+            if (selectedMessage.sender?.id === user?.id) {
+                targetRecipientId = selectedMessage.receipts?.[0]?.recipient?.id;
+            } else {
+                targetRecipientId = selectedMessage.sender?.id;
+            }
+
+            if (!targetRecipientId) {
+                alert('Could not determine recipient for reply.');
+                return;
+            }
+
+            await workstreamService.sendMessage({
+                recipient_ids: [targetRecipientId],
+                subject: `Re: ${selectedMessage.subject}`,
+                body: replyBody,
+                thread_id: selectedMessage.thread_id,
+                parent_message: selectedMessage.id
+            });
+
+            setReplyBody('');
+            alert('Reply sent!');
+            fetchData();
+        } catch (err) {
+            console.error('Error sending reply:', err);
+            alert('Failed to send reply. ' + (err.response?.data?.detail || ''));
         }
     };
 
@@ -120,7 +163,7 @@ const WorkstreamCommunication = () => {
                             />
                         </div>
                         <div style={{ display: 'flex', gap: '0.25rem', padding: '0.25rem', background: 'var(--color-bg-body)', borderRadius: '0.5rem' }}>
-                            {['internal', 'external', 'notifications'].map(tab => (
+                            {['received', 'sent', 'notifications'].map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => { setActiveTab(tab); setSelectedMessage(null); }}
@@ -241,9 +284,12 @@ const WorkstreamCommunication = () => {
                                     <input
                                         type="text"
                                         placeholder={t('workstream.communication.replyPlaceholder')}
+                                        value={replyBody}
+                                        onChange={(e) => setReplyBody(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleSendReply()}
                                         style={{ flex: 1, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
-                                    <Button variant="primary" icon={Send}>{t('workstream.communication.send')}</Button>
+                                    <Button variant="primary" icon={Send} onClick={handleSendReply}>{t('workstream.communication.send')}</Button>
                                 </div>
                             </div>
                         </>
