@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Send, Plus, MessageSquare, Search } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import secretaryService from '../../services/secretaryService';
 
 const SecretaryCommunication = () => {
@@ -12,7 +13,7 @@ const SecretaryCommunication = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const { user } = useAuth(); // Added useAuth hook
+    const { user } = useAuth();
     const [messages, setMessages] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [newMessage, setNewMessage] = useState('');
@@ -70,11 +71,11 @@ const SecretaryCommunication = () => {
         }
     };
 
-    const handleNotificationClick = async (notif) => { // Made async
-        if (!notif.read) { // Changed condition
+    const handleNotificationClick = async (notif) => {
+        if (!notif.is_read) {
             try {
                 await secretaryService.markNotificationRead(notif.id);
-                setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, read: true } : n));
+                setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
             } catch (error) {
                 console.error('Error marking notification read:', error);
             }
@@ -191,8 +192,8 @@ const SecretaryCommunication = () => {
                                         padding: '1rem',
                                         borderBottom: '1px solid var(--sec-border)',
                                         cursor: 'pointer',
-                                        background: notif.read ? 'var(--sec-surface)' : 'var(--sec-border)',
-                                        borderLeft: notif.read ? 'none' : '4px solid var(--sec-primary)'
+                                        background: notif.is_read ? 'var(--sec-surface)' : 'var(--sec-border)',
+                                        borderLeft: notif.is_read ? 'none' : '4px solid var(--sec-primary)'
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>

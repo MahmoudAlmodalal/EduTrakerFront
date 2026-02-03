@@ -86,10 +86,10 @@ const Communication = () => {
     };
 
     const handleNotificationClick = async (notif) => {
-        if (!notif.read) {
+        if (!notif.is_read) {
             try {
                 await api.post(`/notifications/${notif.id}/mark-read/`);
-                setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, read: true } : n));
+                setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
             } catch (err) {
                 console.error('Error marking notification read:', err);
             }
@@ -279,7 +279,7 @@ const Communication = () => {
                                 <div
                                     key={notif.id}
                                     onClick={() => handleNotificationClick(notif)}
-                                    className={`${styles.listItem} ${!notif.read ? styles.unread : ''}`}
+                                    className={`${styles.listItem} ${!notif.is_read ? styles.unread : ''}`}
                                 >
                                     <div className={styles.itemHeader}>
                                         <span className={styles.itemSender}>{notif.title || notif.notification_type}</span>
