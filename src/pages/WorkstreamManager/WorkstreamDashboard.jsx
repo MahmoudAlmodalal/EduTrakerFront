@@ -11,7 +11,6 @@ const WorkstreamDashboard = () => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [dashboardData, setDashboardData] = useState(null);
-    const [recentActivities, setRecentActivities] = useState([]);
     const [activityData, setActivityData] = useState([]);
 
     useEffect(() => {
@@ -19,7 +18,6 @@ const WorkstreamDashboard = () => {
             try {
                 const response = await workstreamService.getDashboardStatistics();
                 setDashboardData(response.statistics);
-                setRecentActivities(response.recent_activity || []);
                 setActivityData(response.activity_chart || []);
             } catch (error) {
                 console.error('Failed to fetch dashboard data:', error);
@@ -34,11 +32,19 @@ const WorkstreamDashboard = () => {
     const stats = [
         {
             title: t('workstream.dashboard.totalSchools'),
-            value: dashboardData?.school_count || dashboardData?.total_schools || '0',
+            value: dashboardData?.school_count || '0',
             icon: School,
             trend: '',
             trendUp: true,
             color: 'purple'
+        },
+        {
+            title: t('workstream.dashboard.totalManagers'),
+            value: dashboardData?.manager_count || '0',
+            icon: Users,
+            trend: '',
+            trendUp: true,
+            color: 'indigo'
         },
         {
             title: t('workstream.dashboard.totalStudents'),
@@ -54,14 +60,6 @@ const WorkstreamDashboard = () => {
             icon: Users,
             trend: '',
             trendUp: false,
-            color: 'indigo'
-        },
-        {
-            title: 'Avg. Performance',
-            value: '87%',
-            icon: Award,
-            trend: '',
-            trendUp: true,
             color: 'green'
         },
     ];
@@ -75,12 +73,6 @@ const WorkstreamDashboard = () => {
         { name: 'Sunrise School', score: 72, students: 260 },
     ];
 
-    const recentActivity = recentActivities.length > 0 ? recentActivities.map(item => ({
-        action: item.description,
-        school: item.entity_type,
-        time: item.created_at_human,
-        type: item.action_type === 'login' ? 'info' : (item.action_type === 'create' ? 'success' : 'warning')
-    })) : [];
 
     const getScoreColor = (score) => {
         if (score >= 90) return '#059669';
@@ -132,18 +124,9 @@ const WorkstreamDashboard = () => {
                 ))}
             </div>
 
-            {/* Activity Chart */}
-            <div style={{ marginBottom: '24px' }}>
-                <ActivityChart
-                    data={activityData}
-                    loading={loading}
-                    title={t('dashboard.charts.activity')}
-                    subtitle="Workstream-wide login activity and engagement trends"
-                />
-            </div>
 
             {/* Content Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
                 {/* School Performance Chart */}
                 <div className="chart-card">
                     <div className="chart-header">
@@ -201,42 +184,6 @@ const WorkstreamDashboard = () => {
                                 </div>
                             );
                         }) : <div style={{ padding: '20px', color: 'var(--color-text-muted)' }}>No school data available</div>}
-                    </div>
-                </div>
-
-                {/* Recent Activity */}
-                <div className="chart-card">
-                    <div className="chart-header">
-                        <h3 className="chart-title">
-                            <Activity size={18} style={{ marginRight: '8px' }} />
-                            Recent Activity
-                        </h3>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {recentActivity.map((activity, index) => (
-                            <div key={index} style={{
-                                display: 'flex',
-                                gap: '12px',
-                                padding: '12px',
-                                background: 'var(--color-bg-hover)',
-                                borderRadius: '12px',
-                                borderLeft: `3px solid ${activity.type === 'success' ? '#059669' :
-                                    activity.type === 'warning' ? '#8b5cf6' : '#4f46e5'
-                                    }`
-                            }}>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)', fontSize: '0.875rem', marginBottom: '4px' }}>
-                                        {activity.action}
-                                    </div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                        {activity.school}
-                                    </div>
-                                </div>
-                                <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-light)', whiteSpace: 'nowrap' }}>
-                                    {activity.time}
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </div>
             </div>

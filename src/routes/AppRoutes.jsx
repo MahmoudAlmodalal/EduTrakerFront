@@ -19,7 +19,7 @@ import AnalyticsReports from '../pages/SuperAdmin/AnalyticsReports';
 import SystemSettings from '../pages/SuperAdmin/SystemSettings';
 import SupportHelpdesk from '../pages/SuperAdmin/SupportHelpdesk';
 import ActivityLog from '../pages/SuperAdmin/ActivityLog';
-import Communication from '../pages/SuperAdmin/Communication';
+import GeneralCommunication from '../pages/Shared/GeneralCommunication';
 
 // Workstream Manager Pages
 import WorkstreamLayout from '../components/WorkstreamLayout';
@@ -29,7 +29,6 @@ import SchoolManagerAssignment from '../pages/WorkstreamManager/SchoolManagerAss
 
 import WorkstreamSettings from '../pages/WorkstreamManager/WorkstreamSettings';
 import WorkstreamReports from '../pages/WorkstreamManager/WorkstreamReports';
-import WorkstreamCommunication from '../pages/WorkstreamManager/WorkstreamCommunication';
 
 // School Manager Pages
 import SchoolManagerLayout from '../components/SchoolManagerLayout';
@@ -47,7 +46,6 @@ import SecretaryDashboard from '../pages/Secretary/SecretaryDashboard';
 import StudentAdmissions from '../pages/Secretary/StudentAdmissions';
 import GuardianLinking from '../pages/Secretary/GuardianLinking';
 import SecretaryAttendance from '../pages/Secretary/SecretaryAttendance';
-import SecretaryCommunication from '../pages/Secretary/SecretaryCommunication';
 import SecretarySettings from '../pages/Secretary/SecretarySettings';
 
 
@@ -58,13 +56,11 @@ import StudentSubjects from '../pages/Student/Subjects/StudentSubjects';
 import StudentResults from '../pages/Student/Results/StudentResults';
 import StudentAttendance from '../pages/Student/Attendance/StudentAttendance';
 import StudentSettings from '../pages/Student/Settings/StudentSettings';
-import StudentCommunication from '../pages/Student/Communication/StudentCommunication';
 
 // Guardian Pages
 import GuardianLayout from '../components/GuardianLayout';
 import GuardianDashboard from '../pages/Guardian/GuardianDashboard';
 import ChildrenMonitoring from '../pages/Guardian/ChildrenMonitoring';
-import GuardianCommunication from '../pages/Guardian/Communication';
 import GuardianSettings from '../pages/Guardian/GuardianSettings';
 
 // Teacher Pages
@@ -73,7 +69,6 @@ import TeacherDashboard from '../pages/Teacher/TeacherDashboard';
 import ClassManagement from '../pages/Teacher/ClassManagement';
 import Assessments from '../pages/Teacher/Assessments';
 import LessonPlans from '../pages/Teacher/LessonPlans';
-import TeacherCommunication from '../pages/Teacher/Communication';
 import TeacherSettings from '../pages/Teacher/TeacherSettings';
 
 const AppRoutes = () => {
@@ -111,7 +106,7 @@ const AppRoutes = () => {
                     <Route path="workstreams" element={<WorkstreamManagement />} />
                     <Route path="reports" element={<AnalyticsReports />} />
                     <Route path="settings" element={<SystemSettings />} />
-                    <Route path="communication" element={<Communication />} />
+                    <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="support" element={<SupportHelpdesk />} />
                     <Route path="activity" element={<ActivityLog />} />
                 </Route>
@@ -125,7 +120,7 @@ const AppRoutes = () => {
                     <Route path="schools" element={<SchoolManagement />} />
                     <Route path="assignments" element={<SchoolManagerAssignment />} />
                     <Route path="reports" element={<WorkstreamReports />} />
-                    <Route path="communication" element={<WorkstreamCommunication />} />
+                    <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="settings" element={<WorkstreamSettings />} />
                 </Route>
             </Route>
@@ -140,6 +135,7 @@ const AppRoutes = () => {
                     <Route path="teachers" element={<TeacherMonitoring />} />
                     <Route path="departments" element={<DepartmentManagement />} />
                     <Route path="secretaries" element={<SecretaryMonitoring />} />
+                    <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="settings" element={<SchoolManagerSettings />} />
                 </Route>
             </Route>
@@ -152,7 +148,7 @@ const AppRoutes = () => {
                     <Route path="admissions" element={<StudentAdmissions />} />
                     <Route path="guardians" element={<GuardianLinking />} />
                     <Route path="attendance" element={<SecretaryAttendance />} />
-                    <Route path="communication" element={<SecretaryCommunication />} />
+                    <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="settings" element={<SecretarySettings />} />
                 </Route>
             </Route>
@@ -165,7 +161,7 @@ const AppRoutes = () => {
                     <Route path="subjects" element={<StudentSubjects />} />
                     <Route path="results" element={<StudentResults />} />
                     <Route path="attendance" element={<StudentAttendance />} />
-                    <Route path="communication" element={<StudentCommunication />} />
+                    <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="settings" element={<StudentSettings />} />
                 </Route>
             </Route>
@@ -177,7 +173,7 @@ const AppRoutes = () => {
                     <Route index element={<Navigate to="dashboard" replace />} />
                     <Route path="dashboard" element={<GuardianDashboard />} />
                     <Route path="monitoring" element={<ChildrenMonitoring />} />
-                    <Route path="communication" element={<GuardianCommunication />} />
+                    <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="settings" element={<GuardianSettings />} />
                 </Route>
             </Route>
@@ -190,7 +186,7 @@ const AppRoutes = () => {
                     <Route path="classes" element={<ClassManagement />} />
                     <Route path="assessments" element={<Assessments />} />
                     <Route path="lesson-plans" element={<LessonPlans />} />
-                    <Route path="communication" element={<TeacherCommunication />} />
+                    <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="settings" element={<TeacherSettings />} />
                 </Route>
             </Route>

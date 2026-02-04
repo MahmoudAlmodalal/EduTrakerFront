@@ -7,6 +7,7 @@ import { useTheme } from '../../../context/ThemeContext';
 
 const CommunicationForm = ({
     onSuccess,
+    onCancel,
     initialRecipient = null,
     isReply = false,
     parentMessage = null,
@@ -74,15 +75,8 @@ const CommunicationForm = ({
             await api.post('/user-messages/', payload);
             if (onSuccess) onSuccess();
 
-            // Clear form if not closing
-            if (!onSuccess) {
-                setFormData({
-                    recipient_id: initialRecipient?.id || null,
-                    recipient_name: initialRecipient?.full_name || initialRecipient?.email || '',
-                    subject: isReply ? `Re: ${parentMessage?.subject}` : '',
-                    body: ''
-                });
-            }
+            // Clear form body if it was a success
+            setFormData(prev => ({ ...prev, body: '' }));
         } catch (err) {
             console.error('Failed to send message:', err);
             // Error handling should be handled by the parent or toast
@@ -102,78 +96,92 @@ const CommunicationForm = ({
         }
     };
 
+    const handleCancel = () => {
+        if (onCancel) onCancel();
+    };
+
     return (
         <div className={styles.formContainer}>
-            <div className={styles.formGroup}>
-                <label>{t('communication.recipient')}</label>
-                {formData.recipient_name ? (
-                    <div className={styles.selectedRecipient}>
-                        <span>{formData.recipient_name}</span>
-                        <button onClick={handleRemoveRecipient} className={styles.removeRecipientBtn}>×</button>
-                    </div>
-                ) : (
-                    <>
-                        {!isReply && (
-                            <div className={styles.adminShortcut} onClick={handleContactAdmin}>
-                                <ShieldCheck size={16} />
-                                <span>{t('communication.contactAdmin')}</span>
+            <div className={isReply ? styles.replyForm : styles.modalBody}>
+                {!isReply && (
+                    <div className={styles.formGroup}>
+                        <label>{t('communication.recipient')}</label>
+                        {formData.recipient_name ? (
+                            <div className={styles.selectedRecipient}>
+                                <span>{formData.recipient_name}</span>
+                                <button onClick={handleRemoveRecipient} className={styles.removeRecipientBtn}>×</button>
                             </div>
-                        )}
-                        <div className={styles.searchContainer}>
-                            <Search size={18} className={styles.searchIcon} />
-                            <input
-                                type="text"
-                                className={styles.searchInput}
-                                placeholder={t('communication.searchPlaceholder')}
-                                value={recipientSearchTerm}
-                                onChange={(e) => handleUserSearch(e.target.value)}
-                            />
-                            {recipientSearchResults.length > 0 && (
-                                <div className={styles.searchResults}>
-                                    {recipientSearchResults.map(user => (
-                                        <div key={user.id} onClick={() => handleSelectRecipient(user)} className={styles.searchResultItem}>
-                                            <div className={styles.resultName}>{user.full_name}</div>
-                                            <div className={styles.resultEmail}>{user.email}</div>
-                                            <div className={styles.resultRole}>{user.role}</div>
-                                        </div>
-                                    ))}
+                        ) : (
+                            <>
+                                <div className={styles.adminShortcut} onClick={handleContactAdmin}>
+                                    <ShieldCheck size={16} />
+                                    <span>{t('communication.contactAdmin')}</span>
                                 </div>
-                            )}
-                        </div>
-                    </>
+                                <div className={styles.searchContainer}>
+                                    <Search size={18} className={styles.searchIcon} />
+                                    <input
+                                        type="text"
+                                        className={styles.searchInput}
+                                        placeholder={t('communication.searchPlaceholder')}
+                                        value={recipientSearchTerm}
+                                        onChange={(e) => handleUserSearch(e.target.value)}
+                                    />
+                                    {recipientSearchResults.length > 0 && (
+                                        <div className={styles.searchResults}>
+                                            {recipientSearchResults.map(user => (
+                                                <div key={user.id} onClick={() => handleSelectRecipient(user)} className={styles.searchResultItem}>
+                                                    <div className={styles.resultName}>{user.full_name}</div>
+                                                    <div className={styles.resultEmail}>{user.email}</div>
+                                                    <div className={styles.resultRole}>{user.role}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 )}
+
+                {!isReply && (
+                    <div className={styles.formGroup}>
+                        <label>{t('communication.subject')}</label>
+                        <input
+                            type="text"
+                            value={formData.subject}
+                            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                            className={styles.input}
+                            placeholder={t('communication.subjectPlaceholder')}
+                        />
+                    </div>
+                )}
+
+                <div className={styles.formGroup}>
+                    {!isReply && <label>{t('communication.messageBody')}</label>}
+                    <textarea
+                        value={formData.body}
+                        onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                        className={styles.textarea}
+                        placeholder={isReply ? t('communication.typeReply') : t('communication.messagePlaceholder')}
+                        rows={isReply ? 3 : 6}
+                    />
+                </div>
             </div>
 
-            <div className={styles.formGroup}>
-                <label>{t('communication.subject')}</label>
-                <input
-                    type="text"
-                    value={formData.subject}
-                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    className={styles.input}
-                    placeholder={t('communication.subjectPlaceholder')}
-                    disabled={isReply}
-                />
-            </div>
-
-            <div className={styles.formGroup}>
-                <label>{t('communication.messageBody')}</label>
-                <textarea
-                    value={formData.body}
-                    onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                    className={styles.textarea}
-                    placeholder={t('communication.messagePlaceholder')}
-                    rows={6}
-                />
-            </div>
-
-            <div className={styles.formActions}>
+            <div className={isReply ? styles.replyActions : styles.modalFooter}>
+                {!isReply && (
+                    <Button
+                        variant="secondary"
+                        onClick={handleCancel}
+                    >
+                        {t('common.cancel')}
+                    </Button>
+                )}
                 <Button
                     variant="primary"
                     onClick={handleSend}
                     icon={Send}
                     disabled={!formData.recipient_id || !formData.body.trim()}
-                    fullWidth
                 >
                     {t('communication.send')}
                 </Button>

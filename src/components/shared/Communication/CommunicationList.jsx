@@ -18,7 +18,7 @@ const CommunicationList = ({
     return (
         <div className={styles.sidebar}>
             <div className={styles.sidebarHeader}>
-                <div className={styles.searchWrapper}>
+                <div className={styles.searchContainer}>
                     <Search size={18} className={styles.searchIcon} />
                     <input
                         type="text"
@@ -65,10 +65,13 @@ const CommunicationList = ({
                             className={`${styles.listItem} ${selectedItemId === msg.id ? styles.active : ''} ${!msg.read ? styles.unread : ''}`}
                         >
                             <div className={styles.itemHeader}>
-                                <span className={styles.itemSender}>{msg.sender?.full_name || msg.sender?.email || 'System'}</span>
+                                <span className={styles.itemSender}>{msg.partner?.full_name || msg.partner?.email || 'System'}</span>
                                 <span className={styles.itemDate}>{new Date(msg.sent_at || msg.created_at).toLocaleDateString()}</span>
                             </div>
-                            <div className={styles.itemSubject}>{msg.subject}</div>
+                            <div className={styles.itemSubject}>
+                                {msg.subject}
+                                {msg.unread_count > 0 && <span className={styles.unreadBadge}>{msg.unread_count}</span>}
+                            </div>
                             <div className={styles.itemPreview}>{msg.body}</div>
                         </div>
                     ))
