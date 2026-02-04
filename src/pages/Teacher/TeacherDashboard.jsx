@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import teacherService from '../../services/teacherService';
 import secretaryService from '../../services/secretaryService';
+import notificationService from '../../services/notificationService';
 
 const TeacherDashboard = () => {
     const navigate = useNavigate();
@@ -25,11 +26,11 @@ const TeacherDashboard = () => {
                 setLoading(true);
                 // Fetch notifications and dashboard statistics
                 const [notifData, statsResponse] = await Promise.all([
-                    secretaryService.getNotifications(),
+                    notificationService.getNotifications({ page_size: 5 }),
                     secretaryService.getDashboardStats()
                 ]);
 
-                setNotifications(Array.isArray(notifData) ? notifData.slice(0, 5) : (notifData.results || []).slice(0, 5));
+                setNotifications(notifData.results || notifData);
 
                 if (statsResponse) {
                     // Map backend stats to UI
@@ -40,11 +41,10 @@ const TeacherDashboard = () => {
                     });
                 }
 
-                // Mock schedule for now as there's no direct "schedule" endpoint yet
-                setSchedule([
-                    { id: 1, day: 'Today', time: '08:00 - 09:30', subject: 'Mathematics', class: 'Grade 10-A', room: 'Room 101', status: 'current' },
-                    { id: 2, day: 'Today', time: '10:00 - 11:30', subject: 'Physics', class: 'Grade 11-B', room: 'Lab 2', status: 'upcoming' },
-                ]);
+                // Fetch real schedule
+                const date = new Date().toISOString().split('T')[0];
+                const scheduleData = await teacherService.getSchedule(date);
+                setSchedule(scheduleData.results || scheduleData || []);
 
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
@@ -222,7 +222,14 @@ const TeacherDashboard = () => {
                                 {t('teacher.dashboard.notifications')}
                             </h2>
                             <button
-                                onClick={() => alert('All notifications marked as read!')}
+                                onClick={async () => {
+                                    try {
+                                        await notificationService.markAllAsRead();
+                                        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+                                    } catch (err) {
+                                        console.error('Error marking all read:', err);
+                                    }
+                                }}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '700', color: 'var(--teacher-text-muted)' }}
                             >
                                 {t('teacher.dashboard.markAllRead')}
@@ -231,28 +238,44 @@ const TeacherDashboard = () => {
 
                         <div className="space-y-6">
                             {notifications.map((notif) => (
-                                <div key={notif.id} className="notification-item">
+                                <div
+                                    key={notif.id}
+                                    className={`notification-item ${!notif.is_read ? 'unread' : ''}`}
+                                    onClick={async () => {
+                                        if (!notif.is_read) {
+                                            try {
+                                                await notificationService.markAsRead(notif.id);
+                                                setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                                            } catch (err) {
+                                                console.error('Error marking read:', err);
+                                            }
+                                        }
+                                        if (notif.action_url) navigate(notif.action_url);
+                                    }}
+                                    style={{
+                                        cursor: 'pointer',
+                                        opacity: notif.is_read ? 0.7 : 1,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
                                     <div style={{
                                         width: '2rem', height: '2rem', borderRadius: '50%',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        backgroundColor: notif.type === 'alert' ? 'rgba(239, 68, 68, 0.4)' : notif.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)',
-                                        color: notif.type === 'alert' ? 'var(--teacher-danger)' : notif.type === 'success' ? 'var(--teacher-success)' : 'var(--teacher-secondary)',
-                                        zIndex: 10,
-                                        boxShadow: '0 0 0 2px var(--teacher-surface)'
+                                        backgroundColor: notif.notification_type === 'grade_posted' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                                        color: notif.notification_type === 'grade_posted' ? 'var(--teacher-success)' : 'var(--teacher-primary)',
                                     }}>
-                                        {notif.type === 'alert' ? <AlertCircle size={14} /> :
-                                            notif.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                                        <Bell size={14} />
                                     </div>
                                     <div>
-                                        <p style={{ fontSize: '0.875rem', color: 'var(--teacher-text-main)', fontWeight: '700', marginBottom: '0.25rem' }}>{notif.message}</p>
-                                        <p style={{ fontSize: '0.75rem', color: 'var(--teacher-text-muted)' }}>{notif.time}</p>
+                                        <p style={{ fontSize: '0.875rem', color: 'var(--teacher-text-main)', fontWeight: notif.is_read ? '400' : '700', marginBottom: '0.25rem' }}>{notif.title}</p>
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--teacher-text-muted)' }}>{new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
 
                         <button
-                            onClick={() => alert('Opening all notifications...')}
+                            onClick={() => navigate('/teacher/communication', { state: { activeTab: 'notifications' } })}
                             style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--teacher-text-muted)', backgroundColor: 'var(--teacher-bg)', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
                         >
                             {t('teacher.dashboard.viewAllNotifications')}

@@ -3,6 +3,8 @@ import { Mail, MessageSquare, Search, Send, User, Bell, X, Loader2 } from 'lucid
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import secretaryService from '../../services/secretaryService';
+import notificationService from '../../services/notificationService';
+import { api } from '../../utils/api';
 
 const Communication = () => {
     const { t } = useTheme();
@@ -21,8 +23,8 @@ const Communication = () => {
             try {
                 setLoading(true);
                 const [msgsData, notifsData] = await Promise.all([
-                    secretaryService.getMessages(),
-                    secretaryService.getNotifications()
+                    api.get('/user-messages/'),
+                    notificationService.getNotifications()
                 ]);
                 setMessages(msgsData.results || msgsData || []);
                 setNotifications(notifsData.results || notifsData || []);
@@ -41,40 +43,89 @@ const Communication = () => {
         e.preventDefault();
         try {
             const payload = {
-                receiver_id: parseInt(newMessage.to),
+                recipient_ids: [parseInt(newMessage.to)],
                 subject: newMessage.subject,
-                content: newMessage.body,
-                message_type: 'direct'
+                body: newMessage.body
             };
-            const sent = await secretaryService.sendMessage(payload);
+            const sent = await api.post('/user-messages/', payload);
             setMessages([sent, ...messages]);
             setIsComposing(false);
             setNewMessage({ to: '', subject: '', body: '' });
             alert('Message sent successfully!');
         } catch (error) {
             console.error("Error sending message:", error);
-            alert("Failed to send message: " + (error.message || 'Unknown error'));
+            alert("Failed to send message: " + (error.response?.data?.detail || error.message));
         }
     };
 
-    const handleSendReply = () => {
-        if (!replyText.trim()) return;
+    const [threadMessages, setThreadMessages] = useState([]);
+    const [loadingThread, setLoadingThread] = useState(false);
 
-        const updatedMessages = messages.map(msg => {
-            if (msg.id === selectedMessage.id) {
-                const newThread = [
-                    ...msg.thread,
-                    { id: Date.now(), from: 'Me', text: replyText, time: 'Just now' }
-                ];
-                const updatedMsg = { ...msg, thread: newThread };
-                setSelectedMessage(updatedMsg);
-                return updatedMsg;
+    const handleMarkAllRead = async () => {
+        try {
+            await notificationService.markAllAsRead();
+            setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+        } catch (error) {
+            console.error("Error marking all read:", error);
+        }
+    };
+
+    const handleMessageClick = async (msg) => {
+        setSelectedMessage(msg);
+        setLoadingThread(true);
+        setThreadMessages([]);
+        try {
+            const response = await api.get(`/user-messages/threads/${msg.thread_id}/`);
+            setThreadMessages(response.results || response);
+
+            // Mark as read if needed
+            const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
+            if (!msg.is_read && myReceipt) {
+                await api.post(`/user-messages/${msg.id}/read/`);
+                setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_read: true } : m));
             }
-            return msg;
-        });
+        } catch (error) {
+            console.error("Error fetching thread:", error);
+            setThreadMessages([msg]);
+        } finally {
+            setLoadingThread(false);
+        }
+    };
 
-        setMessages(updatedMessages);
-        setReplyText('');
+    const handleSendReply = async () => {
+        if (!replyText.trim() || !selectedMessage) return;
+
+        try {
+            let targetRecipientId = null;
+            if (selectedMessage.sender?.id === user?.id) {
+                targetRecipientId = selectedMessage.receipts?.[0]?.recipient?.id;
+            } else {
+                targetRecipientId = selectedMessage.sender?.id;
+            }
+
+            if (!targetRecipientId) {
+                alert('Could not determine recipient');
+                return;
+            }
+
+            const payload = {
+                recipient_ids: [targetRecipientId],
+                subject: `Re: ${selectedMessage.subject}`,
+                body: replyText,
+                thread_id: selectedMessage.thread_id,
+                parent_message: selectedMessage.id
+            };
+
+            await api.post('/user-messages/', payload);
+            setReplyText('');
+
+            // Refresh thread
+            const threadResponse = await api.get(`/user-messages/threads/${selectedMessage.thread_id}/`);
+            setThreadMessages(threadResponse.results || threadResponse);
+        } catch (error) {
+            console.error("Error sending reply:", error);
+            alert("Failed to send reply");
+        }
     };
 
     if (loading) {
@@ -207,32 +258,53 @@ const Communication = () => {
                                 {t('teacher.dashboard.notifications')}
                             </button>
                         </div>
+                        {selectedTab === 'notifications' && notifications.some(n => !n.is_read) && (
+                            <div style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--teacher-border)' }}>
+                                <button
+                                    onClick={handleMarkAllRead}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: 'var(--teacher-primary)' }}
+                                >
+                                    {t('header.markAllRead')}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto' }}>
                         {itemsToDisplay.map((item) => (
                             <div
                                 key={item.id}
-                                onClick={() => setSelectedMessage(item)}
+                                onClick={() => selectedTab === 'messages' ? handleMessageClick(item) : setSelectedMessage(item)}
                                 style={{
                                     padding: '1rem',
                                     borderBottom: '1px solid var(--teacher-border)',
                                     cursor: 'pointer',
                                     backgroundColor: selectedMessage?.id === item.id ? 'var(--teacher-bg)' : 'transparent',
                                     borderLeft: selectedMessage?.id === item.id ? '4px solid var(--teacher-primary)' : '4px solid transparent',
-                                    transition: 'background-color 0.2s'
+                                    transition: 'background-color 0.2s',
+                                    opacity: selectedTab === 'notifications' && item.is_read ? 0.6 : 1
                                 }}
                             >
                                 <div className="flex justify-between items-start mb-1">
-                                    <h3 style={{ fontSize: '0.875rem', fontWeight: !item.is_read ? '700' : '600', color: !item.is_read ? 'var(--teacher-text-main)' : 'var(--teacher-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {selectedTab === 'messages' ? (item.sender_name || `User ${item.sender}`) : 'System'}
+                                    <h3 style={{ fontSize: '0.875rem', fontWeight: (selectedTab === 'messages' ? !item.is_read : !item.is_read) ? '700' : '600', color: (selectedTab === 'messages' ? !item.is_read : !item.is_read) ? 'var(--teacher-text-main)' : 'var(--teacher-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {selectedTab === 'messages' ? (item.sender?.full_name || item.sender?.email || `User ${item.sender?.id}`) : (item.title || 'System')}
                                     </h3>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--teacher-text-muted)' }}>{new Date(item.created_at || item.timestamp).toLocaleDateString()}</span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--teacher-text-muted)' }}>{new Date(item.sent_at || item.created_at).toLocaleDateString()}</span>
                                 </div>
-                                <p style={{ fontSize: '0.875rem', marginBottom: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: !item.is_read ? '500' : '400', color: 'var(--teacher-text-main)' }}>
-                                    {item.subject || item.title || 'No Subject'}
-                                </p>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--teacher-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.content || item.message}</p>
+                                {selectedTab === 'messages' && <p style={{ fontSize: '0.75rem', color: 'var(--teacher-primary)', marginBottom: '2px' }}>{item.subject}</p>}
+                                <p style={{ fontSize: '0.75rem', color: 'var(--teacher-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.body || item.message}</p>
+                                {selectedTab === 'notifications' && !item.is_read && (
+                                    <button
+                                        onClick={async (e) => {
+                                            e.stopPropagation();
+                                            await notificationService.markAsRead(item.id);
+                                            setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, is_read: true } : n));
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: 'var(--teacher-primary)', fontSize: '0.7rem', padding: 0, marginTop: '4px', cursor: 'pointer' }}
+                                    >
+                                        Mark as read
+                                    </button>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -257,21 +329,79 @@ const Communication = () => {
                                 </div>
                             </div>
                             <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                    <div style={{
-                                        maxWidth: '80%',
-                                        padding: '1rem',
-                                        borderRadius: '0.75rem',
-                                        backgroundColor: 'var(--teacher-surface)',
-                                        color: 'var(--teacher-text-main)',
-                                        borderTopLeftRadius: '0',
-                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                    }}>
-                                        <p className="text-sm">{selectedMessage.content || selectedMessage.message}</p>
+                                {loadingThread ? (
+                                    <div className="flex items-center justify-center h-full text-slate-400 italic">
+                                        Loading conversation...
                                     </div>
-                                    <span className="text-xs text-slate-400 mt-1">{new Date(selectedMessage.created_at || selectedMessage.timestamp).toLocaleString()}</span>
-                                </div>
+                                ) : (
+                                    threadMessages.length > 0 ? (
+                                        threadMessages.map(m => (
+                                            <div
+                                                key={m.id}
+                                                style={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: m.sender?.id === user?.id ? 'flex-end' : 'flex-start'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    maxWidth: '80%',
+                                                    padding: '1rem',
+                                                    borderRadius: '1rem',
+                                                    backgroundColor: m.sender?.id === user?.id ? 'var(--teacher-primary)' : 'var(--teacher-surface)',
+                                                    color: m.sender?.id === user?.id ? 'white' : 'var(--teacher-text-main)',
+                                                    borderBottomRightRadius: m.sender?.id === user?.id ? '0' : '1rem',
+                                                    borderBottomLeftRadius: m.sender?.id === user?.id ? '1rem' : '0',
+                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                                }}>
+                                                    <p className="text-sm" style={{ whiteSpace: 'pre-line' }}>{m.body}</p>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                                                    <span className="text-[10px] text-slate-400">{m.sender?.full_name || 'System'}</span>
+                                                    <span className="text-[10px] text-slate-400">{new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                            <div style={{
+                                                maxWidth: '80%',
+                                                padding: '1rem',
+                                                borderRadius: '0.75rem',
+                                                backgroundColor: 'var(--teacher-surface)',
+                                                color: 'var(--teacher-text-main)',
+                                                borderTopLeftRadius: '0',
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                            }}>
+                                                <p className="text-sm">{selectedMessage.content || selectedMessage.message}</p>
+                                            </div>
+                                            <span className="text-xs text-slate-400 mt-1">{new Date(selectedMessage.created_at || selectedMessage.timestamp).toLocaleString()}</span>
+                                        </div>
+                                    )
+                                )}
                             </div>
+
+                            {selectedTab === 'messages' && (
+                                <div style={{ padding: '1rem', borderTop: '1px solid var(--teacher-border)', backgroundColor: 'var(--teacher-surface)' }}>
+                                    <div className="flex gap-3">
+                                        <input
+                                            type="text"
+                                            value={replyText}
+                                            onChange={(e) => setReplyText(e.target.value)}
+                                            onKeyPress={(e) => e.key === 'Enter' && handleSendReply()}
+                                            placeholder="Type your reply..."
+                                            className="teacher-input flex-1"
+                                        />
+                                        <button
+                                            onClick={handleSendReply}
+                                            className="btn-primary"
+                                            disabled={!replyText.trim()}
+                                        >
+                                            <Send size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--teacher-text-muted)' }}>

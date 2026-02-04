@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, UserPlus, FileDown, Filter, Layers } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useToast } from '../../components/ui/Toast';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 import styles from './UserManagement.module.css';
 import { api } from '../../utils/api';
 
 const UserManagement = () => {
     const { t } = useTheme();
+    const { showSuccess, showError } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [users, setUsers] = useState([]);
     const [workstreams, setWorkstreams] = useState([]);
@@ -71,10 +74,10 @@ const UserManagement = () => {
 
         try {
             await api.post(url);
-            await api.post(url);
+            showSuccess(`User ${user.is_active ? 'deactivated' : 'activated'} successfully!`);
             fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter, statusFilter);
         } catch (err) {
-            alert('Status update failed: ' + err.message);
+            showError('Status update failed: ' + err.message);
         }
     };
 
@@ -84,10 +87,10 @@ const UserManagement = () => {
 
         try {
             await api.post(`/users/${user.id}/deactivate/`);
-            await api.post(`/users/${user.id}/deactivate/`);
+            showSuccess(`User ${user.full_name} deactivated successfully!`);
             fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter, statusFilter);
         } catch (err) {
-            alert('Deactivation failed: ' + err.message);
+            showError('Deactivation failed: ' + err.message);
         }
     };
 
@@ -110,15 +113,17 @@ const UserManagement = () => {
         try {
             if (isEditing) {
                 await api.patch(`/users/${currentUserId}/`, payload);
+                showSuccess('User updated successfully!');
             } else {
                 await api.post('/users/create/', payload);
+                showSuccess('User created successfully!');
             }
 
             fetchUsers(currentPage, searchTerm, roleFilter, workstreamFilter, statusFilter);
             setIsModalOpen(false);
             resetForm();
         } catch (err) {
-            alert('Operation failed: ' + err.message);
+            showError('Operation failed: ' + err.message);
         }
     };
 
@@ -134,6 +139,17 @@ const UserManagement = () => {
         });
         setIsModalOpen(true);
     };
+
+    const handleWorkstreamSearch = React.useCallback(async (term) => {
+        try {
+            const response = await api.get('/workstream/', { params: { search: term } });
+            const results = response.results || response;
+            return results.map(ws => ({ value: ws.id, label: ws.workstream_name }));
+        } catch (error) {
+            console.error('Error searching workstreams:', error);
+            return [];
+        }
+    }, []);
 
     const resetForm = () => {
         setIsEditing(false);
@@ -308,7 +324,7 @@ const UserManagement = () => {
                                                 {user.role?.replace('_', ' ')}
                                             </span>
                                         </td>
-                                        <td style={{ fontWeight: 500 }}>{user.work_stream_name || 'N/A'}</td>
+                                        <td style={{ fontWeight: 500 }}>{user.work_stream_name || user.workstream_name || user.workstream?.workstream_name || 'N/A'}</td>
                                         <td>
                                             <span
                                                 className={`${styles.statusBadge} ${user.is_active ? styles.active : styles.inactive}`}
@@ -418,15 +434,14 @@ const UserManagement = () => {
                         </div>
                         <div className={styles.formGroup}>
                             <label>{t('users.form.assignWorkstream')}</label>
-                            <select
+                            <SearchableSelect
+                                options={workstreams.map(ws => ({ value: ws.id, label: ws.workstream_name }))}
                                 value={formData.workstreamId}
-                                onChange={(e) => setFormData({ ...formData, workstreamId: e.target.value })}
-                            >
-                                <option value="">None / Select Workstream</option>
-                                {workstreams.map(ws => (
-                                    <option key={ws.id} value={ws.id}>{ws.workstream_name}</option>
-                                ))}
-                            </select>
+                                onChange={(val) => setFormData({ ...formData, workstreamId: val })}
+                                placeholder="None / Select Workstream"
+                                searchPlaceholder="Search workstreams..."
+                                onSearch={handleWorkstreamSearch}
+                            />
                         </div>
                     </div>
                     <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>

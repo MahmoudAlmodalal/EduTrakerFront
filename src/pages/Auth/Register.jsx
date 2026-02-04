@@ -9,7 +9,7 @@ import styles from './Login.module.css'; // Reusing login styles
 
 const Register = ({ role }) => {
     const { t } = useTheme();
-    const { workstreamId } = useParams();
+    const { workstreamSlug } = useParams();
     const [formData, setFormData] = useState({
         email: '',
         full_name: '',
@@ -41,7 +41,7 @@ const Register = ({ role }) => {
         setIsLoading(true);
 
         try {
-            await authService.register(formData, role, workstreamId);
+            await authService.register(formData, role, workstreamSlug);
             setSuccess(true);
         } catch (err) {
             console.error('Registration error:', err);
@@ -72,7 +72,7 @@ const Register = ({ role }) => {
                                     : "Your account has been created. You can now log in to your workstream."}
                             </p>
                             <Link
-                                to={isPortalRegister ? "/login/portal" : `/login/workstream/${workstreamId}`}
+                                to={isPortalRegister ? "/login/portal" : `/login/workstream/${workstreamSlug}`}
                                 className={styles.backLink}
                                 style={{ textAlign: 'center', display: 'block', marginTop: '1.5rem', fontWeight: 'bold', color: 'var(--color-primary)' }}
                             >
@@ -162,7 +162,7 @@ const Register = ({ role }) => {
                             <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
                                 Already have an account?{' '}
                                 <Link
-                                    to={isPortalRegister ? "/login/portal" : `/login/workstream/${workstreamId}`}
+                                    to={isPortalRegister ? "/login/portal" : `/login/workstream/${workstreamSlug}`}
                                     className={styles.backLink}
                                     style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}
                                 >

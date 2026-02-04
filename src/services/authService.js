@@ -7,10 +7,10 @@ const authService = {
      * @param {string} portalType - 'PORTAL' or 'WORKSTREAM'
      * @param {string|number} workstreamId - Required if portalType is 'WORKSTREAM'
      */
-    login: async (credentials, portalType, workstreamId = null) => {
+    login: async (credentials, portalType, workstreamSlug = null) => {
         const url = portalType === 'PORTAL'
             ? '/portal/auth/login/'
-            : `/workstream/${workstreamId}/auth/login/`;
+            : `/workstream/${workstreamSlug}/auth/login/`;
 
         return await api.post(url, credentials);
     },
@@ -21,10 +21,10 @@ const authService = {
      * @param {string} portalType - 'PORTAL' or 'WORKSTREAM'
      * @param {string|number} workstreamId - Required if portalType is 'WORKSTREAM'
      */
-    register: async (userData, portalType, workstreamId = null) => {
+    register: async (userData, portalType, workstreamSlug = null) => {
         const url = portalType === 'PORTAL'
             ? '/portal/auth/register/'
-            : `/workstream/${workstreamId}/auth/register/`;
+            : `/workstream/${workstreamSlug}/auth/register/`;
 
         return await api.post(url, userData);
     },

@@ -45,6 +45,15 @@
     left: 0;
     z-index: var(--z-fixed);
     box-shadow: 10px 0 40px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.workstream-sidebar.collapsed {
+    transform: translateX(-100%);
+}
+
+[dir="rtl"] .workstream-sidebar.collapsed {
+    transform: translateX(100%);
 }
 
 [dir="rtl"] .workstream-sidebar {
@@ -165,6 +174,15 @@
         radial-gradient(circle at top right, rgba(79, 70, 229, 0.04), transparent 40%),
         radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.03), transparent 40%);
     min-height: 100vh;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.workstream-main.expanded {
+    margin-left: 0;
+}
+
+[dir="rtl"] .workstream-main.expanded {
+    margin-right: 0;
 }
 
 [dir="rtl"] .workstream-main {
@@ -648,8 +666,16 @@
         transform: translateX(-100%);
     }
 
+    .workstream-sidebar.active {
+        transform: translateX(0);
+    }
+
     [dir="rtl"] .workstream-sidebar {
         transform: translateX(100%);
+    }
+
+    [dir="rtl"] .workstream-sidebar.active {
+        transform: translateX(0);
     }
 
     .workstream-main {
@@ -664,4 +690,58 @@
     .charts-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Sidebar Toggle Buttons */
+.workstream-sidebar-toggle-inline {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.workstream-sidebar-toggle-inline:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.workstream-sidebar-toggle-floating {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1100;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    animation: fadeIn 0.3s ease-out;
+}
+
+[dir="rtl"] .workstream-sidebar-toggle-floating {
+    left: auto;
+    right: 20px;
+}
+
+.workstream-logo-icon {
+    width: 44px;
+    height: 44px;
+    background: var(--workstream-gradient);
+    color: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.workstream-logo-icon:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
 }

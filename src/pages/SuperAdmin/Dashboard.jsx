@@ -8,8 +8,10 @@ import {
 } from 'recharts';
 import styles from './Dashboard.module.css';
 import { api } from '../../utils/api';
+import ActivityChart from '../../components/charts/ActivityChart';
 import reportService from '../../services/reportService';
 import secretaryService from '../../services/secretaryService';
+import notificationService from '../../services/notificationService';
 
 const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) => {
     return (
@@ -39,6 +41,7 @@ const Dashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
     const [statsData, setStatsData] = useState(null);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -53,13 +56,20 @@ const Dashboard = () => {
                 setLoading(true);
                 console.log('Fetching dashboard data...');
 
-                const statsRes = await reportService.getDashboardStats().catch(err => {
-                    console.warn('Failed to fetch stats:', err);
-                    return { statistics: {}, recent_activity: [], activity_chart: [] };
-                });
+                const [statsRes, unreadRes] = await Promise.all([
+                    reportService.getDashboardStats().catch(err => {
+                        console.warn('Failed to fetch stats:', err);
+                        return { statistics: {}, recent_activity: [], activity_chart: [] };
+                    }),
+                    notificationService.getUnreadCount().catch(err => {
+                        console.warn('Failed to fetch unread count:', err);
+                        return { unread_count: 0 };
+                    })
+                ]);
 
                 console.log('Dashboard data fetched:', statsRes);
                 setStatsData(statsRes.statistics || {});
+                setUnreadNotifications(unreadRes.unread_count || 0);
                 setActivities(statsRes.recent_activity || []);
                 setChartData(statsRes.activity_chart || []);
 
@@ -104,7 +114,7 @@ const Dashboard = () => {
         },
         {
             title: t('dashboard.stats.notifications'),
-            value: '5',
+            value: loading ? '...' : unreadNotifications,
             icon: 'Bell',
             color: 'orange',
             isNotification: true
@@ -148,51 +158,12 @@ const Dashboard = () => {
 
             <div className={styles.contentGrid}>
                 <div className={styles.mainContent}>
-                    <div className={styles.chartCard}>
-                        <div className={styles.cardHeader}>
-                            <h2 className={styles.cardTitle}>{t('dashboard.charts.activity')}</h2>
-                        </div>
-                        <div className={styles.chartContainer}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={activityData}>
-                                    <defs>
-                                        <linearGradient id="colorLogins" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.1} />
-                                            <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-subtle)" />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'var(--color-bg-surface)',
-                                            borderRadius: 'var(--radius-lg)',
-                                            border: '1px solid var(--color-border)',
-                                            boxShadow: 'var(--shadow-lg)'
-                                        }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="logins"
-                                        stroke="var(--color-primary)"
-                                        fillOpacity={1}
-                                        fill="url(#colorLogins)"
-                                        strokeWidth={3}
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
+                    <ActivityChart
+                        data={chartData}
+                        loading={loading}
+                        title={t('dashboard.charts.activity')}
+                        subtitle="User log-in frequency over the past 7 days"
+                    />
                 </div>
 
                 <div className={styles.activityCard}>
@@ -209,8 +180,8 @@ const Dashboard = () => {
                                         {activity.type === 'alert' ? <ShieldCheck size={16} /> : <Bell size={16} />}
                                     </div>
                                     <div className={styles.activityContent}>
-                                        <p className={styles.activityText}>{activity.message || activity.title}</p>
-                                        <span className={styles.activityTime}>{activity.created_at_human || 'Just now'}</span>
+                                        <p className={styles.activityText}>{t(activity.message) || t(activity.title)}</p>
+                                        <span className={styles.activityTime}>{activity.created_at_human || t('dashboard.activity.justNow') || 'Just now'}</span>
                                     </div>
                                 </div>
                             ))

@@ -3,6 +3,8 @@ import { Plus, Settings, Edit, Trash2, MapPin, Users, School, Layers, ChevronRig
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
+import SearchableSelect from '../../components/ui/SearchableSelect';
+
 import styles from './WorkstreamManagement.module.css';
 import workstreamService from '../../services/workstreamService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -121,6 +123,17 @@ const WorkstreamManagement = () => {
         setCurrentWorkstreamId(null);
         setFormData({ name: '', quota: '100', managerId: '', location: '', description: '' });
     };
+
+    const handleManagerSearch = React.useCallback(async (term) => {
+        try {
+            const response = await workstreamService.getManagers({ search: term });
+            const results = response.results || response;
+            return results.map(m => ({ value: m.id, label: m.full_name }));
+        } catch (error) {
+            console.error('Error searching managers:', error);
+            return [];
+        }
+    }, []);
 
     const openCreateModal = () => {
         resetForm();
@@ -307,27 +320,25 @@ const WorkstreamManagement = () => {
                         </div>
                         <div className={styles.formGroup}>
                             <label>{t('workstreams.form.quota')}</label>
-                            <select
+                            <input
+                                type="number"
                                 required
+                                min="1"
+                                placeholder="Enter school quota"
                                 value={formData.quota}
                                 onChange={(e) => setFormData({ ...formData, quota: e.target.value })}
-                            >
-                                <option value="100">100 Schools (Basic)</option>
-                                <option value="500">500 Schools (Standard)</option>
-                                <option value="1000">1000 Schools (Premium)</option>
-                            </select>
+                            />
                         </div>
                         <div className={styles.formGroup}>
                             <label>{t('workstreams.form.assignManager')}</label>
-                            <select
+                            <SearchableSelect
+                                options={managers.map(m => ({ value: m.id, label: m.full_name }))}
                                 value={formData.managerId}
-                                onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
-                            >
-                                <option value="">{t('workstreams.form.selectManager')}</option>
-                                {managers.map(manager => (
-                                    <option key={manager.id} value={manager.id}>{manager.full_name}</option>
-                                ))}
-                            </select>
+                                onChange={(val) => setFormData({ ...formData, managerId: val })}
+                                placeholder={t('workstreams.form.selectManager')}
+                                searchPlaceholder="Search managers..."
+                                onSearch={handleManagerSearch}
+                            />
                         </div>
                     </div>
                     <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '0.5rem' }}>

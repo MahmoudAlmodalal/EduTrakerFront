@@ -6,6 +6,7 @@ import { useToast } from '../../components/ui/Toast';
 import { Send, Plus, MessageSquare, Search } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import workstreamService from '../../services/workstreamService';
+import { api } from '../../utils/api';
 import './Workstream.css';
 
 
@@ -68,7 +69,7 @@ const WorkstreamCommunication = () => {
 
             console.log('Mapped messages:', mappedMsgs);
             setMessages(mappedMsgs);
-            setNotifications(notifsRes.results || notifsRes);
+            setNotifications(notifsRes.results || notifsRes || []);
         } catch (error) {
             console.error('Failed to fetch communications:', error);
         } finally {
@@ -80,15 +81,27 @@ const WorkstreamCommunication = () => {
         fetchData();
     }, [user]);
 
+    const [threadMessages, setThreadMessages] = useState([]);
+    const [loadingThread, setLoadingThread] = useState(false);
+
     const handleMessageClick = async (msg) => {
         setSelectedMessage(msg);
-        if (!msg.read) {
-            try {
+        setLoadingThread(true);
+        setThreadMessages([]);
+        try {
+            // Use the shared API client so auth headers & base URL are consistent
+            const data = await api.get(`/user-messages/threads/${msg.thread_id}/`);
+            setThreadMessages(data.results || data);
+
+            if (!msg.read) {
                 await workstreamService.markMessageRead(msg.id);
-                setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, read: true } : m));
-            } catch (error) {
-                console.error('Failed to mark message as read:', error);
+                setMessages((msgs) => msgs.map((m) => (m.id === msg.id ? { ...m, read: true } : m)));
             }
+        } catch (error) {
+            console.error('Failed to fetch thread:', error);
+            setThreadMessages([msg]);
+        } finally {
+            setLoadingThread(false);
         }
     };
 
@@ -106,36 +119,22 @@ const WorkstreamCommunication = () => {
     const handleSendReply = async () => {
         if (!replyBody.trim()) return;
 
-        console.log('=== WORKSTREAM: ATTEMPTING TO REPLY ===');
-        console.log('Full selectedMessage object:', selectedMessage);
-        console.log('selectedMessage.id:', selectedMessage?.id);
-        console.log('selectedMessage.sender:', selectedMessage?.sender);
-        console.log('selectedMessage.sender?.id:', selectedMessage?.sender?.id);
-        console.log('selectedMessage.receipts:', selectedMessage?.receipts);
-        console.log('Current user.id:', user?.id);
-        console.log('Am I the sender?', selectedMessage?.sender?.id === user?.id);
-
         try {
             let targetRecipientId = null;
 
-            // Determine recipient based on message direction
             if (selectedMessage.sender?.id === user?.id) {
-                // User is the sender - reply to the first recipient
                 const receipts = selectedMessage.receipts || [];
                 if (receipts.length > 0 && receipts[0]?.recipient?.id) {
                     targetRecipientId = receipts[0].recipient.id;
                 } else {
-                    showError('Could not determine recipient for reply. This message has no recipients.');
-                    console.error('Message receipts:', selectedMessage.receipts);
+                    showError('Could not determine recipient for reply.');
                     return;
                 }
             } else {
-                // User is the recipient - reply to the sender
                 if (selectedMessage.sender?.id) {
                     targetRecipientId = selectedMessage.sender.id;
                 } else {
-                    showError('Could not determine sender for reply. Sender information is missing.');
-                    console.error('Message sender:', selectedMessage.sender);
+                    showError('Could not determine sender for reply.');
                     return;
                 }
             }
@@ -150,16 +149,32 @@ const WorkstreamCommunication = () => {
 
             setReplyBody('');
             showSuccess('Reply sent successfully!');
+
+            // Refresh thread using the same authenticated API client
+            const threadData = await api.get(`/user-messages/threads/${selectedMessage.thread_id}/`);
+            setThreadMessages(threadData.results || threadData);
+
             fetchData();
         } catch (err) {
             console.error('Error sending reply:', err);
-            showError('Failed to send reply. ' + (err.response?.data?.detail || 'Please try again.'));
+            showError('Failed to send reply');
         }
     };
 
+    // Safeguard against non-array values to prevent ".filter is not a function" runtime errors
+    const safeMessages = Array.isArray(messages) ? messages : [];
+    const safeNotifications = Array.isArray(notifications) ? notifications : [];
+
     const filteredItems = activeTab === 'notifications'
-        ? notifications
-        : messages.filter(m => m.type === activeTab && (m.senderName.toLowerCase().includes(searchTerm.toLowerCase()) || m.subject.toLowerCase().includes(searchTerm.toLowerCase())));
+        ? safeNotifications
+        : safeMessages.filter(
+            (m) =>
+                m.type === activeTab &&
+                (m.senderName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    m.subject?.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+
+    // ... (render logic below)
 
     return (
         <div className="workstream-dashboard" style={{ height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
@@ -310,9 +325,40 @@ const WorkstreamCommunication = () => {
                             </div>
 
                             <div style={{ padding: '2rem', flex: 1, overflowY: 'auto' }}>
-                                <p style={{ color: 'var(--color-text-main)', lineHeight: '1.8', whiteSpace: 'pre-line' }}>
-                                    {selectedMessage.content}
-                                </p>
+                                {loadingThread ? (
+                                    <div style={{ textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>Loading conversation...</div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        {threadMessages.map(m => (
+                                            <div
+                                                key={m.id}
+                                                style={{
+                                                    alignSelf: m.sender?.id === user?.id ? 'flex-end' : 'flex-start',
+                                                    maxWidth: '80%',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: m.sender?.id === user?.id ? 'flex-end' : 'flex-start'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    padding: '0.75rem 1rem',
+                                                    borderRadius: '1rem',
+                                                    background: m.sender?.id === user?.id ? 'var(--color-primary)' : 'var(--color-bg-body)',
+                                                    color: m.sender?.id === user?.id ? 'white' : 'var(--color-text-main)',
+                                                    borderBottomRightRadius: m.sender?.id === user?.id ? '0' : '1rem',
+                                                    borderBottomLeftRadius: m.sender?.id === user?.id ? '1rem' : '0',
+                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                                }}>
+                                                    <p style={{ margin: 0, fontSize: '0.9rem', whiteSpace: 'pre-line' }}>{m.body}</p>
+                                                </div>
+                                                <div style={{ marginTop: '0.25rem', fontSize: '10px', color: '#94a3b8', display: 'flex', gap: '0.5rem' }}>
+                                                    <span>{m.sender?.full_name || 'User'}</span>
+                                                    <span>{new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ padding: '1rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg-body)' }}>

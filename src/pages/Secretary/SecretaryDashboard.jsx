@@ -45,15 +45,20 @@ const SecretaryDashboard = () => {
                 ];
                 setStats(transformedStats);
 
-                // For now, keep some mock or fetch from other endpoints if available
-                setPendingTasks(data.pending_tasks || [
-                    { id: 1, title: 'Review Application #1023', time: '2 hours ago', type: 'application' },
-                    { id: 2, title: 'Verify Documents', time: '5 hours ago', type: 'doc' },
-                ]);
-
-                setEvents(data.upcoming_events || [
-                    { id: 1, title: 'Parent-Teacher Meeting', date: 'Dec 15, 2025', time: '10:00 AM' },
-                ]);
+                // Fetch tasks and events in parallel
+                try {
+                    const [tasksRes, eventsRes] = await Promise.all([
+                        secretaryService.getPendingTasks(),
+                        secretaryService.getUpcomingEvents()
+                    ]);
+                    setPendingTasks(tasksRes.results || tasksRes || []);
+                    setEvents(eventsRes.results || eventsRes || []);
+                } catch (e) {
+                    console.error("Error fetching tasks/events", e);
+                    // Keep defaults if fetch fails for smooth degradation during dev
+                    setPendingTasks([]);
+                    setEvents([]);
+                }
 
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);

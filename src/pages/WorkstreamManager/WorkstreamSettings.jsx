@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { Save, Bell, Lock, Globe, Mail, Moon, Sun, Monitor, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';

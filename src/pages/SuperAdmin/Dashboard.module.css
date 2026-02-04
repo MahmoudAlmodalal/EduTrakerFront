@@ -200,3 +200,97 @@
         align-items: stretch;
     }
 }
+
+.chartContainer {
+    min-height: 350px;
+    width: 100%;
+    margin-top: var(--spacing-4);
+    position: relative;
+    border: 1px solid rgba(79, 70, 229, 0.1);
+    border-radius: var(--radius-lg);
+}
+
+.cardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-6);
+}
+
+.cardTitle {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    margin: 0;
+}
+
+.activityList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-6);
+    margin-top: var(--spacing-6);
+}
+
+.activityItem {
+    display: flex;
+    gap: var(--spacing-4);
+    align-items: flex-start;
+}
+
+.activityContent {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.activityText {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.activityTime {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.emptyActivity {
+    text-align: center;
+    padding: var(--spacing-8);
+    color: var(--color-text-muted);
+    font-weight: 600;
+}
+
+.loadingPulse {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: .5;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

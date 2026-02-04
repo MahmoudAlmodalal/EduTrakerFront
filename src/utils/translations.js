@@ -13,7 +13,7 @@ export const translations = {
 
         // Header
         'header.notifications': 'Notifications',
-        'header.viewAll': 'View all notifications',
+        'header.viewAll': 'View All Notifications',
         'header.logout': 'Logout',
         'header.menu': 'Menu',
         'auth.logout': 'Logout',
@@ -213,6 +213,14 @@ export const translations = {
         'mock.activity.2': 'School "Al-Amal High" added 50 new students.',
         'mock.activity.3': 'System maintenance scheduled for Dec 15.',
         'mock.activity.4': 'New Manager "Ahmed Ali" assigned to West Bank stream.',
+        'mock.notif.1.title': 'New Application Received',
+        'mock.notif.2.title': 'System Maintenance',
+        'mock.notif.3.title': 'Assignment Deadline',
+        'New Message': 'New Message',
+        'Attendance Marked': 'Attendance Marked',
+        'Grade Posted': 'Grade Posted',
+
+
 
         // Workstream Manager Specific
         'workstream.nav.dashboard': 'Dashboard',
@@ -918,6 +926,12 @@ export const translations = {
         'student.attendance.noRecords': 'No records found for this filter.',
     },
     ar: {
+        'mock.notif.1.title': 'تم استلام طلب جديد',
+        'mock.notif.2.title': 'صيانة النظام',
+        'mock.notif.3.title': 'موعد تسليم الواجب',
+        'New Message': 'رسالة جديدة',
+        'Attendance Marked': 'تم تسجيل الحضور',
+        'Grade Posted': 'تم رصد الدرجة',
         // Sidebar
         'app.name': 'EduTraker',
         'nav.dashboard': 'لوحة المعلومات',

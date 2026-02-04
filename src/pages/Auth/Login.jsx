@@ -13,7 +13,7 @@ const Login = ({ role }) => {
 
     const { t } = useTheme();
     const { login } = useAuth();
-    const { workstreamId } = useParams();
+    const { workstreamSlug } = useParams();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -29,9 +29,9 @@ const Login = ({ role }) => {
 
     // Fetch workstream info on mount (for workstream login)
     useEffect(() => {
-        if (!isPortalLogin && workstreamId) {
+        if (!isPortalLogin && workstreamSlug) {
             setLoadingWorkstream(true);
-            api.get(`/workstreams/${workstreamId}/info/`)
+            api.get(`/workstreams/${workstreamSlug}/info/`)
                 .then(data => {
                     setWorkstreamName(data.name);
                     setWorkstreamNotFound(false);
@@ -42,26 +42,26 @@ const Login = ({ role }) => {
                 })
                 .finally(() => setLoadingWorkstream(false));
         }
-    }, [isPortalLogin, workstreamId]);
+    }, [isPortalLogin, workstreamSlug]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
 
-        console.log('Login attempt started', { email, role, workstreamId });
+        console.log('Login attempt started', { email, role, workstreamSlug });
 
         try {
             const data = await authService.login(
                 { email, password },
                 role,
-                workstreamId
+                workstreamSlug
             );
 
             console.log('Login response received:', data);
 
             // Pass user data and tokens to the AuthContext
-            login(data, role, workstreamId);
+            login(data, role, workstreamSlug);
 
             console.log('Login context updated');
         } catch (err) {
@@ -90,7 +90,7 @@ const Login = ({ role }) => {
                         </div>
                         <div className={styles.form}>
                             <div className={styles.error}>
-                                Workstream with ID "{workstreamId}" does not exist or is inactive.
+                                Workstream "{workstreamSlug}" does not exist or is inactive.
                             </div>
                             <a href="/" className={styles.backLink} style={{ textAlign: 'center', display: 'block', marginTop: '1rem' }}>
                                 ← Back to Role Selection
@@ -106,7 +106,7 @@ const Login = ({ role }) => {
     const getSubtitle = () => {
         if (isPortalLogin) return 'Portal Login';
         if (loadingWorkstream) return 'Loading...';
-        return workstreamName ? `${workstreamName} Login` : `Workstream ${workstreamId} Login`;
+        return workstreamName ? `${workstreamName} Login` : `Workstream ${workstreamSlug} Login`;
     };
 
     return (
@@ -168,7 +168,7 @@ const Login = ({ role }) => {
                             <Link to="/" className={styles.backLink}>{t('auth.backToSelection')}</Link>
                             <span style={{ margin: '0 0.5rem', color: 'var(--color-text-muted)' }}>•</span>
                             <Link
-                                to={isPortalLogin ? "/register/portal" : `/register/workstream/${workstreamId}`}
+                                to={isPortalLogin ? "/register/portal" : `/register/workstream/${workstreamSlug}`}
                                 className={styles.backLink}
                             >
                                 Create Account

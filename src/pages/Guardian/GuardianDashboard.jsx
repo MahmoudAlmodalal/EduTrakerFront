@@ -3,6 +3,7 @@ import './Guardian.css';
 import { Bell, Calendar, TrendingUp, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import guardianService from '../../services/guardianService';
+import notificationService from '../../services/notificationService';
 
 const GuardianDashboard = () => {
     const { t } = useTheme();
@@ -73,15 +74,38 @@ const GuardianDashboard = () => {
 
                 {/* Notifications */}
                 <div className="guardian-card">
-                    <div className="guardian-card-header">
-                        <h3>{t('guardian.dashboard.recentNotifications')}</h3>
-                        <Bell size={20} color="#f59e0b" />
+                    <div className="guardian-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0 }}>{t('guardian.dashboard.recentNotifications')}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {notifications.some(n => !n.is_read) && (
+                                <button
+                                    onClick={async () => {
+                                        await notificationService.markAllAsRead();
+                                        setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+                                    }}
+                                    style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                                >
+                                    {t('header.markAllRead')}
+                                </button>
+                            )}
+                            <Bell size={20} color="#f59e0b" />
+                        </div>
                     </div>
                     <div className="notifications-list">
                         {notifications.slice(0, 5).map(notif => (
-                            <div key={notif.id} className={`notification-item ${notif.is_read ? '' : 'unread'}`}>
-                                <div className="notification-title">{notif.title}</div>
-                                <div className="notification-message">{notif.message}</div>
+                            <div
+                                key={notif.id}
+                                className={`notification-item ${notif.is_read ? '' : 'unread'}`}
+                                onClick={async () => {
+                                    if (!notif.is_read) {
+                                        await notificationService.markAsRead(notif.id);
+                                        setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                                    }
+                                }}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                <div className="notification-title" style={{ fontWeight: !notif.is_read ? 600 : 500 }}>{notif.title}</div>
+                                <div className="notification-message">{notif.message || notif.content}</div>
                             </div>
                         ))}
                         {notifications.length === 0 && (

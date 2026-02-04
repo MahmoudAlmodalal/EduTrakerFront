@@ -1,0 +1,206 @@
+.container {
+    position: relative;
+    width: 100%;
+    font-family: var(--font-family);
+}
+
+.selectBox {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-height: 44px;
+}
+
+.selectBox:hover:not(.disabled) {
+    border-color: var(--color-primary);
+}
+
+.selectBox.open {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 4px var(--color-primary-light);
+}
+
+.selectBox.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: var(--color-bg-body);
+}
+
+.valueDisplay {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.selectedLabel {
+    color: var(--color-text-main);
+    font-weight: 500;
+}
+
+.placeholder {
+    color: var(--color-text-muted);
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 8rem;
+    color: var(--color-text-muted);
+}
+
+.actions {
+    gap: 8px;
+}
+
+.clearIcon {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.clearIcon:hover {
+    color: var(--color-error);
+}
+
+.chevron {
+    transition: transform var(--transition-normal);
+}
+
+.chevronOpen {
+    transform: rotate(180deg);
+}
+
+.dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    z-index: 20000;
+    overflow: hidden;
+    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.searchContainer {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    gap: 8px;
+    background-color: var(--color-bg-surface);
+}
+
+.searchIcon {
+    color: var(--color-text-light);
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.searchInput {
+    flex: 1;
+    border: 1px solid transparent !important;
+    padding: 8px 4px !important;
+    background: transparent !important;
+    font-size: 0.875rem !important;
+    box-shadow: none !important;
+    color: var(--color-text-main) !important;
+    outline: none !important;
+    cursor: text !important;
+    pointer-events: auto !important;
+    min-width: 50px;
+}
+
+.searchInput:focus {
+    border-color: var(--color-primary-light) !important;
+}
+
+.searchInput:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.searchInput::placeholder {
+    color: var(--color-text-muted);
+}
+
+.optionsList {
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.option {
+    padding: 10px 16px;
+    font-size: 0.875rem;
+    color: var(--color-text-main);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.option:hover {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.option.selected {
+    background-color: var(--color-primary-subtle);
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.noResults {
+    padding: 16px;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+}
+
+/* Custom Scrollbar */
+.optionsList::-webkit-scrollbar {
+    width: 6px;
+}
+
+.optionsList::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.optionsList::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 10px;
+}
+
+.optionsList::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-light);
+}
+
+/* Loading and hint states */
+.loading,
+.hint {
+    padding: 16px;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+}
+
+.loadingIcon {
+    color: var(--color-primary);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

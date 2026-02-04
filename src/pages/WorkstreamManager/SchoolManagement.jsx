@@ -1,25 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, MapPin, Users, Edit, CheckCircle, Eye, Trash2, X } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../utils/api';
 import './Workstream.css';
 
 const SchoolManagement = () => {
     const { t } = useTheme();
+    const { user, workstreamId } = useAuth();
     const [loading, setLoading] = useState(true);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [schools, setSchools] = useState([]);
     const [newSchool, setNewSchool] = useState({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [viewSchool, setViewSchool] = useState(null);
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'inactive'
 
     const fetchSchools = async () => {
         setLoading(true);
         try {
-            const data = await api.get('/school/');
-            setSchools(data || []);
+            // Ask backend to include inactive schools as well so we can filter by status client-side
+            const data = await api.get('/school/', {
+                params: { include_inactive: true },
+            });
+            // Be defensive: always coerce to an array so .filter/.map are safe
+            const schoolsData = Array.isArray(data?.results)
+                ? data.results
+                : Array.isArray(data)
+                ? data
+                : [];
+            setSchools(schoolsData);
         } catch (error) {
             console.error('Failed to fetch schools:', error);
+            setSchools([]); // ensure we never keep a non-array value
         } finally {
             setLoading(false);
         }
@@ -33,17 +46,32 @@ const SchoolManagement = () => {
         e.preventDefault();
         try {
             if (newSchool.isEditing) {
+                // Backend update endpoint currently only accepts "school_name"
                 await api.patch(`/school/${newSchool.id}/update/`, {
                     school_name: newSchool.school_name,
-                    location: newSchool.location,
-                    capacity: newSchool.capacity
                 });
             } else {
-                await api.post('/school/create/', {
-                    school_name: newSchool.school_name,
-                    location: newSchool.location,
-                    capacity: newSchool.capacity
-                });
+                // SchoolCreateInputSerializer requires: school_name, work_stream (as PK int)
+                // Try several possible sources for the workstream ID from auth context/backend payload
+                const rawWsId =
+                    workstreamId ??
+                    user?.work_stream ?? // from WorkstreamLoginOutputSerializer
+                    user?.work_stream_id ??
+                    user?.workstream_id;
+                const wsId = rawWsId != null ? parseInt(rawWsId, 10) : null;
+
+                if (!wsId || Number.isNaN(wsId)) {
+                    // Fall back to letting the backend raise a validation error
+                    // so the user does not see a hard-blocking frontend exception.
+                    await api.post('/school/create/', {
+                        school_name: newSchool.school_name,
+                    });
+                } else {
+                    await api.post('/school/create/', {
+                        school_name: newSchool.school_name,
+                        work_stream: wsId,
+                    });
+                }
             }
             fetchSchools();
             setNewSchool({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
@@ -57,10 +85,15 @@ const SchoolManagement = () => {
     const handleActivateAll = async () => {
         if (window.confirm(t('workstream.schools.confirmActivate'))) {
             try {
-                // Bulk activation placeholder
-                alert('Bulk activation not implemented in backend yet. Individual activation available via table.');
+                const result = await api.post('/school/activate-all/');
+                // Optionally show how many were activated
+                if (result?.activated !== undefined) {
+                    alert(`Activated ${result.activated} schools${result.errors?.length ? `, with ${result.errors.length} errors` : ''}.`);
+                }
+                fetchSchools();
             } catch (error) {
                 console.error('Failed to activate schools:', error);
+                alert(`Error: ${error.message}`);
             }
         }
     };
@@ -100,10 +133,22 @@ const SchoolManagement = () => {
         }
     };
 
-    const filteredSchools = schools.filter(school =>
-        (school.school_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (school.location?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-    );
+    // Extra safety: ensure we always work with an array to avoid "l.filter is not a function" errors
+    const safeSchools = Array.isArray(schools) ? schools : [];
+    const filteredSchools = safeSchools.filter((school) => {
+        const matchesSearch =
+            (school.school_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (school.location?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+
+        const matchesStatus =
+            statusFilter === 'all'
+                ? true
+                : statusFilter === 'active'
+                ? school.is_active
+                : !school.is_active;
+
+        return matchesSearch && matchesStatus;
+    });
 
     if (loading && schools.length === 0) {
         return <div className="workstream-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading...</div>;
@@ -240,9 +285,18 @@ const SchoolManagement = () => {
             )}
 
             <div className="management-card">
-                <div className="table-header-actions">
-                    <div style={{ position: 'relative', width: '300px' }}>
-                        <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                <div className="table-header-actions" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', width: '280px' }}>
+                        <Search
+                            size={18}
+                            style={{
+                                position: 'absolute',
+                                left: '10px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: 'var(--color-text-muted)',
+                            }}
+                        />
                         <input
                             type="text"
                             placeholder={t('workstream.schools.searchPlaceholder')}
@@ -252,9 +306,30 @@ const SchoolManagement = () => {
                                 width: '100%',
                                 padding: '0.5rem 0.5rem 0.5rem 2.25rem',
                                 borderRadius: '0.375rem',
-                                border: '1px solid var(--color-border)'
+                                border: '1px solid var(--color-border)',
                             }}
                         />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                            Filter by status
+                        </span>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            style={{
+                                padding: '0.4rem 0.75rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)',
+                                background: 'white',
+                                fontSize: '0.85rem',
+                            }}
+                        >
+                            <option value="all">All</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
                     </div>
                 </div>
 

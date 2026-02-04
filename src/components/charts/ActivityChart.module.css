@@ -1,0 +1,101 @@
+.container {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: var(--glass-shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.container:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+}
+
+.header {
+    margin-bottom: 2rem;
+}
+
+.title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.025em;
+}
+
+.subtitle {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.chartWrapper {
+    flex: 1;
+    min-height: 350px;
+    width: 100%;
+}
+
+.tooltip {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    padding: 1rem;
+    border-radius: 16px;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+.tooltipLabel {
+    margin: 0 0 8px 0;
+    font-weight: 800;
+    color: var(--color-text-main);
+    font-size: 0.875rem;
+}
+
+.tooltipValue {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+/* Shimmer Styles */
+.titleShimmer,
+.subtitleShimmer,
+.chartShimmer {
+    background: linear-gradient(90deg, var(--color-border-light) 25%, var(--color-bg-base) 50%, var(--color-border-light) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: 8px;
+}
+
+.titleShimmer {
+    height: 24px;
+    width: 200px;
+    margin-bottom: 12px;
+}
+
+.subtitleShimmer {
+    height: 16px;
+    width: 300px;
+}
+
+.chartShimmer {
+    height: 350px;
+    width: 100%;
+    border-radius: 16px;
+}
+
+@keyframes shimmer {
+    from {
+        background-position: 200% 0;
+    }
+
+    to {
+        background-position: -200% 0;
+    }
+}

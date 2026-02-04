@@ -1,21 +1,83 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Menu, Bell, LogOut, Sun, Moon, Search, User, GraduationCap } from 'lucide-react';
+import { Menu, Bell, LogOut, Sun, Moon, Search, User, GraduationCap, X } from 'lucide-react';
 import styles from './Header.module.css';
+import notificationService from '../../services/notificationService';
 
 const Header = ({ toggleSidebar, isSidebarOpen }) => {
     const { logout, user } = useAuth();
     const { t, theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
+    const searchInputRef = useRef(null);
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const notifications = [
-        { id: 1, title: t('mock.notif.1.title'), time: '5 min ago', unread: true },
-        { id: 2, title: t('mock.notif.2.title'), time: '1 hour ago', unread: false },
-        { id: 3, title: t('mock.notif.3.title'), time: '2 hours ago', unread: true },
-    ];
+    const fetchNotifications = async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            const [notifsData, countData] = await Promise.all([
+                notificationService.getNotifications({ page_size: 5 }),
+                notificationService.getUnreadCount()
+            ]);
+            console.log('Fetched notifications:', notifsData);
+            setNotifications(notifsData.results || notifsData);
+            setUnreadCount(countData.unread_count);
+        } catch (err) {
+            console.error('Error fetching notifications:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchNotifications();
+        // Poll for new notifications every 30 seconds
+        const interval = setInterval(fetchNotifications, 30000);
+        return () => clearInterval(interval);
+    }, [user]);
+
+    const handleMarkAllRead = async () => {
+        try {
+            await notificationService.markAllAsRead();
+            setUnreadCount(0);
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        } catch (err) {
+            console.error('Error marking all read:', err);
+        }
+    };
+
+    const handleNotificationClick = async (notif) => {
+        if (!notif.is_read) {
+            try {
+                await notificationService.markAsRead(notif.id);
+                setUnreadCount(prev => Math.max(0, prev - 1));
+                setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+            } catch (err) {
+                console.error('Error marking notification read:', err);
+            }
+        }
+
+        // Navigate to related object if available
+        if (notif.action_url) {
+            navigate(notif.action_url);
+        } else {
+            navigate('/super-admin/communication', { state: { activeTab: 'notifications' } });
+        }
+        setShowNotifications(false);
+    };
+
+    const handleSearch = (e) => {
+        if (e.key === 'Enter') {
+            console.log('Searching for:', searchQuery);
+            // Implement search navigation or filtering logic here
+        }
+    };
 
     return (
         <header className={styles.header}>
@@ -39,20 +101,51 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                     </button>
                 )}
 
-                {/* Search Bar - Aesthetic Placeholder */}
-                <div className={styles.searchBar} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    backgroundColor: 'var(--slate-100)',
-                    padding: '0.5rem 1rem',
-                    borderRadius: 'var(--radius-full)',
-                    width: '300px',
-                    marginLeft: 'var(--spacing-4)',
-                    color: 'var(--color-text-muted)'
-                }}>
-                    <Search size={16} />
-                    <span style={{ fontSize: 'var(--font-size-sm)' }}>Search anything...</span>
+                {/* Search Bar - Functional */}
+                <div className={styles.searchContainer}>
+                    <Search
+                        size={16}
+                        style={{ pointerEvents: 'none', color: 'var(--color-text-muted)' }}
+                    />
+                    <input
+                        ref={searchInputRef}
+                        type="text"
+                        name="q"
+                        className={styles.searchInput}
+                        placeholder="Search anything..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                            console.log('SEARCH_INPUT_CHANGE:', e.target.value);
+                            setSearchQuery(e.target.value);
+                        }}
+                        onKeyDown={handleSearch}
+                        onFocus={() => console.log('SEARCH_INPUT_FOCUS')}
+                        autoComplete="off"
+                        style={{
+                            flex: 1,
+                            backgroundColor: 'transparent',
+                            color: 'var(--color-text-main)',
+                            fontSize: 'var(--font-size-sm)',
+                            border: 'none',
+                            outline: 'none',
+                            pointerEvents: 'auto',
+                            position: 'relative',
+                            zIndex: 100
+                        }}
+                    />
+                    {searchQuery && (
+                        <button
+                            className={styles.clearBtn}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSearchQuery('');
+                            }}
+                            title="Clear search"
+                            type="button"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -71,7 +164,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                         title="Notifications"
                     >
                         <Bell size={20} />
-                        <span className={styles.badge}>3</span>
+                        {unreadCount > 0 && <span className={styles.badge}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
                     </button>
 
                     {showNotifications && (
@@ -90,21 +183,44 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                         }}>
                             <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--color-text-main)' }}>{t('header.notifications')}</h3>
-                                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600 }}>Mark all as read</span>
+                                {unreadCount > 0 && (
+                                    <span
+                                        onClick={handleMarkAllRead}
+                                        style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}
+                                    >
+                                        {t('header.markAllRead')}
+                                    </span>
+                                )}
                             </div>
                             <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                                {notifications.map(notif => (
-                                    <div key={notif.id} style={{
-                                        padding: '1rem 1.25rem',
-                                        borderBottom: '1px solid var(--color-border-subtle)',
-                                        backgroundColor: notif.unread ? 'var(--color-primary-light)' : 'transparent',
-                                        cursor: 'pointer',
-                                        transition: 'background-color 0.2s'
-                                    }}>
-                                        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-main)', marginBottom: '0.25rem', fontWeight: notif.unread ? 600 : 400 }}>{notif.title}</p>
-                                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>{notif.time}</span>
+                                {loading ? (
+                                    <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading...</div>
+                                ) : notifications.length === 0 ? (
+                                    <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                                        <Bell size={32} style={{ opacity: 0.2, marginBottom: '0.5rem' }} />
+                                        <p style={{ fontSize: 'var(--font-size-sm)' }}>{t('header.noNotifications')}</p>
                                     </div>
-                                ))}
+                                ) : (
+                                    notifications.map(notif => (
+                                        <div
+                                            key={notif.id}
+                                            onClick={() => handleNotificationClick(notif)}
+                                            style={{
+                                                padding: '1rem 1.25rem',
+                                                borderBottom: '1px solid var(--color-border-subtle)',
+                                                backgroundColor: !notif.is_read ? 'var(--color-primary-light)' : 'transparent',
+                                                cursor: 'pointer',
+                                                transition: 'background-color 0.2s'
+                                            }}
+                                        >
+                                            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-main)', marginBottom: '0.25rem', fontWeight: !notif.is_read ? 600 : 400 }}>{t(notif.title)}</p>
+                                            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: '0.25rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t(notif.message)}</p>
+                                            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                                                {new Date(notif.created_at).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                             <div style={{ padding: '1rem', textAlign: 'center' }}>
                                 <button
@@ -124,7 +240,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                 <div className={styles.divider}></div>
 
                 <div className={styles.userSection} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-                    <div style={{ textAlign: 'right', display: 'none', md: 'block' }}>
+                    <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text-main)', lineHeight: 1 }}>{user?.displayName || user?.email || 'Admin'}</p>
                         <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>{user?.role?.replace('_', ' ').toLowerCase() || 'super admin'}</p>
                     </div>

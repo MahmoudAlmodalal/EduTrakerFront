@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Shield, School, Mail, Trash2, Edit, X } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../utils/api';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 import './Workstream.css';
 
 const SchoolManagerAssignment = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [showAssignForm, setShowAssignForm] = useState(false);
     const [managers, setManagers] = useState([]);
@@ -18,12 +21,28 @@ const SchoolManagerAssignment = () => {
         try {
             const [managersData, schoolsData] = await Promise.all([
                 api.get('/users/?role=manager_school'),
-                api.get('/school/school/')
+                // Backend: EduTraker/school/urls.py -> path("school/", SchoolListAPIView...)
+                api.get('/school/', { params: { include_inactive: true } })
             ]);
-            setManagers(managersData.results || managersData || []);
-            setSchools(schoolsData || []);
+
+            const managersArray = Array.isArray(managersData?.results)
+                ? managersData.results
+                : Array.isArray(managersData)
+                ? managersData
+                : [];
+
+            const schoolsArray = Array.isArray(schoolsData?.results)
+                ? schoolsData.results
+                : Array.isArray(schoolsData)
+                ? schoolsData
+                : [];
+
+            setManagers(managersArray);
+            setSchools(schoolsArray);
         } catch (error) {
             console.error('Failed to fetch data:', error);
+            setManagers([]);
+            setSchools([]);
         } finally {
             setLoading(false);
         }
@@ -40,15 +59,20 @@ const SchoolManagerAssignment = () => {
                 await api.patch(`/users/${newManager.id}/`, {
                     full_name: newManager.full_name,
                     email: newManager.email,
-                    school: newManager.schoolId || null
+                    school: newManager.schoolId || null,
                 });
             } else {
+                // For manager_workstream creators, backend requires work_stream to match
+                // the creator's work_stream_id, otherwise it raises "Invalid work stream assignment."
+                const workStreamId = user?.work_stream ?? user?.work_stream_id ?? null;
+
                 await api.post('/users/create/', {
                     full_name: newManager.full_name,
                     email: newManager.email,
                     password: newManager.password || 'TemporaryPassword123!',
                     role: 'manager_school',
-                    school: newManager.schoolId || null
+                    work_stream: workStreamId,
+                    school: newManager.schoolId || null,
                 });
             }
             fetchData();
@@ -86,7 +110,9 @@ const SchoolManagerAssignment = () => {
         }
     };
 
-    const filteredManagers = managers.filter(manager =>
+    // Ensure we always work with an array to avoid ".filter is not a function" issues
+    const safeManagers = Array.isArray(managers) ? managers : [];
+    const filteredManagers = safeManagers.filter((manager) =>
         (manager.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (manager.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (manager.school_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
@@ -151,16 +177,13 @@ const SchoolManagerAssignment = () => {
                         )}
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.assignTo')}</label>
-                            <select
+                            <SearchableSelect
+                                options={schools.map(s => ({ value: s.id, label: s.school_name }))}
                                 value={newManager.schoolId}
-                                onChange={(e) => setNewManager({ ...newManager, schoolId: e.target.value })}
-                                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'white' }}
-                            >
-                                <option value="">{t('workstream.assignments.form.selectSchool')}</option>
-                                {schools.map(school => (
-                                    <option key={school.id} value={school.id}>{school.school_name}</option>
-                                ))}
-                            </select>
+                                onChange={(val) => setNewManager({ ...newManager, schoolId: val })}
+                                placeholder={t('workstream.assignments.form.selectSchool')}
+                                searchPlaceholder="Search schools..."
+                            />
                         </div>
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                             <button type="submit" className="btn-primary" disabled={loading}>{newManager.isEditing ? t('workstream.assignments.updateBtn') : t('workstream.assignments.assignBtn')}</button>

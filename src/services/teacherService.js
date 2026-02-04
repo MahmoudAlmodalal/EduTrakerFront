@@ -10,6 +10,10 @@ const teacherService = {
     },
 
     // Course Allocations / Classes
+    getSchedule: async (date) => {
+        return api.get(`/teacher/schedule/?date=${date}`);
+    },
+
     getCourseAllocations: async (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
         // Since there's no specific CourseAllocation API list in urls.py, 

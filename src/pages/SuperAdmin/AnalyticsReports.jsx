@@ -4,10 +4,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Download, FileBarChart, PieChart, TrendingUp, CheckCircle, User } from 'lucide-react';
 import styles from './AnalyticsReports.module.css';
 import reportService from '../../services/reportService';
+import ActivityChart from '../../components/charts/ActivityChart';
 
 const AnalyticsReports = () => {
     const { t } = useTheme();
     const [stats, setStats] = useState(null);
+    const [activityData, setActivityData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -17,6 +19,7 @@ const AnalyticsReports = () => {
                 setLoading(true);
                 const data = await reportService.getComprehensiveStats();
                 setStats(data.statistics);
+                setActivityData(data.activity_chart || []);
                 setError(null);
             } catch (err) {
                 console.error('Error fetching comprehensive stats:', err);
@@ -204,6 +207,15 @@ const AnalyticsReports = () => {
                             </ResponsiveContainer>
                         )}
                     </div>
+                </div>
+
+                <div className={styles.fullWidth}>
+                    <ActivityChart
+                        data={activityData}
+                        loading={loading}
+                        title={t('dashboard.charts.activity')}
+                        subtitle="System-wide login frequency monitoring"
+                    />
                 </div>
 
                 <div className={styles.card}>

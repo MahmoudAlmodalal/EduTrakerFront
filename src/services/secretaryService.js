@@ -6,6 +6,14 @@ const secretaryService = {
         return api.get('/statistics/dashboard/');
     },
 
+    getPendingTasks: async () => {
+        return api.get('/secretary/tasks/pending/');
+    },
+
+    getUpcomingEvents: async () => {
+        return api.get('/secretary/events/upcoming/');
+    },
+
     // Secretary Profile/Settings
     getProfile: async (id) => {
         return api.get(`/secretary/${id}/`);

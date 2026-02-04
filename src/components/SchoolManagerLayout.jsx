@@ -14,6 +14,8 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import '../pages/SchoolManager/SchoolManager.css';
+import notificationService from '../services/notificationService';
+import { useEffect, useState } from 'react';
 
 const SchoolManagerLayout = () => {
     const { t } = useTheme();
@@ -34,6 +36,24 @@ const SchoolManagerLayout = () => {
         logout();
         navigate('/login');
     };
+
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        const fetchUnreadCount = async () => {
+            if (!user) return;
+            try {
+                const data = await notificationService.getUnreadCount();
+                setUnreadCount(data.unread_count);
+            } catch (err) {
+                console.error('Error fetching unread count:', err);
+            }
+        };
+
+        fetchUnreadCount();
+        const interval = setInterval(fetchUnreadCount, 30000);
+        return () => clearInterval(interval);
+    }, [user]);
 
     const getInitials = () => {
         if (user?.name) {
@@ -103,32 +123,38 @@ const SchoolManagerLayout = () => {
                     paddingTop: '20px',
                     borderTop: '1px solid rgba(255, 255, 255, 0.06)'
                 }}>
-                    {/* Notification Bell */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px 16px',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: '12px',
-                        marginBottom: '12px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                    }}>
+                    <div
+                        onClick={() => navigate('/school-manager/communication')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '12px 16px',
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            borderRadius: '12px',
+                            marginBottom: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
                         <div style={{ position: 'relative' }}>
                             <Bell size={18} style={{ color: 'rgba(226, 232, 240, 0.7)' }} />
-                            <span style={{
-                                position: 'absolute',
-                                top: '-4px',
-                                right: '-4px',
-                                width: '8px',
-                                height: '8px',
-                                background: '#8b5cf6',
-                                borderRadius: '50%',
-                                border: '2px solid #0f172a'
-                            }}></span>
+                            {unreadCount > 0 && (
+                                <span style={{
+                                    position: 'absolute',
+                                    top: '-4px',
+                                    right: '-4px',
+                                    width: '10px',
+                                    height: '10px',
+                                    background: '#ef4444',
+                                    borderRadius: '50%',
+                                    border: '2px solid #0f172a'
+                                }}></span>
+                            )}
                         </div>
-                        <span style={{ fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)' }}>5 new notifications</span>
+                        <span style={{ fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)' }}>
+                            {unreadCount > 0 ? `${unreadCount} ${t('header.newNotifications')}` : t('header.noNewNotifications')}
+                        </span>
                     </div>
 
                     {/* User Card */}

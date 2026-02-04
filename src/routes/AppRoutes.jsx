@@ -93,11 +93,11 @@ const AppRoutes = () => {
             <Route path="/register/portal" element={<Register role="PORTAL" />} />
             <Route path="/register" element={<Navigate to="/register/portal" replace />} />
 
-            {/* Workstream Login - URL: /login/workstream/:id */}
-            <Route path="/login/workstream/:workstreamId" element={<Login role="WORKSTREAM" />} />
+            {/* Workstream Login - URL: /login/workstream/:slug */}
+            <Route path="/login/workstream/:workstreamSlug" element={<Login role="WORKSTREAM" />} />
 
             {/* Workstream Registration */}
-            <Route path="/register/workstream/:workstreamId" element={<Register role="WORKSTREAM" />} />
+            <Route path="/register/workstream/:workstreamSlug" element={<Register role="WORKSTREAM" />} />
 
             {/* Password Reset */}
             <Route path="/password-reset" element={<RequestPasswordReset />} />

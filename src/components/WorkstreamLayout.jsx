@@ -9,17 +9,26 @@ import {
     MessageSquare,
     LogOut,
     Bell,
-    Sparkles
+    GraduationCap,
+    Sparkles,
+    Menu
 } from 'lucide-react';
 import '../pages/WorkstreamManager/Workstream.css';
 
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import notificationService from '../services/notificationService';
+import { useEffect, useState } from 'react';
 
 const WorkstreamLayout = () => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
+
+    const toggleSidebar = () => {
+        setSidebarOpen(!isSidebarOpen);
+    };
 
     const navItems = [
         { path: '/workstream/dashboard', label: t('workstream.nav.dashboard'), icon: LayoutDashboard },
@@ -35,6 +44,24 @@ const WorkstreamLayout = () => {
         navigate('/login');
     };
 
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        const fetchUnreadCount = async () => {
+            if (!user) return;
+            try {
+                const data = await notificationService.getUnreadCount();
+                setUnreadCount(data.unread_count);
+            } catch (err) {
+                console.error('Error fetching unread count:', err);
+            }
+        };
+
+        fetchUnreadCount();
+        const interval = setInterval(fetchUnreadCount, 30000);
+        return () => clearInterval(interval);
+    }, [user]);
+
     const getInitials = () => {
         if (user?.name) {
             return user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -43,13 +70,35 @@ const WorkstreamLayout = () => {
     };
 
     return (
-        <div className="workstream-layout">
+        <div className={`workstream-layout ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
+            {/* Sidebar Toggle Button (Visible when sidebar is closed) */}
+            {!isSidebarOpen && (
+                <button
+                    onClick={toggleSidebar}
+                    className="workstream-sidebar-toggle-floating"
+                    title="Open Sidebar"
+                >
+                    <div className="workstream-logo-icon">
+                        <GraduationCap size={24} />
+                    </div>
+                </button>
+            )}
+
             {/* Sidebar */}
-            <aside className="workstream-sidebar">
+            <aside className={`workstream-sidebar ${!isSidebarOpen ? 'collapsed' : ''}`}>
                 {/* Brand Section */}
                 <div className="workstream-brand">
-                    <Sparkles size={28} />
-                    <span>{t('app.name')}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                        <GraduationCap size={28} />
+                        <span>{t('app.name')}</span>
+                    </div>
+                    <button
+                        onClick={toggleSidebar}
+                        className="workstream-sidebar-toggle-inline"
+                        title="Close Sidebar"
+                    >
+                        <Menu size={20} />
+                    </button>
                 </div>
 
                 {/* Quick Stats */}
@@ -104,34 +153,44 @@ const WorkstreamLayout = () => {
                     paddingTop: '20px',
                     borderTop: '1px solid rgba(255, 255, 255, 0.06)'
                 }}>
-                    {/* Notification Bell */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px 16px',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: '12px',
-                        marginBottom: '12px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                    }}>
-                        <div style={{
-                            position: 'relative'
-                        }}>
+                    <div
+                        onClick={() => navigate('/workstream/communication')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '12px 16px',
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            borderRadius: '12px',
+                            marginBottom: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <div style={{ position: 'relative' }}>
                             <Bell size={18} style={{ color: 'rgba(226, 232, 240, 0.7)' }} />
-                            <span style={{
-                                position: 'absolute',
-                                top: '-4px',
-                                right: '-4px',
-                                width: '8px',
-                                height: '8px',
-                                background: '#8b5cf6',
-                                borderRadius: '50%',
-                                border: '2px solid #0f172a'
-                            }}></span>
+                            {unreadCount > 0 && (
+                                <span style={{
+                                    position: 'absolute',
+                                    top: '-4px',
+                                    right: '-4px',
+                                    width: '10px',
+                                    height: '10px',
+                                    background: '#ef4444',
+                                    borderRadius: '50%',
+                                    border: '2px solid #0f172a',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '8px',
+                                    color: 'white',
+                                    fontWeight: 'bold'
+                                }}></span>
+                            )}
                         </div>
-                        <span style={{ fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)' }}>3 new notifications</span>
+                        <span style={{ fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)' }}>
+                            {unreadCount > 0 ? `${unreadCount} ${t('header.newNotifications')}` : t('header.noNewNotifications')}
+                        </span>
                     </div>
 
                     {/* User Card */}
@@ -195,7 +254,7 @@ const WorkstreamLayout = () => {
             </aside>
 
             {/* Main Content */}
-            <main className="workstream-main">
+            <main className={`workstream-main ${!isSidebarOpen ? 'expanded' : ''}`}>
                 <Outlet />
             </main>
         </div>

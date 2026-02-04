@@ -29,9 +29,9 @@ const WorkstreamReports = () => {
     }, []);
 
     // Map backend schools in workstream to chart/table format
-    const schoolStats = stats?.schools?.map(school => ({
+    const schoolStats = stats?.summary?.by_school?.map(school => ({
         school: school.school_name,
-        attendance: 95, // Mocking these for now as they might not be in comprehensive stats yet
+        attendance: 95, // Mocking these for now as they might not be in stats yet
         absent: 5,
         teachers: school.teacher_count,
         classrooms: school.classroom_count,
@@ -76,7 +76,7 @@ const WorkstreamReports = () => {
                             <Users size={20} />
                         </div>
                     </div>
-                    <div className="stat-value">{loading ? '...' : (stats?.total_schools || 0)}</div>
+                    <div className="stat-value">{loading ? '...' : (stats?.summary?.school_count || 0)}</div>
                     <div className="stat-trend">
                         <span style={{ color: 'var(--color-text-muted)' }}>In your workstream</span>
                     </div>
@@ -88,7 +88,7 @@ const WorkstreamReports = () => {
                             <BookOpen size={20} />
                         </div>
                     </div>
-                    <div className="stat-value">{loading ? '...' : (stats?.total_students || 0)}</div>
+                    <div className="stat-value">{loading ? '...' : (stats?.summary?.total_students || 0)}</div>
                     <div className="stat-trend">
                         <span style={{ color: 'var(--color-text-muted)' }}>Active enrollments</span>
                     </div>

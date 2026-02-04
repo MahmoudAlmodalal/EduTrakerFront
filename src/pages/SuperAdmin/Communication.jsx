@@ -7,6 +7,7 @@ import { Send, Plus, MessageSquare, Search, ChevronLeft } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import styles from './Communication.module.css';
 import { api } from '../../utils/api';
+import notificationService from '../../services/notificationService';
 
 const Communication = () => {
     const { t } = useTheme();
@@ -39,7 +40,7 @@ const Communication = () => {
         try {
             const [msgsData, notifsData] = await Promise.all([
                 api.get('/user-messages/'),
-                api.get('/notifications/')
+                notificationService.getNotifications()
             ]);
 
             const rawMessages = msgsData.results || msgsData;
@@ -69,7 +70,7 @@ const Communication = () => {
             });
 
             setMessages(mappedMessages);
-            setNotifications(notifsData.results || notifsData);
+            setNotifications(notifsData?.results || (Array.isArray(notifsData) ? notifsData : []));
         } catch (err) {
             console.error('Error fetching communication data:', err);
             showError('Failed to load messages');
@@ -85,30 +86,53 @@ const Communication = () => {
         fetchData();
     }, [location.state, user]);
 
+    const [threadMessages, setThreadMessages] = useState([]);
+    const [loadingThread, setLoadingThread] = useState(false);
+
     const handleMessageClick = async (msg) => {
         setSelectedMessage(msg);
+        setLoadingThread(true);
+        setThreadMessages([]); // Reset thread
 
-        // Only mark read if current user is a recipient and it's unread
-        const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
+        try {
+            // Fetch the full thread
+            const response = await api.get(`/user-messages/threads/${msg.thread_id}/`);
+            const results = response.results || response;
+            setThreadMessages(results);
 
-        if (activeTab !== 'notifications' && !msg.read && myReceipt) {
-            try {
+            // Mark original message read if needed
+            const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
+            if (activeTab !== 'notifications' && !msg.read && myReceipt) {
                 await api.post(`/user-messages/${msg.id}/read/`);
                 setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, read: true } : m));
-            } catch (err) {
-                console.error('Error marking message read:', err);
             }
+        } catch (err) {
+            console.error('Error fetching thread:', err);
+            setThreadMessages([msg]); // Fallback
+        } finally {
+            setLoadingThread(false);
         }
     };
 
     const handleNotificationClick = async (notif) => {
         if (!notif.is_read) {
             try {
-                await api.post(`/notifications/${notif.id}/mark-read/`);
+                await notificationService.markAsRead(notif.id);
                 setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
             } catch (err) {
                 console.error('Error marking notification read:', err);
             }
+        }
+    };
+
+    const handleMarkAllNotificationsRead = async () => {
+        try {
+            await notificationService.markAllAsRead();
+            setNotifications(notifs => notifs.map(n => ({ ...n, is_read: true })));
+            showSuccess('All notifications marked as read');
+        } catch (err) {
+            console.error('Error marking all notifications read:', err);
+            showError('Failed to mark notifications as read');
         }
     };
 
@@ -279,30 +303,36 @@ const Communication = () => {
 
             setReplyBody('');
             showSuccess('Reply sent successfully!');
-            fetchData();
+
+            // Re-fetch thread to show the new reply immediately
+            const threadResponse = await api.get(`/user-messages/threads/${selectedMessage.thread_id}/`);
+            setThreadMessages(threadResponse.results || threadResponse);
+
+            fetchData(); // Refresh sidebar
         } catch (err) {
             console.error('Error sending reply:', err);
             showError('Failed to send reply. ' + (err.response?.data?.detail || 'Please try again.'));
         }
     };
 
+    // Compute filtered items based on active tab and search term
     const filteredItems = activeTab === 'notifications'
-        ? notifications
-        : messages.filter(m => {
-            // Filter by tab type (sent/received)
-            const typeMatch = m.type === activeTab;
-
-            // Filter by search query
-            const searchLower = searchTerm.toLowerCase();
-            const senderMatch = (m.sender?.full_name || m.sender?.email || '').toLowerCase().includes(searchLower);
-            const subjectMatch = (m.subject || '').toLowerCase().includes(searchLower);
-            const bodyMatch = (m.body || '').toLowerCase().includes(searchLower);
-
-            return typeMatch && (senderMatch || subjectMatch || bodyMatch);
-        });
+        ? notifications.filter(n =>
+            (n.title || n.notification_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (n.message || '').toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        : messages.filter(m =>
+            m.type === activeTab &&
+            (
+                (m.subject || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (m.body || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (m.sender?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase())
+            )
+        );
 
     return (
         <div className={styles.container}>
+            {/* ... header remains same ... */}
             <div className={styles.header}>
                 <div>
                     <h1 className={styles.title}>{t('communication.title')}</h1>
@@ -312,8 +342,9 @@ const Communication = () => {
             </div>
 
             <div className={styles.layout}>
-                {/* Sidebar / List */}
+                {/* ... sidebar remains same ... */}
                 <div className={styles.sidebar}>
+                    {/* ... (sidebar content) ... */}
                     <div className={styles.sidebarHeader}>
                         <div className={styles.searchWrapper}>
                             <Search size={18} className={styles.searchIcon} />
@@ -336,6 +367,16 @@ const Communication = () => {
                                 </button>
                             ))}
                         </div>
+                        {activeTab === 'notifications' && notifications.some(n => !n.is_read) && (
+                            <div style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--sec-border)' }}>
+                                <button
+                                    onClick={handleMarkAllNotificationsRead}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary)' }}
+                                >
+                                    {t('header.markAllRead')}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div className={styles.list}>
@@ -351,10 +392,10 @@ const Communication = () => {
                                     className={`${styles.listItem} ${!notif.is_read ? styles.unread : ''}`}
                                 >
                                     <div className={styles.itemHeader}>
-                                        <span className={styles.itemSender}>{notif.title || notif.notification_type}</span>
+                                        <span className={styles.itemSender}>{t((notif.title || notif.notification_type || '').trim())}</span>
                                         <span className={styles.itemDate}>{new Date(notif.created_at).toLocaleDateString()}</span>
                                     </div>
-                                    <div className={styles.itemPreview}>{notif.message}</div>
+                                    <div className={styles.itemPreview}>{t(notif.message)}</div>
                                 </div>
                             ))
                         ) : (
@@ -395,17 +436,29 @@ const Communication = () => {
                                     <div>
                                         <div className={styles.itemSender}>{selectedMessage.sender?.full_name || selectedMessage.sender?.email}</div>
                                         <div className={styles.itemDate}>
-                                            {selectedMessage.type === 'sent'
-                                                ? `${t('communication.to')}: ${selectedMessage.receipts?.[0]?.recipient?.full_name || selectedMessage.receipts?.[0]?.recipient?.email || '...'}`
-                                                : `${t('communication.from')}: ${selectedMessage.sender?.full_name || selectedMessage.sender?.email}`}
-                                            &bull; {new Date(selectedMessage.sent_at || selectedMessage.created_at).toLocaleString()}
+                                            Conversation Started &bull; {new Date(selectedMessage.sent_at || selectedMessage.created_at).toLocaleString()}
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div className={styles.body}>
-                                {selectedMessage.body}
+                                {loadingThread ? (
+                                    <div className={styles.threadLoading}>Loading conversation...</div>
+                                ) : (
+                                    threadMessages.map(m => (
+                                        <div
+                                            key={m.id}
+                                            className={`${styles.messageBubble} ${m.sender?.id === user?.id ? styles.sentMessage : styles.receivedMessage}`}
+                                        >
+                                            <div className={styles.messageBody}>{m.body}</div>
+                                            <div className={styles.messageMeta}>
+                                                <span>{m.sender?.full_name || m.sender?.email}</span>
+                                                <span>{new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
 
                             <div className={styles.footer}>

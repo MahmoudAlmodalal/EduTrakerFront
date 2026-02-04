@@ -5,6 +5,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import secretaryService from '../../services/secretaryService';
+import notificationService from '../../services/notificationService';
+import { api } from '../../utils/api';
 
 const SecretaryCommunication = () => {
     const { t } = useTheme();
@@ -24,9 +26,9 @@ const SecretaryCommunication = () => {
         if (!user) return; // Added user check
         try {
             setLoading(true);
-            const [msgsRes, notifsRes] = await Promise.all([ // Changed to Promise.all
-                secretaryService.getMessages(),
-                secretaryService.getNotifications()
+            const [msgsRes, notifsRes] = await Promise.all([
+                api.get('/user-messages/'),
+                notificationService.getNotifications()
             ]);
 
             const rawMessages = msgsRes.results || msgsRes;
@@ -66,27 +68,50 @@ const SecretaryCommunication = () => {
         fetchData();
     }, [user, activeTab]); // Added user to dependencies
 
-    const handleMessageClick = async (msg) => { // Made async
+    const [threadMessages, setThreadMessages] = useState([]);
+    const [loadingThread, setLoadingThread] = useState(false);
+
+    const handleMessageClick = async (msg) => {
         setSelectedMessage(msg);
-        const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
-        if (activeTab !== 'notifications' && !msg.read && myReceipt) {
-            try {
+        setLoadingThread(true);
+        setThreadMessages([]);
+        try {
+            // Use shared API client so auth headers & base URL are consistent
+            const data = await api.get(`/user-messages/threads/${msg.thread_id}/`);
+            setThreadMessages(data.results || data);
+
+            const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
+            if (activeTab !== 'notifications' && !msg.read && myReceipt) {
                 await secretaryService.markMessageRead(msg.id);
                 setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, read: true } : m));
-            } catch (err) {
-                console.error('Error marking message read:', err);
             }
+        } catch (err) {
+            console.error('Error fetching thread:', err);
+            setThreadMessages([msg]);
+        } finally {
+            setLoadingThread(false);
         }
     };
 
     const handleNotificationClick = async (notif) => {
         if (!notif.is_read) {
             try {
-                await secretaryService.markNotificationRead(notif.id);
+                await notificationService.markAsRead(notif.id);
                 setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
             } catch (error) {
                 console.error('Error marking notification read:', error);
             }
+        }
+    };
+
+    const handleMarkAllRead = async () => {
+        try {
+            await notificationService.markAllAsRead();
+            setNotifications(notifs => notifs.map(n => ({ ...n, is_read: true })));
+            showSuccess('All notifications marked as read');
+        } catch (error) {
+            console.error('Error marking all notifications read:', error);
+            showError('Failed to mark notifications as read');
         }
     };
 
@@ -143,6 +168,11 @@ const SecretaryCommunication = () => {
             console.log('Message sent successfully, response:', response);
             setNewMessage('');
             showSuccess('Message sent successfully!');
+
+            // Refresh thread
+            const threadData = await api.get(`/user-messages/threads/${selectedMessage.thread_id}/`);
+            setThreadMessages(threadData.results || threadData);
+
             await fetchData();
         } catch (error) {
             console.error('=== ERROR Sending Message ===');
@@ -217,6 +247,16 @@ const SecretaryCommunication = () => {
                                 </button>
                             ))}
                         </div>
+                        {activeTab === 'notifications' && notifications.some(n => !n.is_read) && (
+                            <div style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--sec-border)' }}>
+                                <button
+                                    onClick={handleMarkAllRead}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: 'var(--sec-primary)' }}
+                                >
+                                    {t('header.markAllRead')}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -313,9 +353,40 @@ const SecretaryCommunication = () => {
                             </div>
 
                             <div style={{ padding: '2rem', flex: 1, overflowY: 'auto' }}>
-                                <p style={{ color: 'var(--sec-text-main)', lineHeight: '1.8', whiteSpace: 'pre-line' }}>
-                                    {selectedMessage.body}
-                                </p>
+                                {loadingThread ? (
+                                    <div style={{ textAlign: 'center', color: 'var(--sec-text-muted)', fontStyle: 'italic' }}>Loading conversation...</div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        {threadMessages.map(m => (
+                                            <div
+                                                key={m.id}
+                                                style={{
+                                                    alignSelf: m.sender?.id === user?.id ? 'flex-end' : 'flex-start',
+                                                    maxWidth: '80%',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: m.sender?.id === user?.id ? 'flex-end' : 'flex-start'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    padding: '0.75rem 1rem',
+                                                    borderRadius: '1rem',
+                                                    background: m.sender?.id === user?.id ? 'var(--sec-primary)' : 'var(--sec-border)',
+                                                    color: m.sender?.id === user?.id ? 'white' : 'var(--sec-text-main)',
+                                                    borderBottomRightRadius: m.sender?.id === user?.id ? '0' : '1rem',
+                                                    borderBottomLeftRadius: m.sender?.id === user?.id ? '1rem' : '0',
+                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                                }}>
+                                                    <p style={{ margin: 0, fontSize: '0.9rem', whiteSpace: 'pre-line' }}>{m.body}</p>
+                                                </div>
+                                                <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--sec-text-muted)', display: 'flex', gap: '8px' }}>
+                                                    <span>{m.sender?.full_name || 'User'}</span>
+                                                    <span>{new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ padding: '1rem', borderTop: '1px solid var(--sec-border)', background: 'var(--sec-border)', borderBottomLeftRadius: '0.5rem', borderBottomRightRadius: '0.5rem' }}>

@@ -108,6 +108,15 @@ const managerService = {
 
     markMessageRead: async (messageId) => {
         return api.post(`/user-messages/${messageId}/read/`);
+    },
+
+    // New Endpoints for Dashboard
+    getSchoolPerformance: async (period = 'monthly') => {
+        return api.get(`/reports/school-performance/?period=${period}`);
+    },
+
+    getAlerts: async () => {
+        return api.get('/notifications/alerts/');
     }
 };
 

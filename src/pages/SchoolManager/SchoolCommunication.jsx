@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import managerService from '../../services/managerService';
+import notificationService from '../../services/notificationService';
+import { api } from '../../utils/api';
 import './SchoolManager.css';
 
 import { useAuth } from '../../context/AuthContext';
@@ -28,6 +30,13 @@ const SchoolCommunication = () => {
     const [newMessage, setNewMessage] = useState('');
     const [selectedThread, setSelectedThread] = useState(null);
 
+    // Compose new message
+    const [showCompose, setShowCompose] = useState(false);
+    const [recipients, setRecipients] = useState([]);
+    const [composeRecipientId, setComposeRecipientId] = useState('');
+    const [composeSubject, setComposeSubject] = useState('');
+    const [composeBody, setComposeBody] = useState('');
+
     useEffect(() => {
         fetchData();
     }, [user, activeTab]);
@@ -37,8 +46,8 @@ const SchoolCommunication = () => {
         setLoading(true);
         try {
             const [msgsData, notifsData] = await Promise.all([
-                managerService.getMessages(),
-                managerService.getNotifications()
+                api.get('/user-messages/'),
+                notificationService.getNotifications()
             ]);
 
             const rawMessages = msgsData.results || msgsData;
@@ -73,6 +82,82 @@ const SchoolCommunication = () => {
         }
     };
 
+    const fetchRecipients = async () => {
+        try {
+            // Backend scopes this list based on the authenticated user (school manager),
+            // so we can safely request "active" users and filter client-side.
+            const usersRes = await api.get('/users/', { params: { is_active: true } });
+            const list = Array.isArray(usersRes?.results) ? usersRes.results : (Array.isArray(usersRes) ? usersRes : []);
+            const cleaned = list
+                .filter(u => u?.id && u.id !== user?.id)
+                .map(u => ({
+                    id: u.id,
+                    label: `${u.full_name || u.email} (${u.role})`,
+                }));
+            setRecipients(cleaned);
+        } catch (e) {
+            console.error('Failed to fetch recipients:', e);
+            setRecipients([]);
+        }
+    };
+
+    const openCompose = async () => {
+        setShowCompose(true);
+        setComposeRecipientId('');
+        setComposeSubject('');
+        setComposeBody('');
+        await fetchRecipients();
+    };
+
+    const handleSendNewMessage = async (e) => {
+        if (e) e.preventDefault();
+        if (!composeRecipientId || !composeSubject.trim() || !composeBody.trim()) return;
+        try {
+            await managerService.sendMessage({
+                recipient_ids: [parseInt(composeRecipientId, 10)],
+                subject: composeSubject,
+                body: composeBody,
+            });
+            setShowCompose(false);
+            setActiveTab('sent');
+            await fetchData();
+        } catch (error) {
+            console.error('Failed to send new message:', error);
+            alert('Error: ' + (error.data?.detail || error.message));
+        }
+    };
+
+    const [threadMessages, setThreadMessages] = useState([]);
+    const [loadingThread, setLoadingThread] = useState(false);
+
+    const handleMessageClick = async (thread) => {
+        setSelectedThread(thread);
+        setLoadingThread(true);
+        setThreadMessages([]);
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/user-messages/threads/${thread.thread_id}/`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            setThreadMessages(data.results || data);
+
+            // Mark as read if needed
+            const myReceipt = thread.receipts?.find(r => r.recipient?.id === user?.id);
+            if (!thread.read && myReceipt) {
+                await managerService.markMessageRead(thread.id);
+                setMessages(msgs => msgs.map(m => m.id === thread.id ? { ...m, read: true } : m));
+            }
+        } catch (error) {
+            console.error('Failed to fetch thread:', error);
+            setThreadMessages([thread]);
+        } finally {
+            setLoadingThread(false);
+        }
+    };
+
     const handleSendMessage = async (e) => {
         if (e) e.preventDefault();
         if (!newMessage.trim() || !selectedThread) return;
@@ -97,6 +182,17 @@ const SchoolCommunication = () => {
                 parent_message: selectedThread.id
             });
             setNewMessage('');
+
+            // Refresh thread
+            const threadResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/user-messages/threads/${selectedThread.thread_id}/`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const threadData = await threadResponse.json();
+            setThreadMessages(threadData.results || threadData);
+
             fetchData();
         } catch (error) {
             console.error('Failed to send message:', error);
@@ -106,10 +202,19 @@ const SchoolCommunication = () => {
 
     const handleMarkRead = async (id) => {
         try {
-            await managerService.markNotificationRead(id);
+            await notificationService.markAsRead(id);
             setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
         } catch (error) {
             console.error('Failed to mark notification as read:', error);
+        }
+    };
+
+    const handleMarkAllRead = async () => {
+        try {
+            await notificationService.markAllAsRead();
+            setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+        } catch (error) {
+            console.error('Failed to mark all notifications as read:', error);
         }
     };
 
@@ -136,7 +241,7 @@ const SchoolCommunication = () => {
                     {threadList.map((thread) => (
                         <div
                             key={thread.id}
-                            onClick={() => setSelectedThread(thread)}
+                            onClick={() => handleMessageClick(thread)}
                             style={{
                                 padding: '1.25rem',
                                 borderBottom: '1px solid var(--color-border)',
@@ -195,14 +300,40 @@ const SchoolCommunication = () => {
                             </div>
                         </div>
 
-                        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                            <div style={{ alignSelf: 'flex-start', maxWidth: '80%', backgroundColor: 'var(--color-bg-body)', padding: '1rem', borderRadius: '0 1rem 1rem 1rem', border: '1px solid var(--color-border)' }}>
-                                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '4px' }}>{selectedThread.subject}</div>
-                                <p style={{ margin: 0, fontSize: '0.925rem', lineHeight: '1.5', whiteSpace: 'pre-line' }}>{selectedThread.body}</p>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '6px', display: 'block' }}>
-                                    {new Date(selectedThread.sent_at || selectedThread.created_at).toLocaleString()}
-                                </span>
-                            </div>
+                        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            {loadingThread ? (
+                                <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Loading conversation...</div>
+                            ) : (
+                                threadMessages.map(m => (
+                                    <div
+                                        key={m.id}
+                                        style={{
+                                            alignSelf: m.sender?.id === user?.id ? 'flex-end' : 'flex-start',
+                                            maxWidth: '80%',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: m.sender?.id === user?.id ? 'flex-end' : 'flex-start'
+                                        }}
+                                    >
+                                        <div style={{
+                                            padding: '0.75rem 1rem',
+                                            borderRadius: '1rem',
+                                            background: m.sender?.id === user?.id ? 'var(--color-primary)' : 'var(--color-bg-body)',
+                                            color: m.sender?.id === user?.id ? 'white' : 'var(--color-text-main)',
+                                            borderBottomRightRadius: m.sender?.id === user?.id ? '0' : '1rem',
+                                            borderBottomLeftRadius: m.sender?.id === user?.id ? '1rem' : '0',
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                            border: m.sender?.id === user?.id ? 'none' : '1px solid var(--color-border)'
+                                        }}>
+                                            <p style={{ margin: 0, fontSize: '0.9rem', whiteSpace: 'pre-line' }}>{m.body}</p>
+                                        </div>
+                                        <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--color-text-muted)', display: 'flex', gap: '8px' }}>
+                                            <span>{m.sender?.full_name || 'User'}</span>
+                                            <span>{new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
 
                         <form onSubmit={handleSendMessage} style={{ padding: '1.25rem', borderTop: '1px solid var(--color-border)', display: 'flex', gap: '1rem' }}>
@@ -230,8 +361,16 @@ const SchoolCommunication = () => {
 
     const renderNotifications = () => (
         <div className="management-card">
-            <div className="table-header-actions">
-                <h3 className="chart-title">{t('communication.notificationCenter')}</h3>
+            <div className="table-header-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 className="chart-title" style={{ margin: 0 }}>{t('communication.notificationCenter')}</h3>
+                {notifications.some(n => !n.is_read) && (
+                    <button
+                        onClick={handleMarkAllRead}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                        {t('header.markAllRead')}
+                    </button>
+                )}
             </div>
             <div style={{ padding: '0' }}>
                 {notifications.length === 0 && (
@@ -288,6 +427,14 @@ const SchoolCommunication = () => {
                     <p className="school-manager-subtitle">{t('communication.subtitle')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button
+                        className="btn-primary"
+                        onClick={openCompose}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1.1rem', borderRadius: '0.75rem' }}
+                    >
+                        <Plus size={18} />
+                        {t('communication.newMessage') || 'New message'}
+                    </button>
                     <button className={`tab-btn ${activeTab === 'received' ? 'active' : ''}`} onClick={() => setActiveTab('received')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1.2rem', borderRadius: '0.75rem', border: '1px solid var(--color-border)', background: activeTab === 'received' ? 'var(--color-primary)' : 'var(--color-bg-surface)', color: activeTab === 'received' ? '#fff' : 'var(--color-text-muted)', cursor: 'pointer', fontWeight: 500 }}>
                         <MessageSquare size={18} />
                         {t('communication.received')}
@@ -307,6 +454,112 @@ const SchoolCommunication = () => {
                     </button>
                 </div>
             </div>
+
+            {showCompose && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.45)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '1rem',
+                    }}
+                    onClick={() => setShowCompose(false)}
+                >
+                    <div
+                        className="management-card"
+                        style={{ width: '640px', maxWidth: '100%', padding: '1.5rem' }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="chart-title" style={{ marginTop: 0, marginBottom: '1rem' }}>
+                            {t('communication.newMessage') || 'New message'}
+                        </h3>
+
+                        <form onSubmit={handleSendNewMessage} style={{ display: 'grid', gap: '0.75rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    {t('communication.to') || 'To'}
+                                </label>
+                                <select
+                                    value={composeRecipientId}
+                                    onChange={(e) => setComposeRecipientId(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.65rem 0.75rem',
+                                        borderRadius: '0.5rem',
+                                        border: '1px solid var(--color-border)',
+                                    }}
+                                    required
+                                >
+                                    <option value="">{t('communication.selectRecipient') || 'Select recipient'}</option>
+                                    {recipients.map(r => (
+                                        <option key={r.id} value={r.id}>{r.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    {t('communication.subject') || 'Subject'}
+                                </label>
+                                <input
+                                    value={composeSubject}
+                                    onChange={(e) => setComposeSubject(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.65rem 0.75rem',
+                                        borderRadius: '0.5rem',
+                                        border: '1px solid var(--color-border)',
+                                    }}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    {t('communication.message') || 'Message'}
+                                </label>
+                                <textarea
+                                    value={composeBody}
+                                    onChange={(e) => setComposeBody(e.target.value)}
+                                    rows={6}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.65rem 0.75rem',
+                                        borderRadius: '0.5rem',
+                                        border: '1px solid var(--color-border)',
+                                        resize: 'vertical',
+                                    }}
+                                    required
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCompose(false)}
+                                    style={{
+                                        padding: '0.6rem 1rem',
+                                        borderRadius: '0.75rem',
+                                        border: '1px solid var(--color-border)',
+                                        background: 'white',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {t('common.cancel') || 'Cancel'}
+                                </button>
+                                <button type="submit" className="btn-primary" style={{ padding: '0.6rem 1rem', borderRadius: '0.75rem' }}>
+                                    <Send size={18} />
+                                    {t('communication.send') || 'Send'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {loading ? (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>Loading...</div>

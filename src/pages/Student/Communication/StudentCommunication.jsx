@@ -16,6 +16,8 @@ import {
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
 import studentService from '../../../services/studentService';
+import notificationService from '../../../services/notificationService';
+import { api } from '../../../utils/api';
 import '../Student.css';
 
 const StudentCommunication = () => {
@@ -28,39 +30,51 @@ const StudentCommunication = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [messages, setMessages] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+
+    const fetchData = async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            const [msgsData, notifsData] = await Promise.all([
+                api.get('/user-messages/'),
+                notificationService.getNotifications()
+            ]);
+
+            const msgs = (msgsData.results || msgsData || []).map(m => ({
+                id: m.id,
+                sender: m.sender?.full_name || m.sender?.email || 'System',
+                senderRole: m.sender?.role || 'Staff',
+                avatar: (m.sender?.full_name || m.sender?.email || 'S').charAt(0),
+                subject: m.subject || '(No Subject)',
+                preview: m.body?.substring(0, 60) + '...',
+                date: new Date(m.sent_at || m.created_at).toLocaleDateString(),
+                unread: !m.receipts?.find(r => r.recipient?.id === user?.id)?.is_read,
+                thread_id: m.thread_id,
+                sender_id: m.sender?.id,
+                body: m.body
+            }));
+            setMessages(msgs);
+            setNotifications(notifsData.results || notifsData || []);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     React.useEffect(() => {
-        const fetchMessages = async () => {
-            try {
-                const data = await studentService.getMessages();
-                const msgs = (data.results || data || []).map(m => ({
-                    id: m.id,
-                    sender: m.sender_name || 'System',
-                    senderRole: m.sender_role || 'Staff',
-                    avatar: m.sender_name?.charAt(0) || 'S',
-                    subject: m.subject || '(No Subject)',
-                    preview: m.body?.substring(0, 60) + '...',
-                    date: new Date(m.created_at).toLocaleDateString(),
-                    unread: !m.is_read,
-                    starred: false,
-                    thread_id: m.thread_id,
-                    body: m.body
-                }));
-                setMessages(msgs);
-            } catch (error) {
-                console.error('Error fetching messages:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchMessages();
-    }, []);
+        fetchData();
+    }, [user]);
 
-    const notifications = [
-        { id: 1, type: 'grade', title: 'New Grade Posted', message: 'Mathematics Quiz 3 - Score: 92%', time: '2 hours ago' },
-        { id: 2, type: 'assignment', title: 'Assignment Due Soon', message: 'Physics Lab Report due tomorrow', time: '5 hours ago' },
-        { id: 3, type: 'announcement', title: 'School Announcement', message: 'Holiday break starts December 20th', time: 'Yesterday' },
-    ];
+    const handleMarkAllRead = async () => {
+        try {
+            await notificationService.markAllAsRead();
+            setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+        } catch (error) {
+            console.error('Error marking all read:', error);
+        }
+    };
 
     const [newMessage, setNewMessage] = useState({ to: '', subject: '', body: '' });
 
@@ -93,24 +107,65 @@ const StudentCommunication = () => {
         }
     };
 
-    const handleSendReply = () => {
-        if (!replyText.trim()) return;
+    const [threadMessages, setThreadMessages] = useState([]);
+    const [loadingThread, setLoadingThread] = useState(false);
 
-        const updatedMessages = messages.map(msg => {
-            if (msg.id === selectedMessage.id) {
-                const newThread = [
-                    ...msg.thread,
-                    { id: Date.now(), from: 'Me', text: replyText, time: 'Just now' }
-                ];
-                const updatedMsg = { ...msg, thread: newThread };
-                setSelectedMessage(updatedMsg);
-                return updatedMsg;
+    const handleMessageClick = async (msg) => {
+        setSelectedMessage(msg);
+        setLoadingThread(true);
+        setThreadMessages([]);
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/user-messages/threads/${msg.thread_id}/`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            setThreadMessages(data.results || data);
+
+            if (msg.unread) {
+                await studentService.markMessageRead(msg.id);
+                setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, unread: false } : m));
             }
-            return msg;
-        });
+        } catch (error) {
+            console.error('Error fetching thread:', error);
+            setThreadMessages([{
+                id: msg.id,
+                sender: { full_name: msg.sender, id: msg.sender_id },
+                body: msg.body,
+                sent_at: msg.created_at
+            }]);
+        } finally {
+            setLoadingThread(false);
+        }
+    };
 
-        setMessages(updatedMessages);
-        setReplyText('');
+    const handleSendReply = async () => {
+        if (!replyText.trim() || !selectedMessage) return;
+
+        try {
+            await studentService.sendMessage({
+                recipient_id: selectedMessage.sender_id || 1, // Fallback if missing
+                subject: `Re: ${selectedMessage.subject}`,
+                body: replyText,
+                thread_id: selectedMessage.thread_id,
+                parent_message: selectedMessage.id
+            });
+            setReplyText('');
+
+            // Refresh thread
+            const threadResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/user-messages/threads/${selectedMessage.thread_id}/`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const threadData = await threadResponse.json();
+            setThreadMessages(threadData.results || threadData);
+        } catch (error) {
+            console.error('Error sending reply:', error);
+        }
     };
 
     const toggleStar = (id, e) => {
@@ -235,8 +290,21 @@ const StudentCommunication = () => {
                         >
                             <Bell size={16} />
                             Notifications
+                            {notifications.filter(n => !n.is_read).length > 0 && (
+                                <span className="badge">{notifications.filter(n => !n.is_read).length}</span>
+                            )}
                         </button>
                     </div>
+                    {selectedTab === 'notifications' && notifications.some(n => !n.is_read) && (
+                        <div style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid rgba(8, 145, 178, 0.08)' }}>
+                            <button
+                                onClick={handleMarkAllRead}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: 'var(--student-primary)' }}
+                            >
+                                {t('header.markAllRead')}
+                            </button>
+                        </div>
+                    )}
 
                     {/* Message List */}
                     <div className="message-list">
@@ -246,7 +314,7 @@ const StudentCommunication = () => {
                                     <div
                                         key={msg.id}
                                         className={`message-item ${selectedMessage?.id === msg.id ? 'active' : ''} ${msg.unread ? 'unread' : ''}`}
-                                        onClick={() => setSelectedMessage(msg)}
+                                        onClick={() => handleMessageClick(msg)}
                                     >
                                         <div className="message-avatar" style={{ background: msg.unread ? 'var(--student-gradient)' : '#e0f2fe' }}>
                                             <span style={{ color: msg.unread ? 'white' : 'var(--student-primary)' }}>{msg.avatar}</span>
@@ -275,16 +343,29 @@ const StudentCommunication = () => {
                             )
                         ) : (
                             notifications.map((notif) => (
-                                <div key={notif.id} className="notification-item">
-                                    <div className="notif-icon">
-                                        <Bell size={16} />
+                                notifications.map((notif) => (
+                                    <div key={notif.id} className={`notification-item ${!notif.is_read ? 'unread' : ''}`} style={{ background: !notif.is_read ? 'rgba(8, 145, 178, 0.03)' : 'transparent' }}>
+                                        <div className="notif-icon">
+                                            <Bell size={16} />
+                                        </div>
+                                        <div className="notif-content">
+                                            <div className="notif-title">{notif.title}</div>
+                                            <div className="notif-message">{notif.message}</div>
+                                            <div className="notif-time">{new Date(notif.created_at).toLocaleDateString()}</div>
+                                            {!notif.is_read && (
+                                                <button
+                                                    onClick={async () => {
+                                                        await notificationService.markAsRead(notif.id);
+                                                        setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                                                    }}
+                                                    style={{ background: 'none', border: 'none', color: 'var(--student-primary)', fontSize: '0.75rem', fontWeight: '500', cursor: 'pointer', padding: 0, marginTop: '4px' }}
+                                                >
+                                                    Mark as read
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="notif-content">
-                                        <div className="notif-title">{notif.title}</div>
-                                        <div className="notif-message">{notif.message}</div>
-                                        <div className="notif-time">{notif.time}</div>
-                                    </div>
-                                </div>
+                                ))
                             ))
                         )}
                     </div>
@@ -315,14 +396,18 @@ const StudentCommunication = () => {
                             </div>
 
                             <div className="message-thread">
-                                {selectedMessage.thread.map(msg => (
-                                    <div key={msg.id} className={`thread-message ${msg.from === 'Me' ? 'sent' : 'received'}`}>
-                                        <div className="bubble">
-                                            <p>{msg.text}</p>
+                                {loadingThread ? (
+                                    <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', paddingTop: '2rem' }}>Loading conversation...</div>
+                                ) : (
+                                    threadMessages.map(m => (
+                                        <div key={m.id} className={`thread-message ${m.sender?.id === user?.id ? 'sent' : 'received'}`}>
+                                            <div className="bubble">
+                                                <p>{m.body}</p>
+                                            </div>
+                                            <span className="time">{new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
-                                        <span className="time">{msg.time}</span>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
 
                             <div className="reply-box">

@@ -3,6 +3,7 @@ import { School, Users, GraduationCap, TrendingUp, TrendingDown, Activity, Award
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import workstreamService from '../../services/workstreamService';
+import ActivityChart from '../../components/charts/ActivityChart';
 import './Workstream.css';
 
 const WorkstreamDashboard = () => {
@@ -11,6 +12,7 @@ const WorkstreamDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [dashboardData, setDashboardData] = useState(null);
     const [recentActivities, setRecentActivities] = useState([]);
+    const [activityData, setActivityData] = useState([]);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -18,6 +20,7 @@ const WorkstreamDashboard = () => {
                 const response = await workstreamService.getDashboardStatistics();
                 setDashboardData(response.statistics);
                 setRecentActivities(response.recent_activity || []);
+                setActivityData(response.activity_chart || []);
             } catch (error) {
                 console.error('Failed to fetch dashboard data:', error);
             } finally {
@@ -129,6 +132,16 @@ const WorkstreamDashboard = () => {
                 ))}
             </div>
 
+            {/* Activity Chart */}
+            <div style={{ marginBottom: '24px' }}>
+                <ActivityChart
+                    data={activityData}
+                    loading={loading}
+                    title={t('dashboard.charts.activity')}
+                    subtitle="Workstream-wide login activity and engagement trends"
+                />
+            </div>
+
             {/* Content Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
                 {/* School Performance Chart */}
@@ -137,8 +150,8 @@ const WorkstreamDashboard = () => {
                         <h3 className="chart-title">{t('workstream.dashboard.academicPerformance')}</h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {schoolPerformance.map((school, index) => {
-                            const score = school.score || 85; // Fallback score
+                        {schoolPerformance.length > 0 ? schoolPerformance.map((school, index) => {
+                            const score = school.score || 85;
                             const name = school.school_name || school.name;
                             const students = school.count || school.students;
                             return (
@@ -187,7 +200,7 @@ const WorkstreamDashboard = () => {
                                     </div>
                                 </div>
                             );
-                        })}
+                        }) : <div style={{ padding: '20px', color: 'var(--color-text-muted)' }}>No school data available</div>}
                     </div>
                 </div>
 
@@ -229,44 +242,79 @@ const WorkstreamDashboard = () => {
             </div>
 
             {/* Enrollment Trends */}
-            <div className="chart-card" style={{ marginTop: '24px' }}>
-                <div className="chart-header">
-                    <h3 className="chart-title">{t('workstream.dashboard.enrollmentTrends')}</h3>
-                </div>
-                <div className="css-chart-container" style={{ height: '180px' }}>
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, index) => {
-                        const enrollment = [85, 92, 78, 95, 88, 102][index];
-                        const graduates = [45, 52, 48, 55, 62, 58][index];
-                        return (
-                            <div key={month} className="css-bar-group">
-                                <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
-                                    <div
-                                        className="css-bar"
-                                        style={{ height: `${enrollment * 1.2}px`, width: '24px' }}
-                                        data-value={enrollment}
-                                    ></div>
-                                    <div
-                                        className="css-bar secondary"
-                                        style={{ height: `${graduates * 1.2}px`, width: '24px' }}
-                                        data-value={graduates}
-                                    ></div>
-                                </div>
-                                <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', marginTop: '8px' }}>{month}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-                <div className="chart-legend">
-                    <div className="legend-item">
-                        <div className="legend-color" style={{ background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)' }}></div>
-                        <span>New Enrollments</span>
-                    </div>
-                    <div className="legend-item">
-                        <div className="legend-color" style={{ background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)' }}></div>
-                        <span>Graduates</span>
-                    </div>
-                </div>
+            <EnrollmentTrendsChart />
+        </div>
+    );
+};
+
+const EnrollmentTrendsChart = () => {
+    const { t } = useTheme();
+    const [data, setData] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const res = await workstreamService.getEnrollmentTrends();
+                setData(res.results || res || []);
+            } catch (e) {
+                console.error("Trends error", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const chartData = data.length > 0 ? data : [
+        { month: 'Jan', enrollment: 85, graduates: 45 },
+        { month: 'Feb', enrollment: 92, graduates: 52 },
+        { month: 'Mar', enrollment: 78, graduates: 48 },
+        { month: 'Apr', enrollment: 95, graduates: 55 },
+        { month: 'May', enrollment: 88, graduates: 62 },
+        { month: 'Jun', enrollment: 102, graduates: 58 },
+    ];
+
+    return (
+        <div className="chart-card" style={{ marginTop: '24px' }}>
+            <div className="chart-header">
+                <h3 className="chart-title">{t('workstream.dashboard.enrollmentTrends')}</h3>
             </div>
+            {loading ? <div style={{ padding: '20px' }}>Loading trends...</div> : (
+                <>
+                    <div className="css-chart-container" style={{ height: '180px' }}>
+                        {chartData.map((item, index) => {
+                            return (
+                                <div key={item.month || index} className="css-bar-group">
+                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
+                                        <div
+                                            className="css-bar"
+                                            style={{ height: `${(item.enrollment || 0) * 1.2}px`, width: '24px' }}
+                                            data-value={item.enrollment}
+                                        ></div>
+                                        <div
+                                            className="css-bar secondary"
+                                            style={{ height: `${(item.graduates || 0) * 1.2}px`, width: '24px' }}
+                                            data-value={item.graduates}
+                                        ></div>
+                                    </div>
+                                    <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', marginTop: '8px' }}>{item.month}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="chart-legend">
+                        <div className="legend-item">
+                            <div className="legend-color" style={{ background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)' }}></div>
+                            <span>New Enrollments</span>
+                        </div>
+                        <div className="legend-item">
+                            <div className="legend-color" style={{ background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)' }}></div>
+                            <span>Graduates</span>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };
