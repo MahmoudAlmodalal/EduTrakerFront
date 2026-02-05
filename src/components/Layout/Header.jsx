@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Menu, Bell, LogOut, Sun, Moon, Search, User, GraduationCap, X } from 'lucide-react';
 import styles from './Header.module.css';
 import notificationService from '../../services/notificationService';
+import { useCachedApi } from '../../hooks/useCachedApi';
 
 const Header = ({ toggleSidebar, isSidebarOpen }) => {
     const { logout, user } = useAuth();
@@ -12,41 +13,61 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
     const searchInputRef = useRef(null);
-    const [notifications, setNotifications] = useState([]);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const fetchNotifications = async () => {
-        if (!user) return;
-        setLoading(true);
-        try {
-            const [notifsData, countData] = await Promise.all([
-                notificationService.getNotifications({ page_size: 5 }),
-                notificationService.getUnreadCount()
-            ]);
-            console.log('Fetched notifications:', notifsData);
-            setNotifications(notifsData.results || notifsData);
-            setUnreadCount(countData.unread_count);
-        } catch (err) {
-            console.error('Error fetching notifications:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Check if we have a valid token
+    const hasValidToken = !!user && !!localStorage.getItem('accessToken');
 
-    useEffect(() => {
-        fetchNotifications();
-        // Poll for new notifications every 30 seconds
-        const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
-    }, [user]);
+    // Fetch notifications with caching (5 minute TTL)
+    const {
+        data: notificationsData,
+        loading: notificationsLoading,
+        refetch: refetchNotifications,
+        error: notificationsError
+    } = useCachedApi(
+        () => notificationService.getNotifications({ page_size: 5 }),
+        {
+            enabled: hasValidToken,
+            cacheKey: `notifications_${user?.id}`,
+            ttl: 5 * 60 * 1000, // 5 minutes
+            dependencies: [user?.id]
+        }
+    );
+
+    // Fetch unread count with caching (2 minute TTL)
+    const {
+        data: unreadData,
+        loading: unreadLoading,
+        refetch: refetchUnreadCount,
+        error: unreadError
+    } = useCachedApi(
+        () => notificationService.getUnreadCount(),
+        {
+            enabled: hasValidToken,
+            cacheKey: `unread_count_${user?.id}`,
+            ttl: 2 * 60 * 1000, // 2 minutes
+            dependencies: [user?.id]
+        }
+    );
+
+    // If we get 401 errors, logout the user
+    React.useEffect(() => {
+        if (notificationsError?.includes('401') || unreadError?.includes('401')) {
+            console.warn('Token expired, logging out...');
+            logout();
+        }
+    }, [notificationsError, unreadError, logout]);
+
+    const notifications = notificationsData?.results || notificationsData || [];
+    const unreadCount = unreadData?.unread_count || 0;
+    const loading = notificationsLoading || unreadLoading;
 
     const handleMarkAllRead = async () => {
         try {
             await notificationService.markAllAsRead();
-            setUnreadCount(0);
-            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+            // Refresh both notifications and count
+            refetchNotifications();
+            refetchUnreadCount();
         } catch (err) {
             console.error('Error marking all read:', err);
         }
@@ -56,8 +77,9 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
         if (!notif.is_read) {
             try {
                 await notificationService.markAsRead(notif.id);
-                setUnreadCount(prev => Math.max(0, prev - 1));
-                setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                // Refresh both notifications and count
+                refetchNotifications();
+                refetchUnreadCount();
             } catch (err) {
                 console.error('Error marking notification read:', err);
             }

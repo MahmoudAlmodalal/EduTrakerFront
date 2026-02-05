@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { sessionCache, generateCacheKey } from '../utils/sessionCache';
 
 /**
@@ -50,11 +50,20 @@ export const useCachedApi = (apiFunction, options = {}) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Store apiFunction in ref to prevent it from triggering re-fetches
+    const apiFunctionRef = useRef(apiFunction);
+    useEffect(() => {
+        apiFunctionRef.current = apiFunction;
+    }, [apiFunction]);
+
+    // Memoize dependencies to prevent infinite loop
+    const stableDependencies = useMemo(() => dependencies, [JSON.stringify(dependencies)]);
+
     // Generate cache key based on function name and dependencies
     const functionName = useRef(apiFunction.name || 'api_call');
-    const cacheKey = customCacheKey || generateCacheKey(
-        functionName.current,
-        dependencies
+    const cacheKey = useMemo(
+        () => customCacheKey || generateCacheKey(functionName.current, stableDependencies),
+        [customCacheKey, stableDependencies]
     );
 
     /**
@@ -80,8 +89,8 @@ export const useCachedApi = (apiFunction, options = {}) => {
                 }
             }
 
-            // Make API call
-            const response = await apiFunction();
+            // Make API call using ref to get latest function
+            const response = await apiFunctionRef.current();
 
             // Handle different response structures
             const responseData = response?.data !== undefined ? response.data : response;
@@ -102,7 +111,7 @@ export const useCachedApi = (apiFunction, options = {}) => {
         } finally {
             setLoading(false);
         }
-    }, [apiFunction, cacheKey, enabled, skipCache, ttl]);
+    }, [cacheKey, enabled, skipCache, ttl]);
 
     /**
      * Invalidate cache for this endpoint
@@ -121,7 +130,8 @@ export const useCachedApi = (apiFunction, options = {}) => {
     // Fetch data on mount and when dependencies change
     useEffect(() => {
         fetchData();
-    }, [fetchData, ...dependencies]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [enabled, cacheKey, skipCache]);
 
     return {
         data,

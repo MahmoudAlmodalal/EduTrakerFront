@@ -19,6 +19,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import notificationService from '../services/notificationService';
 import { useEffect, useState } from 'react';
+import { useCachedApi } from '../hooks/useCachedApi';
 
 const WorkstreamLayout = () => {
     const { t } = useTheme();
@@ -44,23 +45,30 @@ const WorkstreamLayout = () => {
         navigate('/login');
     };
 
-    const [unreadCount, setUnreadCount] = useState(0);
+    // Check if we have a valid token
+    const hasValidToken = !!user && !!localStorage.getItem('accessToken');
 
+    // Fetch unread count with caching (2 minute TTL)
+    const { data: unreadData, error: unreadError } = useCachedApi(
+        () => notificationService.getUnreadCount(),
+        {
+            enabled: hasValidToken,
+            cacheKey: `unread_count_${user?.id}`,
+            ttl: 2 * 60 * 1000, // 2 minutes
+            dependencies: [user?.id]
+        }
+    );
+
+    // If we get 401 errors, logout the user
     useEffect(() => {
-        const fetchUnreadCount = async () => {
-            if (!user) return;
-            try {
-                const data = await notificationService.getUnreadCount();
-                setUnreadCount(data.unread_count);
-            } catch (err) {
-                console.error('Error fetching unread count:', err);
-            }
-        };
+        if (unreadError?.includes('401')) {
+            console.warn('Token expired, logging out...');
+            logout();
+            navigate('/login');
+        }
+    }, [unreadError, logout, navigate]);
 
-        fetchUnreadCount();
-        const interval = setInterval(fetchUnreadCount, 30000);
-        return () => clearInterval(interval);
-    }, [user]);
+    const unreadCount = unreadData?.unread_count || 0;
 
     const getInitials = () => {
         if (user?.name) {

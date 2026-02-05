@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { getRoleConfig, getBasePath } from '../config/roleConfig';
 import authService from '../services/authService';
 import { sessionCache } from '../utils/sessionCache';
+import SessionManager from '../utils/sessionManager';
+import { api } from '../utils/api';
 
 // Map Django backend roles to frontend role keys
 const ROLE_MAP = {
@@ -32,27 +34,109 @@ export const AuthProvider = ({ children }) => {
     const [workstreamId, setWorkstreamId] = useState(null);
     const navigate = useNavigate();
 
-    // Restore session on load
+    // Restore session on load and check for extension
     useEffect(() => {
-        const accessToken = localStorage.getItem('accessToken');
-        const savedUser = localStorage.getItem('user');
-        const savedPortalType = localStorage.getItem('portalType');
-        const savedWorkstreamId = localStorage.getItem('workstreamId');
+        const checkAndRestoreSession = async () => {
+            const accessToken = localStorage.getItem('accessToken');
+            const refreshToken = localStorage.getItem('refreshToken');
+            const savedUser = localStorage.getItem('user');
+            const savedPortalType = localStorage.getItem('portalType');
+            const savedWorkstreamId = localStorage.getItem('workstreamId');
 
-        if (accessToken && savedUser) {
-            try {
-                const parsedUser = JSON.parse(savedUser);
-                const roleConfig = getRoleConfig(parsedUser.role);
-                setUser(parsedUser);
-                setPermissions(roleConfig?.permissions || []);
-                setPortalType(savedPortalType);
-                setWorkstreamId(savedWorkstreamId);
-            } catch (e) {
-                console.error('Failed to restore session:', e);
-                localStorage.clear();
+            if (accessToken && savedUser) {
+                try {
+                    const parsedUser = JSON.parse(savedUser);
+                    const roleConfig = getRoleConfig(parsedUser.role);
+
+                    // Check if session tracking exists
+                    const sessionInfo = SessionManager.getSessionInfo();
+
+                    // If no session info, user just logged in - skip check
+                    if (!sessionInfo) {
+                        console.log('Fresh login - skipping session check');
+                        setUser(parsedUser);
+                        setPermissions(roleConfig?.permissions || []);
+                        setPortalType(savedPortalType);
+                        setWorkstreamId(savedWorkstreamId);
+                        return;
+                    }
+
+                    // Check session status
+                    const sessionCheck = SessionManager.checkSession();
+
+                    console.log('Session check:', sessionCheck);
+
+                    if (!sessionCheck.isValid) {
+                        // Session expired and cannot extend - force logout
+                        console.warn('⛔ Session expired:', sessionCheck.reason);
+                        localStorage.clear();
+                        sessionCache.clear();
+                        SessionManager.clearSession();
+                        navigate('/login');
+                        return;
+                    }
+
+                    if (sessionCheck.shouldExtend) {
+                        // Session expired but can extend - refresh token
+                        console.log('🔄 Extending session...');
+                        try {
+                            const response = await api.post('/auth/token/refresh/', {
+                                refresh: refreshToken
+                            });
+
+                            // Update tokens
+                            localStorage.setItem('accessToken', response.access);
+
+                            // Extend session
+                            const extensionResult = SessionManager.extendSession();
+
+                            if (extensionResult.success) {
+                                console.log('✅ Session extended:', extensionResult.reason);
+                            } else {
+                                console.error('❌ Failed to extend session:', extensionResult.reason);
+                                localStorage.clear();
+                                sessionCache.clear();
+                                SessionManager.clearSession();
+                                navigate('/login');
+                                return;
+                            }
+                        } catch (error) {
+                            console.error('❌ Token refresh failed:', error);
+                            localStorage.clear();
+                            sessionCache.clear();
+                            SessionManager.clearSession();
+                            navigate('/login');
+                            return;
+                        }
+                    }
+
+                    // Session is valid - restore user
+                    setUser(parsedUser);
+                    setPermissions(roleConfig?.permissions || []);
+                    setPortalType(savedPortalType);
+                    setWorkstreamId(savedWorkstreamId);
+
+                    // Log session stats
+                    const stats = SessionManager.getSessionStats();
+                    if (stats) {
+                        console.log('📊 Session stats:', {
+                            timeRemaining: SessionManager.formatTimeRemaining(stats.timeRemainingInCurrentPeriod),
+                            extensionsUsed: stats.extensionCount,
+                            extensionsLeft: stats.extensionsLeft
+                        });
+                    }
+
+                } catch (e) {
+                    console.error('Failed to restore session:', e);
+                    localStorage.clear();
+                    sessionCache.clear();
+                    SessionManager.clearSession();
+                }
             }
-        }
-    }, []);
+        };
+
+        checkAndRestoreSession();
+    }, [navigate]);
 
     /**
      * @param {Object} authData - The response from the login API
@@ -93,7 +177,15 @@ export const AuthProvider = ({ children }) => {
         // 3. Set permissions
         setPermissions(roleConfig?.permissions || []);
 
-        // 4. Redirect to the role's base path
+        // 4. Initialize session tracking
+        const sessionInfo = SessionManager.initSession();
+        console.log('✅ Session initialized:', {
+            duration: '30 minutes',
+            maxExtensions: 2,
+            totalMaxTime: '90 minutes'
+        });
+
+        // 5. Redirect to the role's base path
         const basePath = getBasePath(roleKey);
         console.log('Navigating to:', basePath);
         navigate(basePath);
@@ -121,13 +213,16 @@ export const AuthProvider = ({ children }) => {
         // 2. Clear session cache
         sessionCache.clear();
 
-        // 3. Reset state
+        // 3. Clear session manager
+        SessionManager.clearSession();
+
+        // 4. Reset state
         setUser(null);
         setPermissions([]);
         setPortalType(null);
         setWorkstreamId(null);
 
-        // 4. Redirect to login
+        // 5. Redirect to login
         navigate('/login');
     }, [navigate]);
 
