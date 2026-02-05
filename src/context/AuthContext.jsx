@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { useNavigate } from 'react-router-dom';
 import { getRoleConfig, getBasePath } from '../config/roleConfig';
 import authService from '../services/authService';
+import { sessionCache } from '../utils/sessionCache';
 
 // Map Django backend roles to frontend role keys
 const ROLE_MAP = {
@@ -117,13 +118,16 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('portalType');
         localStorage.removeItem('workstreamId');
 
-        // 2. Reset state
+        // 2. Clear session cache
+        sessionCache.clear();
+
+        // 3. Reset state
         setUser(null);
         setPermissions([]);
         setPortalType(null);
         setWorkstreamId(null);
 
-        // 3. Redirect to login
+        // 4. Redirect to login
         navigate('/login');
     }, [navigate]);
 

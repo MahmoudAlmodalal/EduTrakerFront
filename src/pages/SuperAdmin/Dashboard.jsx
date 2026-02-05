@@ -177,11 +177,24 @@ const Dashboard = () => {
                             activities.slice(0, 5).map((activity, index) => (
                                 <div key={activity.id || index} className={styles.activityItem}>
                                     <div className={styles.activityIcon}>
-                                        {activity.type === 'alert' ? <ShieldCheck size={16} /> : <Bell size={16} />}
+                                        {activity.action_type === 'create' && <UserPlus size={16} />}
+                                        {activity.action_type === 'update' && <ActivityIcon size={16} />}
+                                        {activity.action_type === 'delete' && <ShieldCheck size={16} />}
+                                        {!activity.action_type && (activity.type === 'alert' ? <ShieldCheck size={16} /> : <Bell size={16} />)}
                                     </div>
                                     <div className={styles.activityContent}>
-                                        <p className={styles.activityText}>{t(activity.message) || t(activity.title)}</p>
-                                        <span className={styles.activityTime}>{activity.created_at_human || t('dashboard.activity.justNow') || 'Just now'}</span>
+                                        <p className={styles.activityText}>
+                                            {activity.description || t(activity.message) || t(activity.title)}
+                                        </p>
+                                        <div className={styles.activityMeta}>
+                                            <span className={styles.activityUser}>
+                                                {activity.actor_name || 'System'}
+                                            </span>
+                                            <span className={styles.activitySeparator}>•</span>
+                                            <span className={styles.activityTime}>
+                                                {activity.created_at_human || t('dashboard.activity.justNow') || 'Just now'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             ))

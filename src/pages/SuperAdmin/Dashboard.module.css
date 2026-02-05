@@ -251,6 +251,26 @@
     line-height: 1.4;
 }
 
+.activityMeta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+}
+
+.activityUser {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: 0.01em;
+}
+
+.activitySeparator {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    opacity: 0.5;
+}
+
 .activityTime {
     font-size: 0.75rem;
     font-weight: 600;
