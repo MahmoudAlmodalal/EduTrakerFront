@@ -184,11 +184,11 @@ const Dashboard = () => {
                                     </div>
                                     <div className={styles.activityContent}>
                                         <p className={styles.activityText}>
-                                            {activity.description || t(activity.message) || t(activity.title)}
+                                            {activity.description?.replace(/^User\s+/i, '').replace(/user\s+/gi, '') || t(activity.message) || t(activity.title)}
                                         </p>
                                         <div className={styles.activityMeta}>
                                             <span className={styles.activityUser}>
-                                                {activity.actor_name || 'System'}
+                                                {activity.actor_name?.replace(/^User\s+/i, '') || 'System'}
                                             </span>
                                             <span className={styles.activitySeparator}>•</span>
                                             <span className={styles.activityTime}>
