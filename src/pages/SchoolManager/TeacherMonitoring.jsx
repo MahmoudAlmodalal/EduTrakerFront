@@ -24,21 +24,27 @@ const TeacherMonitoring = () => {
     const [evaluations, setEvaluations] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const schoolId = user?.school;
+    const schoolId = user?.school_id || user?.school?.id || user?.school;
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!schoolId) return;
+            if (!schoolId) {
+                console.warn('No school ID found for user');
+                setLoading(false);
+                return;
+            }
             setLoading(true);
             try {
                 const [teachersData, evaluationsData] = await Promise.all([
                     managerService.getTeachers(),
                     managerService.getStaffEvaluations()
                 ]);
-                setTeachers(teachersData.results || teachersData);
-                setEvaluations(evaluationsData.results || evaluationsData);
+                setTeachers(teachersData.results || teachersData || []);
+                setEvaluations(evaluationsData.results || evaluationsData || []);
             } catch (error) {
                 console.error('Failed to fetch teacher monitoring data:', error);
+                setTeachers([]);
+                setEvaluations([]);
             } finally {
                 setLoading(false);
             }
@@ -143,14 +149,93 @@ const TeacherMonitoring = () => {
 
 // Sub-components
 const TeacherDirectory = ({ teachers, setTeachers, t }) => {
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to deactivate this teacher?')) {
-            try {
-                await managerService.deactivateTeacher(id);
-                setTeachers(teachers.filter(t => t.id !== id));
-            } catch (error) {
-                console.error('Failed to deactivate teacher:', error);
-            }
+    const { user } = useAuth();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({
+        full_name: '',
+        email: '',
+        password: 'test1234',
+        specialization: '',
+        employment_status: 'full_time',
+        hire_date: new Date().toISOString().split('T')[0]
+    });
+
+    const handleDeactivate = async (teacher) => {
+        const id = teacher.user_id || teacher.id;
+        const name = teacher.full_name || teacher.name || 'this teacher';
+        if (!window.confirm(`Are you sure you want to deactivate ${name}?`)) return;
+        try {
+            await managerService.deactivateTeacher(id);
+            const response = await managerService.getTeachers();
+            setTeachers(response.results || response || []);
+        } catch (error) {
+            console.error('Failed to deactivate teacher:', error);
+            alert('Failed to deactivate teacher.');
+        }
+    };
+
+    const handleActivate = async (teacher) => {
+        const id = teacher.user_id || teacher.id;
+        try {
+            await managerService.activateTeacher(id);
+            const response = await managerService.getTeachers();
+            setTeachers(response.results || response || []);
+        } catch (error) {
+            console.error('Failed to activate teacher:', error);
+            alert('Failed to activate teacher.');
+        }
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+
+        // Try to get school_id from multiple possible locations in user object
+        const resolvedSchoolId = user?.school_id ||
+            user?.school?.id ||
+            (typeof user?.school === 'number' ? user.school : null) ||
+            localStorage.getItem('school_id'); // Fallback
+
+        if (!resolvedSchoolId) {
+            alert('Error: School ID not found. Please log out and log in again.');
+            console.error('Cannot create teacher: school_id is missing. User context:', user);
+            return;
+        }
+
+        try {
+            const teacherData = {
+                email: formData.email,
+                full_name: formData.full_name,
+                password: formData.password,
+                school_id: parseInt(resolvedSchoolId),
+                specialization: formData.specialization,
+                employment_status: formData.employment_status,
+                hire_date: formData.hire_date,
+            };
+
+            console.log('Creating teacher with data:', teacherData);
+
+            await managerService.createTeacher(teacherData);
+
+            // Refresh teacher list
+            const response = await managerService.getTeachers();
+            setTeachers(response.results || response || []);
+
+            setIsModalOpen(false);
+            setFormData({
+                full_name: '',
+                email: '',
+                password: 'Teacher@123',
+                specialization: '',
+                employment_status: 'full_time',
+                hire_date: new Date().toISOString().split('T')[0]
+            });
+            alert('Teacher created successfully!');
+        } catch (error) {
+            console.error('Failed to create teacher:', error);
+            const errorMsg = error.response?.data
+                ? JSON.stringify(error.response.data)
+                : error.message || 'Unknown error';
+            alert(`Failed to create teacher: ${errorMsg}`);
         }
     };
 
@@ -170,6 +255,10 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                         }}
                     />
                 </div>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                    <Plus size={18} />
+                    Add Teacher
+                </button>
             </div>
             <table className="data-table">
                 <thead>
@@ -181,32 +270,122 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {teachers.map((teacher) => (
-                        <tr key={teacher.id}>
-                            <td className="font-medium text-gray-900">{teacher.full_name}</td>
-                            <td>{teacher.email}</td>
-                            <td>
-                                <span style={{
-                                    padding: '2px 8px',
-                                    borderRadius: '999px',
-                                    fontSize: '12px',
-                                    background: teacher.is_active ? 'var(--color-success-light)' : 'var(--color-error-light)',
-                                    color: teacher.is_active ? 'var(--color-success)' : 'var(--color-error)'
-                                }}>
-                                    {teacher.is_active ? 'Active' : 'Inactive'}
-                                </span>
-                            </td>
-                            <td>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button onClick={() => handleDelete(teacher.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>
-                                        <Trash size={16} />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
+                    {teachers.map((teacher) => {
+                        const id = teacher.user_id || teacher.id;
+                        const isActive = teacher.is_active !== false;
+                        return (
+                            <tr key={id}>
+                                <td className="font-medium text-gray-900">{teacher.full_name}</td>
+                                <td>{teacher.email}</td>
+                                <td>
+                                    <span style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '999px',
+                                        fontSize: '12px',
+                                        background: isActive ? 'var(--color-success-light)' : 'var(--color-error-light)',
+                                        color: isActive ? 'var(--color-success)' : 'var(--color-error)'
+                                    }}>
+                                        {isActive ? 'Active' : 'Inactive'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        {isActive ? (
+                                            <button onClick={() => handleDeactivate(teacher)} title="Deactivate" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>
+                                                <Trash size={16} />
+                                            </button>
+                                        ) : (
+                                            <button onClick={() => handleActivate(teacher)} title="Activate" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-success)' }}>
+                                                <Award size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
+
+            {/* Create Teacher Modal */}
+            {isModalOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '500px',
+                        border: '1px solid var(--color-border)', maxHeight: '90vh', overflowY: 'auto'
+                    }}>
+                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add New Teacher</h2>
+                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Full Name</label>
+                                <input
+                                    required
+                                    value={formData.full_name}
+                                    onChange={e => setFormData({ ...formData, full_name: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Email</label>
+                                <input
+                                    required
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            {/* School ID is automatically set from logged-in School Manager */}
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Specialization</label>
+                                <input
+                                    value={formData.specialization}
+                                    onChange={e => setFormData({ ...formData, specialization: e.target.value })}
+                                    placeholder="e.g., Mathematics, Science, English"
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Employment Status</label>
+                                <select
+                                    required
+                                    value={formData.employment_status}
+                                    onChange={e => setFormData({ ...formData, employment_status: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                >
+                                    <option value="full_time">Full Time</option>
+                                    <option value="part_time">Part Time</option>
+                                    <option value="contract">Contract</option>
+                                    <option value="substitute">Substitute</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Hire Date</label>
+                                <input
+                                    required
+                                    type="date"
+                                    value={formData.hire_date}
+                                    onChange={e => setFormData({ ...formData, hire_date: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsModalOpen(false)}
+                                    style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-primary">Create Teacher</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -219,7 +398,9 @@ const PerformanceEvaluation = ({ evaluations, onEvaluationAdded, teachers, t }) 
         e.preventDefault();
         try {
             await managerService.createStaffEvaluation({
-                ...formData,
+                reviewee_id: parseInt(formData.reviewee_id),
+                rating_score: parseInt(formData.rating_score),
+                comments: formData.comments,
                 evaluation_date: new Date().toISOString().split('T')[0]
             });
             onEvaluationAdded();
@@ -288,8 +469,8 @@ const PerformanceEvaluation = ({ evaluations, onEvaluationAdded, teachers, t }) 
                                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
                                 >
                                     <option value="">Select Staff Member</option>
-                                    {teachers.map(t => (
-                                        <option key={t.id} value={t.id}>{t.full_name}</option>
+                                    {teachers.map(teacher => (
+                                        <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>{teacher.full_name}</option>
                                     ))}
                                 </select>
                             </div>

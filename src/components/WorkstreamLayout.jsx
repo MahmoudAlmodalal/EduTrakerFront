@@ -18,6 +18,7 @@ import '../pages/WorkstreamManager/Workstream.css';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import notificationService from '../services/notificationService';
+import workstreamService from '../services/workstreamService';
 import { useEffect, useState } from 'react';
 import { useCachedApi } from '../hooks/useCachedApi';
 
@@ -55,6 +56,17 @@ const WorkstreamLayout = () => {
             enabled: hasValidToken,
             cacheKey: `unread_count_${user?.id}`,
             ttl: 2 * 60 * 1000, // 2 minutes
+            dependencies: [user?.id]
+        }
+    );
+
+    // Fetch dashboard statistics for quick stats (5 minute TTL)
+    const { data: statsData } = useCachedApi(
+        () => workstreamService.getDashboardStatistics(),
+        {
+            enabled: hasValidToken,
+            cacheKey: `workstream_nav_stats_${user?.id}`,
+            ttl: 5 * 60 * 1000, // 5 minutes
             dependencies: [user?.id]
         }
     );
@@ -123,7 +135,9 @@ const WorkstreamLayout = () => {
                         textAlign: 'center',
                         border: '1px solid rgba(79, 70, 229, 0.2)'
                     }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>12</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>
+                            {statsData?.statistics?.school_count || 0}
+                        </div>
                         <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schools</div>
                     </div>
                     <div style={{
@@ -134,7 +148,9 @@ const WorkstreamLayout = () => {
                         textAlign: 'center',
                         border: '1px solid rgba(14, 165, 233, 0.2)'
                     }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>8</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>
+                            {statsData?.statistics?.manager_count || 0}
+                        </div>
                         <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Managers</div>
                     </div>
                 </div>

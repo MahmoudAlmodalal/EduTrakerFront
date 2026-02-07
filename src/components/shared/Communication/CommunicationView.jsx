@@ -24,18 +24,36 @@ const CommunicationView = ({ role = 'user' }) => {
     const [isComposeOpen, setIsComposeOpen] = useState(false);
     const [threadMessages, setThreadMessages] = useState([]);
     const [loadingThread, setLoadingThread] = useState(false);
-    const [replyBody, setReplyBody] = useState('');
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [nextHistoryPage, setNextHistoryPage] = useState(null);
     const threadEndRef = useRef(null);
+    const bodyRef = useRef(null);
+    const lastScrollHeight = useRef(null);
+    const isInitialLoad = useRef(true);
 
     const scrollToBottom = () => {
-        threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        threadEndRef.current?.scrollIntoView({ behavior: 'auto' });
     };
 
     useEffect(() => {
-        if (threadMessages.length > 0) {
+        if (threadMessages.length > 0 && isInitialLoad.current) {
+            scrollToBottom();
+            isInitialLoad.current = false;
+        } else if (threadMessages.length > 0 && !loadingMore) {
+            // Only scroll to bottom if we are not loading more messages (e.g. sent/received a new one)
             scrollToBottom();
         }
-    }, [threadMessages]);
+    }, [threadMessages, loadingMore]);
+
+    // Preserve scroll position when loading more
+    useEffect(() => {
+        if (loadingMore && bodyRef.current && lastScrollHeight.current !== null) {
+            const newScrollHeight = bodyRef.current.scrollHeight;
+            const scrollDiff = newScrollHeight - lastScrollHeight.current;
+            bodyRef.current.scrollTop = scrollDiff;
+            lastScrollHeight.current = null;
+        }
+    }, [threadMessages, loadingMore]);
 
     const fetchData = async () => {
         if (!user) return;
@@ -95,30 +113,61 @@ const CommunicationView = ({ role = 'user' }) => {
         }
     };
 
-    const fetchHistory = async (partnerId) => {
-        setLoadingThread(true);
+    const fetchHistory = async (partnerId, loadMore = false) => {
+        if (loadMore && !nextHistoryPage) return;
+
+        if (loadMore) {
+            setLoadingMore(true);
+            lastScrollHeight.current = bodyRef.current?.scrollHeight;
+        } else {
+            setLoadingThread(true);
+            isInitialLoad.current = true;
+        }
+
         try {
-            const response = await api.get('/user-messages/', { params: { peer_id: partnerId } });
+            const url = loadMore ? nextHistoryPage : '/user-messages/';
+            const params = loadMore ? {} : { peer_id: partnerId };
+
+            const response = await api.get(url, { params });
             const history = response.results || response;
-            setThreadMessages(history);
+            setNextHistoryPage(response.next);
 
-            // Mark unread messages in this conversation as read
-            const unreadMsgs = history.filter(m => {
-                const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
-                return m.sender?.id !== user?.id && myReceipt && !myReceipt.is_read;
-            });
+            // Correct sorting: Oldest at TOP, Newest at BOTTOM
+            // history comes in -sent_at (newest first).
+            // When loading more, we prepend the oldest messages to the top.
+            const newMessages = [...history].reverse();
 
-            if (unreadMsgs.length > 0) {
-                await Promise.all(unreadMsgs.map(m => api.post(`/user-messages/${m.id}/read/`)));
-                // Update local status
-                setMessages(prev => prev.map(conv =>
-                    conv.partner.id === partnerId ? { ...conv, read: true, unread_count: 0 } : conv
-                ));
+            if (loadMore) {
+                setThreadMessages(prev => [...newMessages, ...prev]);
+            } else {
+                setThreadMessages(newMessages);
+
+                // Mark unread messages in this conversation as read
+                const unreadMsgs = history.filter(m => {
+                    const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
+                    return m.sender?.id !== user?.id && myReceipt && !myReceipt.is_read;
+                });
+
+                if (unreadMsgs.length > 0) {
+                    await Promise.all(unreadMsgs.map(m => api.post(`/user-messages/${m.id}/read/`)));
+                    // Update local status
+                    setMessages(prev => prev.map(conv =>
+                        conv.partner.id === partnerId ? { ...conv, read: true, unread_count: 0 } : conv
+                    ));
+                }
             }
         } catch (err) {
             console.error('Error fetching history:', err);
         } finally {
             setLoadingThread(false);
+            setLoadingMore(false);
+        }
+    };
+
+    const handleScroll = (e) => {
+        // Tweak threshold for better infinite scroll trigger
+        if (e.target.scrollTop < 50 && nextHistoryPage && !loadingMore) {
+            fetchHistory(selectedItem.partner.id, true);
         }
     };
 
@@ -140,6 +189,7 @@ const CommunicationView = ({ role = 'user' }) => {
         } else {
             setSelectedItem(item);
             setThreadMessages([]);
+            setNextHistoryPage(null);
             fetchHistory(item.partner.id);
         }
     };
@@ -230,7 +280,7 @@ const CommunicationView = ({ role = 'user' }) => {
                                 )}
                             </div>
 
-                            <div className={styles.body}>
+                            <div className={styles.body} onScroll={handleScroll} ref={bodyRef}>
                                 {activeTab === 'notifications' ? (
                                     <div className={styles.notificationContent}>
                                         <p>{t(selectedItem.message)}</p>
@@ -239,6 +289,7 @@ const CommunicationView = ({ role = 'user' }) => {
                                     <div className={styles.threadLoading}>{t('common.loading')}</div>
                                 ) : (
                                     <>
+                                        {loadingMore && <div className={styles.loadMoreIndicator}>{t('common.loading')}</div>}
                                         {threadMessages.map(m => (
                                             <div
                                                 key={m.id}

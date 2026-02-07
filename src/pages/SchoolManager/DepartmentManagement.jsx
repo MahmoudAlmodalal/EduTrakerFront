@@ -28,9 +28,11 @@ const DepartmentManagement = () => {
         setLoading(true);
         try {
             const data = await managerService.getGrades();
-            setGrades(data.results || data);
+            const gradesData = data.results || data || [];
+            setGrades(gradesData);
         } catch (error) {
             console.error('Failed to fetch grades:', error);
+            setGrades([]);
         } finally {
             setLoading(false);
         }
@@ -64,7 +66,16 @@ const DepartmentManagement = () => {
             setIsModalOpen(false);
         } catch (error) {
             console.error('Failed to save grade:', error);
-            alert('Failed to save. Please verify your permissions.');
+            console.error('Error details:', {
+                message: error.message,
+                status: error.status,
+                data: error.data,
+                response: error.response
+            });
+
+            // Show more specific error message if available
+            const errorMessage = error.message || 'Failed to save. Please verify your permissions.';
+            alert(errorMessage);
         }
     };
 

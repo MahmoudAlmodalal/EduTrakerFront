@@ -36,31 +36,53 @@ const secretaryService = {
     createStudent: async (data) => {
         return api.post('/manager/students/create/', data);
     },
-    getUnassignedStudents: async () => {
-        return api.get('/manager/students/?assigned_to_class=false');
+    getStudents: async (params = {}) => {
+        const queryParams = new URLSearchParams(params).toString();
+        return api.get(`/manager/students/${queryParams ? `?${queryParams}` : ''}`);
     },
-    assignToClass: async (studentId, classId) => {
-        return api.patch(`/manager/students/${studentId}/`, { class_room_id: classId });
+    getUnassignedStudents: async () => {
+        // Get all students - we'll filter on the frontend for those without active enrollment
+        return api.get('/manager/students/');
+    },
+    assignToClass: async (data) => {
+        // Create an enrollment: { student_id, class_room_id, academic_year_id }
+        return api.post('/manager/enrollments/create/', data);
+    },
+
+    // Grades & Classrooms
+    getGrades: async (params = {}) => {
+        const queryParams = new URLSearchParams(params).toString();
+        return api.get(`/grades/${queryParams ? `?${queryParams}` : ''}`);
+    },
+    getClassrooms: async (schoolId, academicYearId, params = {}) => {
+        const queryParams = new URLSearchParams(params).toString();
+        return api.get(`/school/${schoolId}/academic-year/${academicYearId}/classrooms/${queryParams ? `?${queryParams}` : ''}`);
+    },
+    getAcademicYears: async (params = {}) => {
+        const queryParams = new URLSearchParams(params).toString();
+        return api.get(`/academic-years/${queryParams ? `?${queryParams}` : ''}`);
     },
 
     // Guardians
     getGuardians: async (search = '') => {
         return api.get(`/guardian/guardians/?search=${search}`);
     },
+    getGuardianLinks: async (guardianId) => {
+        return api.get(`/guardian/guardians/${guardianId}/students/`);
+    },
     linkGuardianToStudent: async (guardianId, studentId, data) => {
         return api.post(`/guardian/guardians/${guardianId}/students/`, {
-            student_id: studentId,
-            relationship: data.relationship,
-            access_level: data.access_level
+            student_id: parseInt(studentId),
+            relationship_type: data.relationship_type,
+            is_primary: data.is_primary || false,
+            can_pickup: data.can_pickup !== undefined ? data.can_pickup : true,
         });
     },
 
-    // Attendance
-    getAttendance: async (date, classId) => {
-        return api.get(`/teacher/attendance/?date=${date}&class_room_id=${classId}`);
-    },
-    recordAttendance: async (data) => {
-        return api.post('/teacher/attendance/record/', data);
+    // Attendance (view only for secretary - recording is teacher-only)
+    getAttendance: async (params = {}) => {
+        const queryParams = new URLSearchParams(params).toString();
+        return api.get(`/teacher/attendance/${queryParams ? `?${queryParams}` : ''}`);
     },
 
     // Communication

@@ -1,64 +1,126 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Link as LinkIcon, MoreVertical, Shield, UserCheck, AlertCircle } from 'lucide-react';
+import { Search, Link as LinkIcon, Shield, AlertCircle, UserPlus } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import secretaryService from '../../services/secretaryService';
 import './Secretary.css';
 import '../WorkstreamManager/Workstream.css';
 
 const GuardianLinking = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const [guardians, setGuardians] = useState([]);
+    const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
 
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [selectedGuardian, setSelectedGuardian] = useState(null);
+    const [guardianLinks, setGuardianLinks] = useState([]);
     const [linkData, setLinkData] = useState({
         student_id: '',
-        relationship: 'Guardian',
-        access_level: 'Full'
+        relationship_type: 'parent',
+        is_primary: false,
+        can_pickup: true,
     });
+
+    const schoolId = user?.school_id || user?.school;
 
     useEffect(() => {
         fetchGuardians();
+        fetchStudents();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Clear messages after 5 seconds
+    useEffect(() => {
+        if (error || success) {
+            const timer = setTimeout(() => { setError(''); setSuccess(''); }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [error, success]);
 
     const fetchGuardians = async (search = '') => {
         try {
             setLoading(true);
             const data = await secretaryService.getGuardians(search);
-            setGuardians(data.results || data);
-        } catch (error) {
-            console.error('Error fetching guardians:', error);
+            setGuardians(data.results || data || []);
+        } catch (err) {
+            console.error('Error fetching guardians:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSearch = (e) => {
-        setSearchTerm(e.target.value);
-        // Debounce or search on enter/button
+    const fetchStudents = async () => {
+        try {
+            const data = await secretaryService.getStudents({ school_id: schoolId });
+            setStudents(data.results || data || []);
+        } catch (err) {
+            console.error('Error fetching students:', err);
+        }
     };
 
-    const handleLinkClick = (guardian) => {
+    const fetchGuardianLinks = async (guardianId) => {
+        try {
+            const data = await secretaryService.getGuardianLinks(guardianId);
+            setGuardianLinks(data.results || data || []);
+        } catch (err) {
+            console.error('Error fetching guardian links:', err);
+            setGuardianLinks([]);
+        }
+    };
+
+    const handleSearch = (e) => {
+        setSearchTerm(e.target.value);
+    };
+
+    const handleLinkClick = async (guardian) => {
         setSelectedGuardian(guardian);
+        setLinkData({
+            student_id: '',
+            relationship_type: 'parent',
+            is_primary: false,
+            can_pickup: true,
+        });
+        await fetchGuardianLinks(guardian.user_id);
         setIsLinkModalOpen(true);
     };
 
     const handleSaveLink = async () => {
-        if (!selectedGuardian || !linkData.student_id) return;
+        if (!selectedGuardian || !linkData.student_id) {
+            setError('Please select a student.');
+            return;
+        }
+        setError('');
+        setSuccess('');
         try {
             setLoading(true);
-            await secretaryService.linkGuardianToStudent(selectedGuardian.user_id || selectedGuardian.id, linkData.student_id, {
-                relationship: linkData.relationship,
-                access_level: linkData.access_level
-            });
-            alert('Guardian linked successfully!');
+            await secretaryService.linkGuardianToStudent(
+                selectedGuardian.user_id,
+                linkData.student_id,
+                {
+                    relationship_type: linkData.relationship_type,
+                    is_primary: linkData.is_primary,
+                    can_pickup: linkData.can_pickup,
+                }
+            );
+            setSuccess('Guardian linked to student successfully!');
             setIsLinkModalOpen(false);
             fetchGuardians();
-        } catch (error) {
-            alert('Error linking guardian: ' + error.message);
+        } catch (err) {
+            const errData = err.response?.data || err;
+            if (typeof errData === 'object' && !Array.isArray(errData)) {
+                const messages = Object.entries(errData)
+                    .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`)
+                    .join(' | ');
+                setError(messages);
+            } else {
+                setError('Error linking guardian: ' + (err.message || 'Unknown error'));
+            }
         } finally {
             setLoading(false);
         }
@@ -70,6 +132,18 @@ const GuardianLinking = () => {
                 <h1>{t('secretary.guardians.title')}</h1>
                 <p>{t('secretary.guardians.subtitle')}</p>
             </header>
+
+            {/* Status banners */}
+            {error && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertCircle size={18} /> {error}
+                </div>
+            )}
+            {success && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px' }}>
+                    ✓ {success}
+                </div>
+            )}
 
             <div className="management-card">
                 <div className="table-controls">
@@ -96,29 +170,24 @@ const GuardianLinking = () => {
                     <table className="data-table">
                         <thead>
                             <tr>
+                                <th>ID</th>
                                 <th>{t('secretary.guardians.guardianName')}</th>
-                                <th>{t('secretary.guardians.linkedStudent')}</th>
-                                <th>{t('secretary.guardians.relationship')}</th>
-                                <th>{t('secretary.guardians.accessLevel')}</th>
+                                <th>Email</th>
+                                <th>Phone</th>
                                 <th>{t('secretary.guardians.status')}</th>
                                 <th>{t('secretary.guardians.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {guardians.map((guardian) => (
-                                <tr key={guardian.id || guardian.user_id}>
-                                    <td className="font-medium">{guardian.full_name || guardian.user?.full_name}</td>
-                                    <td>{guardian.students?.map(s => s.full_name).join(', ') || '-'}</td>
-                                    <td>{guardian.relationship || '-'}</td>
+                                <tr key={guardian.user_id}>
+                                    <td>#{guardian.user_id}</td>
+                                    <td className="font-medium">{guardian.full_name}</td>
+                                    <td>{guardian.email || '-'}</td>
+                                    <td>{guardian.phone_number || '-'}</td>
                                     <td>
-                                        <div className="flex items-center gap-2">
-                                            <Shield size={14} className={guardian.access_level === 'Full' ? 'text-green-600' : 'text-gray-400'} />
-                                            {guardian.access_level || 'None'}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span className={`status-badge ${guardian.students?.length > 0 ? 'status-active' : 'status-inactive'}`}>
-                                            {guardian.students?.length > 0 ? t('secretary.guardians.linked') : t('secretary.guardians.unlinked')}
+                                        <span className={`status-badge ${guardian.is_active ? 'status-active' : 'status-inactive'}`}>
+                                            {guardian.is_active ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td>
@@ -140,56 +209,83 @@ const GuardianLinking = () => {
                 )}
             </div>
 
+            {/* Link Modal */}
             <Modal
                 isOpen={isLinkModalOpen}
                 onClose={() => setIsLinkModalOpen(false)}
-                title={selectedGuardian ? `${t('secretary.guardians.manageLink')}: ${selectedGuardian.full_name || selectedGuardian.user?.full_name}` : t('secretary.guardians.linkGuardianToStudent')}
+                title={selectedGuardian ? `Link Student to: ${selectedGuardian.full_name}` : 'Link Guardian to Student'}
             >
                 <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveLink(); }}>
+                    {/* Show existing links */}
+                    {guardianLinks.length > 0 && (
+                        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
+                            <p className="text-sm font-bold text-blue-800 mb-2">Existing Links:</p>
+                            {guardianLinks.map(link => (
+                                <div key={link.id} className="text-sm text-blue-700" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                                    <span>{link.student_name}</span>
+                                    <span className="text-xs bg-blue-100 px-2 py-0.5 rounded">{link.relationship_display || link.relationship_type}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="form-group">
-                        <label className="form-label">{t('secretary.guardians.selectStudent')}</label>
-                        <input
-                            type="text"
-                            className="form-input"
-                            placeholder={t('secretary.guardians.searchStudent')}
+                        <label className="form-label">Select Student *</label>
+                        <select
+                            className="form-select"
                             value={linkData.student_id}
                             onChange={(e) => setLinkData({ ...linkData, student_id: e.target.value })}
                             required
-                        />
-                        <p className="text-xs text-gray-400 mt-1">Enter Student ID</p>
-                    </div>
-
-                    <div className="form-group">
-                        <label className="form-label">{t('secretary.guardians.relationshipToStudent')}</label>
-                        <select
-                            className="form-select"
-                            value={linkData.relationship}
-                            onChange={(e) => setLinkData({ ...linkData, relationship: e.target.value })}
                         >
-                            <option value="Mother">{t('secretary.guardians.mother')}</option>
-                            <option value="Father">{t('secretary.guardians.father')}</option>
-                            <option value="Guardian">{t('secretary.guardians.legalGuardian')}</option>
-                            <option value="Other">{t('secretary.guardians.other')}</option>
+                            <option value="">Choose a student...</option>
+                            {students.map(s => (
+                                <option key={s.user_id} value={s.user_id}>
+                                    {s.full_name} (#{s.user_id})
+                                </option>
+                            ))}
                         </select>
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">{t('secretary.guardians.accessPermissions')}</label>
+                        <label className="form-label">Relationship Type *</label>
                         <select
                             className="form-select"
-                            value={linkData.access_level}
-                            onChange={(e) => setLinkData({ ...linkData, access_level: e.target.value })}
+                            value={linkData.relationship_type}
+                            onChange={(e) => setLinkData({ ...linkData, relationship_type: e.target.value })}
                         >
-                            <option value="Full">Full Access</option>
-                            <option value="Limited">Limited Access</option>
-                            <option value="View Only">View Only</option>
+                            <option value="parent">Parent</option>
+                            <option value="legal_guardian">Legal Guardian</option>
+                            <option value="foster_parent">Foster Parent</option>
+                            <option value="sibling">Sibling</option>
+                            <option value="other">Other</option>
                         </select>
+                    </div>
+
+                    <div className="form-group" style={{ display: 'flex', gap: '24px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={linkData.is_primary}
+                                onChange={(e) => setLinkData({ ...linkData, is_primary: e.target.checked })}
+                            />
+                            <span className="text-sm">Primary Guardian</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={linkData.can_pickup}
+                                onChange={(e) => setLinkData({ ...linkData, can_pickup: e.target.checked })}
+                            />
+                            <span className="text-sm">Can Pick Up Student</span>
+                        </label>
                     </div>
 
                     <div className="flex justify-end gap-2 mt-6">
-                        <button type="button" className="btn-secondary" onClick={() => setIsLinkModalOpen(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', background: 'white' }}>{t('common.cancel')}</button>
+                        <button type="button" className="btn-secondary" onClick={() => setIsLinkModalOpen(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', background: 'white' }}>
+                            {t('common.cancel')}
+                        </button>
                         <button type="submit" className="btn-primary" disabled={loading}>
-                            {loading ? 'Saving...' : t('common.save')}
+                            {loading ? 'Linking...' : 'Link Student'}
                         </button>
                     </div>
                 </form>

@@ -64,7 +64,9 @@ const AcademicReports = () => {
                             +12%
                         </span>
                     </div>
-                    <div className="stat-value">{stats?.averge_performance || '84%'}</div>
+                    <div className="stat-value">
+                        {stats?.statistics?.course_count || '0'}%
+                    </div>
                     <div className="stat-label">Average Performance</div>
                 </div>
 
@@ -78,7 +80,7 @@ const AcademicReports = () => {
                             +5%
                         </span>
                     </div>
-                    <div className="stat-value">{stats?.total_students || '1,248'}</div>
+                    <div className="stat-value">{stats?.statistics?.total_students || '0'}</div>
                     <div className="stat-label">Total Students</div>
                 </div>
 
@@ -92,7 +94,7 @@ const AcademicReports = () => {
                             -2%
                         </span>
                     </div>
-                    <div className="stat-value">{stats?.active_teachers || '86'}</div>
+                    <div className="stat-value">{stats?.statistics?.total_teachers || '0'}</div>
                     <div className="stat-label">Active Teachers</div>
                 </div>
 
@@ -106,7 +108,7 @@ const AcademicReports = () => {
                             +3%
                         </span>
                     </div>
-                    <div className="stat-value">{stats?.total_courses || '42'}</div>
+                    <div className="stat-value">{stats?.statistics?.course_count || '0'}</div>
                     <div className="stat-label">Active Courses</div>
                 </div>
             </div>
@@ -190,11 +192,11 @@ const AcademicReports = () => {
                 <div style={{ padding: '1.5rem' }}>
                     {/* Placeholder for a real chart component */}
                     <div style={{ height: '300px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 1rem' }}>
-                        {[65, 82, 45, 91, 74, 58, 88].map((height, i) => (
-                            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '12%' }}>
+                        {stats?.statistics?.by_grade?.length > 0 ? stats.statistics.by_grade.map((item, i) => (
+                            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: `${Math.floor(80 / stats.statistics.subject_performance.length)}%` }}>
                                 <div style={{
                                     width: '100%',
-                                    height: `${height}%`,
+                                    height: `${Math.min(item.student_count || item.count || 0, 100)}%`,
                                     backgroundColor: 'var(--color-primary)',
                                     opacity: 0.8,
                                     borderRadius: '4px 4px 0 0',
@@ -209,12 +211,15 @@ const AcademicReports = () => {
                                         color: '#fff',
                                         padding: '2px 6px',
                                         borderRadius: '4px',
-                                        fontSize: '10px'
-                                    }}>{height}%</div>
+                                        fontSize: '10px',
+                                        whiteSpace: 'nowrap'
+                                    }}>{item.student_count || item.count || 0}</div>
                                 </div>
-                                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', textAlign: 'center' }}>Subject {i + 1}</span>
+                                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{item.grade__name || item.grade_name || 'N/A'}</span>
                             </div>
-                        ))}
+                        )) : (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>No performance data available</div>
+                        )}
                     </div>
                 </div>
             </div>

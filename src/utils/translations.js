@@ -357,12 +357,14 @@ export const translations = {
         'workstream.settings.security.changePassword': 'Change Password',
 
         // School Manager Specific
-        'school.nav.dashboard': 'Dashboard',
-        'school.nav.configuration': 'Academic Configuration',
-        'school.nav.reports': 'Academic Reports',
-        'school.nav.teachers': 'Teacher Monitoring',
-        'school.nav.departments': 'Department Management',
-        'school.nav.secretaries': 'Secretary Monitoring',
+        'schoolManager.nav.dashboard': 'Dashboard',
+        'schoolManager.nav.configuration': 'Academic Configuration',
+        'schoolManager.nav.reports': 'Reports',
+        'schoolManager.nav.teachers': 'Teachers',
+        'schoolManager.nav.departments': 'Departments',
+        'schoolManager.nav.secretaries': 'Secretaries',
+        'schoolManager.nav.communication': 'Communication',
+        'schoolManager.nav.settings': 'Settings',
 
         // Teacher Specific
         'teacher.nav.dashboard': 'Dashboard',
@@ -506,13 +508,14 @@ export const translations = {
         'teacher.communication.selectToView': 'Select a message to view',
 
         // School Manager Navigation
-        'school.nav.overview': 'Overview',
-        'school.nav.academicConfig': 'Academic Config',
-        'school.nav.reports': 'Reports',
-        'school.nav.teacherMonitoring': 'Teacher Monitoring',
-        'school.nav.departments': 'Departments',
-        'school.nav.secretaryMonitoring': 'Secretary Monitoring',
-        'school.nav.settings': 'Settings',
+        'schoolManager.nav.dashboard': 'Overview',
+        'schoolManager.nav.configuration': 'Academic Config',
+        'schoolManager.nav.reports': 'Reports',
+        'schoolManager.nav.teachers': 'Teacher Monitoring',
+        'schoolManager.nav.departments': 'Departments',
+        'schoolManager.nav.secretaries': 'Secretary Monitoring',
+        'schoolManager.nav.communication': 'Communication',
+        'schoolManager.nav.settings': 'Settings',
 
         // School Dashboard
         'school.dashboard.title': 'School Overview',
@@ -1431,13 +1434,14 @@ export const translations = {
         'teacher.communication.selectToView': 'اختر رسالة لعرضها',
 
         // School Manager Navigation
-        'school.nav.overview': 'نظرة عامة',
-        'school.nav.academicConfig': 'الإعداد الأكاديمي',
-        'school.nav.reports': 'التقارير',
-        'school.nav.teacherMonitoring': 'متابعة المعلمين',
-        'school.nav.departments': 'الأقسام',
-        'school.nav.secretaryMonitoring': 'متابعة السكرتارية',
-        'school.nav.settings': 'الإعدادات',
+        'schoolManager.nav.dashboard': 'لوحة التحكم',
+        'schoolManager.nav.configuration': 'الإعدادات الأكاديمية',
+        'schoolManager.nav.reports': 'التقارير',
+        'schoolManager.nav.teachers': 'المعلمون',
+        'schoolManager.nav.departments': 'الأقسام',
+        'schoolManager.nav.secretaries': 'السكرتارية',
+        'schoolManager.nav.communication': 'الاتصالات',
+        'schoolManager.nav.settings': 'الإعدادات',
 
         // School Dashboard
         'school.dashboard.title': 'نظرة عامة على المدرسة',

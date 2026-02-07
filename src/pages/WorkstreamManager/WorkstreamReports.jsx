@@ -31,8 +31,8 @@ const WorkstreamReports = () => {
     // Map backend schools in workstream to chart/table format
     const schoolStats = stats?.summary?.by_school?.map(school => ({
         school: school.school_name,
-        attendance: 95, // Mocking these for now as they might not be in stats yet
-        absent: 5,
+        attendance: school.attendance_percentage || 0,
+        absent: school.absent_percentage || 0,
         teachers: school.teacher_count,
         classrooms: school.classroom_count,
         utilization: Math.round((school.student_count / (school.classroom_count * 30 || 1)) * 100)

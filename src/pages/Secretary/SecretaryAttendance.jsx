@@ -1,70 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Search, Filter, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Calendar, Search, Filter, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import secretaryService from '../../services/secretaryService';
 import './Secretary.css';
 
 const SecretaryAttendance = () => {
     const { t } = useTheme();
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [selectedClass, setSelectedClass] = useState('1'); // Use ID 1 for Class 1-A
-    const [students, setStudents] = useState([]);
+    const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
+    const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
+    const [statusFilter, setStatusFilter] = useState('');
+    const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [error, setError] = useState('');
 
     useEffect(() => {
         fetchAttendance();
-    }, [date, selectedClass]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dateFrom, dateTo, statusFilter]);
 
     const fetchAttendance = async () => {
         try {
             setLoading(true);
-            const data = await secretaryService.getAttendance(date, selectedClass);
-            setStudents(data.results || data);
-        } catch (error) {
-            console.error('Error fetching attendance:', error);
+            setError('');
+            const params = {};
+            if (dateFrom) params.date_from = dateFrom;
+            if (dateTo) params.date_to = dateTo;
+            if (statusFilter) params.status = statusFilter;
+            const data = await secretaryService.getAttendance(params);
+            setRecords(data.results || data || []);
+        } catch (err) {
+            console.error('Error fetching attendance:', err);
+            setError('Failed to load attendance records.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleMarkAttendance = async (studentId, status) => {
-        try {
-            await secretaryService.recordAttendance({
-                student_id: studentId,
-                date: date,
-                status: status,
-                class_room_id: selectedClass
-            });
-            fetchAttendance();
-        } catch (error) {
-            alert('Error recording attendance: ' + error.message);
-        }
-    };
-
     const getStatusColor = (status) => {
         switch (status) {
-            case 'Present': return 'text-green-600 bg-green-50 border-green-200';
-            case 'Absent': return 'text-red-600 bg-red-50 border-red-200';
-            case 'Late': return 'text-orange-600 bg-orange-50 border-orange-200';
-            case 'Excused': return 'text-blue-600 bg-blue-50 border-blue-200';
+            case 'present': return 'text-green-600 bg-green-50 border-green-200';
+            case 'absent': return 'text-red-600 bg-red-50 border-red-200';
+            case 'late': return 'text-orange-600 bg-orange-50 border-orange-200';
+            case 'excused': return 'text-blue-600 bg-blue-50 border-blue-200';
             default: return 'text-gray-600 bg-gray-50 border-gray-200';
         }
     };
 
-    const getStatusTranslation = (status) => {
-        switch (status) {
-            case 'Present': return t('secretary.attendance.present');
-            case 'Absent': return t('secretary.attendance.absent');
-            case 'Late': return t('secretary.attendance.late');
-            case 'Excused': return t('secretary.attendance.excused');
-            default: return status;
-        }
+    const getStatusLabel = (status) => {
+        const map = {
+            present: t('secretary.attendance.present') || 'Present',
+            absent: t('secretary.attendance.absent') || 'Absent',
+            late: t('secretary.attendance.late') || 'Late',
+            excused: t('secretary.attendance.excused') || 'Excused',
+        };
+        return map[status] || status;
     };
 
-    const filteredStudents = students.filter(s =>
-        (s.student_name || s.student?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredRecords = records.filter(r =>
+        (r.student_name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Summary stats
+    const totalPresent = records.filter(r => r.status === 'present').length;
+    const totalAbsent = records.filter(r => r.status === 'absent').length;
+    const totalLate = records.filter(r => r.status === 'late').length;
 
     return (
         <div className="secretary-dashboard">
@@ -73,26 +73,61 @@ const SecretaryAttendance = () => {
                 <p>{t('secretary.attendance.subtitle')}</p>
             </header>
 
+            {error && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertCircle size={18} /> {error}
+                </div>
+            )}
+
+            {/* Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#16a34a' }}>{totalPresent}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#4ade80' }}>Present</div>
+                </div>
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#dc2626' }}>{totalAbsent}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#f87171' }}>Absent</div>
+                </div>
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#d97706' }}>{totalLate}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#fbbf24' }}>Late</div>
+                </div>
+            </div>
+
             <div className="management-card">
                 <div className="table-controls">
                     <div className="flex gap-4 items-center">
                         <div className="form-group mb-0">
+                            <label className="text-xs text-gray-500 mb-1 block">From</label>
                             <input
                                 type="date"
                                 className="form-input"
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
                             />
                         </div>
                         <div className="form-group mb-0">
+                            <label className="text-xs text-gray-500 mb-1 block">To</label>
+                            <input
+                                type="date"
+                                className="form-input"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                            />
+                        </div>
+                        <div className="form-group mb-0">
+                            <label className="text-xs text-gray-500 mb-1 block">Status</label>
                             <select
                                 className="form-select"
-                                value={selectedClass}
-                                onChange={(e) => setSelectedClass(e.target.value)}
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
                             >
-                                <option value="1">Class 1-A</option>
-                                <option value="2">Class 1-B</option>
-                                <option value="3">Class 2-A</option>
+                                <option value="">All Statuses</option>
+                                <option value="present">Present</option>
+                                <option value="absent">Absent</option>
+                                <option value="late">Late</option>
+                                <option value="excused">Excused</option>
                             </select>
                         </div>
                     </div>
@@ -110,43 +145,37 @@ const SecretaryAttendance = () => {
                 </div>
 
                 <div className="overflow-x-auto">
-                    {loading ? <p className="text-center p-8">Loading attendance record...</p> : (
+                    {loading ? <p className="text-center p-8">Loading attendance records...</p> : (
                         <table className="data-table">
                             <thead>
                                 <tr>
+                                    <th>ID</th>
                                     <th>{t('secretary.attendance.studentName')}</th>
-                                    <th>{t('secretary.attendance.arrivalTime')}</th>
+                                    <th>Course</th>
+                                    <th>Date</th>
                                     <th>{t('secretary.attendance.status')}</th>
-                                    <th>{t('secretary.attendance.actions')}</th>
+                                    <th>Note</th>
+                                    <th>Recorded By</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredStudents.map((record) => (
+                                {filteredRecords.map((record) => (
                                     <tr key={record.id}>
-                                        <td className="font-medium">{record.student_name || record.student?.full_name}</td>
-                                        <td className="text-gray-500">{record.arrival_time || '-'}</td>
+                                        <td>#{record.id}</td>
+                                        <td className="font-medium">{record.student_name || '-'}</td>
+                                        <td>{record.course_name || '-'}</td>
+                                        <td className="text-gray-500">{record.date || '-'}</td>
                                         <td>
                                             <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(record.status)}`}>
-                                                {getStatusTranslation(record.status)}
+                                                {getStatusLabel(record.status)}
                                             </span>
                                         </td>
-                                        <td>
-                                            <div className="flex gap-2">
-                                                <button className="btn-icon" title={t('secretary.attendance.markPresent')} onClick={() => handleMarkAttendance(record.student_id || record.student?.id, 'Present')}>
-                                                    <CheckCircle size={18} className="text-green-600" />
-                                                </button>
-                                                <button className="btn-icon" title={t('secretary.attendance.markAbsent')} onClick={() => handleMarkAttendance(record.student_id || record.student?.id, 'Absent')}>
-                                                    <XCircle size={18} className="text-red-600" />
-                                                </button>
-                                                <button className="btn-icon" title={t('secretary.attendance.markLate')} onClick={() => handleMarkAttendance(record.student_id || record.student?.id, 'Late')}>
-                                                    <Clock size={18} className="text-orange-600" />
-                                                </button>
-                                            </div>
-                                        </td>
+                                        <td className="text-gray-500 text-sm">{record.note || '-'}</td>
+                                        <td className="text-gray-500 text-sm">{record.recorded_by_name || '-'}</td>
                                     </tr>
                                 ))}
-                                {filteredStudents.length === 0 && (
-                                    <tr><td colSpan="4" className="text-center p-4">No records found.</td></tr>
+                                {filteredRecords.length === 0 && (
+                                    <tr><td colSpan="7" className="text-center p-4">No attendance records found for this date range.</td></tr>
                                 )}
                             </tbody>
                         </table>

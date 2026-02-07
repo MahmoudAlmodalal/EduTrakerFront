@@ -18,7 +18,7 @@ const RoleSelection = () => {
             id: 'education',
             title: 'workstream login',
             items: [
-                { path: '/login/workstream/1', label: 'workstream', icon: <GraduationCap size={28} />, desc: 'Access workstream for role (Student, guardian, teacher, secretary, school manager, workstream manager).' },
+                { path: '/login/workstream/ws1', label: 'workstream', icon: <GraduationCap size={28} />, desc: 'Access workstream for role (Student, guardian, teacher, secretary, school manager, workstream manager).' },
             ]
         },
         {

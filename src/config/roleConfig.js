@@ -68,6 +68,7 @@ export const roleConfigs = {
             { path: 'teachers', labelKey: 'schoolManager.nav.teachers', icon: 'Users' },
             { path: 'departments', labelKey: 'schoolManager.nav.departments', icon: 'Building' },
             { path: 'secretaries', labelKey: 'schoolManager.nav.secretaries', icon: 'UserCheck' },
+            { path: 'communication', labelKey: 'schoolManager.nav.communication', icon: 'MessageSquare' },
             { path: 'settings', labelKey: 'schoolManager.nav.settings', icon: 'Settings' },
         ],
         dashboard: {

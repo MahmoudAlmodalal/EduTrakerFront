@@ -6,7 +6,11 @@ import {
     AlertTriangle,
     Plus,
     CheckCircle,
-    Search
+    Search,
+    GraduationCap,
+    Power,
+    Edit,
+    Building
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -16,40 +20,66 @@ import './SchoolManager.css';
 const AcademicConfiguration = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('subjects');
+    const [activeTab, setActiveTab] = useState('academic-year');
     const [courses, setCourses] = useState([]);
     const [teachers, setTeachers] = useState([]);
+    const [academicYears, setAcademicYears] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const schoolId = user?.school;
+    const schoolId = user?.school_id || user?.school?.id || user?.school;
+    const hasActiveAcademicYear = academicYears.some(ay => ay.is_active);
 
     useEffect(() => {
+        // Debug logging
+        console.log('User object:', user);
+        console.log('School ID:', schoolId);
+
         const fetchData = async () => {
-            if (!schoolId) return;
+            if (!schoolId) {
+                console.warn('No school ID found for user. User object:', user);
+                setLoading(false);
+                return;
+            }
             setLoading(true);
             try {
-                const [coursesData, teachersData] = await Promise.all([
+                const [coursesData, teachersData, academicYearsData] = await Promise.all([
                     managerService.getCourses(schoolId),
-                    managerService.getTeachers()
+                    managerService.getTeachers(),
+                    managerService.getAcademicYears({ school_id: schoolId, include_inactive: true })
                 ]);
-                setCourses(coursesData.results || coursesData);
-                setTeachers(teachersData.results || teachersData);
+                setCourses(coursesData.results || coursesData || []);
+                setTeachers(teachersData.results || teachersData || []);
+                setAcademicYears(academicYearsData.results || academicYearsData || []);
             } catch (error) {
                 console.error('Failed to fetch academic configuration data:', error);
+                setCourses([]);
+                setTeachers([]);
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [schoolId]);
+    }, [schoolId, user]);
 
     const fetchCourses = async () => {
         if (!schoolId) return;
         try {
             const data = await managerService.getCourses(schoolId);
-            setCourses(data.results || data);
+            setCourses(data.results || data || []);
         } catch (error) {
             console.error('Failed to fetch courses:', error);
+            setCourses([]);
+        }
+    }
+
+    const fetchAcademicYears = async () => {
+        if (!schoolId) return;
+        try {
+            const data = await managerService.getAcademicYears({ school_id: schoolId, include_inactive: true });
+            setAcademicYears(data.results || data || []);
+        } catch (error) {
+            console.error('Failed to fetch academic years:', error);
+            setAcademicYears([]);
         }
     }
 
@@ -62,16 +92,20 @@ const AcademicConfiguration = () => {
     const renderTabContent = () => {
         if (loading) return <div>Loading...</div>;
         switch (activeTab) {
+            case 'academic-year':
+                return <AcademicYearManagement academicYears={academicYears} schoolId={schoolId} onUpdated={fetchAcademicYears} />;
             case 'subjects':
                 return <SubjectAllocation courses={courses} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
+            case 'classrooms':
+                return <ClassroomManagement schoolId={schoolId} academicYears={academicYears} />;
             case 'teachers':
-                return <TeacherAllocation courses={courses} teachers={teachers} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
+                return <TeacherAllocation courses={courses} teachers={teachers} schoolId={schoolId} onCourseUpdated={fetchCourses} hasActiveAcademicYear={hasActiveAcademicYear} />;
             case 'timetable':
                 return <TimetableGenerator />;
             case 'conflicts':
                 return <ConflictDetection conflicts={conflicts} />;
             default:
-                return <SubjectAllocation courses={courses} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
+                return <AcademicYearManagement academicYears={academicYears} schoolId={schoolId} onUpdated={fetchAcademicYears} />;
         }
     };
 
@@ -82,8 +116,43 @@ const AcademicConfiguration = () => {
                 <p className="school-manager-subtitle">{t('school.config.subtitle')}</p>
             </div>
 
+            {/* Warning banner when no active academic year */}
+            {!loading && !hasActiveAcademicYear && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                    padding: '1rem 1.25rem', marginBottom: '1rem',
+                    background: '#fef3c7', border: '1px solid #f59e0b',
+                    borderRadius: '0.5rem', color: '#92400e'
+                }}>
+                    <AlertTriangle size={20} />
+                    <div>
+                        <strong>No active academic year found.</strong> You must create and activate an academic year before assigning teachers to courses.
+                    </div>
+                </div>
+            )}
+
             {/* Tabs */}
-            <div className="flex border-b border-gray-200 mb-6 w-full" style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '1.5rem', display: 'flex', gap: '2rem' }}>
+            <div className="flex border-b border-gray-200 mb-6 w-full" style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '1.5rem', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                <button
+                    style={{
+                        paddingBottom: '0.5rem',
+                        color: activeTab === 'academic-year' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                        fontWeight: 500,
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        borderBottom: activeTab === 'academic-year' ? '2px solid var(--color-primary)' : '2px solid transparent'
+                    }}
+                    onClick={() => setActiveTab('academic-year')}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <GraduationCap size={18} />
+                        Academic Year
+                        {!hasActiveAcademicYear && !loading && (
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                        )}
+                    </div>
+                </button>
                 <button
                     style={{
                         paddingBottom: '0.5rem',
@@ -99,6 +168,23 @@ const AcademicConfiguration = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <BookOpen size={18} />
                         Subject Allocation
+                    </div>
+                </button>
+                <button
+                    style={{
+                        paddingBottom: '0.5rem',
+                        color: activeTab === 'classrooms' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                        fontWeight: 500,
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        borderBottom: activeTab === 'classrooms' ? '2px solid var(--color-primary)' : '2px solid transparent'
+                    }}
+                    onClick={() => setActiveTab('classrooms')}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Building size={18} />
+                        Classrooms
                     </div>
                 </button>
                 <button
@@ -135,27 +221,194 @@ const AcademicConfiguration = () => {
                         Timetable Generator
                     </div>
                 </button>
-                <button
-                    style={{
-                        paddingBottom: '0.5rem',
-                        color: activeTab === 'conflicts' ? 'var(--color-error)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        cursor: 'pointer',
-                        borderBottom: activeTab === 'conflicts' ? '2px solid var(--color-error)' : '2px solid transparent'
-                    }}
-                    onClick={() => setActiveTab('conflicts')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <AlertTriangle size={18} />
-                        Conflict Detection
-                    </div>
-                </button>
-            </div>
+  </div>
 
             <div className="tab-content">
                 {renderTabContent()}
             </div>
+        </div>
+    );
+};
+
+// ============================================
+// Academic Year Management Tab
+// ============================================
+const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ start_date: '', end_date: '' });
+    const [saving, setSaving] = useState(false);
+
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        if (!schoolId) {
+            alert('Error: School ID not found.');
+            return;
+        }
+        setSaving(true);
+        try {
+            await managerService.createAcademicYear({
+                school: parseInt(schoolId),
+                start_date: formData.start_date,
+                end_date: formData.end_date
+            });
+            alert('Academic year created successfully!');
+            setIsModalOpen(false);
+            setFormData({ start_date: '', end_date: '' });
+            onUpdated();
+        } catch (error) {
+            console.error('Failed to create academic year:', error);
+            const msg = error?.response?.data?.detail || error?.response?.data?.non_field_errors?.[0] || error.message || 'Failed to create academic year.';
+            alert(msg);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleActivate = async (id) => {
+        try {
+            await managerService.activateAcademicYear(id);
+            alert('Academic year activated!');
+            onUpdated();
+        } catch (error) {
+            console.error('Failed to activate:', error);
+            alert(error?.response?.data?.detail || 'Failed to activate academic year.');
+        }
+    };
+
+    const handleDeactivate = async (id) => {
+        if (!window.confirm('Are you sure you want to deactivate this academic year?')) return;
+        try {
+            await managerService.deactivateAcademicYear(id);
+            alert('Academic year deactivated!');
+            onUpdated();
+        } catch (error) {
+            console.error('Failed to deactivate:', error);
+            alert(error?.response?.data?.detail || 'Failed to deactivate academic year.');
+        }
+    };
+
+    return (
+        <div className="management-card">
+            <div className="table-header-actions">
+                <h3 className="chart-title">Academic Years</h3>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                    <Plus size={18} />
+                    Create Academic Year
+                </button>
+            </div>
+
+            {academicYears.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    <GraduationCap size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>
+                        No Academic Years Configured
+                    </h3>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        Create an academic year to enable teacher assignments and course management.
+                    </p>
+                    <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                        <Plus size={18} />
+                        Create First Academic Year
+                    </button>
+                </div>
+            ) : (
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>Academic Year</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {academicYears.map((ay) => (
+                            <tr key={ay.id}>
+                                <td style={{ fontWeight: 600 }}>{ay.academic_year_code}</td>
+                                <td>{ay.start_date}</td>
+                                <td>{ay.end_date}</td>
+                                <td>
+                                    <span style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '999px',
+                                        fontSize: '12px',
+                                        background: ay.is_active ? 'var(--color-success-light, #dcfce7)' : 'var(--color-error-light, #fee2e2)',
+                                        color: ay.is_active ? 'var(--color-success, #16a34a)' : 'var(--color-error, #dc2626)'
+                                    }}>
+                                        {ay.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        {ay.is_active ? (
+                                            <button
+                                                onClick={() => handleDeactivate(ay.id)}
+                                                style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.875rem' }}
+                                            >
+                                                <Power size={14} /> Deactivate
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleActivate(ay.id)}
+                                                style={{ color: 'var(--color-success, #16a34a)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.875rem' }}
+                                            >
+                                                <Power size={14} /> Activate
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+
+            {/* Create Academic Year Modal */}
+            {isModalOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '420px',
+                        border: '1px solid var(--color-border)'
+                    }}>
+                        <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Create Academic Year</h2>
+                        <p style={{ marginBottom: '1.5rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                            The academic year code will be auto-generated from the dates (e.g. 2025-2026).
+                        </p>
+                        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>Start Date</label>
+                                <input
+                                    required
+                                    type="date"
+                                    value={formData.start_date}
+                                    onChange={e => setFormData({ ...formData, start_date: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>End Date</label>
+                                <input
+                                    required
+                                    type="date"
+                                    value={formData.end_date}
+                                    onChange={e => setFormData({ ...formData, end_date: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
+                                <button type="submit" className="btn-primary" disabled={saving}>
+                                    {saving ? 'Creating...' : 'Create'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -180,8 +433,18 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
 
     const handleSave = async (e) => {
         e.preventDefault();
+
+        if (!schoolId) {
+            alert('Error: School ID not found. Please log out and log in again.');
+            console.error('Cannot create course: schoolId is undefined.');
+            return;
+        }
+
         try {
-            await managerService.createCourse(schoolId, formData);
+            await managerService.createCourse(schoolId, {
+                ...formData,
+                grade_id: parseInt(formData.grade_id)
+            });
             onCourseUpdated();
             setIsModalOpen(false);
             setFormData({ grade_id: '', course_code: '', name: '' });
@@ -194,10 +457,13 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
     const handleRemove = async (id) => {
         if (!window.confirm('Are you sure you want to deactivate this subject?')) return;
         try {
+            // Backend returns 204 No Content on success
             await managerService.deactivateCourse(schoolId, id);
+            alert('Subject deactivated successfully!');
             onCourseUpdated();
         } catch (error) {
             console.error('Failed to deactivate course:', error);
+            alert(error.message || 'Failed to deactivate subject. Please check network and permissions.');
         }
     };
 
@@ -303,12 +569,16 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
     );
 };
 
-const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated }) => {
+const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasActiveAcademicYear }) => {
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [selectedTeacher, setSelectedTeacher] = useState('');
 
     const handleOpenAssign = (course) => {
+        if (!hasActiveAcademicYear) {
+            alert('No active academic year found. Please go to the "Academic Year" tab and create/activate one first.');
+            return;
+        }
         setSelectedCourse(course);
         setSelectedTeacher('');
         setIsAssignModalOpen(true);
@@ -321,10 +591,12 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated }) => 
         try {
             await managerService.assignTeacherToCourse(schoolId, selectedCourse.id, selectedTeacher);
             setIsAssignModalOpen(false);
+            alert('Teacher assigned successfully!');
             onCourseUpdated();
         } catch (error) {
             console.error('Failed to assign teacher:', error);
-            alert('Failed to assign teacher.');
+            const msg = error?.response?.data?.detail || error?.response?.data?.non_field_errors?.[0] || error.message || 'Failed to assign teacher.';
+            alert(msg);
         }
     };
 
@@ -398,14 +670,248 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated }) => 
                                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
                                 >
                                     <option value="">Select a teacher...</option>
-                                    {teachers.map(t => (
-                                        <option key={t.id} value={t.id}>{t.full_name}</option>
+                                    {teachers.map(teacher => (
+                                        <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>{teacher.full_name}</option>
                                     ))}
                                 </select>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
                                 <button type="button" onClick={() => setIsAssignModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
                                 <button type="submit" className="btn-primary">Assign Teacher</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ============================================
+// Classroom Management Tab
+// ============================================
+const ClassroomManagement = ({ schoolId, academicYears }) => {
+    const [classrooms, setClassrooms] = useState([]);
+    const [grades, setGrades] = useState([]);
+    const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ grade_id: '', classroom_name: '' });
+    const [saving, setSaving] = useState(false);
+    const [loadingClassrooms, setLoadingClassrooms] = useState(false);
+
+    const activeAcademicYear = academicYears.find(ay => ay.is_active);
+
+    useEffect(() => {
+        if (activeAcademicYear && !selectedAcademicYear) {
+            setSelectedAcademicYear(String(activeAcademicYear.id));
+        }
+    }, [activeAcademicYear]);
+
+    useEffect(() => {
+        const fetchGrades = async () => {
+            try {
+                const data = await managerService.getGrades();
+                setGrades(data.results || data || []);
+            } catch (error) {
+                console.error('Failed to fetch grades:', error);
+            }
+        };
+        fetchGrades();
+    }, []);
+
+    useEffect(() => {
+        if (schoolId && selectedAcademicYear) {
+            fetchClassrooms();
+        }
+    }, [schoolId, selectedAcademicYear]);
+
+    const fetchClassrooms = async () => {
+        if (!schoolId || !selectedAcademicYear) return;
+        setLoadingClassrooms(true);
+        try {
+            const data = await managerService.getClassrooms(schoolId, selectedAcademicYear, { include_inactive: true });
+            setClassrooms(data.results || data || []);
+        } catch (error) {
+            console.error('Failed to fetch classrooms:', error);
+            setClassrooms([]);
+        } finally {
+            setLoadingClassrooms(false);
+        }
+    };
+
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        if (!schoolId || !selectedAcademicYear) {
+            alert('Please select an academic year first.');
+            return;
+        }
+        setSaving(true);
+        try {
+            await managerService.createClassroom(schoolId, selectedAcademicYear, {
+                grade_id: parseInt(formData.grade_id),
+                classroom_name: formData.classroom_name
+            });
+            alert('Classroom created successfully!');
+            setIsModalOpen(false);
+            setFormData({ grade_id: '', classroom_name: '' });
+            fetchClassrooms();
+        } catch (error) {
+            console.error('Failed to create classroom:', error);
+            const msg = error?.response?.data?.detail || error?.response?.data?.classroom_name?.[0] || error?.response?.data?.non_field_errors?.[0] || error.message || 'Failed to create classroom.';
+            alert(msg);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeactivate = async (classroomId) => {
+        if (!window.confirm('Are you sure you want to deactivate this classroom?')) return;
+        try {
+            await managerService.deactivateClassroom(schoolId, selectedAcademicYear, classroomId);
+            alert('Classroom deactivated!');
+            fetchClassrooms();
+        } catch (error) {
+            console.error('Failed to deactivate classroom:', error);
+            alert(error?.response?.data?.detail || 'Failed to deactivate classroom.');
+        }
+    };
+
+    return (
+        <div className="management-card">
+            <div className="table-header-actions">
+                <h3 className="chart-title">Classroom Management</h3>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <select
+                        value={selectedAcademicYear}
+                        onChange={e => setSelectedAcademicYear(e.target.value)}
+                        style={{ padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', fontSize: '0.875rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
+                    >
+                        <option value="">Select Academic Year</option>
+                        {academicYears.map(ay => (
+                            <option key={ay.id} value={ay.id}>
+                                {ay.academic_year_code} {ay.is_active ? '(Active)' : ''}
+                            </option>
+                        ))}
+                    </select>
+                    <button className="btn-primary" onClick={() => setIsModalOpen(true)} disabled={!selectedAcademicYear}>
+                        <Plus size={18} />
+                        Add Classroom
+                    </button>
+                </div>
+            </div>
+
+            {!selectedAcademicYear ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    <Building size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>
+                        Select an Academic Year
+                    </h3>
+                    <p>Choose an academic year above to manage its classrooms.</p>
+                </div>
+            ) : loadingClassrooms ? (
+                <div style={{ padding: '2rem', textAlign: 'center' }}>Loading classrooms...</div>
+            ) : classrooms.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    <Building size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>
+                        No Classrooms Found
+                    </h3>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        Create classrooms for this academic year to enable teacher assignments.
+                    </p>
+                    <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                        <Plus size={18} />
+                        Create First Classroom
+                    </button>
+                </div>
+            ) : (
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>Classroom Name</th>
+                            <th>Grade</th>
+                            <th>Homeroom Teacher</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {classrooms.map((cr) => (
+                            <tr key={cr.id}>
+                                <td style={{ fontWeight: 600 }}>{cr.classroom_name}</td>
+                                <td>{cr.grade_name || cr.grade}</td>
+                                <td>{cr.homeroom_teacher_name || 'Not assigned'}</td>
+                                <td>
+                                    <span style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '999px',
+                                        fontSize: '12px',
+                                        background: cr.is_active ? 'var(--color-success-light, #dcfce7)' : 'var(--color-error-light, #fee2e2)',
+                                        color: cr.is_active ? 'var(--color-success, #16a34a)' : 'var(--color-error, #dc2626)'
+                                    }}>
+                                        {cr.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </td>
+                                <td>
+                                    {cr.is_active && (
+                                        <button
+                                            onClick={() => handleDeactivate(cr.id)}
+                                            style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.875rem' }}
+                                        >
+                                            <Power size={14} /> Deactivate
+                                        </button>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+
+            {/* Create Classroom Modal */}
+            {isModalOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '420px',
+                        border: '1px solid var(--color-border)'
+                    }}>
+                        <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Create Classroom</h2>
+                        <p style={{ marginBottom: '1.5rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                            Add a new classroom for the selected academic year.
+                        </p>
+                        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>Grade</label>
+                                <select
+                                    required
+                                    value={formData.grade_id}
+                                    onChange={e => setFormData({ ...formData, grade_id: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
+                                >
+                                    <option value="">Select Grade</option>
+                                    {grades.map(g => (
+                                        <option key={g.id} value={g.id}>{g.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>Classroom Name</label>
+                                <input
+                                    required
+                                    placeholder="e.g. Class 1-A"
+                                    value={formData.classroom_name}
+                                    onChange={e => setFormData({ ...formData, classroom_name: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
+                                <button type="submit" className="btn-primary" disabled={saving}>
+                                    {saving ? 'Creating...' : 'Create'}
+                                </button>
                             </div>
                         </form>
                     </div>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Search, Send, User, ShieldCheck } from 'lucide-react';
+// filepath: /home/mahmoud/Desktop/front/EduTrakerFront/src/components/shared/Communication/CommunicationForm.jsx
+import { useState } from 'react';
+import { Search, Send, ShieldCheck } from 'lucide-react';
 import Button from '../../ui/Button';
 import styles from './Communication.module.css';
 import { api } from '../../../utils/api';
@@ -10,13 +11,12 @@ const CommunicationForm = ({
     onCancel,
     initialRecipient = null,
     isReply = false,
-    parentMessage = null,
-    isAdminMessage = false
+    parentMessage = null
 }) => {
     const { t } = useTheme();
     const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
     const [recipientSearchResults, setRecipientSearchResults] = useState([]);
-    const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+    const [_isSearchingUsers, setIsSearchingUsers] = useState(false);
     const [formData, setFormData] = useState({
         recipient_id: initialRecipient?.id || null,
         recipient_name: initialRecipient?.full_name || initialRecipient?.email || '',
@@ -33,7 +33,7 @@ const CommunicationForm = ({
 
         setIsSearchingUsers(true);
         try {
-            const response = await api.get('/users/', { params: { search: term } });
+            const response = await api.get('/user-messages/search/', { params: { search: term } });
             const results = response.results || response;
             setRecipientSearchResults(Array.isArray(results) ? results : []);
         } catch (err) {
@@ -55,15 +55,29 @@ const CommunicationForm = ({
 
     const handleRemoveRecipient = () => {
         setFormData(prev => ({ ...prev, recipient_id: null, recipient_name: '' }));
+        setRecipientSearchTerm('');
+        setRecipientSearchResults([]);
     };
 
     const handleSend = async () => {
-        if (!formData.recipient_id) return;
         if (!formData.body.trim()) return;
 
+        // Determine recipient payload
+        let recipientPayload = {};
+        if (formData.recipient_id) {
+            recipientPayload = { recipient_ids: [formData.recipient_id] };
+        } else {
+            const emailInput = (recipientSearchTerm.trim() || formData.recipient_name || '').trim();
+            if (emailInput) {
+                recipientPayload = { recipient_emails: [emailInput] };
+            } else {
+                alert(t('communication.noRecipient') || 'Please select or type a recipient email.');
+                return;
+            }
+        }
+
         try {
-            const payload = {
-                recipient_ids: [formData.recipient_id],
+            const basePayload = {
                 subject: formData.subject || t('communication.noSubject'),
                 body: formData.body,
                 ...(isReply && {
@@ -72,6 +86,8 @@ const CommunicationForm = ({
                 })
             };
 
+            const payload = { ...basePayload, ...recipientPayload };
+
             await api.post('/user-messages/', payload);
             if (onSuccess) onSuccess();
 
@@ -79,13 +95,18 @@ const CommunicationForm = ({
             setFormData(prev => ({ ...prev, body: '' }));
         } catch (err) {
             console.error('Failed to send message:', err);
-            // Error handling should be handled by the parent or toast
+            const detail = err?.response?.data;
+            if (detail) {
+                const errorMsg = detail.recipient_emails
+                    ? (Array.isArray(detail.recipient_emails) ? detail.recipient_emails.join(', ') : detail.recipient_emails)
+                    : (typeof detail === 'string' ? detail : JSON.stringify(detail));
+                alert(errorMsg);
+            }
         }
     };
 
     const handleContactAdmin = async () => {
         try {
-            // Find an admin user to contact
             const response = await api.get('/users/', { params: { role: 'super_admin', limit: 1 } });
             const admins = response.results || response;
             if (admins && admins.length > 0) {
@@ -126,15 +147,22 @@ const CommunicationForm = ({
                                         value={recipientSearchTerm}
                                         onChange={(e) => handleUserSearch(e.target.value)}
                                     />
-                                    {recipientSearchResults.length > 0 && (
+                                    {recipientSearchTerm.length >= 2 && (
                                         <div className={styles.searchResults}>
-                                            {recipientSearchResults.map(user => (
-                                                <div key={user.id} onClick={() => handleSelectRecipient(user)} className={styles.searchResultItem}>
-                                                    <div className={styles.resultName}>{user.full_name}</div>
-                                                    <div className={styles.resultEmail}>{user.email}</div>
-                                                    <div className={styles.resultRole}>{user.role}</div>
+                                            {recipientSearchResults.length > 0 ? (
+                                                recipientSearchResults.map(user => (
+                                                    <div key={user.id} onClick={() => handleSelectRecipient(user)} className={styles.searchResultItem}>
+                                                        <div className={styles.resultName}>{user.full_name}</div>
+                                                        <div className={styles.resultEmail}>{user.email}</div>
+                                                        <div className={styles.resultRole}>{user.role}</div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className={styles.searchResultItem} style={{ opacity: 0.7, cursor: 'default' }}>
+                                                    <div className={styles.resultName}>{t('communication.noResults') || 'No users found'}</div>
+                                                    <div className={styles.resultEmail}>{t('communication.typeEmailHint') || 'Type a full email and click Send'}</div>
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -181,7 +209,7 @@ const CommunicationForm = ({
                     variant="primary"
                     onClick={handleSend}
                     icon={Send}
-                    disabled={!formData.recipient_id || !formData.body.trim()}
+                    disabled={false} // always clickable
                 >
                     {t('communication.send')}
                 </Button>

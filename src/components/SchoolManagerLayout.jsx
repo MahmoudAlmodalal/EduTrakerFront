@@ -9,13 +9,15 @@ import {
     Briefcase,
     UserCheck,
     Sparkles,
-    Bell
+    Bell,
+    MessageSquare
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import '../pages/SchoolManager/SchoolManager.css';
 import notificationService from '../services/notificationService';
-import { useEffect, useState } from 'react';
+import managerService from '../services/managerService';
+import { useEffect } from 'react';
 import { useCachedApi } from '../hooks/useCachedApi';
 
 const SchoolManagerLayout = () => {
@@ -24,18 +26,24 @@ const SchoolManagerLayout = () => {
     const navigate = useNavigate();
 
     const navItems = [
-        { path: '/school-manager/dashboard', labelKey: 'school.nav.overview', icon: LayoutDashboard },
-        { path: '/school-manager/configuration', labelKey: 'school.nav.academicConfig', icon: Settings },
-        { path: '/school-manager/reports', labelKey: 'school.nav.reports', icon: FileBarChart },
-        { path: '/school-manager/teachers', labelKey: 'school.nav.teacherMonitoring', icon: UserCheck },
-        { path: '/school-manager/departments', labelKey: 'school.nav.departments', icon: Briefcase },
-        { path: '/school-manager/secretaries', labelKey: 'school.nav.secretaryMonitoring', icon: Users },
-        { path: '/school-manager/settings', labelKey: 'school.nav.settings', icon: Settings },
+        { path: '/school-manager/dashboard', labelKey: 'schoolManager.nav.dashboard', icon: LayoutDashboard },
+        { path: '/school-manager/configuration', labelKey: 'schoolManager.nav.configuration', icon: Settings },
+        { path: '/school-manager/reports', labelKey: 'schoolManager.nav.reports', icon: FileBarChart },
+        { path: '/school-manager/teachers', labelKey: 'schoolManager.nav.teachers', icon: UserCheck },
+        { path: '/school-manager/departments', labelKey: 'schoolManager.nav.departments', icon: Briefcase },
+        { path: '/school-manager/secretaries', labelKey: 'schoolManager.nav.secretaries', icon: Users },
+        { path: '/school-manager/communication', labelKey: 'schoolManager.nav.communication', icon: MessageSquare },
+        { path: '/school-manager/settings', labelKey: 'schoolManager.nav.settings', icon: Settings },
     ];
 
     const handleLogout = () => {
         logout();
-        navigate('/login');
+        const path = window.location.pathname || '';
+        if (path.includes('/workstream')) {
+            navigate('/workstream/login');
+        } else {
+            navigate('/login');
+        }
     };
 
     // Check if we have a valid token
@@ -51,6 +59,19 @@ const SchoolManagerLayout = () => {
             dependencies: [user?.id]
         }
     );
+
+    // Fetch dashboard stats for sidebar quick stats (5 minute TTL)
+    const { data: dashboardData } = useCachedApi(
+        () => managerService.getDashboardStats(),
+        {
+            enabled: hasValidToken,
+            cacheKey: `sidebar_stats_${user?.id}`,
+            ttl: 5 * 60 * 1000, // 5 minutes
+            dependencies: [user?.id]
+        }
+    );
+
+    const sidebarStats = dashboardData?.statistics || {};
 
     // If we get 401 errors, logout the user
     useEffect(() => {
@@ -79,7 +100,7 @@ const SchoolManagerLayout = () => {
                     <span>{t('app.name')}</span>
                 </div>
 
-                {/* Quick Stats */}
+                {/* Quick Stats from Backend */}
                 <div style={{
                     display: 'flex',
                     gap: '8px',
@@ -93,8 +114,12 @@ const SchoolManagerLayout = () => {
                         textAlign: 'center',
                         border: '1px solid rgba(79, 70, 229, 0.2)'
                     }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>156</div>
-                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Teachers</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>
+                            {sidebarStats.total_teachers ?? '—'}
+                        </div>
+                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {t('teachers') || 'Teachers'}
+                        </div>
                     </div>
                     <div style={{
                         flex: 1,
@@ -104,8 +129,12 @@ const SchoolManagerLayout = () => {
                         textAlign: 'center',
                         border: '1px solid rgba(14, 165, 233, 0.2)'
                     }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>2.4K</div>
-                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Students</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>
+                            {sidebarStats.total_students ?? '—'}
+                        </div>
+                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {t('students') || 'Students'}
+                        </div>
                     </div>
                 </div>
 

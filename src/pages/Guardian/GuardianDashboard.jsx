@@ -67,7 +67,7 @@ const GuardianDashboard = () => {
                             </div>
                         ))}
                         {(!stats?.children || stats.children.length === 0) && (
-                            <div className="text-muted text-center py-4">{t('common.noData')}</div>
+                            <div className="text-muted text-center py-4">{t('noData')}</div>
                         )}
                     </div>
                 </div>

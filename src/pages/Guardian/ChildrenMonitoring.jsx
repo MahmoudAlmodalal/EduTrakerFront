@@ -145,7 +145,7 @@ const ChildrenMonitoring = () => {
                                 </tr>
                             ))}
                             {results.length === 0 && (
-                                <tr><td colSpan="4" className="text-center py-4">{t('common.noData')}</td></tr>
+                                <tr><td colSpan="4" className="text-center py-4">{t('noData')}</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -173,7 +173,7 @@ const ChildrenMonitoring = () => {
                                 </tr>
                             ))}
                             {attendance.length === 0 && (
-                                <tr><td colSpan="3" className="text-center py-4">{t('common.noData')}</td></tr>
+                                <tr><td colSpan="3" className="text-center py-4">{t('noData')}</td></tr>
                             )}
                         </tbody>
                     </table>

@@ -59,6 +59,12 @@ const Login = ({ role }) => {
             );
 
             console.log('Login response received:', data);
+            console.log('Login response structure:', {
+                hasUser: !!data.user,
+                hasTokens: !!data.tokens,
+                dataKeys: Object.keys(data),
+                fullData: JSON.stringify(data, null, 2)
+            });
 
             // Pass user data and tokens to the AuthContext
             login(data, role, workstreamSlug);
