@@ -1,6 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Calendar, AlertCircle, CheckCircle, Bell, Plus, FileText, UserCheck, Search, ChevronRight, Loader2 } from 'lucide-react';
+import {
+    Clock,
+    Calendar,
+    Bell,
+    Plus,
+    FileText,
+    UserCheck,
+    Search,
+    ChevronRight,
+    Loader2,
+    TrendingUp,
+    Users,
+    GraduationCap,
+    ArrowUpRight
+} from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import teacherService from '../../services/teacherService';
@@ -24,24 +38,22 @@ const TeacherDashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 setLoading(true);
-                // Fetch notifications and dashboard statistics
                 const [notifData, statsResponse] = await Promise.all([
                     notificationService.getNotifications({ page_size: 5 }),
                     secretaryService.getDashboardStats()
                 ]);
 
-                setNotifications(notifData.results || notifData);
+                setNotifications(notifData.results || notifData || []);
 
-                if (statsResponse) {
-                    // Map backend stats to UI
+                if (statsResponse && statsResponse.statistics) {
+                    const s = statsResponse.statistics;
                     setStats({
-                        avgAttendance: statsResponse.average_attendance ? `${Math.round(statsResponse.average_attendance)}%` : '0%',
-                        pendingAssignments: statsResponse.pending_assignments_count || 0,
-                        totalToGrade: statsResponse.total_submissions_to_grade || 0
+                        avgAttendance: s.average_attendance ? `${Math.round(s.average_attendance)}%` : '0%',
+                        pendingAssignments: s.pending_assignments_count || 0,
+                        totalToGrade: s.total_submissions_to_grade || 0
                     });
                 }
 
-                // Fetch real schedule
                 const date = new Date().toISOString().split('T')[0];
                 const scheduleData = await teacherService.getSchedule(date);
                 setSchedule(scheduleData.results || scheduleData || []);
@@ -58,167 +70,229 @@ const TeacherDashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="animate-spin text-teacher-primary" size={48} />
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+                <Loader2 className="animate-spin text-indigo-600" size={40} />
+                <p className="text-gray-500 font-medium animate-pulse">Loading dashboard...</p>
             </div>
         );
     }
 
+    const StatCard = ({ label, value, subValue, icon: Icon, colorClass }) => (
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+            <div className="flex justify-between items-start mb-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass} group-hover:scale-110 transition-transform`}>
+                    <Icon size={20} />
+                </div>
+                {subValue && (
+                    <span className="text-[10px] font-bold uppercase py-1 px-2 rounded-full bg-indigo-50 text-indigo-600">
+                        {subValue}
+                    </span>
+                )}
+            </div>
+            <div>
+                <p className="text-gray-500 text-sm font-medium">{label}</p>
+                <h3 className="text-3xl font-bold text-gray-900 mt-1">{value}</h3>
+            </div>
+        </div>
+    );
+
+    const QuickAction = ({ label, sub, icon: Icon, onClick, colorClass, iconColor }) => (
+        <button
+            onClick={onClick}
+            className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all text-left w-full group"
+        >
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass} ${iconColor} group-hover:scale-110 transition-transform`}>
+                <Icon size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate">{label}</p>
+                <p className="text-xs text-gray-500 truncate">{sub}</p>
+            </div>
+            <ArrowUpRight size={16} className="text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+        </button>
+    );
+
     return (
-        <div className="space-y-6 animate-fade-in">
-            {/* Header Section */}
-            <header className="dashboard-header">
+        <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in overflow-hidden px-4 sm:px-6">
+            {/* Page Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-100 pb-8">
                 <div>
-                    <h1 className="dashboard-header-title">
+                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
                         {t('teacher.dashboard.title')}
                     </h1>
-                    <p className="text-slate-500 mt-1">{t('teacher.dashboard.welcome')}</p>
+                    <p className="text-gray-500 mt-1 flex items-center gap-2">
+                        <Users size={16} className="text-indigo-500" />
+                        {t('teacher.dashboard.welcome')}, <span className="font-semibold text-gray-700">{user?.full_name || user?.username}</span>
+                    </p>
                 </div>
 
-                <div className="glass-panel dashboard-date-widget">
-                    <div style={{ paddingRight: '1rem', borderRight: '1px solid var(--teacher-border)', marginRight: '1rem' }}>
-                        <p className="font-bold text-slate-800">Monday, Dec 15</p>
-                        <p className="text-xs text-slate-500">2025</p>
-                    </div>
-
-                    <div style={{ position: 'relative', cursor: 'pointer' }}>
-                        <Bell size={24} className="text-slate-500" />
-                        <span style={{
-                            position: 'absolute', top: 0, right: 0,
-                            height: '10px', width: '10px',
-                            backgroundColor: 'red', borderRadius: '50%',
-                            border: '2px solid white'
-                        }}></span>
+                <div className="flex items-center gap-4">
+                    <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                        <div className="pr-4 border-r border-gray-100">
+                            <p className="text-sm font-bold text-gray-900 leading-none">
+                                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">{new Date().getFullYear()}</p>
+                        </div>
+                        <div className="relative cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors"
+                            onClick={() => navigate('/teacher/communication', { state: { activeTab: 'notifications' } })}>
+                            <Bell size={22} className="text-gray-500" />
+                            {notifications.some(n => !n.is_read) && (
+                                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm animate-pulse"></span>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </header>
+            </div>
 
-            <div className="dashboard-grid">
-                {/* Main Content Area */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                    {/* Schedule Section */}
-                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h2 style={{ fontWeight: '700', color: 'var(--teacher-text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.25rem' }}>
-                                <span style={{ padding: '0.5rem', backgroundColor: 'var(--teacher-primary-light)', borderRadius: '0.5rem', color: 'var(--teacher-primary)', display: 'flex' }}>
-                                    <Calendar size={20} />
-                                </span>
+            {/* Top Stats Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard
+                    label={t('teacher.dashboard.avgAttendance')}
+                    value={stats.avgAttendance}
+                    icon={UserCheck}
+                    colorClass="bg-emerald-500 text-white"
+                    subValue="Overall"
+                />
+                <StatCard
+                    label={t('teacher.dashboard.assignmentsToGrade')}
+                    value={stats.totalToGrade}
+                    icon={FileText}
+                    colorClass="bg-amber-500 text-white"
+                    subValue={`${stats.pendingAssignments} Active`}
+                />
+                <StatCard
+                    label="Current Classes"
+                    value={schedule.length}
+                    icon={GraduationCap}
+                    colorClass="bg-indigo-600 text-white"
+                />
+                <StatCard
+                    label="Active Students"
+                    value="---"
+                    icon={Users}
+                    colorClass="bg-sky-500 text-white"
+                />
+            </div>
+
+            {/* Main Content & Sidebar */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Schedule Column */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden min-h-[400px]">
+                        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+                            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-3">
+                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                    <Clock size={18} />
+                                </div>
                                 {t('teacher.dashboard.mySchedule')}
                             </h2>
                             <button
-                                onClick={() => alert('Opening full timetable view...')}
-                                style={{ color: 'var(--teacher-primary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer' }}
+                                onClick={() => navigate('/teacher/classes')}
+                                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group"
                             >
-                                {t('teacher.dashboard.viewTimetable')} <ChevronRight size={16} />
+                                {t('teacher.dashboard.viewTimetable')}
+                                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                             </button>
                         </div>
 
-                        <div className="space-y-4">
-                            {schedule.map((slot) => (
-                                <div
-                                    key={slot.id}
-                                    className={`schedule-item ${slot.status === 'current' ? 'current' : ''}`}
-                                >
-                                    <div className="schedule-time-box">
-                                        {slot.time.split(' ')[0]}
-                                    </div>
+                        <div className="p-6">
+                            {schedule.length > 0 ? (
+                                <div className="space-y-4">
+                                    {schedule.map((slot) => (
+                                        <div key={slot.id} className={`flex items-center gap-5 p-4 rounded-2xl border transition-all ${slot.status === 'current'
+                                                ? 'bg-indigo-50/50 border-indigo-100 shadow-sm ring-1 ring-indigo-100'
+                                                : 'bg-white border-gray-100 hover:bg-gray-50'
+                                            }`}>
+                                            <div className="w-16 h-16 rounded-xl bg-white border border-gray-100 shadow-xs flex flex-col items-center justify-center shrink-0">
+                                                <span className="text-xs font-bold text-indigo-600">{slot.time.split(' ')[0]}</span>
+                                                <Clock size={14} className="text-gray-300 mt-1" />
+                                            </div>
 
-                                    <div className="flex-1">
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
-                                            <h3 style={{ fontWeight: '700', color: 'var(--teacher-text-main)', fontSize: '1.125rem' }}>{slot.subject}</h3>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h3 className="font-bold text-gray-900 truncate">{slot.subject}</h3>
+                                                    {slot.status === 'current' && (
+                                                        <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                                                            {t('teacher.dashboard.now')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                                    <span className="flex items-center gap-1">
+                                                        <Users size={12} className="text-gray-400" />
+                                                        {slot.class}
+                                                    </span>
+                                                    <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                                                    <span className="flex items-center gap-1 uppercase tracking-tight">
+                                                        {slot.room}
+                                                    </span>
+                                                </div>
+                                            </div>
+
                                             {slot.status === 'current' && (
-                                                <span style={{ padding: '0.25rem 0.75rem', backgroundColor: '#DCFCE7', color: '#15803D', fontSize: '0.75rem', fontWeight: '700', borderRadius: '999px' }}>
-                                                    {t('teacher.dashboard.now')}
-                                                </span>
+                                                <button
+                                                    onClick={() => navigate('/teacher/attendance')}
+                                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
+                                                >
+                                                    {t('teacher.dashboard.start')}
+                                                </button>
                                             )}
                                         </div>
-                                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                <UserCheck size={16} />
-                                                {slot.class}
-                                            </span>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                {slot.room}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {slot.status === 'current' && (
-                                        <div style={{ marginLeft: '1rem', paddingLeft: '1rem', borderLeft: '1px solid var(--teacher-primary-light)' }}>
-                                            <button
-                                                onClick={() => alert(`Starting class: ${slot.subject} - ${slot.class}`)}
-                                                style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--teacher-primary)', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '500', cursor: 'pointer' }}
-                                            >
-                                                {t('teacher.dashboard.start')}
-                                            </button>
-                                        </div>
-                                    )}
+                                    ))}
                                 </div>
-                            ))}
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-20 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                                    <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm mb-4">
+                                        <Calendar className="text-gray-300" size={32} />
+                                    </div>
+                                    <p className="text-gray-500 font-medium">{t('teacher.dashboard.noSchedule') || 'No classes scheduled for today'}</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {/* Quick Stats / Overview Panels */}
-                    <div className="stat-card">
-                        <div className="glass-panel card-hover" style={{ padding: '1.5rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                                <div style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--teacher-success)', borderRadius: '0.75rem' }}>
-                                    <UserCheck size={24} />
-                                </div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--teacher-success)', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '0.25rem 0.5rem', borderRadius: '999px' }}>+0%</span>
-                            </div>
-                            <h3 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '0.25rem' }}>{stats.avgAttendance}</h3>
-                            <p style={{ color: 'var(--teacher-text-muted)', fontSize: '0.875rem' }}>{t('teacher.dashboard.avgAttendance')}</p>
-                        </div>
-
-                        <div className="glass-panel card-hover" style={{ padding: '1.5rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                                <div style={{ padding: '0.75rem', backgroundColor: 'rgba(234, 88, 12, 0.2)', color: 'var(--teacher-warning)', borderRadius: '0.75rem' }}>
-                                    <FileText size={24} />
-                                </div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--teacher-warning)', backgroundColor: 'rgba(234, 88, 12, 0.15)', padding: '0.25rem 0.5rem', borderRadius: '999px' }}>{stats.pendingAssignments} {t('teacher.dashboard.pending')}</span>
-                            </div>
-                            <h3 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '0.25rem' }}>{stats.totalToGrade}</h3>
-                            <p style={{ color: 'var(--teacher-text-muted)', fontSize: '0.875rem' }}>{t('teacher.dashboard.assignmentsToGrade')}</p>
+                    {/* Quick Access Desktop Grid */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                        <h2 className="text-md font-bold text-gray-900 mb-6 flex items-center gap-2">
+                            <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                            Quick Actions
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <QuickAction
+                                label={t('teacher.dashboard.createAssessment')}
+                                sub="New Assignment"
+                                icon={Plus}
+                                onClick={() => navigate('/teacher/assessments')}
+                                colorClass="bg-indigo-50"
+                                iconColor="text-indigo-600"
+                            />
+                            <QuickAction
+                                label={t('teacher.dashboard.recordAttendance')}
+                                sub="Today's Classes"
+                                icon={UserCheck}
+                                onClick={() => navigate('/teacher/classes')}
+                                colorClass="bg-emerald-50"
+                                iconColor="text-emerald-600"
+                            />
+                            <QuickAction
+                                label={t('teacher.dashboard.findStudent')}
+                                sub="Student Profiles"
+                                icon={Search}
+                                onClick={() => navigate('/teacher/classes')}
+                                colorClass="bg-amber-50"
+                                iconColor="text-amber-600"
+                            />
                         </div>
                     </div>
                 </div>
 
-                {/* Sidebar Area */}
+                {/* Sidebar Notification Column */}
                 <div className="space-y-6">
-                    {/* Quick Actions */}
-                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                        <h2 style={{ fontWeight: '700', color: 'var(--teacher-text-main)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ width: '4px', height: '1.5rem', backgroundColor: 'var(--teacher-primary)', borderRadius: '999px' }}></span>
-                            {t('teacher.dashboard.quickActions')}
-                        </h2>
-                        <div className="space-y-4">
-                            <button className="action-btn" onClick={() => navigate('/teacher/assessments')}>
-                                <div style={{ padding: '0.5rem', backgroundColor: 'var(--teacher-primary-light)', color: 'var(--teacher-primary)', borderRadius: '0.5rem' }}>
-                                    <Plus size={18} />
-                                </div>
-                                <span>{t('teacher.dashboard.createAssessment')}</span>
-                            </button>
-                            <button className="action-btn" onClick={() => navigate('/teacher/classes')}>
-                                <div style={{ padding: '0.5rem', backgroundColor: '#F3E8FF', color: '#9333EA', borderRadius: '0.5rem' }}>
-                                    <UserCheck size={18} />
-                                </div>
-                                <span>{t('teacher.dashboard.recordAttendance')}</span>
-                            </button>
-                            <button className="action-btn" onClick={() => navigate('/teacher/classes')}>
-                                <div style={{ padding: '0.5rem', backgroundColor: '#DBEAFE', color: '#2563EB', borderRadius: '0.5rem' }}>
-                                    <Search size={18} />
-                                </div>
-                                <span>{t('teacher.dashboard.findStudent')}</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Notifications */}
-                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h2 style={{ fontWeight: '700', color: 'var(--teacher-text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ width: '4px', height: '1.5rem', backgroundColor: 'var(--teacher-warning)', borderRadius: '999px' }}></span>
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
+                            <h2 className="text-md font-bold text-gray-900 flex items-center gap-2">
+                                <Bell size={18} className="text-amber-500" />
                                 {t('teacher.dashboard.notifications')}
                             </h2>
                             <button
@@ -226,60 +300,74 @@ const TeacherDashboard = () => {
                                     try {
                                         await notificationService.markAllAsRead();
                                         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-                                    } catch (err) {
-                                        console.error('Error marking all read:', err);
-                                    }
+                                    } catch (err) { console.error('Error:', err); }
                                 }}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '700', color: 'var(--teacher-text-muted)' }}
+                                className="text-[10px] font-bold text-gray-400 hover:text-indigo-600 uppercase tracking-widest transition-colors"
                             >
                                 {t('teacher.dashboard.markAllRead')}
                             </button>
                         </div>
 
-                        <div className="space-y-6">
-                            {notifications.map((notif) => (
-                                <div
-                                    key={notif.id}
-                                    className={`notification-item ${!notif.is_read ? 'unread' : ''}`}
-                                    onClick={async () => {
-                                        if (!notif.is_read) {
-                                            try {
-                                                await notificationService.markAsRead(notif.id);
-                                                setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-                                            } catch (err) {
-                                                console.error('Error marking read:', err);
+                        <div className="p-4 space-y-2">
+                            {notifications.length > 0 ? (
+                                notifications.map((notif) => (
+                                    <div
+                                        key={notif.id}
+                                        onClick={async () => {
+                                            if (!notif.is_read) {
+                                                try {
+                                                    await notificationService.markAsRead(notif.id);
+                                                    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                                                } catch (err) { console.error('Error:', err); }
                                             }
-                                        }
-                                        if (notif.action_url) navigate(notif.action_url);
-                                    }}
-                                    style={{
-                                        cursor: 'pointer',
-                                        opacity: notif.is_read ? 0.7 : 1,
-                                        transition: 'all 0.2s'
-                                    }}
-                                >
-                                    <div style={{
-                                        width: '2rem', height: '2rem', borderRadius: '50%',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        backgroundColor: notif.notification_type === 'grade_posted' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                                        color: notif.notification_type === 'grade_posted' ? 'var(--teacher-success)' : 'var(--teacher-primary)',
-                                    }}>
-                                        <Bell size={14} />
+                                            if (notif.action_url) navigate(notif.action_url);
+                                        }}
+                                        className={`p-4 rounded-xl flex gap-4 cursor-pointer transition-all ${!notif.is_read ? 'bg-amber-50/50 border border-amber-100 shadow-xs' : 'hover:bg-gray-50 border border-transparent'
+                                            }`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${notif.notification_type === 'grade_posted' ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'
+                                            }`}>
+                                            <Bell size={14} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className={`text-sm leading-tight mb-1 ${!notif.is_read ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
+                                                {notif.title}
+                                            </p>
+                                            <p className="text-[10px] text-gray-400 font-medium">
+                                                {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p style={{ fontSize: '0.875rem', color: 'var(--teacher-text-main)', fontWeight: notif.is_read ? '400' : '700', marginBottom: '0.25rem' }}>{notif.title}</p>
-                                        <p style={{ fontSize: '0.75rem', color: 'var(--teacher-text-muted)' }}>{new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-10">
+                                    <p className="text-xs text-gray-400 italic">No new notifications</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
 
-                        <button
-                            onClick={() => navigate('/teacher/communication', { state: { activeTab: 'notifications' } })}
-                            style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--teacher-text-muted)', backgroundColor: 'var(--teacher-bg)', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
-                        >
-                            {t('teacher.dashboard.viewAllNotifications')}
-                        </button>
+                        <div className="p-4 border-t border-gray-50 bg-gray-50/20">
+                            <button
+                                onClick={() => navigate('/teacher/communication', { state: { activeTab: 'notifications' } })}
+                                className="w-full py-2 text-xs font-bold text-gray-500 hover:text-indigo-600 transition-colors uppercase tracking-widest"
+                            >
+                                {t('teacher.dashboard.viewAllNotifications')}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Small Support Widget */}
+                    <div className="bg-indigo-900 rounded-2xl p-6 text-white text-center relative overflow-hidden shadow-lg">
+                        <div className="relative z-10">
+                            <h3 className="font-bold text-sm mb-2">Technical Support</h3>
+                            <p className="text-indigo-200 text-[11px] mb-4">Facing issues with the dashboard? Our team is here to help.</p>
+                            <button className="w-full py-2 bg-indigo-500 hover:bg-indigo-400 text-white rounded-lg text-xs font-bold transition-colors">
+                                Contact IT Desk
+                            </button>
+                        </div>
+                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                            <TrendingUp size={80} />
+                        </div>
                     </div>
                 </div>
             </div>

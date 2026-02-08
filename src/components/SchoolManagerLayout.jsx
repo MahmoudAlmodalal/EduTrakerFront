@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -10,20 +10,39 @@ import {
     UserCheck,
     Sparkles,
     Bell,
-    MessageSquare
+    MessageSquare,
+    Menu,
+    X
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import '../pages/SchoolManager/SchoolManager.css';
 import notificationService from '../services/notificationService';
 import managerService from '../services/managerService';
-import { useEffect } from 'react';
 import { useCachedApi } from '../hooks/useCachedApi';
 
 const SchoolManagerLayout = () => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth <= 768) {
+                setSidebarOpen(false);
+            } else {
+                setSidebarOpen(true);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const toggleSidebar = () => {
+        setSidebarOpen(!isSidebarOpen);
+    };
 
     const navItems = [
         { path: '/school-manager/dashboard', labelKey: 'schoolManager.nav.dashboard', icon: LayoutDashboard },
@@ -92,12 +111,32 @@ const SchoolManagerLayout = () => {
     };
 
     return (
-        <div className="school-manager-layout">
-            <aside className="school-manager-sidebar">
+        <div className={`school-manager-layout ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
+            {/* Mobile/Collapsed Menu Toggle */}
+            {!isSidebarOpen && (
+                <button
+                    onClick={toggleSidebar}
+                    className="sm-sidebar-toggle-floating"
+                    title="Open Sidebar"
+                >
+                    <Menu size={24} />
+                </button>
+            )}
+
+            <aside className={`school-manager-sidebar ${!isSidebarOpen ? 'collapsed' : ''}`}>
                 {/* Brand Section */}
                 <div className="school-manager-brand">
-                    <Sparkles size={28} />
-                    <span>{t('app.name')}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Sparkles size={28} />
+                        <span>{t('app.name')}</span>
+                    </div>
+                    <button
+                        onClick={toggleSidebar}
+                        className="sm-sidebar-toggle-inline"
+                        title="Close Sidebar"
+                    >
+                        <X size={20} />
+                    </button>
                 </div>
 
                 {/* Quick Stats from Backend */}
@@ -254,7 +293,7 @@ const SchoolManagerLayout = () => {
                 </div>
             </aside>
 
-            <main className="school-manager-main">
+            <main className={`school-manager-main ${!isSidebarOpen ? 'expanded' : ''}`}>
                 <Outlet />
             </main>
         </div>

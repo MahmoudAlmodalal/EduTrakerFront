@@ -69,7 +69,7 @@ const SchoolManagerAssignment = () => {
                 await api.post('/users/create/', {
                     full_name: newManager.full_name,
                     email: newManager.email,
-                    password: newManager.password || 'TemporaryPassword123!',
+                    password: newManager.password || 'Password123!',
                     role: 'manager_school',
                     work_stream: workStreamId,
                     school: newManager.schoolId || null,

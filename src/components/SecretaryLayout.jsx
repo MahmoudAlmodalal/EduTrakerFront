@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -7,7 +7,8 @@ import {
     FileText,
     Settings,
     LogOut,
-    Shield
+    Shield,
+    Menu
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +18,11 @@ const SecretaryLayout = () => {
     const { t } = useTheme();
     const { logout } = useAuth();
     const navigate = useNavigate();
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
+
+    const toggleSidebar = () => {
+        setSidebarOpen(!isSidebarOpen);
+    };
 
     const navItems = [
         { path: '/secretary/dashboard', labelKey: 'secretary.nav.overview', icon: LayoutDashboard },
@@ -33,12 +39,34 @@ const SecretaryLayout = () => {
     };
 
     return (
-        <div className="workstream-layout">
+        <div className={`workstream-layout ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
+            {/* Sidebar Toggle Button (Visible when sidebar is closed) */}
+            {!isSidebarOpen && (
+                <button
+                    onClick={toggleSidebar}
+                    className="workstream-sidebar-toggle-floating"
+                    title="Open Sidebar"
+                >
+                    <div className="workstream-logo-icon">
+                        <Shield size={24} />
+                    </div>
+                </button>
+            )}
+
             {/* Sidebar */}
-            <aside className="workstream-sidebar">
+            <aside className={`workstream-sidebar ${!isSidebarOpen ? 'collapsed' : ''}`}>
                 <div className="workstream-brand">
-                    <Shield size={32} />
-                    <span>{t('app.name') || 'EduTraker'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                        <Shield size={32} />
+                        <span>{t('app.name') || 'EduTraker'}</span>
+                    </div>
+                    <button
+                        onClick={toggleSidebar}
+                        className="workstream-sidebar-toggle-inline"
+                        title="Close Sidebar"
+                    >
+                        <Menu size={20} />
+                    </button>
                 </div>
 
                 <nav className="workstream-nav">
@@ -69,7 +97,7 @@ const SecretaryLayout = () => {
             </aside>
 
             {/* Main Content */}
-            <main className="workstream-main">
+            <main className={`workstream-main ${!isSidebarOpen ? 'expanded' : ''}`}>
                 <Outlet />
             </main>
         </div>

@@ -63,6 +63,15 @@
     left: 0;
     z-index: var(--z-fixed);
     box-shadow: 10px 0 40px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.school-manager-sidebar.collapsed {
+    transform: translateX(-100%);
+}
+
+[dir="rtl"] .school-manager-sidebar.collapsed {
+    transform: translateX(100%);
 }
 
 [dir="rtl"] .school-manager-sidebar {
@@ -71,10 +80,59 @@
     box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
 }
 
+/* Toggle Buttons */
+.sm-sidebar-toggle-floating {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: calc(var(--z-fixed) + 10);
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--sm-gradient);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+[dir="rtl"] .sm-sidebar-toggle-floating {
+    left: auto;
+    right: 20px;
+}
+
+.sm-sidebar-toggle-floating:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+}
+
+.sm-sidebar-toggle-inline {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sm-sidebar-toggle-inline:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
 /* Brand Section */
 .school-manager-brand {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--spacing-3);
     margin-bottom: var(--spacing-8);
     padding: var(--spacing-4);
@@ -187,11 +245,20 @@
         radial-gradient(circle at top right, rgba(79, 70, 229, 0.04), transparent 40%),
         radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.03), transparent 40%);
     min-height: 100vh;
+    transition: margin 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.school-manager-main.expanded {
+    margin-left: 0;
 }
 
 [dir="rtl"] .school-manager-main {
     margin-left: 0;
     margin-right: 280px;
+}
+
+[dir="rtl"] .school-manager-main.expanded {
+    margin-right: 0;
 }
 
 @media (max-width: 1024px) {
@@ -508,15 +575,13 @@
    ======================================================================== */
 @media (max-width: 768px) {
     .school-manager-sidebar {
-        transform: translateX(-100%);
-    }
-
-    [dir="rtl"] .school-manager-sidebar {
-        transform: translateX(100%);
+        width: 100%;
+        max-width: 280px;
     }
 
     .school-manager-main {
-        margin-left: 0;
-        margin-right: 0;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: var(--spacing-4);
     }
 }

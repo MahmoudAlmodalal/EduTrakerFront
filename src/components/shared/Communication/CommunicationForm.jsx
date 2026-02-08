@@ -105,17 +105,6 @@ const CommunicationForm = ({
         }
     };
 
-    const handleContactAdmin = async () => {
-        try {
-            const response = await api.get('/users/', { params: { role: 'super_admin', limit: 1 } });
-            const admins = response.results || response;
-            if (admins && admins.length > 0) {
-                handleSelectRecipient(admins[0]);
-            }
-        } catch (err) {
-            console.error('Error finding admin:', err);
-        }
-    };
 
     const handleCancel = () => {
         if (onCancel) onCancel();
@@ -134,10 +123,6 @@ const CommunicationForm = ({
                             </div>
                         ) : (
                             <>
-                                <div className={styles.adminShortcut} onClick={handleContactAdmin}>
-                                    <ShieldCheck size={16} />
-                                    <span>{t('communication.contactAdmin')}</span>
-                                </div>
                                 <div className={styles.searchContainer}>
                                     <Search size={18} className={styles.searchIcon} />
                                     <input

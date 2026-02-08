@@ -45,7 +45,7 @@ const StudentSettings = () => {
                     first_name: data.full_name?.split(' ')[0] || '',
                     last_name: data.full_name?.split(' ').slice(1).join(' ') || '',
                     email: data.email || '',
-                    phone: data.user?.phone || '',
+                    phone: data.phone || data.user?.phone || '',
                     student_id_code: data.id_code || 'N/A'
                 });
             } catch (error) {
@@ -62,7 +62,8 @@ const StudentSettings = () => {
         try {
             await studentService.updateProfile(user.id, {
                 full_name: `${profile.first_name} ${profile.last_name}`,
-                email: profile.email
+                email: profile.email,
+                phone: profile.phone
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);

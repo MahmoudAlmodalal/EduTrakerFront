@@ -193,37 +193,47 @@ export const AuthProvider = ({ children }) => {
 
     const logout = useCallback(async () => {
         const refreshToken = localStorage.getItem('refreshToken');
+        const savedPortalType = localStorage.getItem('portalType');
+        const savedWorkstreamId = localStorage.getItem('workstreamId');
 
-        // Attempt to notify backend (best effort)
-        if (refreshToken) {
-            try {
-                await authService.logout(refreshToken);
-            } catch (e) {
-                console.warn('Backend logout failed, continuing with local cleanup');
-            }
+        console.log('Initiating logout: clearing local state');
+
+        // Determine the correct login path before clearing storage
+        let loginPath = '/login/portal'; // Default to portal login
+        if (savedPortalType === 'WORKSTREAM' && savedWorkstreamId) {
+            loginPath = `/login/workstream/${savedWorkstreamId}`;
         }
 
-        // 1. Clear local storage
+        // 1. Clear local storage immediately
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         localStorage.removeItem('portalType');
         localStorage.removeItem('workstreamId');
 
-        // 2. Clear session cache
+        // 2. Clear session cache and manager
         sessionCache.clear();
-
-        // 3. Clear session manager
         SessionManager.clearSession();
 
-        // 4. Reset state
+        // 3. Reset React state
         setUser(null);
         setPermissions([]);
         setPortalType(null);
         setWorkstreamId(null);
 
-        // 5. Redirect to login
-        navigate('/login');
+        // 4. Redirect to the appropriate login page
+        console.log('Redirecting to:', loginPath);
+        navigate(loginPath, { replace: true });
+
+        // 5. Attempt to notify backend (best effort, in background)
+        if (refreshToken) {
+            try {
+                await authService.logout(refreshToken);
+                console.log('Backend logout successful');
+            } catch (e) {
+                console.warn('Backend logout failed, local cleanup already complete', e);
+            }
+        }
     }, [navigate]);
 
     const isAuthenticated = !!user;

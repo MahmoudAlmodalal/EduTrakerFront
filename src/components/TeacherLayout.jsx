@@ -1,5 +1,5 @@
-import React from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     Users,
@@ -8,13 +8,26 @@ import {
     MessageSquare,
     LogOut,
     GraduationCap,
-    Settings
+    Settings,
+    Menu
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import '../pages/Teacher/Teacher.css';
 
 const TeacherLayout = () => {
     const { t } = useTheme();
+    const { logout } = useAuth();
+    const navigate = useNavigate();
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
+
+    const toggleSidebar = () => {
+        setSidebarOpen(!isSidebarOpen);
+    };
+
+    const handleLogout = async () => {
+        await logout();
+    };
 
     const navItems = [
         { path: '/teacher/dashboard', label: t('teacher.nav.dashboard'), icon: LayoutDashboard },
@@ -26,13 +39,33 @@ const TeacherLayout = () => {
     ];
 
     return (
-        <div className="teacher-layout">
-            <aside className="teacher-sidebar">
+        <div className={`teacher-layout ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
+            {/* Mobile/Collapsed Menu Toggle */}
+            {!isSidebarOpen && (
+                <button
+                    onClick={toggleSidebar}
+                    className="teacher-sidebar-toggle-floating"
+                    title="Open Sidebar"
+                >
+                    <Menu size={24} />
+                </button>
+            )}
+
+            <aside className={`teacher-sidebar ${!isSidebarOpen ? 'collapsed' : ''}`}>
                 <div className="teacher-brand mb-6">
-                    <div className="teacher-brand-icon">
-                        <GraduationCap size={32} />
+                    <div className="teacher-brand-content">
+                        <div className="teacher-brand-icon">
+                            <GraduationCap size={32} />
+                        </div>
+                        <span>EduTraker</span>
                     </div>
-                    <span>EduTraker</span>
+                    <button
+                        onClick={toggleSidebar}
+                        className="teacher-sidebar-toggle-inline"
+                        title="Close Sidebar"
+                    >
+                        <Menu size={20} />
+                    </button>
                 </div>
 
                 <nav className="teacher-nav">
@@ -51,7 +84,11 @@ const TeacherLayout = () => {
                 </nav>
 
                 <div className="teacher-logout-section">
-                    <button className="teacher-nav-item teacher-logout-btn">
+                    <button
+                        type="button"
+                        className="teacher-nav-item teacher-logout-btn"
+                        onClick={handleLogout}
+                    >
                         <LogOut size={22} strokeWidth={1.5} />
                         <span>{t('header.logout')}</span>
                     </button>
@@ -68,7 +105,7 @@ const TeacherLayout = () => {
                 </div>
             </aside>
 
-            <main className="teacher-main">
+            <main className={`teacher-main ${!isSidebarOpen ? 'expanded' : ''}`}>
                 <Outlet />
             </main>
         </div>

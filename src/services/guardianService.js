@@ -39,6 +39,18 @@ const guardianService = {
     // Update guardian profile
     updateProfile: async (guardianId, data) => {
         return api.patch(`/guardian/guardians/${guardianId}/`, data);
+    },
+
+    // Get children data (from dashboard stats)
+    getChildren: async () => {
+        const response = await api.get('/reports/statistics/dashboard/');
+        return response.statistics?.children || [];
+    },
+
+    // Get upcoming events (from dashboard stats)
+    getUpcomingEvents: async () => {
+        const response = await api.get('/reports/statistics/dashboard/');
+        return response.statistics?.upcoming_events || [];
     }
 };
 

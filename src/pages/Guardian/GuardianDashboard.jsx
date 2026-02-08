@@ -10,7 +10,7 @@ const GuardianDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
     const [notifications, setNotifications] = useState([]);
-    const [upcomingEvents, setUpcomingEvents] = useState([]); // Still mocked as no backend yet
+    const [upcomingEvents, setUpcomingEvents] = useState([]);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -22,11 +22,8 @@ const GuardianDashboard = () => {
                 setStats(statsRes.statistics);
                 setNotifications(notificationsRes.results || []);
 
-                // Mock events for now as they don't exist in backend
-                setUpcomingEvents([
-                    { id: 1, title: "Math Midterm", date: "Oct 20, 2025", child: "Ahmed" },
-                    { id: 2, title: "Science Fair", date: "Oct 25, 2025", child: "Sara" }
-                ]);
+                // Use upcoming events from backend (assignments)
+                setUpcomingEvents(statsRes.statistics?.upcoming_events || []);
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
             } finally {

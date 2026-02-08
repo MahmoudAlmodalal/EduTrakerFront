@@ -27,6 +27,14 @@ const GuardianLinking = () => {
         can_pickup: true,
     });
 
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [newGuardian, setNewGuardian] = useState({
+        full_name: '',
+        email: '',
+        phone_number: '',
+        password: 'Guardian@123',
+    });
+
     const schoolId = user?.school_id || user?.school;
 
     useEffect(() => {
@@ -163,6 +171,14 @@ const GuardianLinking = () => {
                             <Search size={18} />
                             Search
                         </button>
+                        <button className="btn-primary" onClick={() => fetchGuardians(searchTerm)}>
+                            <Search size={18} />
+                            Search
+                        </button>
+                        <button className="btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                            <UserPlus size={18} />
+                            Add Guardian
+                        </button>
                     </div>
                 </div>
 
@@ -286,6 +302,98 @@ const GuardianLinking = () => {
                         </button>
                         <button type="submit" className="btn-primary" disabled={loading}>
                             {loading ? 'Linking...' : 'Link Student'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Create Guardian Modal */}
+            <Modal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                title="Create New Guardian"
+            >
+                <form className="space-y-4" onSubmit={async (e) => {
+                    e.preventDefault();
+                    setError('');
+                    setSuccess('');
+                    setLoading(true);
+                    try {
+                        await secretaryService.createGuardian({
+                            ...newGuardian,
+                            school_id: schoolId
+                        });
+                        setSuccess('Guardian created successfully!');
+                        setIsCreateModalOpen(false);
+                        setNewGuardian({
+                            full_name: '',
+                            email: '',
+                            phone_number: '',
+                            password: 'Guardian@123',
+                        });
+                        fetchGuardians();
+                    } catch (err) {
+                        const errData = err.response?.data || err;
+                        if (typeof errData === 'object' && !Array.isArray(errData)) {
+                            const messages = Object.entries(errData)
+                                .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`)
+                                .join(' | ');
+                            setError(messages);
+                        } else {
+                            setError('Error creating guardian: ' + (err.message || 'Unknown error'));
+                        }
+                    } finally {
+                        setLoading(false);
+                    }
+                }}>
+                    <div className="form-group">
+                        <label className="form-label">Full Name *</label>
+                        <input
+                            type="text"
+                            className="form-input"
+                            value={newGuardian.full_name}
+                            onChange={(e) => setNewGuardian({ ...newGuardian, full_name: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Email *</label>
+                        <input
+                            type="email"
+                            className="form-input"
+                            value={newGuardian.email}
+                            onChange={(e) => setNewGuardian({ ...newGuardian, email: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Phone Number *</label>
+                        <input
+                            type="tel"
+                            className="form-input"
+                            value={newGuardian.phone_number}
+                            onChange={(e) => setNewGuardian({ ...newGuardian, phone_number: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Password *</label>
+                        <input
+                            type="text"
+                            className="form-input"
+                            value={newGuardian.password}
+                            onChange={(e) => setNewGuardian({ ...newGuardian, password: e.target.value })}
+                            required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Default: Guardian@123</p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 mt-6">
+                        <button type="button" className="btn-secondary" onClick={() => setIsCreateModalOpen(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', background: 'white' }}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={loading}>
+                            {loading ? 'Creating...' : 'Create Guardian'}
                         </button>
                     </div>
                 </form>

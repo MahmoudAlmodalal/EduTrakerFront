@@ -40,6 +40,9 @@ const secretaryService = {
         const queryParams = new URLSearchParams(params).toString();
         return api.get(`/manager/students/${queryParams ? `?${queryParams}` : ''}`);
     },
+    updateStudent: async (id, data) => {
+        return api.patch(`/manager/students/${id}/`, data);
+    },
     getUnassignedStudents: async () => {
         // Get all students - we'll filter on the frontend for those without active enrollment
         return api.get('/manager/students/');
@@ -64,6 +67,9 @@ const secretaryService = {
     },
 
     // Guardians
+    createGuardian: async (data) => {
+        return api.post('/guardian/guardians/create/', data);
+    },
     getGuardians: async (search = '') => {
         return api.get(`/guardian/guardians/?search=${search}`);
     },

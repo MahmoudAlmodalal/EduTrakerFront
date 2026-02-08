@@ -12,8 +12,8 @@ const Assessments = () => {
     const [selectedClass, setSelectedClass] = useState('Grade 10-A');
     const [selectedAssessmentId, setSelectedAssessmentId] = useState(null);
 
-    // Mock Data for now
-    const classes = ['Grade 10-A', 'Grade 10-B', 'Grade 11-A', 'Grade 11-B'];
+    // Real Data
+    const [classes, setClasses] = useState([]);
     const assessmentTypes = ['homework', 'quiz', 'midterm', 'final', 'project', 'participation', 'assignment'];
 
     // Real Data
@@ -27,46 +27,72 @@ const Assessments = () => {
         due_date: '',
         full_mark: '',
         description: '',
+        course_allocation: '',
         assignment_code: `ASN-${Date.now().toString().slice(-6)}`
     });
 
     useEffect(() => {
-        const fetchAssessments = async () => {
+        const fetchData = async () => {
             try {
                 setLoading(true);
-                const data = await teacherService.getAssignments();
-                setAssessments(data.results || data || []);
-                if ((data.results || data || []).length > 0) {
-                    setSelectedAssessmentId((data.results || data || [])[0].id);
+                // Fetch assignments and classes (allocations)
+                const [assignmentsData, allocationsData] = await Promise.all([
+                    teacherService.getAssignments(),
+                    teacherService.getSchedule(new Date().toISOString().split('T')[0])
+                ]);
+
+                const fetchedAssessments = assignmentsData.results || assignmentsData || [];
+                setAssessments(fetchedAssessments);
+
+                const allocations = allocationsData.results || allocationsData || [];
+                setClasses(allocations);
+
+                if (allocations.length > 0) {
+                    setSelectedClass(allocations[0].id);
+                }
+
+                if (fetchedAssessments.length > 0) {
+                    setSelectedAssessmentId(fetchedAssessments[0].id);
                 }
             } catch (error) {
-                console.error("Error fetching assessments:", error);
+                console.error("Error fetching assessment data:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchAssessments();
+        fetchData();
     }, []);
 
     useEffect(() => {
-        if (selectedAssessmentId) {
+        if (selectedAssessmentId && selectedClass) {
             const fetchGradesAndStudents = async () => {
                 try {
                     // Fetch both existing marks and students in the school
+                    // In a real app, we should filter students by the course allocation/class
+                    const allocation = classes.find(c => c.id === parseInt(selectedClass));
+                    const studentFilters = {
+                        school_id: user.school_id
+                    };
+                    if (allocation && (allocation.class_room_id || allocation.classroom_id)) {
+                        studentFilters.classroom_id = allocation.class_room_id || allocation.classroom_id;
+                    }
+
                     const [marksData, studentsData] = await Promise.all([
                         teacherService.getMarks({ assignment_id: selectedAssessmentId }),
-                        teacherService.getStudents({ school_id: user.school_id })
+                        teacherService.getStudents(studentFilters)
                     ]);
 
                     const existingMarks = marksData.results || marksData || [];
                     const students = studentsData.results || studentsData || [];
 
-                    // Map students to grades: use existing mark if found, otherwise empty
+                    // Filter students if class info is available in students data
+                    // For now, mapping all students, but we should ideally filter by classroom
                     const gradebookData = students.map(student => {
-                        const mark = existingMarks.find(m => m.student_id === student.user_id);
+                        const studentId = student.user_id || student.id;
+                        const mark = existingMarks.find(m => m.student_id === studentId);
                         return {
-                            id: student.user_id,
-                            student_name: student.full_name,
+                            id: studentId,
+                            student_name: student.full_name || student.user_name || 'N/A',
                             score: mark ? mark.score : '',
                             feedback: mark ? mark.feedback : '',
                             is_active: mark ? mark.is_active : false,
@@ -81,19 +107,23 @@ const Assessments = () => {
             };
             fetchGradesAndStudents();
         }
-    }, [selectedAssessmentId, user.school_id]);
+    }, [selectedAssessmentId, selectedClass, user.school_id]);
 
     const handleCreateAssessment = async (e) => {
         e.preventDefault();
         try {
             const payload = {
                 ...newAssessment,
+                exam_type: newAssessment.assignment_type, // Backend uses exam_type
                 created_by: user.user_id,
                 assigned_date: new Date().toISOString().split('T')[0]
             };
             const created = await teacherService.createAssignment(payload);
             setAssessments([created, ...assessments]);
             setSelectedAssessmentId(created.id);
+            if (created.course_allocation) {
+                setSelectedClass(created.course_allocation);
+            }
             setActiveTab('gradebook');
             setNewAssessment({
                 title: '',
@@ -101,6 +131,7 @@ const Assessments = () => {
                 due_date: '',
                 full_mark: '',
                 description: '',
+                course_allocation: '',
                 assignment_code: `ASN-${Date.now().toString().slice(-6)}`
             });
             alert(`Assessment "${created.title}" created successfully!`);
@@ -287,6 +318,24 @@ const Assessments = () => {
                                 className="teacher-input w-full"
                             ></textarea>
                         </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 mb-1 block">Class / Subject</label>
+                                <select
+                                    required
+                                    value={newAssessment.course_allocation}
+                                    onChange={(e) => setNewAssessment({ ...newAssessment, course_allocation: e.target.value })}
+                                    className="teacher-select w-full"
+                                >
+                                    <option value="" disabled>Select Class</option>
+                                    {classes.map(cls => (
+                                        <option key={cls.id} value={cls.id}>
+                                            {cls.class_room_name} - {cls.course_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                         <div className="flex justify-end gap-3 pt-4">
                             <button type="button" onClick={() => setActiveTab('gradebook')} className="icon-btn" style={{ width: 'auto', padding: '0.625rem 1.25rem' }}>{t('teacher.assessments.cancel')}</button>
                             <button type="submit" className="btn-primary">{t('teacher.assessments.createAssessment')}</button>
@@ -300,11 +349,16 @@ const Assessments = () => {
                     <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--teacher-border)', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                         <div className="filter-bar">
                             <select
-                                value={selectedClass}
+                                value={selectedClass || ''}
                                 onChange={(e) => setSelectedClass(e.target.value)}
                                 className="teacher-select"
                             >
-                                {classes.map(cls => <option key={cls} value={cls}>{cls}</option>)}
+                                <option value="" disabled>Select Class</option>
+                                {classes.map(cls => (
+                                    <option key={cls.id} value={cls.id}>
+                                        {cls.class_room_name} - {cls.course_name}
+                                    </option>
+                                ))}
                             </select>
                             <select
                                 value={selectedAssessmentId || ''}
@@ -312,7 +366,9 @@ const Assessments = () => {
                                 className="teacher-select"
                             >
                                 <option value="" disabled>Select Assessment</option>
-                                {assessments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+                                {assessments
+                                    .filter(a => !selectedClass || a.course_allocation === parseInt(selectedClass))
+                                    .map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
                             </select>
                         </div>
                         <div className="flex gap-2">
@@ -373,8 +429,9 @@ const Assessments = () => {
                         </table>
                     </div>
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };
 

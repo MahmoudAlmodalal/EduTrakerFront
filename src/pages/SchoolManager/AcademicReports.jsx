@@ -14,12 +14,14 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import managerService from '../../services/managerService';
+import reportService from '../../services/reportService';
 import './SchoolManager.css';
 
 const AcademicReports = () => {
     const { t } = useTheme();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [downloading, setDownloading] = useState(null);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -37,11 +39,23 @@ const AcademicReports = () => {
     }, []);
 
     const reportTypes = [
-        { id: 'attendance', name: 'Attendance Trends', description: 'Monthly student and teacher attendance overview.', icon: Calendar, color: 'blue' },
-        { id: 'performance', name: 'Academic Performance', description: 'Grade distribution and subject performance metrics.', icon: TrendingUp, color: 'green' },
-        { id: 'enrollment', name: 'Enrollment Report', description: 'New admissions and student retention statistics.', icon: Users, color: 'purple' },
-        { id: 'teacher', name: 'Teacher Evaluations', description: 'Summary of annual teacher performance reviews.', icon: FileText, color: 'orange' }
+        { id: 'attendance', backendId: 'attendance', name: 'Attendance Trends', description: 'Monthly student and teacher attendance overview.', icon: Calendar, color: 'blue' },
+        { id: 'performance', backendId: 'student_performance', name: 'Academic Performance', description: 'Grade distribution and subject performance metrics.', icon: TrendingUp, color: 'green' },
+        { id: 'enrollment', backendId: 'student_list', name: 'Enrollment Report', description: 'New admissions and student retention statistics.', icon: Users, color: 'purple' },
+        { id: 'teacher', backendId: 'teacher_evaluations', name: 'Teacher Evaluations', description: 'Summary of annual teacher performance reviews.', icon: FileText, color: 'orange' }
     ];
+
+    const handleDownload = async (report) => {
+        if (downloading) return;
+        setDownloading(report.id);
+        try {
+            await reportService.exportReport('pdf', report.backendId);
+        } catch (error) {
+            console.error('Failed to download report:', error);
+        } finally {
+            setDownloading(null);
+        }
+    };
 
     if (loading) return <div className="academic-reports-page">Loading...</div>;
 
@@ -127,16 +141,24 @@ const AcademicReports = () => {
 
                 <div className="reports-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
                     {reportTypes.map((report) => (
-                        <div key={report.id} className="report-type-card" style={{
-                            backgroundColor: 'var(--color-bg-surface)',
-                            padding: '1.5rem',
-                            borderRadius: '0.75rem',
-                            border: '1px solid var(--color-border)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '1rem',
-                            transition: 'all 0.2s ease'
-                        }}>
+                        <div
+                            key={report.id}
+                            className="report-type-card"
+                            onClick={() => handleDownload(report)}
+                            style={{
+                                backgroundColor: 'var(--color-bg-surface)',
+                                padding: '1.5rem',
+                                borderRadius: '0.75rem',
+                                border: '1px solid var(--color-border)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '1rem',
+                                transition: 'all 0.2s ease',
+                                cursor: downloading === report.id ? 'wait' : 'pointer',
+                                opacity: downloading && downloading !== report.id ? 0.7 : 1,
+                                transform: downloading === report.id ? 'scale(0.98)' : 'none'
+                            }}
+                        >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{
                                     padding: '10px',
@@ -146,8 +168,20 @@ const AcademicReports = () => {
                                 }}>
                                     <report.icon size={24} />
                                 </div>
-                                <button style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
-                                    <Download size={18} />
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDownload(report);
+                                    }}
+                                    disabled={downloading === report.id}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: downloading === report.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <Download size={18} className={downloading === report.id ? 'animate-bounce' : ''} />
                                 </button>
                             </div>
                             <div>
@@ -155,7 +189,9 @@ const AcademicReports = () => {
                                 <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', lineHeight: '1.5' }}>{report.description}</p>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Last updated: 2 days ago</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                    {downloading === report.id ? 'Preparing download...' : 'Last updated: 2 days ago'}
+                                </span>
                                 <button style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -193,7 +229,7 @@ const AcademicReports = () => {
                     {/* Placeholder for a real chart component */}
                     <div style={{ height: '300px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 1rem' }}>
                         {stats?.statistics?.by_grade?.length > 0 ? stats.statistics.by_grade.map((item, i) => (
-                            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: `${Math.floor(80 / stats.statistics.subject_performance.length)}%` }}>
+                            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: `${Math.floor(80 / (stats.statistics.by_grade?.length || 1))}%` }}>
                                 <div style={{
                                     width: '100%',
                                     height: `${Math.min(item.student_count || item.count || 0, 100)}%`,

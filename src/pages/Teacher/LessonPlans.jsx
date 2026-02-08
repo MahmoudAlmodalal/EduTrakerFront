@@ -14,6 +14,7 @@ const LessonPlans = () => {
 
     const [plans, setPlans] = useState([]);
     const [resources, setResources] = useState([]);
+    const [allocations, setAllocations] = useState([]);
 
     const [formData, setFormData] = useState({
         title: '',
@@ -23,19 +24,26 @@ const LessonPlans = () => {
         date_planned: '',
         objectives: '',
         content: '',
-        is_published: true
+        is_published: true,
+        // Resource specific
+        description: '',
+        file_url: '',
+        file_type: 'PDF',
+        file_size: 0
     });
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const [plansData, materialsData] = await Promise.all([
+                const [plansData, materialsData, scheduleData] = await Promise.all([
                     teacherService.getLessonPlans(),
-                    teacherService.getLearningMaterials()
+                    teacherService.getLearningMaterials(),
+                    teacherService.getSchedule()
                 ]);
                 setPlans(plansData.results || plansData || []);
                 setResources(materialsData.results || materialsData || []);
+                setAllocations(scheduleData.results || scheduleData || []);
             } catch (error) {
                 console.error("Error fetching lesson plans data:", error);
             } finally {
@@ -48,20 +56,29 @@ const LessonPlans = () => {
     const handleStartCreate = () => {
         setFormData({
             title: '',
-            classroom_id: '',
-            course_id: '',
-            academic_year_id: 1,
-            date_planned: '',
+            classroom_id: allocations.length > 0 ? allocations[0].class_room_id : '',
+            course_id: allocations.length > 0 ? allocations[0].course_id : '',
+            academic_year_id: allocations.length > 0 ? allocations[0].academic_year_id : 1,
+            date_planned: new Date().toISOString().split('T')[0],
             objectives: '',
             content: '',
-            is_published: true
+            is_published: true,
+            description: '',
+            file_url: 'https://example.com/placeholder.pdf', // Mock URL for now as requested
+            file_type: 'PDF',
+            file_size: 1024 * 1024
         });
         setIsCreating(true);
         setEditingId(null);
     };
 
     const handleStartEdit = (plan) => {
-        setFormData({ ...plan });
+        setFormData({
+            ...plan,
+            classroom_id: plan.classroom,
+            course_id: plan.course,
+            academic_year_id: plan.academic_year
+        });
         setIsCreating(true);
         setEditingId(plan.id);
     };
@@ -69,15 +86,19 @@ const LessonPlans = () => {
     const handleSave = async (e) => {
         e.preventDefault();
         try {
-            const payload = {
-                ...formData,
-                teacher_id: user.user_id,
-                classroom_id: parseInt(formData.classroom_id) || null,
-                course_id: parseInt(formData.course_id) || null,
-                academic_year_id: parseInt(formData.academic_year_id) || 1
-            };
-
             if (activeTab === 'plans') {
+                const payload = {
+                    title: formData.title,
+                    content: formData.content,
+                    objectives: formData.objectives,
+                    date_planned: formData.date_planned,
+                    is_published: formData.is_published,
+                    teacher: user.user_id,
+                    classroom: parseInt(formData.classroom_id),
+                    course: parseInt(formData.course_id),
+                    academic_year: parseInt(formData.academic_year_id) || 1
+                };
+
                 if (editingId) {
                     const updated = await teacherService.updateLessonPlan(editingId, payload);
                     setPlans(plans.map(p => p.id === editingId ? updated : p));
@@ -88,13 +109,25 @@ const LessonPlans = () => {
                     alert(`Lesson Plan "${formData.title}" created successfully!`);
                 }
             } else {
-                alert(`Resource upload functionality pending file handling.`);
+                const payload = {
+                    title: formData.title,
+                    description: formData.description,
+                    file_url: formData.file_url,
+                    file_type: formData.file_type,
+                    file_size: formData.file_size,
+                    classroom: parseInt(formData.classroom_id),
+                    course: parseInt(formData.course_id),
+                    academic_year: parseInt(formData.academic_year_id) || 1
+                };
+                const created = await teacherService.createLearningMaterial(payload);
+                setResources([created, ...resources]);
+                alert(`Resource "${formData.title}" uploaded successfully!`);
             }
             setIsCreating(false);
             setEditingId(null);
         } catch (error) {
-            console.error("Error saving lesson plan:", error);
-            alert("Failed to save lesson plan");
+            console.error("Error saving lesson plan/resource:", error);
+            alert("Failed to save. Please check all fields.");
         }
     };
 
@@ -105,7 +138,7 @@ const LessonPlans = () => {
                     await teacherService.deleteLessonPlan(id);
                     setPlans(plans.filter(p => p.id !== id));
                 } else {
-                    // await teacherService.deleteLearningMaterial(id);
+                    await teacherService.deleteLearningMaterial(id);
                     setResources(resources.filter(r => r.id !== id));
                 }
             } catch (error) {
@@ -200,18 +233,32 @@ const LessonPlans = () => {
                             />
                         </div>
 
-                        {activeTab === 'plans' && (
+                        {activeTab === 'plans' ? (
                             <>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                                     <div>
                                         <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.forClass')}</label>
-                                        <input
-                                            type="number"
+                                        <select
+                                            required
                                             value={formData.classroom_id}
-                                            onChange={(e) => setFormData({ ...formData, classroom_id: e.target.value })}
-                                            className="teacher-input w-full"
-                                            placeholder="Classroom ID"
-                                        />
+                                            onChange={(e) => {
+                                                const alloc = allocations.find(a => a.class_room_id === parseInt(e.target.value));
+                                                setFormData({
+                                                    ...formData,
+                                                    classroom_id: e.target.value,
+                                                    course_id: alloc ? alloc.course_id : formData.course_id,
+                                                    academic_year_id: alloc ? alloc.academic_year_id : formData.academic_year_id
+                                                });
+                                            }}
+                                            className="teacher-select w-full"
+                                        >
+                                            <option value="">Select Class</option>
+                                            {allocations.map(a => (
+                                                <option key={a.id} value={a.class_room_id}>
+                                                    {a.classroom_name} - {a.course_name}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.date')}</label>
@@ -231,6 +278,7 @@ const LessonPlans = () => {
                                         value={formData.objectives}
                                         onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
                                         className="teacher-input w-full"
+                                        placeholder="What should students learn?"
                                     ></textarea>
                                 </div>
                                 <div>
@@ -240,6 +288,57 @@ const LessonPlans = () => {
                                         value={formData.content}
                                         onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                                         className="teacher-input w-full"
+                                        placeholder="Detailed steps and content..."
+                                    ></textarea>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Class & Course</label>
+                                        <select
+                                            required
+                                            value={formData.classroom_id}
+                                            onChange={(e) => {
+                                                const alloc = allocations.find(a => a.class_room_id === parseInt(e.target.value));
+                                                setFormData({
+                                                    ...formData,
+                                                    classroom_id: e.target.value,
+                                                    course_id: alloc ? alloc.course_id : formData.course_id,
+                                                    academic_year_id: alloc ? alloc.academic_year_id : formData.academic_year_id
+                                                });
+                                            }}
+                                            className="teacher-select w-full"
+                                        >
+                                            <option value="">Select Class & Course</option>
+                                            {allocations.map(a => (
+                                                <option key={a.id} value={a.class_room_id}>
+                                                    {a.classroom_name} - {a.course_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700 mb-1 block">File URL</label>
+                                        <input
+                                            type="url"
+                                            required
+                                            value={formData.file_url}
+                                            onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
+                                            placeholder="https://..."
+                                            className="teacher-input w-full"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.description') || 'Description'}</label>
+                                    <textarea
+                                        rows="3"
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        className="teacher-input w-full"
+                                        placeholder="Enter resource description..."
                                     ></textarea>
                                 </div>
                             </>
@@ -261,13 +360,24 @@ const LessonPlans = () => {
                         <div key={plan.id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <h3 className="font-bold text-slate-800 text-lg leading-tight">{plan.title}</h3>
-                                <button
-                                    className="icon-btn"
-                                    style={{ border: 'none' }}
-                                    onClick={() => alert(`Options for: ${plan.title}`)}
-                                >
-                                    <MoreVertical size={18} />
-                                </button>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        onClick={() => handleStartEdit(plan)}
+                                        className="icon-btn"
+                                        title="Edit"
+                                        style={{ border: 'none', padding: '4px' }}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(plan.id)}
+                                        className="icon-btn danger"
+                                        title="Delete"
+                                        style={{ border: 'none', padding: '4px' }}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="space-y-2">
@@ -277,26 +387,15 @@ const LessonPlans = () => {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>
                                     <BookOpen size={16} style={{ color: 'var(--teacher-accent)' }} />
-                                    <span>Class: {plan.classroom_name}</span>
+                                    <span>{plan.classroom_name} - {plan.course_name}</span>
                                 </div>
                             </div>
 
-                            <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--teacher-border)', display: 'flex', gap: '0.5rem' }}>
-                                <button
-                                    onClick={() => handleStartEdit(plan)}
-                                    className="icon-btn"
-                                    style={{ flex: 1, justifyContent: 'center', gap: '0.5rem' }}
-                                >
-                                    <Edit2 size={16} /> {t('teacher.lessonPlans.edit')}
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(plan.id)}
-                                    className="icon-btn danger"
-                                    style={{ flex: 1, justifyContent: 'center', gap: '0.5rem' }}
-                                >
-                                    <Trash2 size={16} /> {t('teacher.lessonPlans.delete')}
-                                </button>
-                            </div>
+                            {plan.objectives && (
+                                <p className="text-sm text-slate-600 line-clamp-2" style={{ borderTop: '1px solid var(--teacher-border)', paddingTop: '0.5rem' }}>
+                                    <strong>Obj:</strong> {plan.objectives}
+                                </p>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -307,8 +406,8 @@ const LessonPlans = () => {
                             <thead>
                                 <tr>
                                     <th>{t('teacher.lessonPlans.resourceTable.name')}</th>
+                                    <th>Course / Class</th>
                                     <th>{t('teacher.lessonPlans.resourceTable.type')}</th>
-                                    <th>{t('teacher.lessonPlans.resourceTable.size')}</th>
                                     <th>{t('teacher.lessonPlans.resourceTable.date')}</th>
                                     <th>{t('teacher.lessonPlans.resourceTable.actions')}</th>
                                 </tr>
@@ -316,24 +415,38 @@ const LessonPlans = () => {
                             <tbody>
                                 {resources.map((res) => (
                                     <tr key={res.id}>
-                                        <td className="font-bold text-slate-800">{res.title}</td>
+                                        <td className="font-bold text-slate-800">
+                                            <div>{res.title}</div>
+                                            <div className="text-xs font-normal text-slate-500">{res.description}</div>
+                                        </td>
+                                        <td>
+                                            <div className="text-sm font-medium">{res.course_name}</div>
+                                            <div className="text-xs text-slate-500">{res.classroom_name}</div>
+                                        </td>
                                         <td>
                                             <span className="status-badge info">
                                                 {res.file_type || 'PDF'}
                                             </span>
                                         </td>
-                                        <td className="text-slate-500">{(res.file_size / 1024 / 1024).toFixed(2)} MB</td>
                                         <td className="text-slate-500">{new Date(res.created_at).toLocaleDateString()}</td>
                                         <td>
-                                            <div className="action-group">
+                                            <div className="flex gap-2">
                                                 <button
-                                                    className="text-sm font-medium"
-                                                    style={{ color: 'var(--teacher-primary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                                                    className="icon-btn"
+                                                    style={{ border: 'none', cursor: 'pointer', color: 'var(--teacher-primary)' }}
                                                     onClick={() => window.open(res.file_url, '_blank')}
+                                                    title="View"
                                                 >
-                                                    {t('teacher.lessonPlans.view')}
+                                                    <Paperclip size={18} />
                                                 </button>
-                                                <button onClick={() => handleDelete(res.id)} className="icon-btn danger" style={{ border: 'none' }}><Trash2 size={18} /></button>
+                                                <button
+                                                    onClick={() => handleDelete(res.id)}
+                                                    className="icon-btn danger"
+                                                    style={{ border: 'none' }}
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

@@ -113,6 +113,9 @@ const teacherService = {
     createLearningMaterial: async (data) => {
         return api.post('/teacher/learning-materials/', data);
     },
+    deleteLearningMaterial: async (id) => {
+        return api.delete(`/teacher/learning-materials/${id}/`);
+    },
 
     // Analytics
     getKnowledgeGaps: async (allocationId, threshold = 50.0) => {

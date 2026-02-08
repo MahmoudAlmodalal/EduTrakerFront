@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, FileText, Upload, Download, Check, X, UserPlus, Users, AlertCircle } from 'lucide-react';
+import { Search, Filter, FileText, Upload, Download, Check, X, UserPlus, Users, AlertCircle, Edit2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import secretaryService from '../../services/secretaryService';
@@ -35,6 +35,7 @@ const StudentAdmissions = () => {
 
     const [gradeQuery, setGradeQuery] = useState('');
     const [showGradeDropdown, setShowGradeDropdown] = useState(false);
+    const [editingStudent, setEditingStudent] = useState(null);
 
     const filteredGrades = useMemo(() =>
         (grades || []).filter(g =>
@@ -56,8 +57,10 @@ const StudentAdmissions = () => {
     }, [error, success]);
 
     useEffect(() => {
-        if (activeTab === 'applications') fetchApplications();
-        else if (activeTab === 'add-student') fetchGrades();
+        if (activeTab === 'applications') {
+            fetchStudentApplications();
+            fetchAcademicYears();
+        } else if (activeTab === 'add-student') fetchGrades();
         else if (activeTab === 'class-assignment') {
             fetchStudents(); fetchAcademicYears(); fetchGrades();
         }
@@ -69,92 +72,136 @@ const StudentAdmissions = () => {
         }
     }, [selectedAcademicYear, schoolId]);
 
-    const fetchApplications = async () => {
-        try { setLoading(true); const data = await secretaryService.getApplications(); setApplications(data.results || data || []); }
-        catch (err) { console.error('Error fetching applications:', err); }
-        finally { setLoading(false); }
-    };
+    const fetchStudentApplications = async (yearId = selectedAcademicYear) => {
+        try {
+            setLoading(true);
+            // Fetch all students instead of just applications
+            const params = { school_id: schoolId };
+            if (yearId) params.academic_year_id = yearId;
 
-    const fetchStudents = async () => {
-        try { setLoading(true); const data = await secretaryService.getStudents({ school_id: schoolId }); setStudents(data.results || data || []); }
+            const data = await secretaryService.getStudents(params);
+            setApplications(data.results || data || []);
+        }
         catch (err) { console.error('Error fetching students:', err); }
         finally { setLoading(false); }
     };
 
+    const handleCreateStudent = async (e) => {
+        e.preventDefault();
+        if (!newStudent.first_name || !newStudent.last_name || !newStudent.email || !newStudent.date_of_birth || !newStudent.grade_id) {
+            setError('Please fill all required fields.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const studentData = {
+                ...newStudent,
+                username: newStudent.email, // using email as username
+                role: 'student',
+                school_id: schoolId
+            };
+
+            await secretaryService.createStudent(studentData);
+            setSuccess('Student created successfully!');
+            setNewStudent({
+                first_name: '', last_name: '', email: '',
+                password: 'Student@123', date_of_birth: '', grade_id: '',
+            });
+            setGradeQuery('');
+            setActiveTab('applications');
+            fetchStudentApplications();
+        } catch (err) {
+            console.error('Error creating student:', err);
+            setError(err.response?.data?.message || 'Failed to create student. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAssign = async () => {
+        if (!selectedStudent || !selectedClassroom || !selectedAcademicYear) {
+            setError('Please select a student, classroom and academic year.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            await secretaryService.assignToClass({
+                student_id: selectedStudent,
+                class_room_id: selectedClassroom,
+                academic_year_id: selectedAcademicYear
+            });
+            setSuccess('Student assigned to class successfully!');
+            setSelectedStudent('');
+            // changing the key to force re-render or just fetching students again
+            if (activeTab === 'class-assignment') fetchStudents();
+        } catch (err) {
+            console.error('Error assigning student:', err);
+            setError(err.response?.data?.message || 'Failed to assign student to class.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateStudent = async (e) => {
+        e.preventDefault();
+        if (!editingStudent) return;
+
+        try {
+            setLoading(true);
+            const studentId = editingStudent.user_id || editingStudent.id;
+            await secretaryService.updateStudent(studentId, {
+                current_status: editingStudent.current_status.toLowerCase()
+            });
+            setSuccess('Student status updated successfully!');
+            setEditingStudent(null);
+            fetchStudentApplications();
+        } catch (err) {
+            console.error('Error updating student:', err);
+            setError(err.response?.data?.message || 'Failed to update student status.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchStudents = async () => {
+        try {
+            setLoading(true);
+            const data = await secretaryService.getStudents({ school_id: schoolId });
+            setStudents(data.results || data || []);
+        } catch (err) {
+            console.error('Error fetching students for assignment:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const fetchGrades = async () => {
-        try { const data = await secretaryService.getGrades(); setGrades(data.results || data || []); }
-        catch (err) { console.error('Error fetching grades:', err); }
+        try {
+            const data = await secretaryService.getGrades({ school_id: schoolId });
+            setGrades(data.results || data || []);
+        } catch (err) {
+            console.error('Error fetching grades:', err);
+        }
     };
 
     const fetchAcademicYears = async () => {
         try {
-            const data = await secretaryService.getAcademicYears();
-            const years = data.results || data || [];
-            setAcademicYears(years);
-            const active = years.find(y => y.is_active);
-            if (active) setSelectedAcademicYear(active.id.toString());
-        } catch (err) { console.error('Error fetching academic years:', err); }
-    };
-
-    const fetchClassrooms = async (school, academicYearId) => {
-        try { const data = await secretaryService.getClassrooms(school, academicYearId); setClassrooms(data.results || data || []); }
-        catch (err) { console.error('Error fetching classrooms:', err); setClassrooms([]); }
-    };
-
-    const handleApprove = async (id) => {
-        try { await secretaryService.approveApplication(id); setSuccess('Application approved!'); fetchApplications(); }
-        catch (err) { setError('Error approving: ' + (err.response?.data?.detail || err.message)); }
-    };
-
-    const handleReject = async (id) => {
-        try { await secretaryService.rejectApplication(id); setSuccess('Application rejected.'); fetchApplications(); }
-        catch (err) { setError('Error rejecting: ' + (err.response?.data?.detail || err.message)); }
-    };
-
-    const handleCreateStudent = async (e) => {
-        e.preventDefault(); setError('');
-        try {
-            setLoading(true);
-            const payload = {
-                email: newStudent.email,
-                full_name: (newStudent.first_name + ' ' + newStudent.last_name).trim(),
-                password: newStudent.password || 'Student@123',
-                school_id: schoolId,
-                grade_id: parseInt(newStudent.grade_id),
-                date_of_birth: newStudent.date_of_birth,
-                admission_date: new Date().toISOString().split('T')[0],
-            };
-            await secretaryService.createStudent(payload);
-            setSuccess('Student created successfully!');
-            setNewStudent({ first_name: '', last_name: '', email: '', password: 'Student@123', date_of_birth: '', grade_id: '' });
-            setGradeQuery('');
+            const data = await secretaryService.getAcademicYears({ school_id: schoolId });
+            setAcademicYears(data.results || data || []);
         } catch (err) {
-            const errData = err.response?.data;
-            if (errData && typeof errData === 'object') {
-                setError(Object.entries(errData).map(([k,v]) => k + ': ' + (Array.isArray(v) ? v.join(', ') : v)).join(' | '));
-            } else { setError('Error creating student: ' + (err.message || 'Unknown error')); }
-        } finally { setLoading(false); }
-    };
-
-    const handleAssign = async () => {
-        if (!selectedClassroom || !selectedStudent || !selectedAcademicYear) {
-            setError('Please select a student, academic year, and classroom.'); return;
+            console.error('Error fetching academic years:', err);
         }
+    };
+
+    const fetchClassrooms = async (sId, aId) => {
         try {
-            setLoading(true);
-            await secretaryService.assignToClass({
-                student_id: parseInt(selectedStudent),
-                class_room_id: parseInt(selectedClassroom),
-                academic_year_id: parseInt(selectedAcademicYear),
-            });
-            setSuccess('Student assigned to class successfully!');
-            setSelectedStudent(''); setSelectedClassroom(''); fetchStudents();
+            const data = await secretaryService.getClassrooms(sId, aId);
+            setClassrooms(data.results || data || []);
         } catch (err) {
-            const errData = err.response?.data;
-            if (errData && typeof errData === 'object') {
-                setError(Object.entries(errData).map(([k,v]) => k + ': ' + (Array.isArray(v) ? v.join(', ') : v)).join(' | '));
-            } else { setError('Error assigning student: ' + (err.message || 'Unknown error')); }
-        } finally { setLoading(false); }
+            console.error('Error fetching classrooms:', err);
+        }
     };
 
     const renderNewApplications = () => (
@@ -162,31 +209,54 @@ const StudentAdmissions = () => {
             <div className="table-controls">
                 <div className="search-wrapper">
                     <Search size={18} className="search-icon" />
-                    <input type="text" placeholder="Search applications..." className="search-input" />
+                    <input type="text" placeholder="Search students..." className="search-input" />
                 </div>
+                <select
+                    className="form-select"
+                    value={selectedAcademicYear}
+                    style={{ width: '200px' }}
+                    onChange={(e) => {
+                        const yearId = e.target.value;
+                        setSelectedAcademicYear(yearId);
+                        fetchStudentApplications(yearId);
+                    }}
+                >
+                    <option value="">All Academic Years</option>
+                    {academicYears.map(y => (
+                        <option key={y.id} value={y.id}>
+                            {y.name} {y.is_active ? '(Active)' : ''}
+                        </option>
+                    ))}
+                </select>
                 <button className="btn-primary"><Filter size={18} /> Filter</button>
             </div>
-            {loading ? <p className="p-4 text-center">Loading applications...</p> : (
+            {loading ? <p className="p-4 text-center">Loading students...</p> : (
                 <table className="data-table">
                     <thead><tr><th>ID</th><th>Student Name</th><th>Grade</th><th>Classroom</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>
-                        {applications.map((app) => (
-                            <tr key={app.id}>
-                                <td>#{app.id}</td>
-                                <td className="font-medium">{app.student_name || app.student?.full_name || 'N/A'}</td>
-                                <td>{app.grade_name || 'N/A'}</td>
-                                <td>{app.classroom_name || 'N/A'}</td>
-                                <td><span className={`status-badge ${app.is_active ? 'status-active' : 'status-inactive'}`}>{app.is_active ? 'Active' : 'Pending'}</span></td>
-                                <td>
-                                    <div className="action-btn-group">
-                                        <button className="btn-icon success" title="Approve" onClick={() => handleApprove(app.id)}><Check size={18} /></button>
-                                        <button className="btn-icon danger" title="Reject" onClick={() => handleReject(app.id)}><X size={18} /></button>
-                                        <button className="btn-icon info" title="View Details"><FileText size={18} /></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {applications.length === 0 && <tr><td colSpan="6" className="text-center p-4">No applications found.</td></tr>}
+                        {applications.map((student) => {
+                            const studentId = student.user_id || student.id;
+                            return (
+                                <tr key={studentId}>
+                                    <td>#{studentId}</td>
+                                    <td className="font-medium">{student.full_name || 'N/A'}</td>
+                                    <td>{student.current_grade?.name || 'N/A'}</td>
+                                    <td>{student.classroom?.classroom_name || 'N/A'}</td>
+                                    <td>
+                                        <span className={`status-badge ${student.current_status === 'active' ? 'status-active' : 'status-inactive'}`}>
+                                            {student.current_status || (student.is_active ? 'active' : 'inactive')}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div className="action-btn-group">
+                                            <button className="btn-icon info" title="Edit Status" onClick={() => setEditingStudent({ ...student, current_status: student.current_status || 'pending' })}><Edit2 size={18} /></button>
+                                            <button className="btn-icon info" title="View Details"><FileText size={18} /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        {applications.length === 0 && <tr><td colSpan="6" className="text-center p-4">No students found.</td></tr>}
                     </tbody>
                 </table>
             )}
@@ -372,6 +442,51 @@ const StudentAdmissions = () => {
         );
     };
 
+    const renderEditModal = () => {
+        if (!editingStudent) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold">Edit Student Status</h3>
+                        <button onClick={() => setEditingStudent(null)} className="text-gray-500 hover:text-gray-700">
+                            <X size={24} />
+                        </button>
+                    </div>
+                    <form onSubmit={handleUpdateStudent}>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
+                            <input type="text" className="form-input bg-gray-100" value={editingStudent.full_name || ''} readOnly />
+                        </div>
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Enrollment Status</label>
+                            <select
+                                className="form-select w-full"
+                                value={editingStudent.current_status}
+                                onChange={(e) => setEditingStudent({ ...editingStudent, current_status: e.target.value })}
+                            >
+                                <option value="pending">Pending</option>
+                                <option value="active">Active</option>
+                                <option value="suspended">Suspended</option>
+                                <option value="graduated">Graduated</option>
+                                <option value="expelled">Expelled</option>
+                                <option value="withdrawn">Withdrawn</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button type="button" className="btn-secondary" onClick={() => setEditingStudent(null)}>Cancel</button>
+                            <button type="submit" className="btn-primary" disabled={loading}>
+                                {loading ? 'Saving...' : 'Save Changes'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="secretary-dashboard">
             <header className="secretary-header">
@@ -411,6 +526,7 @@ const StudentAdmissions = () => {
                 {activeTab === 'class-assignment' && renderClassAssignment()}
                 {activeTab === 'files' && renderManageFiles()}
             </div>
+            {renderEditModal()}
         </div>
     );
 };

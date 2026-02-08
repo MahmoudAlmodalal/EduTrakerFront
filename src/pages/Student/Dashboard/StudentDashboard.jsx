@@ -22,6 +22,7 @@ const StudentDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [dashboardData, setDashboardData] = useState(null);
+    const [schedule, setSchedule] = useState([]);
 
     const fetchDashboardData = async () => {
         setLoading(true);
@@ -32,6 +33,17 @@ const StudentDashboard = () => {
                 setDashboardData(data.statistics);
             } else {
                 setDashboardData(data.statistics || data);
+            }
+
+            // Fetch Schedule
+            if (user?.id) {
+                try {
+                    const scheduleData = await studentService.getSchedule(user.id);
+                    setSchedule(Array.isArray(scheduleData) ? scheduleData : []);
+                } catch (schedError) {
+                    console.error("Error fetching schedule:", schedError);
+                    // Don't fail the whole dashboard for schedule error
+                }
             }
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -89,13 +101,8 @@ const StudentDashboard = () => {
         rank: classmates?.rank || `Top ${classmates?.active_classmates || 'N/A'}`
     };
 
-    // Placeholder schedule since backend doesn't seem to provide it yet
-    const todaySchedule = [
-        { id: 1, time: '08:30 AM', subject: 'Mathematics', teacher: 'Dr. Smith', room: 'Room 302', status: 'done' },
-        { id: 2, time: '10:15 AM', subject: 'Physics', teacher: 'Prof. Johnson', room: 'Lab 1', status: 'now' },
-        { id: 3, time: '01:00 PM', subject: 'English', teacher: 'Ms. Davis', room: 'Room 105', status: 'upcoming' },
-        { id: 4, time: '02:45 PM', subject: 'History', teacher: 'Mr. Wilson', room: 'Room 204', status: 'upcoming' },
-    ];
+    // Use fetched schedule or empty array
+    const todaySchedule = schedule.length > 0 ? schedule : [];
 
     const getStatusBadge = (status) => {
         switch (status) {
@@ -190,7 +197,7 @@ const StudentDashboard = () => {
                                 <div className="schedule-details">
                                     <div className="schedule-subject">{item.subject}</div>
                                     <div className="schedule-meta">
-                                        {item.teacher} • {item.room}
+                                        {item.teacher_name || 'Teacher'} • {item.room || 'Room TBD'}
                                     </div>
                                 </div>
                                 {getStatusBadge(item.status)}

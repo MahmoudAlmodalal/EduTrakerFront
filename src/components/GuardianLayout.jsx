@@ -9,10 +9,16 @@ import {
     ShieldCheck // Guardian Icon/Brand
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import '../pages/Guardian/Guardian.css';
 
 const GuardianLayout = () => {
     const { t } = useTheme();
+    const { logout } = useAuth();
+
+    const handleLogout = async () => {
+        await logout();
+    };
 
     const navItems = [
         { path: '/guardian/dashboard', labelKey: 'guardian.nav.dashboard', icon: LayoutDashboard },
@@ -51,7 +57,11 @@ const GuardianLayout = () => {
                 </nav>
 
                 <div style={{ marginTop: 'auto' }}>
-                    <button className="guardian-nav-item" style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                    <button
+                        className="guardian-nav-item"
+                        style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                        onClick={handleLogout}
+                    >
                         <LogOut size={20} />
                         <span>{t('header.logout')}</span>
                     </button>
