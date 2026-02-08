@@ -109,119 +109,100 @@ const AcademicConfiguration = () => {
         }
     };
 
+    const tabs = [
+        { id: 'academic-year', label: 'Academic Year', icon: GraduationCap, hasWarning: !hasActiveAcademicYear && !loading },
+        { id: 'subjects', label: 'Subjects', icon: BookOpen },
+        { id: 'classrooms', label: 'Classrooms', icon: Building },
+        { id: 'teachers', label: 'Teachers', icon: Users },
+        { id: 'timetable', label: 'Timetable', icon: Calendar },
+    ];
+
     return (
         <div className="academic-config-page">
-            <div className="school-manager-header">
-                <h1 className="school-manager-title">{t('school.config.title')}</h1>
-                <p className="school-manager-subtitle">{t('school.config.subtitle')}</p>
+            {/* Clean Header - No Subtitle */}
+            <div className="school-manager-header" style={{ marginBottom: '1.5rem' }}>
+                <h1 className="school-manager-title">{t('school.config.title') || 'Academic Configuration'}</h1>
             </div>
 
             {/* Warning banner when no active academic year */}
             {!loading && !hasActiveAcademicYear && (
                 <div style={{
-                    display: 'flex', alignItems: 'center', gap: '0.75rem',
-                    padding: '1rem 1.25rem', marginBottom: '1rem',
-                    background: '#fef3c7', border: '1px solid #f59e0b',
-                    borderRadius: '0.5rem', color: '#92400e'
+                    display: 'flex', alignItems: 'center', gap: '1rem',
+                    padding: '1rem 1.5rem', marginBottom: '1.5rem',
+                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                    border: '1px solid #f59e0b',
+                    borderRadius: '12px', color: '#92400e',
+                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.15)'
                 }}>
-                    <AlertTriangle size={20} />
+                    <div style={{
+                        background: '#f59e0b',
+                        borderRadius: '50%',
+                        padding: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        <AlertTriangle size={18} color="#fff" />
+                    </div>
                     <div>
-                        <strong>No active academic year found.</strong> You must create and activate an academic year before assigning teachers to courses.
+                        <strong style={{ display: 'block', marginBottom: '2px' }}>No Active Academic Year</strong>
+                        <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Create and activate an academic year to enable teacher assignments.</span>
                     </div>
                 </div>
             )}
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200 mb-6 w-full" style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '1.5rem', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                <button
-                    style={{
-                        paddingBottom: '0.5rem',
-                        color: activeTab === 'academic-year' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        borderBottom: activeTab === 'academic-year' ? '2px solid var(--color-primary)' : '2px solid transparent'
-                    }}
-                    onClick={() => setActiveTab('academic-year')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <GraduationCap size={18} />
-                        Academic Year
-                        {!hasActiveAcademicYear && !loading && (
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-                        )}
-                    </div>
-                </button>
-                <button
-                    style={{
-                        paddingBottom: '0.5rem',
-                        color: activeTab === 'subjects' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        borderBottom: activeTab === 'subjects' ? '2px solid var(--color-primary)' : '2px solid transparent'
-                    }}
-                    onClick={() => setActiveTab('subjects')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <BookOpen size={18} />
-                        Subject Allocation
-                    </div>
-                </button>
-                <button
-                    style={{
-                        paddingBottom: '0.5rem',
-                        color: activeTab === 'classrooms' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        borderBottom: activeTab === 'classrooms' ? '2px solid var(--color-primary)' : '2px solid transparent'
-                    }}
-                    onClick={() => setActiveTab('classrooms')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Building size={18} />
-                        Classrooms
-                    </div>
-                </button>
-                <button
-                    style={{
-                        paddingBottom: '0.5rem',
-                        color: activeTab === 'teachers' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        borderBottom: activeTab === 'teachers' ? '2px solid var(--color-primary)' : '2px solid transparent'
-                    }}
-                    onClick={() => setActiveTab('teachers')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Users size={18} />
-                        Teacher Allocation
-                    </div>
-                </button>
-                <button
-                    style={{
-                        paddingBottom: '0.5rem',
-                        color: activeTab === 'timetable' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        borderBottom: activeTab === 'timetable' ? '2px solid var(--color-primary)' : '2px solid transparent'
-                    }}
-                    onClick={() => setActiveTab('timetable')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Calendar size={18} />
-                        Timetable Generator
-                    </div>
-                </button>
-  </div>
+            {/* Enhanced Tab Navigation */}
+            <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '2rem',
+                padding: '0.5rem',
+                background: 'var(--color-bg-body)',
+                borderRadius: '14px',
+                border: '1px solid var(--color-border)',
+                flexWrap: 'wrap'
+            }}>
+                {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '0.75rem 1.25rem',
+                                borderRadius: '10px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                fontSize: '0.875rem',
+                                transition: 'all 0.2s ease',
+                                background: isActive ? 'var(--color-primary)' : 'transparent',
+                                color: isActive ? '#fff' : 'var(--color-text-muted)',
+                                boxShadow: isActive ? '0 4px 12px rgba(79, 70, 229, 0.3)' : 'none',
+                                position: 'relative'
+                            }}
+                        >
+                            <Icon size={18} strokeWidth={2.25} />
+                            {tab.label}
+                            {tab.hasWarning && (
+                                <span style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: isActive ? '#fff' : '#ef4444',
+                                    display: 'inline-block',
+                                    marginLeft: '4px',
+                                    animation: 'pulse 2s infinite'
+                                }} />
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
 
             <div className="tab-content">
                 {renderTabContent()}

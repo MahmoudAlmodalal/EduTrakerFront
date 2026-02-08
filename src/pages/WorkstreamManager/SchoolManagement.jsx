@@ -3,6 +3,7 @@ import { Plus, Search, MapPin, Users, Edit, CheckCircle, Eye, Trash2, X } from '
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../utils/api';
+import Modal from '../../components/ui/Modal';
 import './Workstream.css';
 
 const SchoolManagement = () => {
@@ -175,114 +176,114 @@ const SchoolManagement = () => {
                 </div>
             </div>
 
-            {showCreateForm && (
-                <div className="management-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
-                    <h3 className="chart-title" style={{ marginBottom: '1rem' }}>{newSchool.isEditing ? t('workstream.schools.form.editTitle') : t('workstream.schools.form.createTitle')}</h3>
-                    <form onSubmit={handleCreateSchool} style={{ display: 'grid', gap: '1rem', maxWidth: '500px' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.schools.form.name')}</label>
-                            <input
-                                type="text"
-                                required
-                                value={newSchool.school_name}
-                                onChange={(e) => setNewSchool({ ...newSchool, school_name: e.target.value })}
-                                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder={t('workstream.schools.form.name')}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.schools.form.location')}</label>
-                            <input
-                                type="text"
-                                required
-                                value={newSchool.location}
-                                onChange={(e) => setNewSchool({ ...newSchool, location: e.target.value })}
-                                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder={t('workstream.schools.form.location')}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.schools.form.capacity')}</label>
-                            <input
-                                type="number"
-                                required
-                                value={newSchool.capacity}
-                                onChange={(e) => setNewSchool({ ...newSchool, capacity: e.target.value })}
-                                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder={t('workstream.schools.form.capacity')}
-                            />
-                        </div>
-                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                            <button type="submit" className="btn-primary" disabled={loading}>{newSchool.isEditing ? t('common.save') : t('common.create')}</button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowCreateForm(false);
-                                    setNewSchool({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
-                                }}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    borderRadius: '0.375rem',
-                                    border: '1px solid var(--color-border)',
-                                    background: 'white',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                {t('common.cancel')}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {viewSchool && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-                }}>
-                    <div className="management-card" style={{ padding: '2rem', width: '500px', maxWidth: '90%', position: 'relative' }}>
+            {/* Create/Edit School Modal */}
+            <Modal
+                isOpen={showCreateForm}
+                onClose={() => {
+                    setShowCreateForm(false);
+                    setNewSchool({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
+                }}
+                title={newSchool.isEditing ? t('workstream.schools.form.editTitle') : t('workstream.schools.form.createTitle')}
+            >
+                <form onSubmit={handleCreateSchool} style={{ display: 'grid', gap: '1rem' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.schools.form.name')}</label>
+                        <input
+                            type="text"
+                            required
+                            value={newSchool.school_name}
+                            onChange={(e) => setNewSchool({ ...newSchool, school_name: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder={t('workstream.schools.form.name')}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.schools.form.location')}</label>
+                        <input
+                            type="text"
+                            required
+                            value={newSchool.location}
+                            onChange={(e) => setNewSchool({ ...newSchool, location: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder={t('workstream.schools.form.location')}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.schools.form.capacity')}</label>
+                        <input
+                            type="number"
+                            required
+                            value={newSchool.capacity}
+                            onChange={(e) => setNewSchool({ ...newSchool, capacity: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder={t('workstream.schools.form.capacity')}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
                         <button
-                            onClick={() => setViewSchool(null)}
-                            style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                            type="button"
+                            onClick={() => {
+                                setShowCreateForm(false);
+                                setNewSchool({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
+                            }}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)',
+                                background: 'white',
+                                cursor: 'pointer'
+                            }}
                         >
-                            <X size={20} />
+                            {t('common.cancel')}
                         </button>
-                        <h3 className="chart-title" style={{ marginBottom: '1.5rem' }}>{t('workstream.schools.table.actions')}</h3>
-                        <div style={{ display: 'grid', gap: '1rem' }}>
-                            <div>
-                                <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.name')}</label>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{viewSchool.school_name}</div>
+                        <button type="submit" className="btn-primary" disabled={loading}>
+                            {newSchool.isEditing ? t('common.save') : t('common.create')}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* View School Details Modal */}
+            <Modal
+                isOpen={!!viewSchool}
+                onClose={() => setViewSchool(null)}
+                title={viewSchool?.school_name || 'School Details'}
+            >
+                {viewSchool && (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                        <div>
+                            <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.name')}</label>
+                            <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{viewSchool.school_name}</div>
+                        </div>
+                        <div>
+                            <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.location')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <MapPin size={16} /> {viewSchool.location || 'N/A'}
                             </div>
-                            <div>
-                                <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.location')}</label>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <MapPin size={16} /> {viewSchool.location}
-                                </div>
+                        </div>
+                        <div>
+                            <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.capacity')}</label>
+                            <div>{viewSchool.student_count || 0} / {viewSchool.capacity || 0} {t('workstream.schools.table.students')}</div>
+                            <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', marginTop: '4px' }}>
+                                <div style={{
+                                    width: `${viewSchool.capacity ? (viewSchool.student_count / viewSchool.capacity) * 100 : 0}%`,
+                                    height: '100%',
+                                    background: 'var(--color-primary)',
+                                    borderRadius: '4px'
+                                }}></div>
                             </div>
+                        </div>
+                        <div>
+                            <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.status')}</label>
                             <div>
-                                <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.capacity')}</label>
-                                <div>{viewSchool.student_count || 0} / {viewSchool.capacity} {t('workstream.schools.table.students')}</div>
-                                <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', marginTop: '4px' }}>
-                                    <div style={{
-                                        width: `${(viewSchool.student_count / viewSchool.capacity) * 100 || 0}%`,
-                                        height: '100%',
-                                        background: 'var(--color-primary)',
-                                        borderRadius: '4px'
-                                    }}></div>
-                                </div>
-                            </div>
-                            <div>
-                                <label style={{ fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{t('workstream.schools.table.status')}</label>
-                                <div>
-                                    <span className={`status-badge ${viewSchool.is_active ? 'status-active' : 'status-inactive'}`}>
-                                        {viewSchool.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </div>
+                                <span className={`status-badge ${viewSchool.is_active ? 'status-active' : 'status-inactive'}`}>
+                                    {viewSchool.is_active ? 'Active' : 'Inactive'}
+                                </span>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </Modal>
 
             <div className="management-card">
                 <div className="table-header-actions" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>

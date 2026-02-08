@@ -64,14 +64,16 @@ const WorkstreamDashboard = () => {
         },
     ];
 
-    const schoolPerformance = dashboardData?.schools || [
-        { name: 'Al-Noor Academy', score: 92, students: 420 },
-        { name: 'Gaza Central', score: 88, students: 380 },
-        { name: 'Al-Quds School', score: 85, students: 350 },
-        { name: 'Hope Academy', score: 78, students: 290 },
-        { name: 'Al-Aqsa School', score: 95, students: 450 },
-        { name: 'Sunrise School', score: 72, students: 260 },
-    ];
+    // Map backend school data to the expected format
+    // Backend returns: { school_name, student_count, attendance_percentage, ... }
+    const schoolPerformance = (dashboardData?.schools || []).map(school => ({
+        name: school.school_name,
+        score: Math.round(school.attendance_percentage || 0), // Use attendance as performance score
+        students: school.student_count || 0,
+        manager: school.manager_name,
+        teachers: school.teacher_count || 0,
+        classrooms: school.classroom_count || 0
+    }));
 
 
     const getScoreColor = (score) => {
@@ -134,9 +136,10 @@ const WorkstreamDashboard = () => {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {schoolPerformance.length > 0 ? schoolPerformance.map((school, index) => {
-                            const score = school.score || 85;
-                            const name = school.school_name || school.name;
-                            const students = school.count || school.students;
+                            const score = school.score || 0;
+                            const name = school.name;
+                            const students = school.students;
+                            const hasData = score > 0;
                             return (
                                 <div key={index} style={{
                                     display: 'flex',
@@ -151,19 +154,23 @@ const WorkstreamDashboard = () => {
                                         width: '40px',
                                         height: '40px',
                                         borderRadius: '10px',
-                                        background: `linear-gradient(135deg, ${getScoreColor(score)}20, ${getScoreColor(score)}10)`,
+                                        background: hasData
+                                            ? `linear-gradient(135deg, ${getScoreColor(score)}20, ${getScoreColor(score)}10)`
+                                            : 'var(--color-bg-subtle)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: getScoreColor(score),
+                                        color: hasData ? getScoreColor(score) : 'var(--color-text-muted)',
                                         fontWeight: '700',
-                                        fontSize: '0.875rem'
+                                        fontSize: hasData ? '0.875rem' : '0.625rem'
                                     }}>
-                                        {score}
+                                        {hasData ? score : 'N/A'}
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '4px' }}>{name}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{students} students</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                            {students} students {school.manager && `• ${school.manager}`}
+                                        </div>
                                     </div>
                                     <div style={{ width: '120px' }}>
                                         <div style={{
@@ -173,13 +180,20 @@ const WorkstreamDashboard = () => {
                                             overflow: 'hidden'
                                         }}>
                                             <div style={{
-                                                width: `${score}%`,
+                                                width: hasData ? `${score}%` : '0%',
                                                 height: '100%',
-                                                background: `linear-gradient(90deg, ${getScoreColor(score)}, ${getScoreColor(score)}aa)`,
+                                                background: hasData
+                                                    ? `linear-gradient(90deg, ${getScoreColor(score)}, ${getScoreColor(score)}aa)`
+                                                    : 'var(--color-border)',
                                                 borderRadius: '4px',
                                                 transition: 'width 0.5s ease'
                                             }}></div>
                                         </div>
+                                        {!hasData && (
+                                            <div style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                                                No attendance data
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );

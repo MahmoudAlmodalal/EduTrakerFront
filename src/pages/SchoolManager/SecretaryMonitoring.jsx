@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, MoreVertical, Edit, Trash2, Eye, X, UserCheck, UserX } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, UserCheck, UserX, Mail, Briefcase } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import managerService from '../../services/managerService';
@@ -169,193 +169,228 @@ const SecretaryMonitoring = () => {
     return (
         <div className="management-page">
             <div className="school-manager-header">
-                <div>
-                    <h1 className="school-manager-title">{t('school.secretaries.title') || 'Secretary Monitoring'}</h1>
-                    <p className="school-manager-subtitle">{t('school.secretaries.subtitle') || 'Manage and monitor administrative staff.'}</p>
-                </div>
-                <button className="btn-primary" onClick={handleOpenCreate}>
-                    <Plus size={18} />
-                    {t('school.secretaries.addSecretary') || 'Add Secretary'}
-                </button>
+                <h1 className="school-manager-title">{t('school.secretaries.title') || 'Secretary Monitoring'}</h1>
             </div>
 
-            {/* Search */}
-            <div className="management-card" style={{ padding: '1rem 1.5rem' }}>
-                <div className="search-container" style={{ position: 'relative', maxWidth: '400px' }}>
-                    <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
-                    <input
-                        type="text"
-                        placeholder={t('common.search') || 'Search secretaries...'}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ width: '100%', padding: '0.6rem 0.6rem 0.6rem 2.5rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', color: 'var(--color-text-main)', fontSize: '0.875rem' }}
-                    />
+            {/* Main Card with Search and Table */}
+            <div className="management-card">
+                <div className="table-header-actions">
+                    <div style={{ position: 'relative', width: '300px' }}>
+                        <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                        <input
+                            type="text"
+                            placeholder={t('common.search') || 'Search secretaries...'}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '0.5rem 0.5rem 0.5rem 2.25rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)'
+                            }}
+                        />
+                    </div>
+                    <button className="btn-primary" onClick={handleOpenCreate}>
+                        <Plus size={18} />
+                        {t('school.secretaries.addSecretary') || 'Add Secretary'}
+                    </button>
                 </div>
-            </div>
 
-            {/* Table */}
-            <div className="management-card" style={{ marginTop: '1rem' }}>
+                {/* Table */}
                 {loading ? (
                     <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                         {t('common.loading') || 'Loading...'}
                     </div>
-                ) : filteredSecretaries.length === 0 ? (
-                    <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                        {t('common.noResults') || 'No secretaries found.'}
-                    </div>
                 ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
-                                    <th style={thStyle}>{t('common.name') || 'Name'}</th>
-                                    <th style={thStyle}>{t('common.email') || 'Email'}</th>
-                                    <th style={thStyle}>{t('common.department') || 'Department'}</th>
-                                    <th style={thStyle}>{t('common.status') || 'Status'}</th>
-                                    <th style={thStyle}>{t('common.actions') || 'Actions'}</th>
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Secretary</th>
+                                <th>Department</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredSecretaries.length === 0 ? (
+                                <tr>
+                                    <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                        No secretaries found.
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {filteredSecretaries.map((sec) => {
+                            ) : (
+                                filteredSecretaries.map((sec) => {
                                     const id = sec.user_id || sec.id;
                                     const isActive = sec.is_active !== false;
                                     return (
-                                        <tr key={id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                            <td style={tdStyle}>{sec.full_name || sec.name || '-'}</td>
-                                            <td style={tdStyle}>{sec.email || '-'}</td>
-                                            <td style={tdStyle}>{sec.department || '-'}</td>
-                                            <td style={tdStyle}>
-                                                <span style={{
-                                                    padding: '4px 10px',
-                                                    borderRadius: '20px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: '600',
-                                                    background: isActive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                                                    color: isActive ? '#10b981' : '#ef4444'
-                                                }}>
+                                        <tr key={id}>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <div style={{
+                                                        width: '36px', height: '36px', borderRadius: '50%',
+                                                        background: '#f3e8ff', color: '#9333ea',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontWeight: 'bold', fontSize: '0.875rem'
+                                                    }}>
+                                                        {(sec.full_name || sec.name)?.charAt(0)?.toUpperCase() || 'S'}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
+                                                            {sec.full_name || sec.name || '-'}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Mail size={12} /> {sec.email || '-'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <Briefcase size={14} color="var(--color-text-muted)" />
+                                                    <span style={{ color: sec.department ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                                        {sec.department || 'Not assigned'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span className={`status-badge ${isActive ? 'status-active' : 'status-inactive'}`}>
                                                     {isActive ? 'Active' : 'Inactive'}
                                                 </span>
                                             </td>
-                                            <td style={tdStyle}>
+                                            <td>
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    <button onClick={() => handleOpenEdit(sec)} title="Edit" style={actionBtnStyle}>
-                                                        <Edit size={16} />
+                                                    <button
+                                                        onClick={() => handleOpenEdit(sec)}
+                                                        title="Edit"
+                                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-primary)' }}
+                                                    >
+                                                        <Edit size={18} />
                                                     </button>
                                                     {isActive ? (
-                                                        <button onClick={() => handleDeactivate(sec)} title="Deactivate" style={{ ...actionBtnStyle, color: 'var(--color-error, #ef4444)' }}>
-                                                            <UserX size={16} />
+                                                        <button
+                                                            onClick={() => handleDeactivate(sec)}
+                                                            title="Deactivate"
+                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
+                                                        >
+                                                            <Trash2 size={18} />
                                                         </button>
                                                     ) : (
-                                                        <button onClick={() => handleActivate(sec)} title="Activate" style={{ ...actionBtnStyle, color: 'var(--color-success, #10b981)' }}>
-                                                            <UserCheck size={16} />
+                                                        <button
+                                                            onClick={() => handleActivate(sec)}
+                                                            title="Activate"
+                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-success)' }}
+                                                        >
+                                                            <UserCheck size={18} />
                                                         </button>
                                                     )}
                                                 </div>
                                             </td>
                                         </tr>
                                     );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                })
+                            )}
+                        </tbody>
+                    </table>
                 )}
             </div>
 
-            {/* Modal */}
-            {showModal && (
-                <Modal isOpen={showModal} onClose={() => { setShowModal(false); resetForm(); }}>
-                    <div style={{ padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700' }}>
-                                {isEditing ? (t('school.secretaries.editSecretary') || 'Edit Secretary') : (t('school.secretaries.addSecretary') || 'Add Secretary')}
-                            </h2>
-                            <button onClick={() => { setShowModal(false); resetForm(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        {error && (
-                            <div style={{ padding: '0.75rem', marginBottom: '1rem', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: '0.875rem' }}>
-                                {error}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSave}>
-                            <div style={{ marginBottom: '1rem' }}>
-                                <label style={labelStyle}>{t('common.fullName') || 'Full Name'} *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.full_name}
-                                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                                    style={inputStyle}
-                                    placeholder="Enter full name"
-                                />
-                            </div>
-                            <div style={{ marginBottom: '1rem' }}>
-                                <label style={labelStyle}>{t('common.email') || 'Email'} *</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    style={inputStyle}
-                                    placeholder="Enter email address"
-                                />
-                            </div>
-                            <div style={{ marginBottom: '1rem' }}>
-                                <label style={labelStyle}>
-                                    {t('common.password') || 'Password'} {!isEditing && '*'}
-                                </label>
-                                <input
-                                    type="password"
-                                    required={!isEditing}
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    style={inputStyle}
-                                    placeholder={isEditing ? 'Leave blank to keep current' : 'Enter password'}
-                                />
-                            </div>
-                            <div style={{ marginBottom: '1rem' }}>
-                                <label style={labelStyle}>{t('common.department') || 'Department'}</label>
-                                <input
-                                    type="text"
-                                    value={formData.department}
-                                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                    style={inputStyle}
-                                    placeholder="e.g. Administration"
-                                />
-                            </div>
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <label style={labelStyle}>{t('common.hireDate') || 'Hire Date'}</label>
-                                <input
-                                    type="date"
-                                    value={formData.hire_date}
-                                    onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-                                    style={inputStyle}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="btn-secondary">
-                                    {t('common.cancel') || 'Cancel'}
-                                </button>
-                                <button type="submit" className="btn-primary">
-                                    {isEditing ? (t('common.update') || 'Update') : (t('common.create') || 'Create')}
-                                </button>
-                            </div>
-                        </form>
+            {/* Create/Edit Modal */}
+            <Modal
+                isOpen={showModal}
+                onClose={() => { setShowModal(false); resetForm(); }}
+                title={isEditing ? 'Edit Secretary' : 'Add New Secretary'}
+            >
+                {error && (
+                    <div style={{
+                        padding: '0.75rem', marginBottom: '1rem', borderRadius: '0.375rem',
+                        background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: '0.875rem'
+                    }}>
+                        {error}
                     </div>
-                </Modal>
-            )}
+                )}
+
+                <form onSubmit={handleSave} style={{ display: 'grid', gap: '1rem' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                            Full Name *
+                        </label>
+                        <input
+                            type="text"
+                            required
+                            value={formData.full_name}
+                            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder="Enter full name"
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                            Email *
+                        </label>
+                        <input
+                            type="email"
+                            required
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder="secretary@example.com"
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                            Password {!isEditing && '*'}
+                        </label>
+                        <input
+                            type="password"
+                            required={!isEditing}
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder={isEditing ? 'Leave blank to keep current' : 'Enter password'}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                            Department
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.department}
+                            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder="e.g. Administration, Finance, Records"
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                            Hire Date
+                        </label>
+                        <input
+                            type="date"
+                            value={formData.hire_date}
+                            onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                        <button
+                            type="button"
+                            onClick={() => { setShowModal(false); resetForm(); }}
+                            style={{
+                                padding: '0.5rem 1rem', borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)', background: 'white', cursor: 'pointer'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary">
+                            {isEditing ? 'Update Secretary' : 'Create Secretary'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
-
-// Shared styles
-const thStyle = { padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' };
-const tdStyle = { padding: '0.75rem 1rem', fontSize: '0.875rem', color: 'var(--color-text-main)' };
-const actionBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '6px', color: 'var(--color-text-muted)', transition: 'all 0.2s' };
-const labelStyle = { display: 'block', marginBottom: '0.4rem', fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-main)' };
-const inputStyle = { width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', color: 'var(--color-text-main)', fontSize: '0.875rem' };
 
 export default SecretaryMonitoring;

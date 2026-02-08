@@ -7,13 +7,17 @@ import {
     Clock,
     Search,
     Plus,
-    MoreVertical,
-    Edit,
-    Trash
+    Mail,
+    UserCheck,
+    UserX,
+    Trash2,
+    Edit
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import managerService from '../../services/managerService';
+import Modal from '../../components/ui/Modal';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 import './SchoolManager.css';
 
 const TeacherMonitoring = () => {
@@ -75,69 +79,56 @@ const TeacherMonitoring = () => {
         }
     };
 
+    const tabs = [
+        { id: 'directory', label: t('school.teachers.directory') || 'Directory', icon: Users },
+        { id: 'performance', label: t('school.teachers.performance') || 'Performance', icon: Star },
+        { id: 'activity', label: 'Activity Log', icon: Activity },
+    ];
+
     return (
         <div className="teacher-monitoring-page">
             <div className="school-manager-header">
-                <h1 className="school-manager-title">{t('school.teachers.title')}</h1>
-                <p className="school-manager-subtitle">{t('school.teachers.subtitle')}</p>
+                <h1 className="school-manager-title">{t('school.teachers.title') || 'Teacher Monitoring'}</h1>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200 mb-6 w-full" style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '1.5rem', display: 'flex', gap: '2rem' }}>
-                <button
-                    className={`pb-2 px-1 ${activeTab === 'directory' ? 'active-tab' : 'inactive-tab'}`}
-                    style={{
-                        paddingBottom: '0.5rem',
-                        borderBottom: activeTab === 'directory' ? '2px solid var(--color-primary)' : '2px solid transparent',
-                        color: activeTab === 'directory' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer'
-                    }}
-                    onClick={() => setActiveTab('directory')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Users size={18} />
-                        {t('school.teachers.directory')}
-                    </div>
-                </button>
-                <button
-                    className={`pb-2 px-1 ${activeTab === 'performance' ? 'active-tab' : 'inactive-tab'}`}
-                    style={{
-                        paddingBottom: '0.5rem',
-                        borderBottom: activeTab === 'performance' ? '2px solid var(--color-primary)' : '2px solid transparent',
-                        color: activeTab === 'performance' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer'
-                    }}
-                    onClick={() => setActiveTab('performance')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Star size={18} />
-                        {t('school.teachers.performance')}
-                    </div>
-                </button>
-                <button
-                    className={`pb-2 px-1 ${activeTab === 'activity' ? 'active-tab' : 'inactive-tab'}`}
-                    style={{
-                        paddingBottom: '0.5rem',
-                        borderBottom: activeTab === 'activity' ? '2px solid var(--color-primary)' : '2px solid transparent',
-                        color: activeTab === 'activity' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                        fontWeight: 500,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer'
-                    }}
-                    onClick={() => setActiveTab('activity')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Activity size={18} />
-                        Activities
-                    </div>
-                </button>
+            {/* Enhanced Pill-Style Tabs */}
+            <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '1.5rem',
+                padding: '0.25rem',
+                backgroundColor: 'var(--color-bg-muted)',
+                borderRadius: '0.5rem',
+                width: 'fit-content'
+            }}>
+                {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.625rem 1rem',
+                                borderRadius: '0.375rem',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: 500,
+                                fontSize: '0.875rem',
+                                transition: 'all 0.2s ease',
+                                backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
+                                color: isActive ? 'white' : 'var(--color-text-muted)',
+                                boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
+                            }}
+                        >
+                            <Icon size={18} strokeWidth={2} />
+                            {tab.label}
+                        </button>
+                    );
+                })}
             </div>
 
             <div className="tab-content">
@@ -151,10 +142,11 @@ const TeacherMonitoring = () => {
 const TeacherDirectory = ({ teachers, setTeachers, t }) => {
     const { user } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const [formData, setFormData] = useState({
         full_name: '',
         email: '',
-        password: 'test1234',
+        password: 'Teacher@123',
         specialization: '',
         employment_status: 'full_time',
         hire_date: new Date().toISOString().split('T')[0]
@@ -188,21 +180,17 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
 
     const handleSave = async (e) => {
         e.preventDefault();
-
-        // Try to get school_id from multiple possible locations in user object
-        const resolvedSchoolId = user?.school_id ||
-            user?.school?.id ||
+        const resolvedSchoolId = user?.school_id || user?.school?.id ||
             (typeof user?.school === 'number' ? user.school : null) ||
-            localStorage.getItem('school_id'); // Fallback
+            localStorage.getItem('school_id');
 
         if (!resolvedSchoolId) {
             alert('Error: School ID not found. Please log out and log in again.');
-            console.error('Cannot create teacher: school_id is missing. User context:', user);
             return;
         }
 
         try {
-            const teacherData = {
+            await managerService.createTeacher({
                 email: formData.email,
                 full_name: formData.full_name,
                 password: formData.password,
@@ -210,34 +198,28 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                 specialization: formData.specialization,
                 employment_status: formData.employment_status,
                 hire_date: formData.hire_date,
-            };
+            });
 
-            console.log('Creating teacher with data:', teacherData);
-
-            await managerService.createTeacher(teacherData);
-
-            // Refresh teacher list
             const response = await managerService.getTeachers();
             setTeachers(response.results || response || []);
-
             setIsModalOpen(false);
             setFormData({
-                full_name: '',
-                email: '',
-                password: 'Teacher@123',
-                specialization: '',
-                employment_status: 'full_time',
+                full_name: '', email: '', password: 'Teacher@123',
+                specialization: '', employment_status: 'full_time',
                 hire_date: new Date().toISOString().split('T')[0]
             });
-            alert('Teacher created successfully!');
         } catch (error) {
             console.error('Failed to create teacher:', error);
-            const errorMsg = error.response?.data
-                ? JSON.stringify(error.response.data)
-                : error.message || 'Unknown error';
+            const errorMsg = error.response?.data ? JSON.stringify(error.response.data) : error.message;
             alert(`Failed to create teacher: ${errorMsg}`);
         }
     };
+
+    const filteredTeachers = teachers.filter(teacher =>
+        (teacher.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (teacher.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (teacher.specialization?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    );
 
     return (
         <div className="management-card">
@@ -247,9 +229,11 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                     <input
                         type="text"
                         placeholder="Search teachers..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                         style={{
                             width: '100%',
-                            padding: '0.5rem 0.5rem 0.5rem 2.5rem',
+                            padding: '0.5rem 0.5rem 0.5rem 2.25rem',
                             borderRadius: '0.375rem',
                             border: '1px solid var(--color-border)'
                         }}
@@ -260,43 +244,67 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                     Add Teacher
                 </button>
             </div>
+
             <table className="data-table">
                 <thead>
                     <tr>
-                        <th>Full Name</th>
-                        <th>Email</th>
+                        <th>Teacher</th>
+                        <th>Specialization</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {teachers.map((teacher) => {
+                    {filteredTeachers.map((teacher) => {
                         const id = teacher.user_id || teacher.id;
                         const isActive = teacher.is_active !== false;
                         return (
                             <tr key={id}>
-                                <td className="font-medium text-gray-900">{teacher.full_name}</td>
-                                <td>{teacher.email}</td>
                                 <td>
-                                    <span style={{
-                                        padding: '2px 8px',
-                                        borderRadius: '999px',
-                                        fontSize: '12px',
-                                        background: isActive ? 'var(--color-success-light)' : 'var(--color-error-light)',
-                                        color: isActive ? 'var(--color-success)' : 'var(--color-error)'
-                                    }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{
+                                            width: '36px', height: '36px', borderRadius: '50%',
+                                            background: 'var(--color-primary-light)', color: 'var(--color-primary)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontWeight: 'bold', fontSize: '0.875rem'
+                                        }}>
+                                            {teacher.full_name?.charAt(0)?.toUpperCase() || 'T'}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
+                                                {teacher.full_name}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Mail size={12} /> {teacher.email}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style={{ color: teacher.specialization ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                    {teacher.specialization || 'Not specified'}
+                                </td>
+                                <td>
+                                    <span className={`status-badge ${isActive ? 'status-active' : 'status-inactive'}`}>
                                         {isActive ? 'Active' : 'Inactive'}
                                     </span>
                                 </td>
                                 <td>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                         {isActive ? (
-                                            <button onClick={() => handleDeactivate(teacher)} title="Deactivate" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)' }}>
-                                                <Trash size={16} />
+                                            <button
+                                                onClick={() => handleDeactivate(teacher)}
+                                                title="Deactivate Teacher"
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
+                                            >
+                                                <Trash2 size={18} />
                                             </button>
                                         ) : (
-                                            <button onClick={() => handleActivate(teacher)} title="Activate" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-success)' }}>
-                                                <Award size={16} />
+                                            <button
+                                                onClick={() => handleActivate(teacher)}
+                                                title="Activate Teacher"
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-success)' }}
+                                            >
+                                                <UserCheck size={18} />
                                             </button>
                                         )}
                                     </div>
@@ -308,84 +316,98 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
             </table>
 
             {/* Create Teacher Modal */}
-            {isModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '500px',
-                        border: '1px solid var(--color-border)', maxHeight: '90vh', overflowY: 'auto'
-                    }}>
-                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add New Teacher</h2>
-                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Full Name</label>
-                                <input
-                                    required
-                                    value={formData.full_name}
-                                    onChange={e => setFormData({ ...formData, full_name: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Email</label>
-                                <input
-                                    required
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            {/* School ID is automatically set from logged-in School Manager */}
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Specialization</label>
-                                <input
-                                    value={formData.specialization}
-                                    onChange={e => setFormData({ ...formData, specialization: e.target.value })}
-                                    placeholder="e.g., Mathematics, Science, English"
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Employment Status</label>
-                                <select
-                                    required
-                                    value={formData.employment_status}
-                                    onChange={e => setFormData({ ...formData, employment_status: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                >
-                                    <option value="full_time">Full Time</option>
-                                    <option value="part_time">Part Time</option>
-                                    <option value="contract">Contract</option>
-                                    <option value="substitute">Substitute</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Hire Date</label>
-                                <input
-                                    required
-                                    type="date"
-                                    value={formData.hire_date}
-                                    onChange={e => setFormData({ ...formData, hire_date: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn-primary">Create Teacher</button>
-                            </div>
-                        </form>
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setFormData({
+                        full_name: '', email: '', password: 'Teacher@123',
+                        specialization: '', employment_status: 'full_time',
+                        hire_date: new Date().toISOString().split('T')[0]
+                    });
+                }}
+                title="Add New Teacher"
+            >
+                <form onSubmit={handleSave} style={{ display: 'grid', gap: '1rem' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Full Name</label>
+                        <input
+                            required
+                            value={formData.full_name}
+                            onChange={e => setFormData({ ...formData, full_name: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder="Enter teacher's full name"
+                        />
                     </div>
-                </div>
-            )}
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Email</label>
+                        <input
+                            required
+                            type="email"
+                            value={formData.email}
+                            onChange={e => setFormData({ ...formData, email: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder="teacher@example.com"
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Password</label>
+                        <input
+                            required
+                            type="password"
+                            value={formData.password}
+                            onChange={e => setFormData({ ...formData, password: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Specialization</label>
+                        <input
+                            value={formData.specialization}
+                            onChange={e => setFormData({ ...formData, specialization: e.target.value })}
+                            placeholder="e.g., Mathematics, Science, English"
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Employment Status</label>
+                        <select
+                            required
+                            value={formData.employment_status}
+                            onChange={e => setFormData({ ...formData, employment_status: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                        >
+                            <option value="full_time">Full Time</option>
+                            <option value="part_time">Part Time</option>
+                            <option value="contract">Contract</option>
+                            <option value="substitute">Substitute</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Hire Date</label>
+                        <input
+                            required
+                            type="date"
+                            value={formData.hire_date}
+                            onChange={e => setFormData({ ...formData, hire_date: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                        <button
+                            type="button"
+                            onClick={() => setIsModalOpen(false)}
+                            style={{
+                                padding: '0.5rem 1rem', borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)', background: 'white', cursor: 'pointer'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary">Create Teacher</button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
@@ -408,134 +430,270 @@ const PerformanceEvaluation = ({ evaluations, onEvaluationAdded, teachers, t }) 
             setFormData({ reviewee_id: '', rating_score: 5, comments: '' });
         } catch (error) {
             console.error('Failed to create evaluation:', error);
+            alert('Failed to create evaluation');
         }
+    };
+
+    const renderStars = (score) => {
+        const stars = [];
+        for (let i = 1; i <= 10; i++) {
+            stars.push(
+                <Star
+                    key={i}
+                    size={14}
+                    fill={i <= score ? '#fbbf24' : 'transparent'}
+                    stroke={i <= score ? '#fbbf24' : '#d1d5db'}
+                />
+            );
+        }
+        return stars;
     };
 
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <h3 className="chart-title">Latest Evaluations</h3>
+                <h3 className="chart-title">Performance Evaluations</h3>
                 <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
                     <Plus size={18} />
                     New Evaluation
                 </button>
             </div>
+
             <table className="data-table">
                 <thead>
                     <tr>
                         <th>Teacher</th>
-                        <th>Score</th>
+                        <th>Rating</th>
                         <th>Comments</th>
                         <th>Date</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {evaluations.map((evalItem) => (
-                        <tr key={evalItem.id}>
-                            <td className="font-medium text-gray-900">{evalItem.reviewee_name || evalItem.reviewee_email}</td>
-                            <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <Star size={16} fill="gold" stroke="gold" />
-                                    <span style={{ fontWeight: 'bold' }}>{evalItem.rating_score}</span>
-                                </div>
+                    {evaluations.length === 0 ? (
+                        <tr>
+                            <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                No evaluations yet. Click "New Evaluation" to add one.
                             </td>
-                            <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {evalItem.comments}
-                            </td>
-                            <td>{new Date(evalItem.evaluation_date).toLocaleDateString()}</td>
                         </tr>
-                    ))}
+                    ) : (
+                        evaluations.map((evalItem) => (
+                            <tr key={evalItem.id}>
+                                <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{
+                                            width: '32px', height: '32px', borderRadius: '50%',
+                                            background: '#fef3c7', color: '#d97706',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontWeight: 'bold', fontSize: '0.75rem'
+                                        }}>
+                                            {(evalItem.reviewee_name || evalItem.reviewee_email)?.charAt(0)?.toUpperCase() || 'T'}
+                                        </div>
+                                        <span style={{ fontWeight: '500' }}>{evalItem.reviewee_name || evalItem.reviewee_email}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div style={{ display: 'flex', gap: '2px' }}>
+                                            {renderStars(evalItem.rating_score)}
+                                        </div>
+                                        <span style={{
+                                            fontWeight: 'bold',
+                                            color: evalItem.rating_score >= 7 ? 'var(--color-success)' :
+                                                   evalItem.rating_score >= 4 ? '#d97706' : 'var(--color-error)'
+                                        }}>
+                                            {evalItem.rating_score}/10
+                                        </span>
+                                    </div>
+                                </td>
+                                <td style={{ maxWidth: '300px' }}>
+                                    <p style={{
+                                        margin: 0, whiteSpace: 'nowrap', overflow: 'hidden',
+                                        textOverflow: 'ellipsis', color: 'var(--color-text-muted)'
+                                    }}>
+                                        {evalItem.comments || 'No comments'}
+                                    </p>
+                                </td>
+                                <td style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                                    {new Date(evalItem.evaluation_date).toLocaleDateString()}
+                                </td>
+                            </tr>
+                        ))
+                    )}
                 </tbody>
             </table>
 
-            {/* Modal */}
-            {isModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '400px',
-                        border: '1px solid var(--color-border)'
-                    }}>
-                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>New Staff Evaluation</h2>
-                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Select Staff</label>
-                                <select
-                                    required
-                                    value={formData.reviewee_id}
-                                    onChange={e => setFormData({ ...formData, reviewee_id: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                >
-                                    <option value="">Select Staff Member</option>
-                                    {teachers.map(teacher => (
-                                        <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>{teacher.full_name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Score (1-10)</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="10"
-                                    required
-                                    value={formData.rating_score}
-                                    onChange={e => setFormData({ ...formData, rating_score: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Comments</label>
-                                <textarea
-                                    required
-                                    value={formData.comments}
-                                    onChange={e => setFormData({ ...formData, comments: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', minHeight: '100px' }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
-                                <button type="submit" className="btn-primary">Save Evaluation</button>
-                            </div>
-                        </form>
+            {/* Evaluation Modal */}
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setFormData({ reviewee_id: '', rating_score: 5, comments: '' });
+                }}
+                title="New Staff Evaluation"
+            >
+                <form onSubmit={handleSave} style={{ display: 'grid', gap: '1rem' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                            Select Teacher
+                        </label>
+                        <SearchableSelect
+                            options={teachers.map(t => ({
+                                value: t.user_id || t.id,
+                                label: t.full_name
+                            }))}
+                            value={formData.reviewee_id}
+                            onChange={(val) => setFormData({ ...formData, reviewee_id: val })}
+                            placeholder="Select a teacher..."
+                            searchPlaceholder="Search teachers..."
+                        />
                     </div>
-                </div>
-            )}
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                            Rating Score (1-10)
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <input
+                                type="range"
+                                min="1"
+                                max="10"
+                                value={formData.rating_score}
+                                onChange={e => setFormData({ ...formData, rating_score: e.target.value })}
+                                style={{ flex: 1 }}
+                            />
+                            <span style={{
+                                fontWeight: 'bold', fontSize: '1.25rem', minWidth: '40px', textAlign: 'center',
+                                color: formData.rating_score >= 7 ? 'var(--color-success)' :
+                                       formData.rating_score >= 4 ? '#d97706' : 'var(--color-error)'
+                            }}>
+                                {formData.rating_score}
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                            Comments
+                        </label>
+                        <textarea
+                            required
+                            value={formData.comments}
+                            onChange={e => setFormData({ ...formData, comments: e.target.value })}
+                            placeholder="Enter evaluation comments..."
+                            style={{
+                                width: '100%', padding: '0.5rem', borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)', minHeight: '100px', resize: 'vertical'
+                            }}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                        <button
+                            type="button"
+                            onClick={() => setIsModalOpen(false)}
+                            style={{
+                                padding: '0.5rem 1rem', borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)', background: 'white', cursor: 'pointer'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary">Save Evaluation</button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
 
 const ActivityLogs = ({ teachers, t }) => {
+    const getLoginStatus = (lastLogin) => {
+        if (!lastLogin) return { text: 'Never logged in', color: 'var(--color-text-muted)', bgColor: '#f3f4f6' };
+        const lastLoginDate = new Date(lastLogin);
+        const now = new Date();
+        const diffDays = Math.floor((now - lastLoginDate) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return { text: 'Today', color: 'var(--color-success)', bgColor: '#dcfce7' };
+        if (diffDays <= 7) return { text: `${diffDays}d ago`, color: '#2563eb', bgColor: '#dbeafe' };
+        if (diffDays <= 30) return { text: `${diffDays}d ago`, color: '#d97706', bgColor: '#fef3c7' };
+        return { text: `${diffDays}d ago`, color: 'var(--color-error)', bgColor: '#fee2e2' };
+    };
+
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <h3 className="chart-title">Teacher Presence</h3>
+                <h3 className="chart-title">Teacher Activity & Presence</h3>
             </div>
+
             <table className="data-table">
                 <thead>
                     <tr>
                         <th>Teacher</th>
-                        <th>Email</th>
                         <th>Last Login</th>
-                        <th>Join Date</th>
+                        <th>Status</th>
+                        <th>Joined</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {teachers.map((teacher) => (
-                        <tr key={teacher.id}>
-                            <td className="font-medium text-gray-900">{teacher.full_name}</td>
-                            <td>{teacher.email}</td>
-                            <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Clock size={16} className="text-gray-400" />
-                                    {teacher.last_login ? new Date(teacher.last_login).toLocaleString() : 'Never'}
-                                </div>
+                    {teachers.length === 0 ? (
+                        <tr>
+                            <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                No teachers found.
                             </td>
-                            <td>{new Date(teacher.date_joined).toLocaleDateString()}</td>
                         </tr>
-                    ))}
+                    ) : (
+                        teachers.map((teacher) => {
+                            const loginStatus = getLoginStatus(teacher.last_login);
+                            return (
+                                <tr key={teacher.id || teacher.user_id}>
+                                    <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div style={{
+                                                width: '36px', height: '36px', borderRadius: '50%',
+                                                background: 'var(--color-primary-light)', color: 'var(--color-primary)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontWeight: 'bold', fontSize: '0.875rem'
+                                            }}>
+                                                {teacher.full_name?.charAt(0)?.toUpperCase() || 'T'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
+                                                    {teacher.full_name}
+                                                </div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Mail size={12} /> {teacher.email}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Clock size={16} color="var(--color-text-muted)" />
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                                                {teacher.last_login
+                                                    ? new Date(teacher.last_login).toLocaleString()
+                                                    : 'Never'}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span style={{
+                                            padding: '4px 10px',
+                                            borderRadius: '999px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: '500',
+                                            backgroundColor: loginStatus.bgColor,
+                                            color: loginStatus.color
+                                        }}>
+                                            {loginStatus.text}
+                                        </span>
+                                    </td>
+                                    <td style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                                        {teacher.date_joined
+                                            ? new Date(teacher.date_joined).toLocaleDateString()
+                                            : 'N/A'}
+                                    </td>
+                                </tr>
+                            );
+                        })
+                    )}
                 </tbody>
             </table>
         </div>

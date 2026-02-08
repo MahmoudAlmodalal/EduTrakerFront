@@ -38,6 +38,11 @@ const WorkstreamReports = () => {
         utilization: Math.round((school.student_count / (school.classroom_count * 30 || 1)) * 100)
     })) || [];
 
+    // Calculate average attendance from real data
+    const avgAttendance = schoolStats.length > 0
+        ? (schoolStats.reduce((sum, s) => sum + (s.attendance || 0), 0) / schoolStats.length).toFixed(1)
+        : 0;
+
     const handleExport = async (format) => {
         try {
             await reportService.exportReport(format);
@@ -64,9 +69,11 @@ const WorkstreamReports = () => {
                             <Calendar size={20} />
                         </div>
                     </div>
-                    <div className="stat-value">{loading ? '...' : '91.6%'}</div>
-                    <div className="stat-trend trend-up">
-                        <span>Stable across cluster</span>
+                    <div className="stat-value">{loading ? '...' : `${avgAttendance}%`}</div>
+                    <div className="stat-trend">
+                        <span style={{ color: 'var(--color-text-muted)' }}>
+                            {avgAttendance > 0 ? 'Across all schools' : 'No data yet'}
+                        </span>
                     </div>
                 </div>
                 <div className="stat-card">

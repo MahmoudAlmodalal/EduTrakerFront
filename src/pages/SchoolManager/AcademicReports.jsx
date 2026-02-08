@@ -8,8 +8,6 @@ import {
     Search,
     ChevronRight,
     Calendar,
-    ArrowUpRight,
-    ArrowDownRight,
     BookOpen
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
@@ -73,15 +71,12 @@ const AcademicReports = () => {
                         <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
                             <TrendingUp size={20} />
                         </div>
-                        <span className="stat-trend trend-up">
-                            <ArrowUpRight size={14} />
-                            +12%
-                        </span>
+                        {/* Trend will be calculated from real backend data in future */}
                     </div>
                     <div className="stat-value">
-                        {stats?.statistics?.course_count || '0'}%
+                        {stats?.statistics?.course_count || '0'}
                     </div>
-                    <div className="stat-label">Average Performance</div>
+                    <div className="stat-label">Total Courses</div>
                 </div>
 
                 <div className="stat-card">
@@ -89,10 +84,7 @@ const AcademicReports = () => {
                         <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-success-light)', color: 'var(--color-success)' }}>
                             <Users size={20} />
                         </div>
-                        <span className="stat-trend trend-up">
-                            <ArrowUpRight size={14} />
-                            +5%
-                        </span>
+                        {/* Trend will be calculated from real backend data in future */}
                     </div>
                     <div className="stat-value">{stats?.statistics?.total_students || '0'}</div>
                     <div className="stat-label">Total Students</div>
@@ -103,13 +95,10 @@ const AcademicReports = () => {
                         <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-warning-light)', color: 'var(--color-warning)' }}>
                             <FileText size={20} />
                         </div>
-                        <span className="stat-trend trend-down">
-                            <ArrowDownRight size={14} />
-                            -2%
-                        </span>
+                        {/* Trend will be calculated from real backend data in future */}
                     </div>
                     <div className="stat-value">{stats?.statistics?.total_teachers || '0'}</div>
-                    <div className="stat-label">Active Teachers</div>
+                    <div className="stat-label">Total Teachers</div>
                 </div>
 
                 <div className="stat-card">
@@ -117,13 +106,10 @@ const AcademicReports = () => {
                         <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-error-light)', color: 'var(--color-error)' }}>
                             <BookOpen size={20} />
                         </div>
-                        <span className="stat-trend trend-up">
-                            <ArrowUpRight size={14} />
-                            +3%
-                        </span>
+                        {/* Trend will be calculated from real backend data in future */}
                     </div>
-                    <div className="stat-value">{stats?.statistics?.course_count || '0'}</div>
-                    <div className="stat-label">Active Courses</div>
+                    <div className="stat-value">{stats?.statistics?.classroom_count || '0'}</div>
+                    <div className="stat-label">Classrooms</div>
                 </div>
             </div>
 
@@ -190,7 +176,7 @@ const AcademicReports = () => {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
                                 <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                    {downloading === report.id ? 'Preparing download...' : 'Last updated: 2 days ago'}
+                                    {downloading === report.id ? 'Preparing download...' : 'Click to download'}
                                 </span>
                                 <button style={{
                                     display: 'flex',

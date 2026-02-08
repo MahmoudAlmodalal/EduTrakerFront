@@ -4,6 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../utils/api';
 import SearchableSelect from '../../components/ui/SearchableSelect';
+import Modal from '../../components/ui/Modal';
 import './Workstream.css';
 
 const SchoolManagerAssignment = () => {
@@ -137,76 +138,83 @@ const SchoolManagerAssignment = () => {
                 </div>
             </div>
 
-            {showAssignForm && (
-                <div className="management-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
-                    <h3 className="chart-title" style={{ marginBottom: '1rem' }}>{newManager.isEditing ? t('workstream.assignments.form.editTitle') : t('workstream.assignments.form.createTitle')}</h3>
-                    <form onSubmit={handleAssignManager} style={{ display: 'grid', gap: '1rem', maxWidth: '500px' }}>
+            {/* Create/Edit School Manager Modal */}
+            <Modal
+                isOpen={showAssignForm}
+                onClose={() => {
+                    setShowAssignForm(false);
+                    setNewManager({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
+                }}
+                title={newManager.isEditing ? t('workstream.assignments.form.editTitle') : t('workstream.assignments.form.createTitle')}
+            >
+                <form onSubmit={handleAssignManager} style={{ display: 'grid', gap: '1rem' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.managerName')}</label>
+                        <input
+                            type="text"
+                            required
+                            value={newManager.full_name}
+                            onChange={(e) => setNewManager({ ...newManager, full_name: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder={t('workstream.assignments.form.managerName')}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.email')}</label>
+                        <input
+                            type="email"
+                            required
+                            value={newManager.email}
+                            onChange={(e) => setNewManager({ ...newManager, email: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            placeholder="email@example.com"
+                        />
+                    </div>
+                    {!newManager.isEditing && (
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.managerName')}</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Password</label>
                             <input
-                                type="text"
+                                type="password"
                                 required
-                                value={newManager.full_name}
-                                onChange={(e) => setNewManager({ ...newManager, full_name: e.target.value })}
+                                value={newManager.password}
+                                onChange={(e) => setNewManager({ ...newManager, password: e.target.value })}
                                 style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder={t('workstream.assignments.form.managerName')}
                             />
                         </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.email')}</label>
-                            <input
-                                type="email"
-                                required
-                                value={newManager.email}
-                                onChange={(e) => setNewManager({ ...newManager, email: e.target.value })}
-                                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                placeholder="email@example.com"
-                            />
-                        </div>
-                        {!newManager.isEditing && (
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Password</label>
-                                <input
-                                    type="password"
-                                    required
-                                    value={newManager.password}
-                                    onChange={(e) => setNewManager({ ...newManager, password: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                                />
-                            </div>
-                        )}
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.assignTo')}</label>
-                            <SearchableSelect
-                                options={schools.map(s => ({ value: s.id, label: s.school_name }))}
-                                value={newManager.schoolId}
-                                onChange={(val) => setNewManager({ ...newManager, schoolId: val })}
-                                placeholder={t('workstream.assignments.form.selectSchool')}
-                                searchPlaceholder="Search schools..."
-                            />
-                        </div>
-                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                            <button type="submit" className="btn-primary" disabled={loading}>{newManager.isEditing ? t('workstream.assignments.updateBtn') : t('workstream.assignments.assignBtn')}</button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowAssignForm(false);
-                                    setNewManager({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
-                                }}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    borderRadius: '0.375rem',
-                                    border: '1px solid var(--color-border)',
-                                    background: 'white',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                {t('common.cancel')}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
+                    )}
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{t('workstream.assignments.form.assignTo')}</label>
+                        <SearchableSelect
+                            options={schools.map(s => ({ value: s.id, label: s.school_name }))}
+                            value={newManager.schoolId}
+                            onChange={(val) => setNewManager({ ...newManager, schoolId: val })}
+                            placeholder={t('workstream.assignments.form.selectSchool')}
+                            searchPlaceholder="Search schools..."
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowAssignForm(false);
+                                setNewManager({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
+                            }}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)',
+                                background: 'white',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {t('common.cancel')}
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={loading}>
+                            {newManager.isEditing ? t('workstream.assignments.updateBtn') : t('workstream.assignments.assignBtn')}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
             <div className="management-card">
                 <div className="table-header-actions">

@@ -46,11 +46,11 @@ const SchoolDashboard = () => {
     }, []);
 
     const dashboardCards = [
-        { title: t('school.dashboard.totalStudents') || 'Total Students', value: stats?.total_students ?? 0, icon: Users, color: 'blue' },
-        { title: t('activeTeachers') || 'Active Teachers', value: stats?.total_teachers ?? 0, icon: UserCheck, color: 'green' },
-        { title: t('secretaries') || 'Secretaries', value: stats?.total_secretaries ?? 0, icon: Briefcase, color: 'purple' },
-        { title: t('classrooms') || 'Classrooms', value: stats?.classroom_count ?? 0, icon: GraduationCap, color: 'orange' },
-        { title: t('courses') || 'Courses', value: stats?.course_count ?? 0, icon: BookOpen, color: 'teal' }
+        { title: t('school.dashboard.totalStudents') || 'Total Students', value: stats?.total_students ?? 0, icon: Users, color: 'blue', bgColor: '#dbeafe', iconColor: '#2563eb' },
+        { title: t('activeTeachers') || 'Active Teachers', value: stats?.total_teachers ?? 0, icon: UserCheck, color: 'green', bgColor: '#dcfce7', iconColor: '#16a34a' },
+        { title: t('secretaries') || 'Secretaries', value: stats?.total_secretaries ?? 0, icon: Briefcase, color: 'purple', bgColor: '#f3e8ff', iconColor: '#9333ea' },
+        { title: t('classrooms') || 'Classrooms', value: stats?.classroom_count ?? 0, icon: GraduationCap, color: 'orange', bgColor: '#ffedd5', iconColor: '#ea580c' },
+        { title: t('courses') || 'Courses', value: stats?.course_count ?? 0, icon: BookOpen, color: 'teal', bgColor: '#ccfbf1', iconColor: '#0d9488' }
     ];
 
     if (loading) {
@@ -95,19 +95,30 @@ const SchoolDashboard = () => {
             {/* Quick Stats Grid */}
             <div className="stats-grid">
                 {dashboardCards.map((card, index) => (
-                    <div key={index} className="stat-card">
-                        <div className="stat-header">
-                            <div className={`stat-icon-wrapper color-${card.color}`} style={{
-                                backgroundColor: `var(--color-${card.color}-light, rgba(59,130,246,0.1))`,
-                                color: `var(--color-${card.color}, #3b82f6)`,
-                                padding: '10px',
-                                borderRadius: '12px'
+                    <div key={index} className="stat-card" style={{
+                        background: 'var(--color-bg-surface)',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        border: '1px solid var(--color-border)',
+                        transition: 'all 0.2s ease',
+                        cursor: 'default'
+                    }}>
+                        <div className="stat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{
+                                backgroundColor: card.bgColor,
+                                color: card.iconColor,
+                                padding: '14px',
+                                borderRadius: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: `0 4px 12px ${card.bgColor}`
                             }}>
-                                <card.icon size={24} />
+                                <card.icon size={28} strokeWidth={2.25} />
                             </div>
                         </div>
-                        <div className="stat-value" style={{ fontSize: '1.75rem', fontWeight: '700', marginTop: '1rem', color: 'var(--color-text-main)' }}>{card.value}</div>
-                        <div className="stat-label" style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>{card.title}</div>
+                        <div className="stat-value" style={{ fontSize: '2rem', fontWeight: '800', marginTop: '1.25rem', color: 'var(--color-text-main)', letterSpacing: '-0.02em' }}>{card.value}</div>
+                        <div className="stat-label" style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', marginTop: '0.375rem', fontWeight: '500' }}>{card.title}</div>
                     </div>
                 ))}
             </div>
