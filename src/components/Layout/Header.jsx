@@ -51,7 +51,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     );
 
     // If we get 401 errors, logout the user
-    React.useEffect(() => {
+    useEffect(() => {
         if (notificationsError?.includes('401') || unreadError?.includes('401')) {
             console.warn('Token expired, logging out...');
             logout();

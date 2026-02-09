@@ -34,7 +34,7 @@ const StudentAttendance = () => {
     });
 
     const fetchAttendanceData = async () => {
-        if (!user?.id) return;
+        if (!user) return;
         setLoading(true);
         setError(null);
         try {
@@ -45,7 +45,8 @@ const StudentAttendance = () => {
             ]);
 
             // Process Dashboard Stats for summary cards
-            const attendanceSummary = dashboardRes?.statistics?.attendance;
+            const statsData = dashboardRes?.statistics || dashboardRes;
+            const attendanceSummary = statsData?.attendance;
             if (attendanceSummary) {
                 setStats({
                     present: attendanceSummary.by_status?.present || 0,

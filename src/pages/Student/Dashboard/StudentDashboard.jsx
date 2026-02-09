@@ -29,11 +29,9 @@ const StudentDashboard = () => {
         setError(null);
         try {
             const data = await studentService.getDashboardStats();
-            if (data && data.status === 'success') {
-                setDashboardData(data.statistics);
-            } else {
-                setDashboardData(data.statistics || data);
-            }
+            // The data structure can be { status: 'success', statistics: { ... } } or just { statistics: { ... } }
+            const stats = data?.statistics || data;
+            setDashboardData(stats);
 
             // Fetch Schedule
             if (user?.id) {
@@ -42,7 +40,6 @@ const StudentDashboard = () => {
                     setSchedule(Array.isArray(scheduleData) ? scheduleData : []);
                 } catch (schedError) {
                     console.error("Error fetching schedule:", schedError);
-                    // Don't fail the whole dashboard for schedule error
                 }
             }
         } catch (error) {
@@ -54,8 +51,10 @@ const StudentDashboard = () => {
     };
 
     useEffect(() => {
-        fetchDashboardData();
-    }, []);
+        if (user) {
+            fetchDashboardData();
+        }
+    }, [user]);
 
     if (loading) {
         return (
@@ -85,11 +84,11 @@ const StudentDashboard = () => {
     const { profile, courses, grades, attendance, classmates } = dashboardData || {};
 
     // Map backend data to UI
-    const assignments = grades?.marks?.slice(0, 3).map(m => ({
-        id: m.assignment_id,
-        title: m.title,
+    const assignments = grades?.marks?.slice(0, 3).map((m, index) => ({
+        id: m.assignment_id || index,
+        title: m.title || 'Assignment',
         subject: m.course_name || 'Subject',
-        due: m.due_date || 'N/A',
+        due: m.due_date ? new Date(m.due_date).toLocaleDateString() : 'N/A',
         status: m.score !== null ? 'graded' : 'pending',
         progress: m.percentage || 0
     })) || [];
@@ -106,9 +105,11 @@ const StudentDashboard = () => {
 
     const getStatusBadge = (status) => {
         switch (status) {
-            case 'done':
+            case 'completed':
             case 'graded':
+            case 'done':
                 return <span className="status-badge status-done"><CheckCircle size={12} /> Completed</span>;
+            case 'current':
             case 'now':
                 return <span className="status-badge status-now"><Zap size={12} /> In Progress</span>;
             case 'upcoming':

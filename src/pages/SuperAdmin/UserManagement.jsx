@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Edit, Trash2, UserPlus, FileDown, Filter, Layers } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/ui/Toast';
@@ -140,7 +140,7 @@ const UserManagement = () => {
         setIsModalOpen(true);
     };
 
-    const handleWorkstreamSearch = React.useCallback(async (term) => {
+    const handleWorkstreamSearch = useCallback(async (term) => {
         try {
             const response = await api.get('/workstream/', { params: { search: term } });
             const results = response.results || response;

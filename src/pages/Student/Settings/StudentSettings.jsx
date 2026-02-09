@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
 import {
@@ -36,7 +36,7 @@ const StudentSettings = () => {
         student_id_code: ''
     });
 
-    React.useEffect(() => {
+    useEffect(() => {
         const fetchProfile = async () => {
             if (!user?.id) return;
             try {

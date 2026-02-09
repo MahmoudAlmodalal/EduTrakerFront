@@ -5,27 +5,33 @@ const teacherService = {
     getProfile: async (id) => {
         return api.get(`/teacher/teachers/${id}/`);
     },
+
+    // Dashboard Stats
+    getDashboardStats: async () => {
+        return api.get('/statistics/dashboard/');
+    },
     updateProfile: async (id, data) => {
         return api.patch(`/teacher/teachers/${id}/`, data);
     },
 
     // Course Allocations / Classes
     getSchedule: async (date) => {
+        // Backend expects 'date' query param
         return api.get(`/teacher/schedule/?date=${date}`);
     },
 
     getCourseAllocations: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
-        // Since there's no specific CourseAllocation API list in urls.py, 
-        // we might need to fetch from another source or assume it's part of assignments/etc.
-        // Actually, looking at urls.py, there's no direct CourseAllocation list.
-        // However, Teachers can see their own info.
-        return api.get(`/teacher/teachers/${filters.teacher_id || ''}`);
+        // Use schedule endpoint to get active allocations
+        const date = new Date().toISOString().split('T')[0];
+        return api.get(`/teacher/schedule/?date=${date}`);
     },
 
     getStudents: async (filters = {}) => {
+        // Teacher specific student list logic if needed,
+        // otherwise rely on class-filtered lists
         const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/student/students/?${queryParams}`);
+        // Teachers are StaffUsers, so they can access /manager/students/
+        return api.get(`/manager/students/?${queryParams}`);
     },
 
     // Assignments

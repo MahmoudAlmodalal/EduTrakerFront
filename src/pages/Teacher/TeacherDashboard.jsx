@@ -9,17 +9,22 @@ import {
     UserCheck,
     Search,
     ChevronRight,
-    Loader2,
     TrendingUp,
     Users,
     GraduationCap,
-    ArrowUpRight
+    ArrowUpRight,
+    AlertCircle
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import teacherService from '../../services/teacherService';
-import secretaryService from '../../services/secretaryService';
 import notificationService from '../../services/notificationService';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Skeleton Component for Loading States
+const Skeleton = ({ className }) => (
+    <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
+);
 
 const TeacherDashboard = () => {
     const navigate = useNavigate();
@@ -31,35 +36,44 @@ const TeacherDashboard = () => {
     const [stats, setStats] = useState({
         avgAttendance: '0%',
         pendingAssignments: 0,
-        totalToGrade: 0
+        totalToGrade: 0,
+        activeStudents: 0
     });
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
                 setLoading(true);
-                const [notifData, statsResponse] = await Promise.all([
+                setError(null);
+
+                // Parallel data fetching
+                const [notifData, statsResponse, scheduleData] = await Promise.all([
                     notificationService.getNotifications({ page_size: 5 }),
-                    secretaryService.getDashboardStats()
+                    teacherService.getDashboardStats(),
+                    teacherService.getSchedule(new Date().toISOString().split('T')[0])
                 ]);
 
+                // Process Notifications
                 setNotifications(notifData.results || notifData || []);
 
+                // Process Stats
                 if (statsResponse && statsResponse.statistics) {
                     const s = statsResponse.statistics;
                     setStats({
                         avgAttendance: s.average_attendance ? `${Math.round(s.average_attendance)}%` : '0%',
                         pendingAssignments: s.pending_assignments_count || 0,
-                        totalToGrade: s.total_submissions_to_grade || 0
+                        totalToGrade: s.total_submissions_to_grade || 0,
+                        activeStudents: s.total_students || 0
                     });
                 }
 
-                const date = new Date().toISOString().split('T')[0];
-                const scheduleData = await teacherService.getSchedule(date);
-                setSchedule(scheduleData.results || scheduleData || []);
+                // Process Schedule
+                setSchedule(scheduleData || []);
 
-            } catch (error) {
-                console.error("Error fetching dashboard data:", error);
+            } catch (err) {
+                console.error("Error fetching dashboard data:", err);
+                setError("Failed to load dashboard data. Please try again later.");
             } finally {
                 setLoading(false);
             }
@@ -68,22 +82,56 @@ const TeacherDashboard = () => {
         fetchDashboardData();
     }, []);
 
-    if (loading) {
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { y: 20, opacity: 0 },
+        visible: {
+            y: 0,
+            opacity: 1,
+            transition: {
+                type: "spring",
+                stiffness: 100
+            }
+        }
+    };
+
+    if (error) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-                <Loader2 className="animate-spin text-indigo-600" size={40} />
-                <p className="text-gray-500 font-medium animate-pulse">Loading dashboard...</p>
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-center px-4">
+                <div className="bg-red-50 p-4 rounded-full">
+                    <AlertCircle className="text-red-500" size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Something went wrong</h3>
+                <p className="text-gray-500 max-w-md">{error}</p>
+                <button
+                    onClick={() => window.location.reload()}
+                    className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                    Retry
+                </button>
             </div>
         );
     }
 
-    const StatCard = ({ label, value, subValue, icon: Icon, colorClass }) => (
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+    const StatCard = ({ label, value, subValue, icon: Icon, colorClass, loading }) => (
+        <motion.div
+            variants={itemVariants}
+            className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+        >
             <div className="flex justify-between items-start mb-4">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass} group-hover:scale-110 transition-transform`}>
                     <Icon size={20} />
                 </div>
-                {subValue && (
+                {subValue && !loading && (
                     <span className="text-[10px] font-bold uppercase py-1 px-2 rounded-full bg-indigo-50 text-indigo-600">
                         {subValue}
                     </span>
@@ -91,13 +139,20 @@ const TeacherDashboard = () => {
             </div>
             <div>
                 <p className="text-gray-500 text-sm font-medium">{label}</p>
-                <h3 className="text-3xl font-bold text-gray-900 mt-1">{value}</h3>
+                {loading ? (
+                    <Skeleton className="h-8 w-16 mt-2" />
+                ) : (
+                    <h3 className="text-3xl font-bold text-gray-900 mt-1">{value}</h3>
+                )}
             </div>
-        </div>
+        </motion.div>
     );
 
     const QuickAction = ({ label, sub, icon: Icon, onClick, colorClass, iconColor }) => (
-        <button
+        <motion.button
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={onClick}
             className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all text-left w-full group"
         >
@@ -109,11 +164,16 @@ const TeacherDashboard = () => {
                 <p className="text-xs text-gray-500 truncate">{sub}</p>
             </div>
             <ArrowUpRight size={16} className="text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-        </button>
+        </motion.button>
     );
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in overflow-hidden px-4 sm:px-6">
+        <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={containerVariants}
+            className="max-w-7xl mx-auto space-y-8 pb-12 overflow-hidden px-4 sm:px-6"
+        >
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-100 pb-8">
                 <div>
@@ -145,41 +205,118 @@ const TeacherDashboard = () => {
                 </div>
             </div>
 
-            {/* Top Stats Row */}
+            {/* Top Stats Row - Enhanced with Gradients */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    label={t('teacher.dashboard.avgAttendance')}
-                    value={stats.avgAttendance}
-                    icon={UserCheck}
-                    colorClass="bg-emerald-500 text-white"
-                    subValue="Overall"
-                />
-                <StatCard
-                    label={t('teacher.dashboard.assignmentsToGrade')}
-                    value={stats.totalToGrade}
-                    icon={FileText}
-                    colorClass="bg-amber-500 text-white"
-                    subValue={`${stats.pendingAssignments} Active`}
-                />
-                <StatCard
-                    label="Current Classes"
-                    value={schedule.length}
-                    icon={GraduationCap}
-                    colorClass="bg-indigo-600 text-white"
-                />
-                <StatCard
-                    label="Active Students"
-                    value="---"
-                    icon={Users}
-                    colorClass="bg-sky-500 text-white"
-                />
+                <motion.div variants={itemVariants} className="relative group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                    <div className="relative bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
+                        {loading ? (
+                            <div className="space-y-3">
+                                <Skeleton className="h-4 w-24 bg-white/20" />
+                                <Skeleton className="h-8 w-16 bg-white/20" />
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                                        <UserCheck size={24} className="text-white" />
+                                    </div>
+                                    <TrendingUp size={16} className="text-white/60" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-white/80 text-xs font-bold uppercase tracking-wide">{t('teacher.dashboard.avgAttendance')}</p>
+                                    <p className="text-4xl font-black text-white">{stats.avgAttendance}%</p>
+                                    <p className="text-white/70 text-xs font-medium">Overall</p>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </motion.div>
+
+                <motion.div variants={itemVariants} className="relative group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                    <div className="relative bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
+                        {loading ? (
+                            <div className="space-y-3">
+                                <Skeleton className="h-4 w-24 bg-white/20" />
+                                <Skeleton className="h-8 w-16 bg-white/20" />
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                                        <FileText size={24} className="text-white" />
+                                    </div>
+                                    <div className="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full">
+                                        <span className="text-xs font-bold text-white">{stats.pendingAssignments}</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-white/80 text-xs font-bold uppercase tracking-wide">{t('teacher.dashboard.assignmentsToGrade')}</p>
+                                    <p className="text-4xl font-black text-white">{stats.totalToGrade}</p>
+                                    <p className="text-white/70 text-xs font-medium">{stats.pendingAssignments} Active</p>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </motion.div>
+
+                <motion.div variants={itemVariants} className="relative group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                    <div className="relative bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
+                        {loading ? (
+                            <div className="space-y-3">
+                                <Skeleton className="h-4 w-24 bg-white/20" />
+                                <Skeleton className="h-8 w-16 bg-white/20" />
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                                        <GraduationCap size={24} className="text-white" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-white/80 text-xs font-bold uppercase tracking-wide">Current Classes</p>
+                                    <p className="text-4xl font-black text-white">{schedule.length}</p>
+                                    <p className="text-white/70 text-xs font-medium">Active Today</p>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </motion.div>
+
+                <motion.div variants={itemVariants} className="relative group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-sky-400 to-blue-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                    <div className="relative bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
+                        {loading ? (
+                            <div className="space-y-3">
+                                <Skeleton className="h-4 w-24 bg-white/20" />
+                                <Skeleton className="h-8 w-16 bg-white/20" />
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                                        <Users size={24} className="text-white" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-white/80 text-xs font-bold uppercase tracking-wide">Active Students</p>
+                                    <p className="text-4xl font-black text-white">{stats.activeStudents}</p>
+                                    <p className="text-white/70 text-xs font-medium">Enrolled</p>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </motion.div>
             </div>
 
             {/* Main Content & Sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Schedule Column */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden min-h-[400px]">
+                <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden min-h-[400px] hover:shadow-xl transition-shadow">
                         <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
                             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-3">
                                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -197,21 +334,27 @@ const TeacherDashboard = () => {
                         </div>
 
                         <div className="p-6">
-                            {schedule.length > 0 ? (
+                            {loading ? (
+                                <div className="space-y-4">
+                                    <Skeleton className="h-24 w-full rounded-2xl" />
+                                    <Skeleton className="h-24 w-full rounded-2xl" />
+                                    <Skeleton className="h-24 w-full rounded-2xl" />
+                                </div>
+                            ) : schedule.length > 0 ? (
                                 <div className="space-y-4">
                                     {schedule.map((slot) => (
-                                        <div key={slot.id} className={`flex items-center gap-5 p-4 rounded-2xl border transition-all ${slot.status === 'current'
-                                                ? 'bg-indigo-50/50 border-indigo-100 shadow-sm ring-1 ring-indigo-100'
-                                                : 'bg-white border-gray-100 hover:bg-gray-50'
+                                        <div key={slot.id} className={`flex items-center gap-5 p-5 rounded-2xl border transition-all group ${slot.status === 'current'
+                                            ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 shadow-md ring-2 ring-indigo-100'
+                                            : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-md'
                                             }`}>
                                             <div className="w-16 h-16 rounded-xl bg-white border border-gray-100 shadow-xs flex flex-col items-center justify-center shrink-0">
-                                                <span className="text-xs font-bold text-indigo-600">{slot.time.split(' ')[0]}</span>
+                                                <span className="text-xs font-bold text-indigo-600">{slot.time?.split(' ')[0] || 'TBD'}</span>
                                                 <Clock size={14} className="text-gray-300 mt-1" />
                                             </div>
 
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <h3 className="font-bold text-gray-900 truncate">{slot.subject}</h3>
+                                                    <h3 className="font-bold text-gray-900 truncate">{slot.subject || slot.course_name}</h3>
                                                     {slot.status === 'current' && (
                                                         <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
                                                             {t('teacher.dashboard.now')}
@@ -221,11 +364,11 @@ const TeacherDashboard = () => {
                                                 <div className="flex items-center gap-3 text-xs text-gray-500">
                                                     <span className="flex items-center gap-1">
                                                         <Users size={12} className="text-gray-400" />
-                                                        {slot.class}
+                                                        {slot.class || slot.classroom_name}
                                                     </span>
                                                     <span className="w-1 h-1 rounded-full bg-gray-300"></span>
                                                     <span className="flex items-center gap-1 uppercase tracking-tight">
-                                                        {slot.room}
+                                                        {slot.room || 'Room TBD'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -285,10 +428,10 @@ const TeacherDashboard = () => {
                             />
                         </div>
                     </div>
-                </div>
+                </motion.div>
 
                 {/* Sidebar Notification Column */}
-                <div className="space-y-6">
+                <motion.div variants={itemVariants} className="space-y-6">
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
                             <h2 className="text-md font-bold text-gray-900 flex items-center gap-2">
@@ -309,10 +452,16 @@ const TeacherDashboard = () => {
                         </div>
 
                         <div className="p-4 space-y-2">
-                            {notifications.length > 0 ? (
+                            {loading ? (
+                                <>
+                                    <Skeleton className="h-16 w-full rounded-xl" />
+                                    <Skeleton className="h-16 w-full rounded-xl" />
+                                </>
+                            ) : notifications.length > 0 ? (
                                 notifications.map((notif) => (
-                                    <div
+                                    <motion.div
                                         key={notif.id}
+                                        whileHover={{ scale: 1.02 }}
                                         onClick={async () => {
                                             if (!notif.is_read) {
                                                 try {
@@ -337,7 +486,7 @@ const TeacherDashboard = () => {
                                                 {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
-                                    </div>
+                                    </motion.div>
                                 ))
                             ) : (
                                 <div className="text-center py-10">
@@ -357,7 +506,7 @@ const TeacherDashboard = () => {
                     </div>
 
                     {/* Small Support Widget */}
-                    <div className="bg-indigo-900 rounded-2xl p-6 text-white text-center relative overflow-hidden shadow-lg">
+                    <motion.div variants={itemVariants} className="bg-indigo-900 rounded-2xl p-6 text-white text-center relative overflow-hidden shadow-lg">
                         <div className="relative z-10">
                             <h3 className="font-bold text-sm mb-2">Technical Support</h3>
                             <p className="text-indigo-200 text-[11px] mb-4">Facing issues with the dashboard? Our team is here to help.</p>
@@ -368,10 +517,10 @@ const TeacherDashboard = () => {
                         <div className="absolute top-0 right-0 p-4 opacity-10">
                             <TrendingUp size={80} />
                         </div>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
             </div>
-        </div>
+        </motion.div>
     );
 };
 

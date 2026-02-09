@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import * as Icons from 'lucide-react';
@@ -49,7 +49,7 @@ const RoleLayout = ({ role: propRole, className = '' }) => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
     const { role: authRole, config, navigation, basePath, displayName, brandIcon } = useRole();
-    const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const navigate = useNavigate();
     const currentRole = propRole || authRole;

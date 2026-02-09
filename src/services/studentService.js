@@ -3,11 +3,16 @@ import { api } from '../utils/api';
 const studentService = {
     // Get dashboard statistics
     getDashboardStats: async () => {
-        return api.get('/statistics/dashboard/');
+        try {
+            return await api.get('/statistics/dashboard/');
+        } catch (error) {
+            console.error('Error fetching dashboard stats:', error);
+            throw error;
+        }
     },
 
     // Get subjects (courses) with mapped fields
-    getSubjects: async (studentId) => {
+    getSubjects: async () => {
         try {
             const response = await studentService.getDashboardStats();
             // structure: { statistics: { courses: { courses: [...] } } }
@@ -15,21 +20,17 @@ const studentService = {
 
             return coursesData.map(course => ({
                 id: course.course_id,
+                classroom_id: course.classroom_id,
                 name: course.course_name,
                 teacher: course.teacher_name,
                 grade: course.grade_name || 'N/A',
-                progress: 75, // Mock progress for now as backend doesn't provide it
+                courseCode: course.course_code,
                 classroom: course.classroom_name
             }));
         } catch (error) {
             console.error("Error fetching subjects:", error);
             return [];
         }
-    },
-
-    // Get subject materials
-    getSubjectMaterials: async (subjectId) => {
-        return api.get(`/teacher/learning-materials/?course_id=${subjectId}`);
     },
 
     // Get student profile
@@ -43,6 +44,7 @@ const studentService = {
 
     // Get attendance history
     getAttendance: async (studentId) => {
+        // This endpoint supports IsStudent and filters by actor
         return api.get(`/teacher/attendance/?student_id=${studentId}`);
     },
 
@@ -62,7 +64,7 @@ const studentService = {
         return api.get(`/teacher/marks/?student_id=${studentId}`);
     },
 
-    // Get learning materials (generic)
+    // Get learning materials
     getLearningMaterials: async (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
         return api.get(`/teacher/learning-materials/?${queryParams}`);

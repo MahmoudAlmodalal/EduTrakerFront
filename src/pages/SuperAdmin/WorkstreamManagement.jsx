@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Settings, Edit, Trash2, MapPin, Users, School, Layers, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
@@ -124,7 +124,7 @@ const WorkstreamManagement = () => {
         setFormData({ name: '', quota: '100', managerId: '', location: '', description: '' });
     };
 
-    const handleManagerSearch = React.useCallback(async (term) => {
+    const handleManagerSearch = useCallback(async (term) => {
         try {
             const response = await workstreamService.getManagers({ search: term });
             const results = response.results || response;

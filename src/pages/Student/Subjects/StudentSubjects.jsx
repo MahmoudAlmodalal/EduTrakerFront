@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Book,
     FileText,
@@ -21,15 +21,18 @@ import '../Student.css';
 const StudentSubjects = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const [selectedSubject, setSelectedSubject] = React.useState(null);
-    const [loading, setLoading] = React.useState(true);
-    const [subjects, setSubjects] = React.useState([]);
+    const [selectedSubject, setSelectedSubject] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [subjects, setSubjects] = useState([]);
 
-    React.useEffect(() => {
+    useEffect(() => {
         const fetchSubjects = async () => {
+            if (!user) return;
+            setLoading(true);
             try {
                 const data = await studentService.getDashboardStats();
-                const courseData = data.statistics.courses.courses || [];
+                const stats = data?.statistics || data;
+                const courseData = stats?.courses?.courses || [];
 
                 // Map API courses to UI subjects
                 const mappedSubjects = courseData.map((c, index) => ({
@@ -52,8 +55,11 @@ const StudentSubjects = () => {
                 setLoading(false);
             }
         };
-        fetchSubjects();
-    }, []);
+
+        if (user) {
+            fetchSubjects();
+        }
+    }, [user]);
 
     const fetchSubjectDetails = async (subject) => {
         try {

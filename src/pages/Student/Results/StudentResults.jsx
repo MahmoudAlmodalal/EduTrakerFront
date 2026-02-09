@@ -33,12 +33,13 @@ const StudentResults = () => {
     });
 
     const fetchResults = async () => {
-        if (!user?.id) return;
+        if (!user) return;
         setLoading(true);
         setError(null);
         try {
             const data = await studentService.getDashboardStats();
-            const grades = data.statistics?.grades;
+            const stats = data?.statistics || data;
+            const grades = stats?.grades;
             if (grades) {
                 setResultsData({
                     overallAverage: grades.overall_average || 0,
@@ -57,8 +58,10 @@ const StudentResults = () => {
     };
 
     useEffect(() => {
-        fetchResults();
-    }, [user?.id]);
+        if (user) {
+            fetchResults();
+        }
+    }, [user]);
 
     const groupedResults = useMemo(() => {
         if (!resultsData.marks.length) return [];

@@ -135,7 +135,7 @@ export const translations = {
         'analytics.title': 'Analytics & Reports',
         'analytics.academic': 'Academic Performance Comparison',
         'analytics.downloads': 'Report Downloads',
-        'analytics.globalReport': 'Global Academic Report 2024',
+        'analytics.globalReport': 'Global Academic Report',
         'analytics.systemUsage': 'System Usage Q3',
         'analytics.downloadPDF': 'Download PDF',
         'analytics.downloadCSV': 'Download CSV',
