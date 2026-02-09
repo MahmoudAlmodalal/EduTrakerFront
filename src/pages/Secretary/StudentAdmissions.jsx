@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, FileText, Upload, Download, Check, X, UserPlus, Users, AlertCircle, Edit2 } from 'lucide-react';
+import { Search, Filter, FileText, Upload, Download, Check, X, UserPlus, Users, AlertCircle, Edit2, GraduationCap, Clock, CheckCircle } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import secretaryService from '../../services/secretaryService';
 import './Secretary.css';
-import '../WorkstreamManager/Workstream.css';
 
 const StudentAdmissions = () => {
     const { t } = useTheme();
@@ -42,6 +41,29 @@ const StudentAdmissions = () => {
             g?.name?.toLowerCase().includes(gradeQuery.toLowerCase())
         ), [grades, gradeQuery]
     );
+
+    // Summary stats
+    const totalStudents = applications.length;
+    const activeStudents = applications.filter(s => s.current_status === 'active' || s.is_active).length;
+    const pendingStudents = applications.filter(s => s.current_status === 'pending').length;
+    const assignedStudents = applications.filter(s => s.classroom?.classroom_name).length;
+
+    const getIconStyle = (color) => {
+        const styles = {
+            indigo: { background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4f46e5' },
+            green: { background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#059669' },
+            amber: { background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#d97706' },
+            rose: { background: 'linear-gradient(135deg, #fce7f3, #fbcfe8)', color: '#e11d48' },
+        };
+        return styles[color] || styles.indigo;
+    };
+
+    const statCards = [
+        { label: 'Total Students', value: totalStudents, icon: Users, color: 'indigo' },
+        { label: 'Active', value: activeStudents, icon: CheckCircle, color: 'green' },
+        { label: 'Pending', value: pendingStudents, icon: Clock, color: 'amber' },
+        { label: 'Assigned to Class', value: assignedStudents, icon: GraduationCap, color: 'rose' },
+    ];
 
     const handleGradeSelect = (grade) => {
         setNewStudent(prev => ({ ...prev, grade_id: grade.id.toString() }));
@@ -205,115 +227,259 @@ const StudentAdmissions = () => {
     };
 
     const renderNewApplications = () => (
-        <div className="management-card">
-            <div className="table-controls">
-                <div className="search-wrapper">
-                    <Search size={18} className="search-icon" />
-                    <input type="text" placeholder="Search students..." className="search-input" />
-                </div>
-                <select
-                    className="form-select"
-                    value={selectedAcademicYear}
-                    style={{ width: '200px' }}
-                    onChange={(e) => {
-                        const yearId = e.target.value;
-                        setSelectedAcademicYear(yearId);
-                        fetchStudentApplications(yearId);
-                    }}
-                >
-                    <option value="">All Academic Years</option>
-                    {academicYears.map(y => (
-                        <option key={y.id} value={y.id}>
-                            {y.name} {y.is_active ? '(Active)' : ''}
-                        </option>
-                    ))}
-                </select>
-                <button className="btn-primary"><Filter size={18} /> Filter</button>
+        <>
+            {/* Summary Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '28px' }}>
+                {statCards.map((stat, index) => (
+                    <div key={index} className="stat-card" style={{ padding: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <p style={{ fontSize: '13px', color: 'var(--sec-text-muted)', fontWeight: '500', marginBottom: '4px' }}>{stat.label}</p>
+                                <p style={{ fontSize: '28px', fontWeight: '700', color: 'var(--sec-text-main)', margin: 0 }}>{stat.value}</p>
+                            </div>
+                            <div style={{
+                                ...getIconStyle(stat.color),
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <stat.icon size={24} />
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
-            {loading ? <p className="p-4 text-center">Loading students...</p> : (
-                <table className="data-table">
-                    <thead><tr><th>ID</th><th>Student Name</th><th>Grade</th><th>Classroom</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody>
-                        {applications.map((student) => {
-                            const studentId = student.user_id || student.id;
-                            return (
-                                <tr key={studentId}>
-                                    <td>#{studentId}</td>
-                                    <td className="font-medium">{student.full_name || 'N/A'}</td>
-                                    <td>{student.current_grade?.name || 'N/A'}</td>
-                                    <td>{student.classroom?.classroom_name || 'N/A'}</td>
-                                    <td>
-                                        <span className={`status-badge ${student.current_status === 'active' ? 'status-active' : 'status-inactive'}`}>
-                                            {student.current_status || (student.is_active ? 'active' : 'inactive')}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="action-btn-group">
-                                            <button className="btn-icon info" title="Edit Status" onClick={() => setEditingStudent({ ...student, current_status: student.current_status || 'pending' })}><Edit2 size={18} /></button>
-                                            <button className="btn-icon info" title="View Details"><FileText size={18} /></button>
-                                        </div>
-                                    </td>
+
+            <div className="management-card">
+                {/* Filters Row */}
+                <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    padding: '20px',
+                    borderBottom: '1px solid var(--sec-border)',
+                    alignItems: 'flex-end'
+                }}>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>
+                            Search Student
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--sec-text-muted)' }} />
+                            <input type="text" placeholder="Search by name..." className="form-input" style={{ paddingLeft: '36px', width: '100%' }} />
+                        </div>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>
+                            Academic Year
+                        </label>
+                        <select
+                            className="form-select"
+                            value={selectedAcademicYear}
+                            style={{ minWidth: '180px' }}
+                            onChange={(e) => {
+                                const yearId = e.target.value;
+                                setSelectedAcademicYear(yearId);
+                                fetchStudentApplications(yearId);
+                            }}
+                        >
+                            <option value="">All Academic Years</option>
+                            {academicYears.map(y => (
+                                <option key={y.id} value={y.id}>
+                                    {y.name} {y.is_active ? '(Active)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div style={{ overflowX: 'auto' }}>
+                    {loading ? (
+                        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--sec-text-muted)' }}>
+                            <div style={{
+                                width: '36px',
+                                height: '36px',
+                                border: '3px solid var(--sec-primary)',
+                                borderTop: '3px solid transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite',
+                                margin: '0 auto 12px'
+                            }}></div>
+                            Loading students...
+                        </div>
+                    ) : (
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th style={{ width: '60px' }}>ID</th>
+                                    <th>Student Name</th>
+                                    <th>Grade</th>
+                                    <th>Classroom</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
-                            );
-                        })}
-                        {applications.length === 0 && <tr><td colSpan="6" className="text-center p-4">No students found.</td></tr>}
-                    </tbody>
-                </table>
-            )}
-        </div>
+                            </thead>
+                            <tbody>
+                                {applications.map((student) => {
+                                    const studentId = student.user_id || student.id;
+                                    const status = student.current_status || (student.is_active ? 'active' : 'inactive');
+                                    return (
+                                        <tr key={studentId}>
+                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>#{studentId}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <div style={{
+                                                        width: '32px',
+                                                        height: '32px',
+                                                        borderRadius: '8px',
+                                                        background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+                                                        color: '#4f46e5',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontWeight: '600',
+                                                        fontSize: '13px'
+                                                    }}>
+                                                        {(student.full_name || 'S').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <span style={{ fontWeight: '500', color: 'var(--sec-text-main)' }}>
+                                                        {student.full_name || 'N/A'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td style={{ color: 'var(--sec-text-main)' }}>{student.current_grade?.name || 'N/A'}</td>
+                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>{student.classroom?.classroom_name || 'Not Assigned'}</td>
+                                            <td>
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '20px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    ...(status === 'active'
+                                                        ? { background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#059669' }
+                                                        : status === 'pending'
+                                                            ? { background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#d97706' }
+                                                            : { background: 'var(--sec-border)', color: 'var(--sec-text-muted)' })
+                                                }}>
+                                                    {status === 'active' && <CheckCircle size={14} />}
+                                                    {status === 'pending' && <Clock size={14} />}
+                                                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button
+                                                        className="btn-icon"
+                                                        title="Edit Status"
+                                                        onClick={() => setEditingStudent({ ...student, current_status: student.current_status || 'pending' })}
+                                                        style={{
+                                                            background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+                                                            color: '#4f46e5',
+                                                            border: 'none',
+                                                            padding: '8px',
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        className="btn-icon"
+                                                        title="View Details"
+                                                        style={{
+                                                            background: 'var(--sec-surface)',
+                                                            color: 'var(--sec-text-muted)',
+                                                            border: '1px solid var(--sec-border)',
+                                                            padding: '8px',
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        <FileText size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {applications.length === 0 && (
+                                    <tr>
+                                        <td colSpan="6" style={{ textAlign: 'center', padding: '48px', color: 'var(--sec-text-muted)' }}>
+                                            <Users size={40} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                                            <p style={{ margin: 0 }}>No students found.</p>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
+        </>
     );
 
     const renderAddNewStudent = () => (
-        <div className="management-card max-w-3xl mx-auto p-8">
-            <h2 className="widget-header text-xl font-bold mb-6 pb-4 border-b border-gray-100">Manual Student Entry</h2>
+        <div className="management-card" style={{ maxWidth: '800px', margin: '0 auto', padding: '32px' }}>
+            <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--sec-border)' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--sec-text-main)', margin: 0 }}>Manual Student Entry</h2>
+                <p style={{ fontSize: '13px', color: 'var(--sec-text-muted)', marginTop: '4px' }}>Add a new student to your school</p>
+            </div>
             <form onSubmit={handleCreateStudent}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="form-group">
-                        <label className="form-label">First Name *</label>
-                        <input type="text" className="form-input" placeholder="e.g. John" value={newStudent.first_name} onChange={(e) => setNewStudent({ ...newStudent, first_name: e.target.value })} required />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>First Name *</label>
+                        <input type="text" className="form-input" placeholder="e.g. John" value={newStudent.first_name} onChange={(e) => setNewStudent({ ...newStudent, first_name: e.target.value })} required style={{ width: '100%' }} />
                     </div>
-                    <div className="form-group">
-                        <label className="form-label">Last Name *</label>
-                        <input type="text" className="form-input" placeholder="e.g. Doe" value={newStudent.last_name} onChange={(e) => setNewStudent({ ...newStudent, last_name: e.target.value })} required />
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Last Name *</label>
+                        <input type="text" className="form-input" placeholder="e.g. Doe" value={newStudent.last_name} onChange={(e) => setNewStudent({ ...newStudent, last_name: e.target.value })} required style={{ width: '100%' }} />
                     </div>
-                    <div className="form-group">
-                        <label className="form-label">Email *</label>
-                        <input type="email" className="form-input" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })} required />
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Email *</label>
+                        <input type="email" className="form-input" placeholder="student@example.com" value={newStudent.email} onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })} required style={{ width: '100%' }} />
                     </div>
-                    <div className="form-group">
-                        <label className="form-label">Password</label>
-                        <input type="text" className="form-input" placeholder="Default: Student@123" value={newStudent.password} onChange={(e) => setNewStudent({ ...newStudent, password: e.target.value })} />
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Password</label>
+                        <input type="text" className="form-input" placeholder="Default: Student@123" value={newStudent.password} onChange={(e) => setNewStudent({ ...newStudent, password: e.target.value })} style={{ width: '100%' }} />
                     </div>
-                    <div className="form-group">
-                        <label className="form-label">Date of Birth *</label>
-                        <input type="date" className="form-input" value={newStudent.date_of_birth} onChange={(e) => setNewStudent({ ...newStudent, date_of_birth: e.target.value })} required />
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Date of Birth *</label>
+                        <input type="date" className="form-input" value={newStudent.date_of_birth} onChange={(e) => setNewStudent({ ...newStudent, date_of_birth: e.target.value })} required style={{ width: '100%' }} />
                     </div>
-                    <div className="form-group" style={{ position: 'relative' }}>
-                        <label className="form-label">Grade *</label>
+                    <div style={{ position: 'relative' }}>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Grade *</label>
                         <input type="text" className="form-input" placeholder="Search and select grade..." value={gradeQuery}
                             onChange={(e) => { setGradeQuery(e.target.value); setShowGradeDropdown(true); }}
                             onFocus={() => setShowGradeDropdown(true)}
                             onBlur={() => setTimeout(() => setShowGradeDropdown(false), 200)}
                             required={!newStudent.grade_id}
+                            style={{ width: '100%' }}
                         />
                         {showGradeDropdown && filteredGrades.length > 0 && (
-                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--sec-surface)', border: '1px solid var(--sec-border)', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                                 {filteredGrades.map(grade => (
                                     <div key={grade.id} onMouseDown={() => handleGradeSelect(grade)}
-                                        style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', background: newStudent.grade_id === grade.id.toString() ? '#eff6ff' : 'white' }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb'; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.background = newStudent.grade_id === grade.id.toString() ? '#eff6ff' : 'white'; }}
+                                        style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--sec-border)', background: newStudent.grade_id === grade.id.toString() ? 'rgba(79, 70, 229, 0.1)' : 'var(--sec-surface)', color: 'var(--sec-text-main)' }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sec-surface-hover, rgba(0,0,0,0.02))'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.background = newStudent.grade_id === grade.id.toString() ? 'rgba(79, 70, 229, 0.1)' : 'var(--sec-surface)'; }}
                                     >{grade.name}</div>
                                 ))}
                             </div>
                         )}
                         {showGradeDropdown && filteredGrades.length === 0 && gradeQuery && (
-                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px', color: '#9ca3af', textAlign: 'center' }}>No grades found</div>
+                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--sec-surface)', border: '1px solid var(--sec-border)', borderRadius: '8px', padding: '12px', color: 'var(--sec-text-muted)', textAlign: 'center' }}>No grades found</div>
                         )}
                     </div>
                 </div>
-                <div className="flex justify-end gap-4 mt-8">
-                    <button type="button" className="btn-secondary bg-white border border-gray-300" onClick={() => setActiveTab('applications')}>Cancel</button>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px', paddingTop: '20px', borderTop: '1px solid var(--sec-border)' }}>
+                    <button type="button" className="btn-secondary" onClick={() => setActiveTab('applications')} style={{ background: 'var(--sec-surface)', border: '1px solid var(--sec-border)', color: 'var(--sec-text-main)' }}>Cancel</button>
                     <button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Saving...' : 'Save Student Record'}</button>
                 </div>
             </form>
@@ -321,42 +487,102 @@ const StudentAdmissions = () => {
     );
 
     const renderManageFiles = () => (
-        <div className="file-management-grid">
-            <div className="upload-card">
-                <h3 className="font-bold mb-4">Upload Documents</h3>
-                <div className="file-upload-area">
-                    <Upload size={32} className="file-upload-icon" />
-                    <p className="text-sm font-medium text-gray-700">Click to upload or drag and drop</p>
-                    <p className="text-xs text-gray-500 mt-1">PDF, JPG up to 10MB</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+            <div className="management-card" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sec-text-main)', marginBottom: '20px' }}>Upload Documents</h3>
+                <div style={{
+                    border: '2px dashed var(--sec-border)',
+                    borderRadius: '12px',
+                    padding: '32px',
+                    textAlign: 'center',
+                    marginBottom: '20px',
+                    background: 'var(--sec-surface)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                }}>
+                    <div style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+                        color: '#4f46e5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 12px'
+                    }}>
+                        <Upload size={28} />
+                    </div>
+                    <p style={{ fontSize: '14px', fontWeight: '500', color: 'var(--sec-text-main)', marginBottom: '4px' }}>Click to upload or drag and drop</p>
+                    <p style={{ fontSize: '12px', color: 'var(--sec-text-muted)' }}>PDF, JPG up to 10MB</p>
                 </div>
-                <div className="form-group">
-                    <label className="form-label">Assign to Student</label>
-                    <input type="text" className="form-input" placeholder="Search student name..." />
+                <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Assign to Student</label>
+                    <input type="text" className="form-input" placeholder="Search student name..." style={{ width: '100%' }} />
                 </div>
-                <div className="form-group">
-                    <label className="form-label">Document Type</label>
-                    <select className="form-select">
-                        <option>Birth Certificate</option><option>ID Card</option><option>Medical Record</option><option>Previous School Report</option>
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Document Type</label>
+                    <select className="form-select" style={{ width: '100%' }}>
+                        <option>Birth Certificate</option>
+                        <option>ID Card</option>
+                        <option>Medical Record</option>
+                        <option>Previous School Report</option>
                     </select>
                 </div>
-                <button className="btn-primary w-full" style={{ justifyContent: 'center' }}>Upload File</button>
+                <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Upload File</button>
             </div>
-            <div className="file-list-card">
-                <div className="table-controls">
-                    <h3 className="font-bold">Recent Uploads</h3>
-                    <div className="search-wrapper"><Search size={16} className="search-icon" /><input type="text" placeholder="Search files..." className="search-input" /></div>
+            <div className="management-card" style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sec-text-main)' }}>Recent Uploads</h3>
+                    <div style={{ position: 'relative' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--sec-text-muted)' }} />
+                        <input type="text" placeholder="Search files..." className="form-input" style={{ paddingLeft: '32px', width: '180px' }} />
+                    </div>
                 </div>
                 <table className="data-table">
-                    <thead><tr><th>File Name / Type</th><th>Student</th><th>Size</th><th>Date</th><th>Actions</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>File Type</th>
+                            <th>Student</th>
+                            <th>Size</th>
+                            <th>Date</th>
+                            <th style={{ width: '60px' }}>Actions</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         {files.map((file) => (
                             <tr key={file.id}>
-                                <td><div className="flex items-center gap-2"><FileText size={16} className="text-blue-500" /><span className="font-medium">{file.type}</span></div></td>
-                                <td>{file.student}</td><td className="text-gray-500">{file.size}</td><td className="text-gray-500">{file.date}</td>
-                                <td><button className="btn-icon"><Download size={18} /></button></td>
+                                <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <FileText size={16} style={{ color: '#4f46e5' }} />
+                                        <span style={{ fontWeight: '500', color: 'var(--sec-text-main)' }}>{file.type}</span>
+                                    </div>
+                                </td>
+                                <td style={{ color: 'var(--sec-text-main)' }}>{file.student}</td>
+                                <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>{file.size}</td>
+                                <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>{file.date}</td>
+                                <td>
+                                    <button style={{
+                                        background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)',
+                                        color: '#059669',
+                                        border: 'none',
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer'
+                                    }}>
+                                        <Download size={16} />
+                                    </button>
+                                </td>
                             </tr>
                         ))}
-                        {files.length === 0 && <tr><td colSpan="5" className="text-center p-4">No files uploaded yet.</td></tr>}
+                        {files.length === 0 && (
+                            <tr>
+                                <td colSpan="5" style={{ textAlign: 'center', padding: '48px', color: 'var(--sec-text-muted)' }}>
+                                    <FileText size={40} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                                    <p style={{ margin: 0 }}>No files uploaded yet.</p>
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -370,74 +596,157 @@ const StudentAdmissions = () => {
 
         return (
             <div className="management-card">
-                <div className="widget-header" style={{ marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                        <div>
-                            <h3 className="font-bold text-gray-800 text-lg">Class Assignment</h3>
-                            <p className="text-gray-500 text-sm">Select a student and assign them to a class.</p>
-                        </div>
-                        <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-                            <select className="form-select" value={selectedAcademicYear} style={{ width: '180px' }} onChange={(e) => setSelectedAcademicYear(e.target.value)}>
-                                <option value="">Academic Year...</option>
-                                {academicYears.map(y => <option key={y.id} value={y.id}>{y.name} {y.is_active ? '(Active)' : ''}</option>)}
-                            </select>
-                            <select className="form-select" value={selectedGradeFilter} style={{ width: '150px' }} onChange={(e) => setSelectedGradeFilter(e.target.value)}>
-                                <option value="">All Grades</option>
-                                {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                            </select>
-                            <select className="form-select" value={selectedClassroom} style={{ width: '180px' }} onChange={(e) => setSelectedClassroom(e.target.value)}>
-                                <option value="">Select Classroom...</option>
-                                {filteredClassrooms.map(c => <option key={c.id} value={c.id}>{c.classroom_name} {c.grade_name ? '(' + c.grade_name + ')' : ''}</option>)}
-                            </select>
-                            <button className={'btn-primary' + ((!selectedStudent || !selectedClassroom || !selectedAcademicYear) ? ' opacity-50 cursor-not-allowed' : '')}
-                                onClick={handleAssign} disabled={!selectedStudent || !selectedClassroom || !selectedAcademicYear}>
-                                <UserPlus size={18} style={{ marginRight: '8px' }} /> Assign Student
-                            </button>
-                        </div>
+                {/* Header with controls */}
+                <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    padding: '20px',
+                    borderBottom: '1px solid var(--sec-border)',
+                    alignItems: 'flex-end'
+                }}>
+                    <div style={{ flex: 1 }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--sec-text-main)', marginBottom: '4px' }}>Class Assignment</h3>
+                        <p style={{ fontSize: '13px', color: 'var(--sec-text-muted)', margin: 0 }}>Select a student and assign them to a class.</p>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                        <select className="form-select" value={selectedAcademicYear} style={{ minWidth: '160px' }} onChange={(e) => setSelectedAcademicYear(e.target.value)}>
+                            <option value="">Academic Year...</option>
+                            {academicYears.map(y => <option key={y.id} value={y.id}>{y.name} {y.is_active ? '(Active)' : ''}</option>)}
+                        </select>
+                        <select className="form-select" value={selectedGradeFilter} style={{ minWidth: '130px' }} onChange={(e) => setSelectedGradeFilter(e.target.value)}>
+                            <option value="">All Grades</option>
+                            {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        </select>
+                        <select className="form-select" value={selectedClassroom} style={{ minWidth: '160px' }} onChange={(e) => setSelectedClassroom(e.target.value)}>
+                            <option value="">Select Classroom...</option>
+                            {filteredClassrooms.map(c => <option key={c.id} value={c.id}>{c.classroom_name} {c.grade_name ? '(' + c.grade_name + ')' : ''}</option>)}
+                        </select>
+                        <button
+                            className="btn-primary"
+                            onClick={handleAssign}
+                            disabled={!selectedStudent || !selectedClassroom || !selectedAcademicYear}
+                            style={{ opacity: (!selectedStudent || !selectedClassroom || !selectedAcademicYear) ? 0.5 : 1 }}
+                        >
+                            <UserPlus size={18} style={{ marginRight: '8px' }} /> Assign Student
+                        </button>
                     </div>
                 </div>
 
-                {!selectedAcademicYear ? (
-                    <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                        <AlertCircle size={48} className="mx-auto mb-2 opacity-20" />
-                        <p>Please select an academic year to see classrooms and assign students.</p>
-                    </div>
-                ) : loading ? (
-                    <p className="text-center p-8">Loading students...</p>
-                ) : students.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                        <Users size={48} className="mx-auto mb-2 opacity-20" />
-                        <p>No students found.</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {students.map(student => {
-                            const studentId = (student.user_id || student.id)?.toString();
-                            const isSelected = selectedStudent === studentId;
-                            return (
-                                <div key={studentId} onClick={() => setSelectedStudent(isSelected ? '' : studentId)}
-                                    className={'student-card p-4 rounded-lg border transition-all cursor-pointer relative overflow-hidden group ' + (isSelected ? 'bg-blue-50 border-blue-500 shadow-md ring-1 ring-blue-500' : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm')}>
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className={'w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ' + (isSelected ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-500 group-hover:bg-blue-50 group-hover:text-blue-600')}>
-                                                {(student.full_name || 'S').charAt(0)}
+                {/* Content */}
+                <div style={{ padding: '20px' }}>
+                    {!selectedAcademicYear ? (
+                        <div style={{
+                            padding: '48px',
+                            textAlign: 'center',
+                            color: 'var(--sec-text-muted)',
+                            background: 'var(--sec-surface)',
+                            borderRadius: '12px',
+                            border: '2px dashed var(--sec-border)'
+                        }}>
+                            <AlertCircle size={48} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                            <p style={{ margin: 0 }}>Please select an academic year to see classrooms and assign students.</p>
+                        </div>
+                    ) : loading ? (
+                        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--sec-text-muted)' }}>
+                            <div style={{
+                                width: '36px',
+                                height: '36px',
+                                border: '3px solid var(--sec-primary)',
+                                borderTop: '3px solid transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite',
+                                margin: '0 auto 12px'
+                            }}></div>
+                            Loading students...
+                        </div>
+                    ) : students.length === 0 ? (
+                        <div style={{
+                            padding: '48px',
+                            textAlign: 'center',
+                            color: 'var(--sec-text-muted)',
+                            background: 'var(--sec-surface)',
+                            borderRadius: '12px',
+                            border: '2px dashed var(--sec-border)'
+                        }}>
+                            <Users size={48} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                            <p style={{ margin: 0 }}>No students found.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                            {students.map(student => {
+                                const studentId = (student.user_id || student.id)?.toString();
+                                const isSelected = selectedStudent === studentId;
+                                return (
+                                    <div
+                                        key={studentId}
+                                        onClick={() => setSelectedStudent(isSelected ? '' : studentId)}
+                                        style={{
+                                            padding: '16px',
+                                            borderRadius: '12px',
+                                            border: isSelected ? '2px solid #4f46e5' : '1px solid var(--sec-border)',
+                                            background: isSelected ? 'rgba(79, 70, 229, 0.05)' : 'var(--sec-surface)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            boxShadow: isSelected ? '0 4px 12px rgba(79, 70, 229, 0.15)' : 'none'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{
+                                                    width: '40px',
+                                                    height: '40px',
+                                                    borderRadius: '10px',
+                                                    background: isSelected ? 'linear-gradient(135deg, #c7d2fe, #a5b4fc)' : 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+                                                    color: '#4f46e5',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontWeight: '700',
+                                                    fontSize: '16px'
+                                                }}>
+                                                    {(student.full_name || 'S').charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <h4 style={{ fontWeight: '600', color: 'var(--sec-text-main)', margin: 0, fontSize: '14px' }}>{student.full_name}</h4>
+                                                    <p style={{ fontSize: '12px', color: 'var(--sec-text-muted)', margin: '2px 0 0' }}>{student.email}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h4 className="font-bold text-gray-800">{student.full_name}</h4>
-                                                <p className="text-xs text-gray-500">{student.email}</p>
-                                            </div>
+                                            {isSelected && (
+                                                <div style={{
+                                                    background: '#4f46e5',
+                                                    color: 'white',
+                                                    borderRadius: '50%',
+                                                    padding: '4px'
+                                                }}>
+                                                    <Check size={14} />
+                                                </div>
+                                            )}
                                         </div>
-                                        {isSelected && <div className="bg-blue-500 text-white rounded-full p-1"><Check size={14} /></div>}
+                                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                                            <span style={{
+                                                fontSize: '11px',
+                                                background: 'var(--sec-border)',
+                                                color: 'var(--sec-text-muted)',
+                                                padding: '4px 8px',
+                                                borderRadius: '6px'
+                                            }}>ID: #{studentId}</span>
+                                            {student.current_grade?.name && (
+                                                <span style={{
+                                                    fontSize: '11px',
+                                                    background: 'rgba(79, 70, 229, 0.1)',
+                                                    color: '#4f46e5',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '6px'
+                                                }}>{student.current_grade.name}</span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="mt-4 flex gap-2">
-                                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">ID: #{studentId}</span>
-                                        {student.current_grade?.name && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">{student.current_grade.name}</span>}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             </div>
         );
     };
@@ -446,25 +755,56 @@ const StudentAdmissions = () => {
         if (!editingStudent) return null;
 
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold">Edit Student Status</h3>
-                        <button onClick={() => setEditingStudent(null)} className="text-gray-500 hover:text-gray-700">
+            <div style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000
+            }}>
+                <div style={{
+                    background: 'var(--sec-surface)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    width: '100%',
+                    maxWidth: '420px',
+                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--sec-text-main)', margin: 0 }}>Edit Student Status</h3>
+                        <button
+                            onClick={() => setEditingStudent(null)}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--sec-text-muted)',
+                                cursor: 'pointer',
+                                padding: '4px'
+                            }}
+                        >
                             <X size={24} />
                         </button>
                     </div>
                     <form onSubmit={handleUpdateStudent}>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
-                            <input type="text" className="form-input bg-gray-100" value={editingStudent.full_name || ''} readOnly />
+                        <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Student Name</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                value={editingStudent.full_name || ''}
+                                readOnly
+                                style={{ width: '100%', background: 'var(--sec-border)', cursor: 'not-allowed' }}
+                            />
                         </div>
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Enrollment Status</label>
+                        <div style={{ marginBottom: '24px' }}>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>Enrollment Status</label>
                             <select
-                                className="form-select w-full"
+                                className="form-select"
                                 value={editingStudent.current_status}
                                 onChange={(e) => setEditingStudent({ ...editingStudent, current_status: e.target.value })}
+                                style={{ width: '100%' }}
                             >
                                 <option value="pending">Pending</option>
                                 <option value="active">Active</option>
@@ -475,8 +815,22 @@ const StudentAdmissions = () => {
                                 <option value="rejected">Rejected</option>
                             </select>
                         </div>
-                        <div className="flex justify-end gap-3">
-                            <button type="button" className="btn-secondary" onClick={() => setEditingStudent(null)}>Cancel</button>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <button
+                                type="button"
+                                onClick={() => setEditingStudent(null)}
+                                style={{
+                                    background: 'var(--sec-surface)',
+                                    border: '1px solid var(--sec-border)',
+                                    color: 'var(--sec-text-main)',
+                                    padding: '10px 20px',
+                                    borderRadius: '8px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Cancel
+                            </button>
                             <button type="submit" className="btn-primary" disabled={loading}>
                                 {loading ? 'Saving...' : 'Save Changes'}
                             </button>
@@ -495,13 +849,33 @@ const StudentAdmissions = () => {
             </header>
 
             {error && (
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#dc2626',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                }}>
                     <AlertCircle size={18} /> {error}
                 </div>
             )}
             {success && (
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px' }}>
-                    {success}
+                <div style={{
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    color: '#16a34a',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                }}>
+                    <CheckCircle size={18} /> {success}
                 </div>
             )}
 
@@ -527,6 +901,13 @@ const StudentAdmissions = () => {
                 {activeTab === 'files' && renderManageFiles()}
             </div>
             {renderEditModal()}
+
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 };
