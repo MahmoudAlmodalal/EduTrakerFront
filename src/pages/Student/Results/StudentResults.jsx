@@ -33,24 +33,32 @@ const StudentResults = () => {
     });
 
     const fetchResults = async () => {
-        if (!user) return;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
-            const data = await studentService.getDashboardStats();
-            const stats = data?.statistics || data;
+            const response = await studentService.getDashboardStats();
+            // Expected structure: { statistics: { grades: { ... } } }
+            const stats = response?.statistics || response;
             const grades = stats?.grades;
+
             if (grades) {
                 setResultsData({
                     overallAverage: grades.overall_average || 0,
                     totalAssignments: grades.total_assignments || 0,
                     gradedAssignments: grades.graded_assignments || 0,
-                    marks: grades.marks || [],
+                    marks: Array.isArray(grades.marks) ? grades.marks : [],
                     byType: grades.by_type || {}
                 });
+            } else {
+                console.warn('Grades data missing from statistics');
             }
-        } catch (error) {
-            console.error('Error fetching results:', error);
+        } catch (err) {
+            console.error('Error fetching results:', err);
             setError('Failed to load academic results. Please try again.');
         } finally {
             setLoading(false);
@@ -58,9 +66,16 @@ const StudentResults = () => {
     };
 
     useEffect(() => {
+        let mounted = true;
+
         if (user) {
             fetchResults();
+        } else {
+            // If no user after mount, stop loading
+            setLoading(false);
         }
+
+        return () => { mounted = false; };
     }, [user]);
 
     const groupedResults = useMemo(() => {
@@ -81,15 +96,15 @@ const StudentResults = () => {
                 };
             }
             groups[courseName].assessments.push({
-                title: m.title,
+                title: m.title || 'Assignment',
                 date: m.due_date ? new Date(m.due_date).toLocaleDateString() : 'N/A',
-                grade: m.score,
-                total: m.full_mark,
-                percentage: m.percentage,
-                type: m.exam_type
+                grade: m.score || 0,
+                total: m.full_mark || 0,
+                percentage: m.percentage || 0,
+                type: m.exam_type || 'Task'
             });
-            groups[courseName].totalScore += m.score;
-            groups[courseName].totalFullMark += m.full_mark;
+            groups[courseName].totalScore += (Number(m.score) || 0);
+            groups[courseName].totalFullMark += (Number(m.full_mark) || 0);
         });
 
         return Object.values(groups).map(group => {
