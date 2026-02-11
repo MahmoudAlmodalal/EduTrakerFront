@@ -6,11 +6,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import secretaryService from '../../services/secretaryService';
 import notificationService from '../../services/notificationService';
-import { api } from '../../utils/api';
 
 const SecretaryCommunication = () => {
     const { t } = useTheme();
-    const { showSuccess, showError, showWarning, showInfo } = useToast();
+    const { showSuccess, showError } = useToast();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState('internal');
     const [selectedMessage, setSelectedMessage] = useState(null);
@@ -27,20 +26,15 @@ const SecretaryCommunication = () => {
         try {
             setLoading(true);
             const [msgsRes, notifsRes] = await Promise.all([
-                api.get('/user-messages/'),
+                secretaryService.getMessages(),
                 notificationService.getNotifications()
             ]);
 
             const rawMessages = msgsRes.results || msgsRes;
-            console.log('=== DEBUG: Fetched Messages ===');
-            console.log('Raw messages:', rawMessages);
-            console.log('First message sample:', rawMessages[0]);
 
             const mappedMsgs = rawMessages.map(m => {
                 const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
                 const isSentByMe = m.sender?.id === user?.id;
-
-                console.log(`Message ${m.id}: sender=${m.sender?.id}, isSentByMe=${isSentByMe}`);
 
                 return {
                     ...m,
@@ -66,6 +60,8 @@ const SecretaryCommunication = () => {
 
     useEffect(() => {
         fetchData();
+        // Deliberately refetch when tab/user changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, activeTab]); // Added user to dependencies
 
     const [threadMessages, setThreadMessages] = useState([]);
@@ -76,8 +72,7 @@ const SecretaryCommunication = () => {
         setLoadingThread(true);
         setThreadMessages([]);
         try {
-            // Use shared API client so auth headers & base URL are consistent
-            const data = await api.get(`/user-messages/threads/${msg.thread_id}/`);
+            const data = await secretaryService.getMessageThread(msg.thread_id);
             setThreadMessages(data.results || data);
 
             const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
@@ -118,12 +113,6 @@ const SecretaryCommunication = () => {
     const handleSendMessage = async () => {
         if (!newMessage || !selectedMessage) return;
 
-        console.log('=== DEBUG: Sending Reply ===');
-        console.log('Selected Message:', selectedMessage);
-        console.log('User ID:', user?.id);
-        console.log('Sender ID:', selectedMessage.sender?.id);
-        console.log('Receipts:', selectedMessage.receipts);
-
         try {
             let targetRecipientId = null;
 
@@ -131,11 +120,9 @@ const SecretaryCommunication = () => {
             if (selectedMessage.sender?.id === user?.id) {
                 // User is the sender - reply to the first recipient
                 const receipts = selectedMessage.receipts || [];
-                console.log('User is sender, receipts array:', receipts);
 
                 if (receipts.length > 0 && receipts[0]?.recipient?.id) {
                     targetRecipientId = receipts[0].recipient.id;
-                    console.log('Target recipient ID from receipts:', targetRecipientId);
                 } else {
                     showError('Could not determine recipient for reply. This message has no recipients.');
                     console.error('FAILED: No recipients found in receipts array');
@@ -144,10 +131,8 @@ const SecretaryCommunication = () => {
                 }
             } else {
                 // User is the recipient - reply to the sender
-                console.log('User is recipient, replying to sender');
                 if (selectedMessage.sender?.id) {
                     targetRecipientId = selectedMessage.sender.id;
-                    console.log('Target recipient ID (sender):', targetRecipientId);
                 } else {
                     showError('Could not determine sender for reply. Sender information is missing.');
                     console.error('FAILED: No sender found');
@@ -156,8 +141,7 @@ const SecretaryCommunication = () => {
                 }
             }
 
-            console.log('Sending message to recipient:', targetRecipientId);
-            const response = await secretaryService.sendMessage({
+            await secretaryService.sendMessage({
                 recipient_ids: [targetRecipientId],
                 body: newMessage,
                 subject: `Re: ${selectedMessage.subject}`,
@@ -165,20 +149,16 @@ const SecretaryCommunication = () => {
                 parent_message: selectedMessage.id
             });
 
-            console.log('Message sent successfully, response:', response);
             setNewMessage('');
             showSuccess('Message sent successfully!');
 
             // Refresh thread
-            const threadData = await api.get(`/user-messages/threads/${selectedMessage.thread_id}/`);
+            const threadData = await secretaryService.getMessageThread(selectedMessage.thread_id);
             setThreadMessages(threadData.results || threadData);
 
             await fetchData();
         } catch (error) {
-            console.error('=== ERROR Sending Message ===');
-            console.error('Error object:', error);
-            console.error('Error response:', error.response);
-            console.error('Error response data:', error.response?.data);
+            console.error('Error sending message:', error);
             showError('Error sending message: ' + (error.response?.data?.detail || error.message));
         }
     };

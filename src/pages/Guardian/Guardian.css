@@ -23,6 +23,15 @@
     height: 100vh;
     z-index: var(--z-fixed);
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.02);
+    transition: transform 0.3s ease-in-out;
+}
+
+.guardian-sidebar.closed {
+    transform: translateX(-100%);
+}
+
+[dir="rtl"] .guardian-sidebar.closed {
+    transform: translateX(100%);
 }
 
 [dir="rtl"] .guardian-sidebar {
@@ -97,9 +106,18 @@
     margin-left: 280px;
     padding: var(--spacing-8);
     background-image:
-        radial-gradient(circle at top right, rgba(79, 70, 229, 0.03), transparent 40%),
         radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.03), transparent 40%);
+    transition: margin-left 0.3s ease-in-out, margin-right 0.3s ease-in-out;
 }
+
+.guardian-main.sidebar-closed {
+    margin-left: 0;
+}
+
+[dir="rtl"] .guardian-main.sidebar-closed {
+    margin-right: 0;
+}
+
 
 [dir="rtl"] .guardian-main {
     margin-left: 0;
@@ -107,9 +125,112 @@
 }
 
 @media (max-width: 1024px) {
-    .guardian-main {
-        padding: var(--spacing-6);
+    .guardian-sidebar {
+        transform: translateX(-100%);
     }
+
+    [dir="rtl"] .guardian-sidebar {
+        transform: translateX(100%);
+    }
+
+    .guardian-sidebar.open {
+        transform: translateX(0);
+    }
+
+    .guardian-main {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: var(--spacing-4);
+    }
+}
+
+/* Sidebar Trigger Button */
+.guardian-trigger-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-2);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-right: var(--spacing-3);
+    box-shadow: var(--shadow-sm);
+}
+
+.guardian-trigger-btn:hover {
+    background: var(--color-bg-surface);
+    color: var(--color-primary);
+}
+
+[dir="rtl"] .guardian-trigger-btn {
+    margin-right: 0;
+    margin-left: var(--spacing-3);
+}
+
+/* Close Button in Sidebar */
+.guardian-sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Hidden on desktop by default unless we want it there */
+    position: absolute;
+    top: var(--spacing-4);
+    right: var(--spacing-4);
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: var(--spacing-1);
+    border-radius: var(--radius-md);
+}
+
+.guardian-sidebar-close-btn:hover {
+    background: var(--color-bg-body);
+    color: var(--color-text-main);
+}
+
+[dir="rtl"] .guardian-sidebar-close-btn {
+    right: auto;
+    left: var(--spacing-4);
+}
+
+@media (max-width: 1024px) {
+    .guardian-sidebar-close-btn {
+        display: block;
+    }
+}
+
+/* Mobile Overlay */
+.guardian-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: calc(var(--z-fixed) - 1);
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Header with Trigger */
+.guardian-header-actions {
+    display: flex;
+    align-items: center;
+    margin-bottom: var(--spacing-6);
 }
 
 .guardian-page-title {

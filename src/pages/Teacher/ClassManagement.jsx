@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Users, UserCheck, AlertTriangle, Check, Search, Filter, Loader2, Save, MoreHorizontal, FileText, ChevronDown } from 'lucide-react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Users, UserCheck, AlertTriangle, Check, Search, Filter, Loader2, Save, ChevronDown } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import teacherService from '../../services/teacherService';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
+import {
+    useRecordBulkAttendanceMutation,
+    useTeacherAllocations,
+    useTeacherAttendance,
+    useTeacherStudents
+} from '../../hooks/useTeacherQueries';
+import { teacherContainerVariants, teacherItemVariants } from '../../utils/animations';
+import { toList, todayIsoDate } from '../../utils/helpers';
 
 // Skeleton Component
 const Skeleton = ({ className }) => (
@@ -13,188 +20,173 @@ const Skeleton = ({ className }) => (
 const ClassManagement = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const [loadingAllocations, setLoadingAllocations] = useState(true);
-    const [loadingStudents, setLoadingStudents] = useState(false);
-
-    // Data States
-    const [allocations, setAllocations] = useState([]);
-    const [students, setStudents] = useState([]);
+    const schoolId = useMemo(
+        () => user?.school_id ?? (typeof user?.school === 'number' ? user.school : null),
+        [user?.school, user?.school_id]
+    );
+    const [attendanceOverrides, setAttendanceOverrides] = useState({});
+    const [behaviorOverrides, setBehaviorOverrides] = useState({});
 
     // Selection States
     const [selectedAllocationId, setSelectedAllocationId] = useState('');
-    const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [attendanceDate, setAttendanceDate] = useState(todayIsoDate());
     const [searchQuery, setSearchQuery] = useState('');
     const [attendanceFilter, setAttendanceFilter] = useState('all');
 
-    // UI States
-    const [saving, setSaving] = useState(false);
+    const {
+        data: allocationsData,
+        isLoading: loadingAllocations
+    } = useTeacherAllocations(todayIsoDate());
 
-    // Initial Load - Get Classes
-    useEffect(() => {
-        const fetchAllocations = async () => {
-            try {
-                setLoadingAllocations(true);
-                // Fetch teacher's schedule. Use current date to get active allocations via schedule.
-                // Ideally we want ALL active allocations, but schedule endpoint returns active ones for the teacher.
-                // Let's pass a date to satisfy the backend param requirement.
-                const allocationsData = await teacherService.getSchedule(attendanceDate);
-                const uniqueAllocations = [];
-                const seenIds = new Set();
+    const allocations = useMemo(() => toList(allocationsData), [allocationsData]);
+    const effectiveAllocationId = selectedAllocationId || allocations[0]?.id?.toString() || '';
 
-                // Dedup allocations if multiple days return same course/class combo
-                // Actually the backend returns CourseAllocation objects. 
-                // We should distinct by class_room_id and course_id potentially, 
-                // but for now let's use the allocation ID as the unique key for the dropdown.
-                (allocationsData.results || allocationsData || []).forEach(alloc => {
-                    if (!seenIds.has(alloc.id)) {
-                        seenIds.add(alloc.id);
-                        uniqueAllocations.push(alloc);
-                    }
-                });
+    const selectedAllocation = useMemo(
+        () => allocations.find((item) => item.id.toString() === effectiveAllocationId),
+        [allocations, effectiveAllocationId]
+    );
 
-                setAllocations(uniqueAllocations);
-
-                if (uniqueAllocations.length > 0 && !selectedAllocationId) {
-                    setSelectedAllocationId(uniqueAllocations[0].id.toString());
-                }
-            } catch (error) {
-                console.error("Error fetching class data:", error);
-            } finally {
-                setLoadingAllocations(false);
-            }
-        };
-
-        fetchAllocations();
-    }, [user.school_id]); // removed attendanceDate dependence for allocation fetch to avoid re-fetching list on date change
-
-    // Fetch Students when Class Details Change
-    useEffect(() => {
-        const fetchStudentsForClass = async () => {
-            if (!selectedAllocationId) return;
-
-            try {
-                setLoadingStudents(true);
-                const selectedAlloc = allocations.find(a => a.id.toString() === selectedAllocationId);
-
-                if (!selectedAlloc) {
-                    setLoadingStudents(false);
-                    return;
-                }
-
-                // 1. Fetch students enrolled in this classroom
-                // Using class_room_id from the allocation
-                const studentsData = await teacherService.getStudents({
-                    classroom_id: selectedAlloc.class_room_id,
-                    school_id: user.school_id,
-                    current_status: 'active',
-                    page_size: 100 // Fetch larger batch for class list
-                });
-
-                const studentList = studentsData.results || studentsData || [];
-
-                // 2. Fetch current attendance for this allocation/date to pre-fill
-                // Note: The attendance endpoint filters are not fully standardized in my verified list
-                // but usually it is GET /attendance/?course_allocation_id=X&date=Y
-                const currentAttendance = await teacherService.getAttendance({
-                    course_allocation_id: selectedAllocationId,
-                    date: attendanceDate
-                });
-
-                const attendanceMap = {};
-                (currentAttendance.results || currentAttendance || []).forEach(record => {
-                    attendanceMap[record.student_id] = {
-                        status: record.status ? (record.status.charAt(0).toUpperCase() + record.status.slice(1)) : 'Present', // Defaulting normalization
-                        id: record.id
-                    };
-                });
-
-                setStudents(studentList.map(s => ({
-                    ...s,
-                    attendance_status: attendanceMap[s.user_id]?.status || null,
-                    attendance_record_id: attendanceMap[s.user_id]?.id || null,
-                    behavior: null // Reset local behavior state on fetch
-                })));
-            } catch (error) {
-                console.error("Error fetching students:", error);
-            } finally {
-                setLoadingStudents(false);
-            }
-        };
-
-        if (selectedAllocationId) {
-            fetchStudentsForClass();
+    const studentFilters = useMemo(() => {
+        if (!selectedAllocation?.class_room_id) {
+            return null;
         }
-    }, [selectedAllocationId, attendanceDate, allocations.length]); // Dependencies
 
-    const handleAttendanceStatus = (studentId, status) => {
-        setStudents(prev => prev.map(s => s.user_id === studentId ? { ...s, attendance_status: status } : s));
-    };
+        const filters = {
+            classroom_id: selectedAllocation.class_room_id,
+            current_status: 'active',
+            page_size: 100
+        };
 
-    const handleSaveAttendance = async () => {
-        if (!selectedAllocationId) return;
+        if (schoolId) {
+            filters.school_id = schoolId;
+        }
+
+        return filters;
+    }, [schoolId, selectedAllocation]);
+
+    const {
+        data: studentsData,
+        isLoading: loadingStudentsList
+    } = useTeacherStudents(studentFilters || {}, {
+        enabled: Boolean(studentFilters)
+    });
+
+    const {
+        data: attendanceData,
+        isLoading: loadingAttendance
+    } = useTeacherAttendance(effectiveAllocationId, attendanceDate, {
+        enabled: Boolean(effectiveAllocationId && attendanceDate)
+    });
+
+    const saveAttendanceMutation = useRecordBulkAttendanceMutation();
+
+    const loadingStudents = loadingStudentsList || loadingAttendance;
+    const saving = saveAttendanceMutation.isPending;
+
+    const baseStudents = useMemo(() => toList(studentsData), [studentsData]);
+    const attendanceMap = useMemo(() => {
+        const map = {};
+        toList(attendanceData).forEach((record) => {
+            const normalizedStatus = record.status
+                ? `${record.status.charAt(0).toUpperCase()}${record.status.slice(1)}`
+                : 'Present';
+
+            map[record.student_id] = {
+                status: normalizedStatus,
+                id: record.id
+            };
+        });
+        return map;
+    }, [attendanceData]);
+
+    const overrideKey = useMemo(
+        () => `${effectiveAllocationId || 'none'}:${attendanceDate}`,
+        [effectiveAllocationId, attendanceDate]
+    );
+    const currentAttendanceOverrides = useMemo(
+        () => attendanceOverrides[overrideKey] || {},
+        [attendanceOverrides, overrideKey]
+    );
+    const currentBehaviorOverrides = useMemo(
+        () => behaviorOverrides[overrideKey] || {},
+        [behaviorOverrides, overrideKey]
+    );
+
+    const students = useMemo(() => baseStudents.map((student) => {
+            const studentId = student.user_id || student.id;
+            return {
+                ...student,
+                user_id: studentId,
+                attendance_status: currentAttendanceOverrides[studentId] ?? attendanceMap[studentId]?.status ?? null,
+                attendance_record_id: attendanceMap[studentId]?.id || null,
+                behavior: currentBehaviorOverrides[studentId] || null
+            };
+    }), [attendanceMap, baseStudents, currentAttendanceOverrides, currentBehaviorOverrides]);
+
+    const handleAttendanceStatus = useCallback((studentId, status) => {
+        setAttendanceOverrides((prev) => ({
+            ...prev,
+            [overrideKey]: {
+                ...(prev[overrideKey] || {}),
+                [studentId]: status
+            }
+        }));
+    }, [overrideKey]);
+
+    const handleSaveAttendance = useCallback(async () => {
+        if (!effectiveAllocationId) return;
 
         try {
-            setSaving(true);
             const attendanceRecords = students
                 .filter(s => s.attendance_status)
                 .map(s => ({
                     student_id: s.user_id,
                     status: s.attendance_status.toLowerCase(),
                     date: attendanceDate,
-                    course_allocation_id: parseInt(selectedAllocationId)
+                    course_allocation_id: parseInt(effectiveAllocationId, 10)
                 }));
 
             if (attendanceRecords.length === 0) {
-                // Keep notification simple for now
                 alert('No attendance marked yet.');
-                setSaving(false);
                 return;
             }
 
-            // Using Promise.all for now - ideally backend supports bulk create
-            await Promise.all(attendanceRecords.map(record => teacherService.recordAttendance(record)));
-
-            // Allow UI to reflect success properly
+            await saveAttendanceMutation.mutateAsync(attendanceRecords);
+            setAttendanceOverrides((prev) => ({
+                ...prev,
+                [overrideKey]: {}
+            }));
             setTimeout(() => alert('Attendance saved successfully!'), 100);
-
         } catch (error) {
             console.error("Error saving attendance:", error);
             alert("Failed to save attendance.");
-        } finally {
-            setSaving(false);
         }
-    };
+    }, [effectiveAllocationId, saveAttendanceMutation, students, attendanceDate, overrideKey]);
 
-    const handleBehavior = (studentId, type) => {
-        setStudents(prev => prev.map(s => s.user_id === studentId ? { ...s, behavior: type } : s));
-    };
+    const handleBehavior = useCallback((studentId, type) => {
+        setBehaviorOverrides((prev) => ({
+            ...prev,
+            [overrideKey]: {
+                ...(prev[overrideKey] || {}),
+                [studentId]: type
+            }
+        }));
+    }, [overrideKey]);
 
-    const filteredStudents = students.filter(s => {
+    const filteredStudents = useMemo(() => students.filter(s => {
         const matchesSearch = s.full_name?.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesFilter = attendanceFilter === 'all' ||
             (attendanceFilter === 'marked' && s.attendance_status) ||
             (attendanceFilter === 'unmarked' && !s.attendance_status) ||
             s.attendance_status === attendanceFilter;
         return matchesSearch && matchesFilter;
-    });
-
-    const selectedAllocation = allocations.find(a => a.id.toString() === selectedAllocationId);
-
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-    };
-
-    const itemVariants = {
-        hidden: { y: 20, opacity: 0 },
-        visible: { y: 0, opacity: 1 }
-    };
+    }), [students, searchQuery, attendanceFilter]);
 
     return (
-        <motion.div
+        <Motion.div
             initial="hidden"
             animate="visible"
-            variants={containerVariants}
+            variants={teacherContainerVariants}
             className="max-w-7xl mx-auto space-y-6 pb-12 px-4 sm:px-6"
         >
             {/* Header Area */}
@@ -224,7 +216,7 @@ const ClassManagement = () => {
                             <div className="px-3 py-2 text-sm text-gray-400">Loading classes...</div>
                         ) : (
                             <select
-                                value={selectedAllocationId}
+                                value={effectiveAllocationId}
                                 onChange={(e) => setSelectedAllocationId(e.target.value)}
                                 className="w-full pl-3 pr-8 py-2 text-sm font-bold text-gray-900 bg-transparent border-none focus:ring-0 cursor-pointer appearance-none"
                             >
@@ -243,7 +235,7 @@ const ClassManagement = () => {
 
             {/* Stats Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                <Motion.div variants={teacherItemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Total Students</p>
                         <p className="text-2xl font-black text-gray-900 mt-1">{loadingStudents ? "-" : students.length}</p>
@@ -251,9 +243,9 @@ const ClassManagement = () => {
                     <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                         <Users size={20} />
                     </div>
-                </motion.div>
+                </Motion.div>
 
-                <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                <Motion.div variants={teacherItemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Present</p>
                         <p className="text-2xl font-black text-emerald-600 mt-1">
@@ -263,9 +255,9 @@ const ClassManagement = () => {
                     <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                         <UserCheck size={20} />
                     </div>
-                </motion.div>
+                </Motion.div>
 
-                <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                <Motion.div variants={teacherItemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Absent</p>
                         <p className="text-2xl font-black text-rose-600 mt-1">
@@ -275,9 +267,9 @@ const ClassManagement = () => {
                     <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
                         <AlertTriangle size={20} />
                     </div>
-                </motion.div>
+                </Motion.div>
 
-                <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                <Motion.div variants={teacherItemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Late</p>
                         <p className="text-2xl font-black text-amber-600 mt-1">
@@ -287,11 +279,11 @@ const ClassManagement = () => {
                     <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                         <AlertTriangle size={20} />
                     </div>
-                </motion.div>
+                </Motion.div>
             </div>
 
             {/* Main Content Area */}
-            <motion.div variants={itemVariants} className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden min-h-[500px] flex flex-col hover:shadow-xl transition-shadow">
+            <Motion.div variants={teacherItemVariants} className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden min-h-[500px] flex flex-col hover:shadow-xl transition-shadow">
                 {/* Toolbar */}
                 <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50/30">
                     <div className="flex items-center gap-3 flex-1">
@@ -366,7 +358,7 @@ const ClassManagement = () => {
                         ))
                     ) : filteredStudents.length > 0 ? (
                         filteredStudents.map((student) => (
-                            <motion.div
+                            <Motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 key={student.user_id}
@@ -445,7 +437,7 @@ const ClassManagement = () => {
                                         <AlertTriangle size={16} />
                                     </button>
                                 </div>
-                            </motion.div>
+                            </Motion.div>
                         ))
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -457,8 +449,8 @@ const ClassManagement = () => {
                         </div>
                     )}
                 </div>
-            </motion.div>
-        </motion.div>
+            </Motion.div>
+        </Motion.div>
     );
 };
 

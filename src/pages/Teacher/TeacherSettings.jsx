@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { User, Lock, Globe, Save, Camera, Check, AlertCircle, Shield, Moon, Sun, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import teacherService from '../../services/teacherService';
+import { useTeacherProfile, useUpdateTeacherProfileMutation } from '../../hooks/useTeacherQueries';
 import './Teacher.css';
 
 const TeacherSettings = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('general');
-    const [loading, setLoading] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
 
@@ -24,26 +23,28 @@ const TeacherSettings = () => {
         specialization: ''
     });
 
+    const {
+        data: profileData,
+        isLoading: loading
+    } = useTeacherProfile(user.user_id, {
+        enabled: Boolean(user?.user_id)
+    });
+
+    const updateProfileMutation = useUpdateTeacherProfileMutation();
+
     useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                setLoading(true);
-                const data = await teacherService.getProfile(user.user_id);
-                setProfile({
-                    name: data.user_name || data.user?.full_name || '',
-                    email: data.user_email || data.user?.email || '',
-                    phone: data.phone_number || '',
-                    bio: data.bio || '',
-                    specialization: data.specialization || ''
-                });
-            } catch (error) {
-                console.error("Error fetching teacher profile:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchProfile();
-    }, [user.user_id]);
+        if (!profileData) {
+            return;
+        }
+
+        setProfile({
+            name: profileData.user_name || profileData.user?.full_name || '',
+            email: profileData.user_email || profileData.user?.email || '',
+            phone: profileData.phone_number || '',
+            bio: profileData.bio || '',
+            specialization: profileData.specialization || ''
+        });
+    }, [profileData]);
 
     // Security State
     const [security, setSecurity] = useState({
@@ -57,10 +58,13 @@ const TeacherSettings = () => {
         setIsLoading(true);
         try {
             if (section === 'Profile') {
-                await teacherService.updateProfile(user.user_id, {
+                await updateProfileMutation.mutateAsync({
+                    userId: user.user_id,
+                    payload: {
                     bio: profile.bio,
                     specialization: profile.specialization
                     // Other fields might be read-only or handled differently in backend
+                    }
                 });
             }
             setSuccessMessage(`${section} updated successfully!`);

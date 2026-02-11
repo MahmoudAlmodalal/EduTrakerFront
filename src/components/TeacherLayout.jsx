@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import {
     LayoutDashboard,
     Users,
@@ -17,9 +17,17 @@ import '../pages/Teacher/Teacher.css';
 
 const TeacherLayout = () => {
     const { t } = useTheme();
-    const { logout } = useAuth();
-    const navigate = useNavigate();
+    const { logout, user } = useAuth();
     const [isSidebarOpen, setSidebarOpen] = useState(true);
+
+    const fullName = user?.full_name || user?.displayName || user?.username || 'Teacher';
+    const email = user?.email || 'No email';
+    const initials = fullName
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('') || 'T';
 
     const toggleSidebar = () => {
         setSidebarOpen(!isSidebarOpen);
@@ -95,11 +103,11 @@ const TeacherLayout = () => {
 
                     <div className="teacher-profile">
                         <div className="teacher-avatar">
-                            TC
+                            {initials}
                         </div>
                         <div className="teacher-profile-info">
-                            <p className="teacher-profile-name">Mr. Teacher</p>
-                            <p className="teacher-profile-email">teacher@edutraker.com</p>
+                            <p className="teacher-profile-name">{fullName}</p>
+                            <p className="teacher-profile-email">{email}</p>
                         </div>
                     </div>
                 </div>

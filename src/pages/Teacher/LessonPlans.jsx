@@ -1,20 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { BookOpen, Plus, Calendar, Paperclip, MoreVertical, Trash2, Edit2, Save, X, Loader2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BookOpen, Plus, Calendar, Paperclip, Trash2, Edit2, Save, X, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import teacherService from '../../services/teacherService';
+import {
+    useCreateLearningMaterialMutation,
+    useCreateLessonPlanMutation,
+    useDeleteLearningMaterialMutation,
+    useDeleteLessonPlanMutation,
+    useTeacherAllocations,
+    useTeacherLearningMaterials,
+    useTeacherLessonPlans,
+    useUpdateLessonPlanMutation
+} from '../../hooks/useTeacherQueries';
+import { toList, todayIsoDate } from '../../utils/helpers';
 
 const LessonPlans = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('plans');
     const [isCreating, setIsCreating] = useState(false);
     const [editingId, setEditingId] = useState(null);
-
-    const [plans, setPlans] = useState([]);
-    const [resources, setResources] = useState([]);
-    const [allocations, setAllocations] = useState([]);
 
     const [formData, setFormData] = useState({
         title: '',
@@ -32,26 +37,31 @@ const LessonPlans = () => {
         file_size: 0
     });
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                const [plansData, materialsData, scheduleData] = await Promise.all([
-                    teacherService.getLessonPlans(),
-                    teacherService.getLearningMaterials(),
-                    teacherService.getSchedule()
-                ]);
-                setPlans(plansData.results || plansData || []);
-                setResources(materialsData.results || materialsData || []);
-                setAllocations(scheduleData.results || scheduleData || []);
-            } catch (error) {
-                console.error("Error fetching lesson plans data:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+    const {
+        data: plansData,
+        isLoading: loadingPlans
+    } = useTeacherLessonPlans();
+
+    const {
+        data: resourcesData,
+        isLoading: loadingResources
+    } = useTeacherLearningMaterials();
+
+    const {
+        data: allocationsData,
+        isLoading: loadingAllocations
+    } = useTeacherAllocations(todayIsoDate());
+
+    const createPlanMutation = useCreateLessonPlanMutation();
+    const updatePlanMutation = useUpdateLessonPlanMutation();
+    const deletePlanMutation = useDeleteLessonPlanMutation();
+    const createResourceMutation = useCreateLearningMaterialMutation();
+    const deleteResourceMutation = useDeleteLearningMaterialMutation();
+
+    const plans = useMemo(() => toList(plansData), [plansData]);
+    const resources = useMemo(() => toList(resourcesData), [resourcesData]);
+    const allocations = useMemo(() => toList(allocationsData), [allocationsData]);
+    const loading = loadingPlans || loadingResources || loadingAllocations;
 
     const handleStartCreate = () => {
         setFormData({
@@ -100,12 +110,10 @@ const LessonPlans = () => {
                 };
 
                 if (editingId) {
-                    const updated = await teacherService.updateLessonPlan(editingId, payload);
-                    setPlans(plans.map(p => p.id === editingId ? updated : p));
+                    await updatePlanMutation.mutateAsync({ id: editingId, payload });
                     alert(`Lesson Plan "${formData.title}" updated successfully!`);
                 } else {
-                    const created = await teacherService.createLessonPlan(payload);
-                    setPlans([created, ...plans]);
+                    await createPlanMutation.mutateAsync(payload);
                     alert(`Lesson Plan "${formData.title}" created successfully!`);
                 }
             } else {
@@ -119,8 +127,7 @@ const LessonPlans = () => {
                     course: parseInt(formData.course_id),
                     academic_year: parseInt(formData.academic_year_id) || 1
                 };
-                const created = await teacherService.createLearningMaterial(payload);
-                setResources([created, ...resources]);
+                await createResourceMutation.mutateAsync(payload);
                 alert(`Resource "${formData.title}" uploaded successfully!`);
             }
             setIsCreating(false);
@@ -135,11 +142,9 @@ const LessonPlans = () => {
         if (window.confirm('Are you sure you want to delete this?')) {
             try {
                 if (activeTab === 'plans') {
-                    await teacherService.deleteLessonPlan(id);
-                    setPlans(plans.filter(p => p.id !== id));
+                    await deletePlanMutation.mutateAsync(id);
                 } else {
-                    await teacherService.deleteLearningMaterial(id);
-                    setResources(resources.filter(r => r.id !== id));
+                    await deleteResourceMutation.mutateAsync(id);
                 }
             } catch (error) {
                 console.error("Error deleting item:", error);

@@ -3,6 +3,7 @@ import { Search, Filter, FileText, Upload, Download, Check, X, UserPlus, Users, 
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import secretaryService from '../../services/secretaryService';
+import { getSecretaryIconStyle } from '../../utils/secretaryHelpers';
 import './Secretary.css';
 
 const StudentAdmissions = () => {
@@ -48,16 +49,6 @@ const StudentAdmissions = () => {
     const pendingStudents = applications.filter(s => s.current_status === 'pending').length;
     const assignedStudents = applications.filter(s => s.classroom?.classroom_name).length;
 
-    const getIconStyle = (color) => {
-        const styles = {
-            indigo: { background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4f46e5' },
-            green: { background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#059669' },
-            amber: { background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#d97706' },
-            rose: { background: 'linear-gradient(135deg, #fce7f3, #fbcfe8)', color: '#e11d48' },
-        };
-        return styles[color] || styles.indigo;
-    };
-
     const statCards = [
         { label: 'Total Students', value: totalStudents, icon: Users, color: 'indigo' },
         { label: 'Active', value: activeStudents, icon: CheckCircle, color: 'green' },
@@ -84,8 +75,14 @@ const StudentAdmissions = () => {
             fetchAcademicYears();
         } else if (activeTab === 'add-student') fetchGrades();
         else if (activeTab === 'class-assignment') {
-            fetchStudents(); fetchAcademicYears(); fetchGrades();
+            if (students.length === 0) {
+                fetchStudents();
+            }
+            fetchAcademicYears();
+            fetchGrades();
         }
+        // Intentionally run when the visible tab changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab]);
 
     useEffect(() => {
@@ -102,7 +99,12 @@ const StudentAdmissions = () => {
             if (yearId) params.academic_year_id = yearId;
 
             const data = await secretaryService.getStudents(params);
-            setApplications(data.results || data || []);
+            const studentData = data.results || data || [];
+
+            setApplications(studentData);
+            if (!yearId || students.length === 0) {
+                setStudents(studentData);
+            }
         }
         catch (err) { console.error('Error fetching students:', err); }
         finally { setLoading(false); }
@@ -156,8 +158,7 @@ const StudentAdmissions = () => {
             });
             setSuccess('Student assigned to class successfully!');
             setSelectedStudent('');
-            // changing the key to force re-render or just fetching students again
-            if (activeTab === 'class-assignment') fetchStudents();
+            if (activeTab === 'class-assignment') fetchStudents(true);
         } catch (err) {
             console.error('Error assigning student:', err);
             setError(err.response?.data?.message || 'Failed to assign student to class.');
@@ -187,7 +188,11 @@ const StudentAdmissions = () => {
         }
     };
 
-    const fetchStudents = async () => {
+    const fetchStudents = async (force = false) => {
+        if (!force && students.length > 0) {
+            return;
+        }
+
         try {
             setLoading(true);
             const data = await secretaryService.getStudents({ school_id: schoolId });
@@ -238,7 +243,7 @@ const StudentAdmissions = () => {
                                 <p style={{ fontSize: '28px', fontWeight: '700', color: 'var(--sec-text-main)', margin: 0 }}>{stat.value}</p>
                             </div>
                             <div style={{
-                                ...getIconStyle(stat.color),
+                                ...getSecretaryIconStyle(stat.color),
                                 width: '48px',
                                 height: '48px',
                                 borderRadius: '12px',
@@ -902,12 +907,6 @@ const StudentAdmissions = () => {
             </div>
             {renderEditModal()}
 
-            <style>{`
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `}</style>
         </div>
     );
 };

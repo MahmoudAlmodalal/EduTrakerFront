@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Clock,
@@ -17,92 +17,105 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import teacherService from '../../services/teacherService';
-import notificationService from '../../services/notificationService';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
+import {
+    useMarkAllTeacherNotificationsRead,
+    useMarkTeacherNotificationRead,
+    useTeacherDashboardStats,
+    useTeacherNotifications,
+    useTeacherSchedule
+} from '../../hooks/useTeacherQueries';
+import { teacherContainerVariants, teacherItemVariants } from '../../utils/animations';
+import { toList, todayIsoDate } from '../../utils/helpers';
 
 // Skeleton Component for Loading States
 const Skeleton = ({ className }) => (
     <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
 );
 
+const QuickAction = ({ label, sub, icon, onClick, colorClass, iconColor }) => (
+    <Motion.button
+        variants={teacherItemVariants}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={onClick}
+        className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all text-left w-full group"
+    >
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass} ${iconColor} group-hover:scale-110 transition-transform`}>
+            {React.createElement(icon, { size: 20 })}
+        </div>
+        <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-gray-900 truncate">{label}</p>
+            <p className="text-xs text-gray-500 truncate">{sub}</p>
+        </div>
+        <ArrowUpRight size={16} className="text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+    </Motion.button>
+);
+
 const TeacherDashboard = () => {
     const navigate = useNavigate();
     const { t } = useTheme();
     const { user } = useAuth();
-    const [loading, setLoading] = useState(true);
-    const [schedule, setSchedule] = useState([]);
-    const [notifications, setNotifications] = useState([]);
-    const [stats, setStats] = useState({
-        avgAttendance: '0%',
-        pendingAssignments: 0,
-        totalToGrade: 0,
-        activeStudents: 0
-    });
-    const [error, setError] = useState(null);
+    const date = todayIsoDate();
 
-    useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                setLoading(true);
-                setError(null);
+    const {
+        data: statsData,
+        isLoading: statsLoading,
+        error: statsError,
+        refetch: refetchStats
+    } = useTeacherDashboardStats();
 
-                // Parallel data fetching
-                const [notifData, statsResponse, scheduleData] = await Promise.all([
-                    notificationService.getNotifications({ page_size: 5 }),
-                    teacherService.getDashboardStats(),
-                    teacherService.getSchedule(new Date().toISOString().split('T')[0])
-                ]);
+    const {
+        data: scheduleData,
+        isLoading: scheduleLoading,
+        error: scheduleError,
+        refetch: refetchSchedule
+    } = useTeacherSchedule(date);
 
-                // Process Notifications
-                setNotifications(notifData.results || notifData || []);
+    const {
+        data: notificationsData,
+        isLoading: notificationsLoading,
+        error: notificationsError,
+        refetch: refetchNotifications
+    } = useTeacherNotifications({ page_size: 5 });
 
-                // Process Stats
-                if (statsResponse && statsResponse.statistics) {
-                    const s = statsResponse.statistics;
-                    setStats({
-                        avgAttendance: s.average_attendance ? `${Math.round(s.average_attendance)}%` : '0%',
-                        pendingAssignments: s.pending_assignments_count || 0,
-                        totalToGrade: s.total_submissions_to_grade || 0,
-                        activeStudents: s.total_students || 0
-                    });
-                }
+    const markAllAsReadMutation = useMarkAllTeacherNotificationsRead();
+    const markAsReadMutation = useMarkTeacherNotificationRead();
 
-                // Process Schedule
-                setSchedule(scheduleData || []);
+    const schedule = useMemo(() => toList(scheduleData), [scheduleData]);
+    const notifications = useMemo(() => toList(notificationsData), [notificationsData]);
 
-            } catch (err) {
-                console.error("Error fetching dashboard data:", err);
-                setError("Failed to load dashboard data. Please try again later.");
-            } finally {
-                setLoading(false);
-            }
+    const stats = useMemo(() => {
+        const source = statsData?.statistics || {};
+        return {
+            avgAttendance: Math.round(Number(source.average_attendance || 0)),
+            pendingAssignments: source.pending_assignments_count || 0,
+            totalToGrade: source.total_submissions_to_grade || 0,
+            activeStudents: source.total_students || 0
         };
+    }, [statsData]);
 
-        fetchDashboardData();
-    }, []);
+    const loading = statsLoading || scheduleLoading || notificationsLoading;
+    const error = statsError || scheduleError || notificationsError;
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.1
-            }
+    const handleRetry = useCallback(() => {
+        refetchStats();
+        refetchSchedule();
+        refetchNotifications();
+    }, [refetchNotifications, refetchSchedule, refetchStats]);
+
+    const handleMarkAllRead = useCallback(() => {
+        markAllAsReadMutation.mutate();
+    }, [markAllAsReadMutation]);
+
+    const handleNotificationClick = useCallback(async (notif) => {
+        if (!notif.is_read) {
+            await markAsReadMutation.mutateAsync(notif.id);
         }
-    };
-
-    const itemVariants = {
-        hidden: { y: 20, opacity: 0 },
-        visible: {
-            y: 0,
-            opacity: 1,
-            transition: {
-                type: "spring",
-                stiffness: 100
-            }
+        if (notif.action_url) {
+            navigate(notif.action_url);
         }
-    };
+    }, [markAsReadMutation, navigate]);
 
     if (error) {
         return (
@@ -111,9 +124,9 @@ const TeacherDashboard = () => {
                     <AlertCircle className="text-red-500" size={32} />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Something went wrong</h3>
-                <p className="text-gray-500 max-w-md">{error}</p>
+                <p className="text-gray-500 max-w-md">{error?.message || 'Failed to load dashboard data. Please try again later.'}</p>
                 <button
-                    onClick={() => window.location.reload()}
+                    onClick={handleRetry}
                     className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
                     Retry
@@ -122,56 +135,11 @@ const TeacherDashboard = () => {
         );
     }
 
-    const StatCard = ({ label, value, subValue, icon: Icon, colorClass, loading }) => (
-        <motion.div
-            variants={itemVariants}
-            className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
-        >
-            <div className="flex justify-between items-start mb-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass} group-hover:scale-110 transition-transform`}>
-                    <Icon size={20} />
-                </div>
-                {subValue && !loading && (
-                    <span className="text-[10px] font-bold uppercase py-1 px-2 rounded-full bg-indigo-50 text-indigo-600">
-                        {subValue}
-                    </span>
-                )}
-            </div>
-            <div>
-                <p className="text-gray-500 text-sm font-medium">{label}</p>
-                {loading ? (
-                    <Skeleton className="h-8 w-16 mt-2" />
-                ) : (
-                    <h3 className="text-3xl font-bold text-gray-900 mt-1">{value}</h3>
-                )}
-            </div>
-        </motion.div>
-    );
-
-    const QuickAction = ({ label, sub, icon: Icon, onClick, colorClass, iconColor }) => (
-        <motion.button
-            variants={itemVariants}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onClick}
-            className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all text-left w-full group"
-        >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass} ${iconColor} group-hover:scale-110 transition-transform`}>
-                <Icon size={20} />
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-gray-900 truncate">{label}</p>
-                <p className="text-xs text-gray-500 truncate">{sub}</p>
-            </div>
-            <ArrowUpRight size={16} className="text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-        </motion.button>
-    );
-
     return (
-        <motion.div
+        <Motion.div
             initial="hidden"
             animate="visible"
-            variants={containerVariants}
+            variants={teacherContainerVariants}
             className="max-w-7xl mx-auto space-y-8 pb-12 overflow-hidden px-4 sm:px-6"
         >
             {/* Page Header */}
@@ -187,6 +155,13 @@ const TeacherDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/teacher/assignments/new')}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                    >
+                        <Plus size={16} />
+                        <span>{t('teacher.assessments.createAssessment') || 'Create Assessment'}</span>
+                    </button>
                     <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                         <div className="pr-4 border-r border-gray-100">
                             <p className="text-sm font-bold text-gray-900 leading-none">
@@ -207,7 +182,7 @@ const TeacherDashboard = () => {
 
             {/* Top Stats Row - Enhanced with Gradients */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <motion.div variants={itemVariants} className="relative group">
+                <Motion.div variants={teacherItemVariants} className="relative group">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
                     <div className="relative bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
                         {loading ? (
@@ -231,9 +206,9 @@ const TeacherDashboard = () => {
                             </>
                         )}
                     </div>
-                </motion.div>
+                </Motion.div>
 
-                <motion.div variants={itemVariants} className="relative group">
+                <Motion.div variants={teacherItemVariants} className="relative group">
                     <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
                     <div className="relative bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
                         {loading ? (
@@ -259,9 +234,9 @@ const TeacherDashboard = () => {
                             </>
                         )}
                     </div>
-                </motion.div>
+                </Motion.div>
 
-                <motion.div variants={itemVariants} className="relative group">
+                <Motion.div variants={teacherItemVariants} className="relative group">
                     <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
                     <div className="relative bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
                         {loading ? (
@@ -284,9 +259,9 @@ const TeacherDashboard = () => {
                             </>
                         )}
                     </div>
-                </motion.div>
+                </Motion.div>
 
-                <motion.div variants={itemVariants} className="relative group">
+                <Motion.div variants={teacherItemVariants} className="relative group">
                     <div className="absolute inset-0 bg-gradient-to-br from-sky-400 to-blue-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
                     <div className="relative bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
                         {loading ? (
@@ -309,13 +284,13 @@ const TeacherDashboard = () => {
                             </>
                         )}
                     </div>
-                </motion.div>
+                </Motion.div>
             </div>
 
             {/* Main Content & Sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Schedule Column */}
-                <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
+                <Motion.div variants={teacherItemVariants} className="lg:col-span-2 space-y-6">
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden min-h-[400px] hover:shadow-xl transition-shadow">
                         <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
                             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-3">
@@ -403,10 +378,10 @@ const TeacherDashboard = () => {
                         </h2>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <QuickAction
-                                label={t('teacher.dashboard.createAssessment')}
+                                label={t('teacher.dashboard.createAssessment') || 'Create Assessment'}
                                 sub="New Assignment"
                                 icon={Plus}
-                                onClick={() => navigate('/teacher/assessments')}
+                                onClick={() => navigate('/teacher/assignments/new')}
                                 colorClass="bg-indigo-50"
                                 iconColor="text-indigo-600"
                             />
@@ -428,10 +403,10 @@ const TeacherDashboard = () => {
                             />
                         </div>
                     </div>
-                </motion.div>
+                </Motion.div>
 
                 {/* Sidebar Notification Column */}
-                <motion.div variants={itemVariants} className="space-y-6">
+                <Motion.div variants={teacherItemVariants} className="space-y-6">
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
                             <h2 className="text-md font-bold text-gray-900 flex items-center gap-2">
@@ -439,13 +414,9 @@ const TeacherDashboard = () => {
                                 {t('teacher.dashboard.notifications')}
                             </h2>
                             <button
-                                onClick={async () => {
-                                    try {
-                                        await notificationService.markAllAsRead();
-                                        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-                                    } catch (err) { console.error('Error:', err); }
-                                }}
+                                onClick={handleMarkAllRead}
                                 className="text-[10px] font-bold text-gray-400 hover:text-indigo-600 uppercase tracking-widest transition-colors"
+                                disabled={markAllAsReadMutation.isPending}
                             >
                                 {t('teacher.dashboard.markAllRead')}
                             </button>
@@ -459,18 +430,10 @@ const TeacherDashboard = () => {
                                 </>
                             ) : notifications.length > 0 ? (
                                 notifications.map((notif) => (
-                                    <motion.div
+                                    <Motion.div
                                         key={notif.id}
                                         whileHover={{ scale: 1.02 }}
-                                        onClick={async () => {
-                                            if (!notif.is_read) {
-                                                try {
-                                                    await notificationService.markAsRead(notif.id);
-                                                    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-                                                } catch (err) { console.error('Error:', err); }
-                                            }
-                                            if (notif.action_url) navigate(notif.action_url);
-                                        }}
+                                        onClick={() => handleNotificationClick(notif)}
                                         className={`p-4 rounded-xl flex gap-4 cursor-pointer transition-all ${!notif.is_read ? 'bg-amber-50/50 border border-amber-100 shadow-xs' : 'hover:bg-gray-50 border border-transparent'
                                             }`}
                                     >
@@ -486,7 +449,7 @@ const TeacherDashboard = () => {
                                                 {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
-                                    </motion.div>
+                                    </Motion.div>
                                 ))
                             ) : (
                                 <div className="text-center py-10">
@@ -506,7 +469,7 @@ const TeacherDashboard = () => {
                     </div>
 
                     {/* Small Support Widget */}
-                    <motion.div variants={itemVariants} className="bg-indigo-900 rounded-2xl p-6 text-white text-center relative overflow-hidden shadow-lg">
+                    <Motion.div variants={teacherItemVariants} className="bg-indigo-900 rounded-2xl p-6 text-white text-center relative overflow-hidden shadow-lg">
                         <div className="relative z-10">
                             <h3 className="font-bold text-sm mb-2">Technical Support</h3>
                             <p className="text-indigo-200 text-[11px] mb-4">Facing issues with the dashboard? Our team is here to help.</p>
@@ -517,10 +480,10 @@ const TeacherDashboard = () => {
                         <div className="absolute top-0 right-0 p-4 opacity-10">
                             <TrendingUp size={80} />
                         </div>
-                    </motion.div>
-                </motion.div>
+                    </Motion.div>
+                </Motion.div>
             </div>
-        </motion.div>
+        </Motion.div>
     );
 };
 

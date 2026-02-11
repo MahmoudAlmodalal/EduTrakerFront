@@ -1,89 +1,195 @@
-import React, { useState, useEffect } from 'react';
-import {
-    Users,
-    Star,
-    Award,
-    Activity,
-    Clock,
-    Search,
-    Plus,
-    Mail,
-    UserCheck,
-    UserX,
-    Trash2,
-    Edit
-} from 'lucide-react';
+import React, { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Users, Star, Activity, Clock, Search, Plus, Mail, UserCheck, Trash2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import managerService from '../../services/managerService';
 import Modal from '../../components/ui/Modal';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import './SchoolManager.css';
 
+const DEFAULT_PASSWORD = 'Teacher@123';
+const STAR_INDICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+const normalizeList = (response) => {
+    if (Array.isArray(response?.results)) return response.results;
+    if (Array.isArray(response)) return response;
+    return [];
+};
+
+const getTeacherId = (teacher) => teacher?.user_id || teacher?.id;
+
+const getTeacherName = (teacher) => teacher?.full_name || teacher?.name || 'this teacher';
+
+const getTodayISO = () => new Date().toISOString().split('T')[0];
+
+const createInitialTeacherForm = () => ({
+    full_name: '',
+    email: '',
+    password: DEFAULT_PASSWORD,
+    specialization: '',
+    employment_status: 'full_time',
+    hire_date: getTodayISO()
+});
+
+const createInitialEvaluationForm = () => ({
+    reviewee_id: '',
+    rating_score: 5,
+    comments: ''
+});
+
+const getLoginStatus = (lastLogin) => {
+    if (!lastLogin) return { text: 'Never logged in', variant: 'never' };
+
+    const lastLoginDate = new Date(lastLogin);
+    const now = new Date();
+    const diffDays = Math.floor((now - lastLoginDate) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return { text: 'Today', variant: 'today' };
+    if (diffDays <= 7) return { text: `${diffDays}d ago`, variant: 'week' };
+    if (diffDays <= 30) return { text: `${diffDays}d ago`, variant: 'month' };
+    return { text: `${diffDays}d ago`, variant: 'stale' };
+};
+
+const getErrorMessage = (error, fallbackMessage) => {
+    const responseData = error?.response?.data;
+
+    if (typeof responseData === 'string' && responseData.trim()) {
+        return responseData;
+    }
+
+    if (responseData?.detail) {
+        return responseData.detail;
+    }
+
+    if (responseData && typeof responseData === 'object') {
+        const flattened = Object.values(responseData)
+            .flat()
+            .map((value) => (typeof value === 'string' ? value : ''))
+            .filter(Boolean)
+            .join(' ');
+
+        if (flattened) {
+            return flattened;
+        }
+    }
+
+    if (typeof error?.message === 'string' && error.message.trim()) {
+        return error.message;
+    }
+
+    return fallbackMessage;
+};
+
+const QueryErrorState = ({ message, onRetry, compact = false }) => (
+    <div className={compact ? 'sm-inline-state' : 'sm-error-state'}>
+        <span>{message}</span>
+        {onRetry ? (
+            <button type="button" className="sm-inline-action" onClick={onRetry}>
+                Retry
+            </button>
+        ) : null}
+    </div>
+);
+
 const TeacherMonitoring = () => {
     const { t } = useTheme();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('directory');
-    const [teachers, setTeachers] = useState([]);
-    const [evaluations, setEvaluations] = useState([]);
-    const [loading, setLoading] = useState(true);
 
-    const schoolId = user?.school_id || user?.school?.id || user?.school;
+    const schoolId = user?.school_id
+        || user?.school?.id
+        || (typeof user?.school === 'number' ? user.school : null);
+    const hasSchoolId = schoolId !== null && schoolId !== undefined && schoolId !== '';
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!schoolId) {
-                console.warn('No school ID found for user');
-                setLoading(false);
-                return;
-            }
-            setLoading(true);
-            try {
-                const [teachersData, evaluationsData] = await Promise.all([
-                    managerService.getTeachers(),
-                    managerService.getStaffEvaluations()
-                ]);
-                setTeachers(teachersData.results || teachersData || []);
-                setEvaluations(evaluationsData.results || evaluationsData || []);
-            } catch (error) {
-                console.error('Failed to fetch teacher monitoring data:', error);
-                setTeachers([]);
-                setEvaluations([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, [schoolId]);
+    const teachersQueryKey = useMemo(() => ['school-manager', 'teachers', schoolId], [schoolId]);
+    const evaluationsQueryKey = useMemo(() => ['school-manager', 'staff-evaluations', schoolId], [schoolId]);
 
-    const fetchEvaluations = async () => {
-        try {
-            const data = await managerService.getStaffEvaluations();
-            setEvaluations(data.results || data);
-        } catch (error) {
-            console.error('Failed to fetch evaluations:', error);
-        }
-    }
+    const {
+        data: teachers = [],
+        isLoading: teachersLoading,
+        error: teachersError,
+        refetch: refetchTeachers
+    } = useQuery({
+        queryKey: teachersQueryKey,
+        queryFn: () => managerService.getTeachers({ school_id: schoolId }),
+        select: normalizeList,
+        enabled: hasSchoolId,
+        staleTime: 5 * 60 * 1000
+    });
 
-    const renderTabContent = () => {
-        if (loading) return <div>Loading...</div>;
-        switch (activeTab) {
-            case 'directory':
-                return <TeacherDirectory teachers={teachers} setTeachers={setTeachers} t={t} />;
-            case 'performance':
-                return <PerformanceEvaluation evaluations={evaluations} onEvaluationAdded={fetchEvaluations} teachers={teachers} t={t} />;
-            case 'activity':
-                return <ActivityLogs teachers={teachers} t={t} />;
-            default:
-                return <TeacherDirectory teachers={teachers} setTeachers={setTeachers} t={t} />;
-        }
-    };
+    const {
+        data: evaluations = [],
+        isLoading: evaluationsLoading,
+        error: evaluationsError,
+        refetch: refetchEvaluations
+    } = useQuery({
+        queryKey: evaluationsQueryKey,
+        queryFn: () => managerService.getStaffEvaluations({ school_id: schoolId }),
+        select: normalizeList,
+        enabled: hasSchoolId && activeTab === 'performance',
+        staleTime: 5 * 60 * 1000
+    });
 
-    const tabs = [
+    const tabs = useMemo(() => ([
         { id: 'directory', label: t('school.teachers.directory') || 'Directory', icon: Users },
         { id: 'performance', label: t('school.teachers.performance') || 'Performance', icon: Star },
-        { id: 'activity', label: 'Activity Log', icon: Activity },
-    ];
+        { id: 'activity', label: 'Activity Log', icon: Activity }
+    ]), [t]);
+
+    const renderTabContent = () => {
+        if (!hasSchoolId) {
+            return (
+                <QueryErrorState message="School information is missing. Please log in again." />
+            );
+        }
+
+        if (teachersLoading) {
+            return <div className="sm-loading-state">Loading teacher data...</div>;
+        }
+
+        if (teachersError) {
+            return (
+                <QueryErrorState
+                    message={getErrorMessage(teachersError, 'Unable to load teacher monitoring data.')}
+                    onRetry={refetchTeachers}
+                />
+            );
+        }
+
+        switch (activeTab) {
+            case 'directory':
+                return (
+                    <TeacherDirectory
+                        teachers={teachers}
+                        schoolId={schoolId}
+                        teachersQueryKey={teachersQueryKey}
+                    />
+                );
+            case 'performance':
+                return (
+                    <PerformanceEvaluation
+                        evaluations={evaluations}
+                        evaluationsLoading={evaluationsLoading}
+                        evaluationsError={evaluationsError}
+                        onRetryEvaluations={refetchEvaluations}
+                        evaluationsQueryKey={evaluationsQueryKey}
+                        teachers={teachers}
+                    />
+                );
+            case 'activity':
+                return <ActivityLogs teachers={teachers} />;
+            default:
+                return (
+                    <TeacherDirectory
+                        teachers={teachers}
+                        schoolId={schoolId}
+                        teachersQueryKey={teachersQueryKey}
+                    />
+                );
+        }
+    };
 
     return (
         <div className="teacher-monitoring-page">
@@ -91,16 +197,7 @@ const TeacherMonitoring = () => {
                 <h1 className="school-manager-title">{t('school.teachers.title') || 'Teacher Monitoring'}</h1>
             </div>
 
-            {/* Enhanced Pill-Style Tabs */}
-            <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginBottom: '1.5rem',
-                padding: '0.25rem',
-                backgroundColor: 'var(--color-bg-muted)',
-                borderRadius: '0.5rem',
-                width: 'fit-content'
-            }}>
+            <div className="teacher-monitoring-tabs">
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -108,21 +205,7 @@ const TeacherMonitoring = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.625rem 1rem',
-                                borderRadius: '0.375rem',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: 500,
-                                fontSize: '0.875rem',
-                                transition: 'all 0.2s ease',
-                                backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
-                                color: isActive ? 'white' : 'var(--color-text-muted)',
-                                boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
-                            }}
+                            className={`teacher-monitoring-tab ${isActive ? 'active' : ''}`}
                         >
                             <Icon size={18} strokeWidth={2} />
                             {tab.label}
@@ -138,105 +221,146 @@ const TeacherMonitoring = () => {
     );
 };
 
-// Sub-components
-const TeacherDirectory = ({ teachers, setTeachers, t }) => {
-    const { user } = useAuth();
+const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, teachersQueryKey }) {
+    const queryClient = useQueryClient();
+    const { showSuccess, showError } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [formData, setFormData] = useState({
-        full_name: '',
-        email: '',
-        password: 'Teacher@123',
-        specialization: '',
-        employment_status: 'full_time',
-        hire_date: new Date().toISOString().split('T')[0]
+    const deferredSearchTerm = useDeferredValue(searchTerm);
+    const [formData, setFormData] = useState(createInitialTeacherForm);
+    const [pendingStatusAction, setPendingStatusAction] = useState(null);
+
+    const filteredTeachers = useMemo(() => {
+        const query = deferredSearchTerm.trim().toLowerCase();
+        if (!query) return teachers;
+
+        return teachers.filter((teacher) => (
+            (teacher.full_name?.toLowerCase() || '').includes(query)
+            || (teacher.email?.toLowerCase() || '').includes(query)
+            || (teacher.specialization?.toLowerCase() || '').includes(query)
+        ));
+    }, [teachers, deferredSearchTerm]);
+
+    const createTeacherMutation = useMutation({
+        mutationFn: (payload) => managerService.createTeacher(payload),
+        onSuccess: (createdTeacher) => {
+            const createdTeacherId = getTeacherId(createdTeacher);
+
+            if (createdTeacherId) {
+                queryClient.setQueryData(teachersQueryKey, (current = []) => {
+                    const currentTeachers = Array.isArray(current) ? current : [];
+                    if (currentTeachers.some((teacher) => getTeacherId(teacher) === createdTeacherId)) {
+                        return currentTeachers;
+                    }
+                    return [createdTeacher, ...currentTeachers];
+                });
+            } else {
+                queryClient.invalidateQueries({ queryKey: teachersQueryKey });
+            }
+
+            showSuccess('Teacher created successfully.');
+            setIsModalOpen(false);
+            setFormData(createInitialTeacherForm());
+        },
+        onError: (error) => {
+            showError(getErrorMessage(error, 'Failed to create teacher.'));
+        }
     });
 
-    const handleDeactivate = async (teacher) => {
-        const id = teacher.user_id || teacher.id;
-        const name = teacher.full_name || teacher.name || 'this teacher';
-        if (!window.confirm(`Are you sure you want to deactivate ${name}?`)) return;
-        try {
-            await managerService.deactivateTeacher(id);
-            const response = await managerService.getTeachers();
-            setTeachers(response.results || response || []);
-        } catch (error) {
-            console.error('Failed to deactivate teacher:', error);
-            alert('Failed to deactivate teacher.');
+    const updateTeacherStatusMutation = useMutation({
+        mutationFn: ({ teacherId, nextIsActive }) => (
+            nextIsActive
+                ? managerService.activateTeacher(teacherId)
+                : managerService.deactivateTeacher(teacherId)
+        ),
+        onMutate: async ({ teacherId, nextIsActive }) => {
+            await queryClient.cancelQueries({ queryKey: teachersQueryKey });
+
+            const previousTeachers = queryClient.getQueryData(teachersQueryKey) || [];
+            queryClient.setQueryData(teachersQueryKey, (current = []) => {
+                const currentTeachers = Array.isArray(current) ? current : [];
+                return currentTeachers.map((teacher) => (
+                    getTeacherId(teacher) === teacherId
+                        ? { ...teacher, is_active: nextIsActive }
+                        : teacher
+                ));
+            });
+
+            return { previousTeachers };
+        },
+        onError: (error, _variables, context) => {
+            if (context?.previousTeachers) {
+                queryClient.setQueryData(teachersQueryKey, context.previousTeachers);
+            }
+            showError(getErrorMessage(error, 'Failed to update teacher status.'));
+        },
+        onSuccess: (_response, variables) => {
+            showSuccess(variables.nextIsActive ? 'Teacher activated.' : 'Teacher deactivated.');
         }
-    };
+    });
 
-    const handleActivate = async (teacher) => {
-        const id = teacher.user_id || teacher.id;
-        try {
-            await managerService.activateTeacher(id);
-            const response = await managerService.getTeachers();
-            setTeachers(response.results || response || []);
-        } catch (error) {
-            console.error('Failed to activate teacher:', error);
-            alert('Failed to activate teacher.');
-        }
-    };
+    const handleSave = useCallback((event) => {
+        event.preventDefault();
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-        const resolvedSchoolId = user?.school_id || user?.school?.id ||
-            (typeof user?.school === 'number' ? user.school : null) ||
-            localStorage.getItem('school_id');
+        const fallbackSchoolId = localStorage.getItem('school_id');
+        const resolvedSchoolId = schoolId || fallbackSchoolId;
+        const parsedSchoolId = Number.parseInt(String(resolvedSchoolId), 10);
 
-        if (!resolvedSchoolId) {
-            alert('Error: School ID not found. Please log out and log in again.');
+        if (!resolvedSchoolId || Number.isNaN(parsedSchoolId)) {
+            showError('School ID not found. Please log out and log in again.');
             return;
         }
 
-        try {
-            await managerService.createTeacher({
-                email: formData.email,
-                full_name: formData.full_name,
-                password: formData.password,
-                school_id: parseInt(resolvedSchoolId),
-                specialization: formData.specialization,
-                employment_status: formData.employment_status,
-                hire_date: formData.hire_date,
-            });
+        createTeacherMutation.mutate({
+            email: formData.email,
+            full_name: formData.full_name,
+            password: formData.password,
+            school_id: parsedSchoolId,
+            specialization: formData.specialization,
+            employment_status: formData.employment_status,
+            hire_date: formData.hire_date
+        });
+    }, [createTeacherMutation, formData, schoolId, showError]);
 
-            const response = await managerService.getTeachers();
-            setTeachers(response.results || response || []);
-            setIsModalOpen(false);
-            setFormData({
-                full_name: '', email: '', password: 'Teacher@123',
-                specialization: '', employment_status: 'full_time',
-                hire_date: new Date().toISOString().split('T')[0]
-            });
-        } catch (error) {
-            console.error('Failed to create teacher:', error);
-            const errorMsg = error.response?.data ? JSON.stringify(error.response.data) : error.message;
-            alert(`Failed to create teacher: ${errorMsg}`);
-        }
-    };
+    const handleCloseCreateModal = useCallback(() => {
+        if (createTeacherMutation.isPending) return;
+        setIsModalOpen(false);
+        setFormData(createInitialTeacherForm());
+    }, [createTeacherMutation.isPending]);
 
-    const filteredTeachers = teachers.filter(teacher =>
-        (teacher.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (teacher.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (teacher.specialization?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-    );
+    const requestStatusChange = useCallback((teacher, nextIsActive) => {
+        const teacherId = getTeacherId(teacher);
+        if (!teacherId) return;
+
+        setPendingStatusAction({
+            teacherId,
+            nextIsActive,
+            teacherName: getTeacherName(teacher)
+        });
+    }, []);
+
+    const closeStatusModal = useCallback(() => {
+        if (updateTeacherStatusMutation.isPending) return;
+        setPendingStatusAction(null);
+    }, [updateTeacherStatusMutation.isPending]);
+
+    const confirmStatusChange = useCallback(() => {
+        if (!pendingStatusAction) return;
+        updateTeacherStatusMutation.mutate(pendingStatusAction);
+        setPendingStatusAction(null);
+    }, [pendingStatusAction, updateTeacherStatusMutation]);
 
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <div style={{ position: 'relative', width: '300px' }}>
-                    <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                <div className="sm-search-wrap">
+                    <Search size={18} className="sm-search-icon" />
                     <input
                         type="text"
                         placeholder="Search teachers..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{
-                            width: '100%',
-                            padding: '0.5rem 0.5rem 0.5rem 2.25rem',
-                            borderRadius: '0.375rem',
-                            border: '1px solid var(--color-border)'
-                        }}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        className="sm-search-input"
                     />
                 </div>
                 <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
@@ -255,32 +379,35 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {filteredTeachers.map((teacher) => {
-                        const id = teacher.user_id || teacher.id;
+                    {filteredTeachers.length === 0 ? (
+                        <tr>
+                            <td colSpan="4" className="sm-empty-state">
+                                No teachers found.
+                            </td>
+                        </tr>
+                    ) : filteredTeachers.map((teacher) => {
+                        const id = getTeacherId(teacher);
                         const isActive = teacher.is_active !== false;
+                        const isUpdatingThisTeacher = updateTeacherStatusMutation.isPending
+                            && updateTeacherStatusMutation.variables?.teacherId === id;
+
                         return (
                             <tr key={id}>
                                 <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{
-                                            width: '36px', height: '36px', borderRadius: '50%',
-                                            background: 'var(--color-primary-light)', color: 'var(--color-primary)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontWeight: 'bold', fontSize: '0.875rem'
-                                        }}>
+                                    <div className="teacher-row-identity">
+                                        <div className="teacher-avatar">
                                             {teacher.full_name?.charAt(0)?.toUpperCase() || 'T'}
                                         </div>
                                         <div>
-                                            <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
-                                                {teacher.full_name}
-                                            </div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Mail size={12} /> {teacher.email}
+                                            <div className="teacher-name">{teacher.full_name}</div>
+                                            <div className="teacher-email">
+                                                <Mail size={12} />
+                                                {teacher.email}
                                             </div>
                                         </div>
                                     </div>
                                 </td>
-                                <td style={{ color: teacher.specialization ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                <td className={`teacher-specialization ${!teacher.specialization ? 'empty' : ''}`}>
                                     {teacher.specialization || 'Not specified'}
                                 </td>
                                 <td>
@@ -289,20 +416,22 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                                     </span>
                                 </td>
                                 <td>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <div className="table-actions">
                                         {isActive ? (
                                             <button
-                                                onClick={() => handleDeactivate(teacher)}
+                                                onClick={() => requestStatusChange(teacher, false)}
                                                 title="Deactivate Teacher"
-                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
+                                                className="icon-btn danger"
+                                                disabled={isUpdatingThisTeacher}
                                             >
                                                 <Trash2 size={18} />
                                             </button>
                                         ) : (
                                             <button
-                                                onClick={() => handleActivate(teacher)}
+                                                onClick={() => requestStatusChange(teacher, true)}
                                                 title="Activate Teacher"
-                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-success)' }}
+                                                className="icon-btn success"
+                                                disabled={isUpdatingThisTeacher}
                                             >
                                                 <UserCheck size={18} />
                                             </button>
@@ -315,67 +444,59 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                 </tbody>
             </table>
 
-            {/* Create Teacher Modal */}
             <Modal
                 isOpen={isModalOpen}
-                onClose={() => {
-                    setIsModalOpen(false);
-                    setFormData({
-                        full_name: '', email: '', password: 'Teacher@123',
-                        specialization: '', employment_status: 'full_time',
-                        hire_date: new Date().toISOString().split('T')[0]
-                    });
-                }}
+                onClose={handleCloseCreateModal}
                 title="Add New Teacher"
             >
-                <form onSubmit={handleSave} style={{ display: 'grid', gap: '1rem' }}>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Full Name</label>
+                <form onSubmit={handleSave} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Full Name</label>
                         <input
                             required
                             value={formData.full_name}
-                            onChange={e => setFormData({ ...formData, full_name: e.target.value })}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            onChange={(event) => setFormData({ ...formData, full_name: event.target.value })}
+                            className="sm-form-input"
                             placeholder="Enter teacher's full name"
                         />
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Email</label>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Email</label>
                         <input
                             required
                             type="email"
                             value={formData.email}
-                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                            className="sm-form-input"
                             placeholder="teacher@example.com"
                         />
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Password</label>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Password</label>
                         <input
                             required
                             type="password"
                             value={formData.password}
-                            onChange={e => setFormData({ ...formData, password: e.target.value })}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            onChange={(event) => setFormData({ ...formData, password: event.target.value })}
+                            className="sm-form-input"
                         />
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Specialization</label>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Specialization</label>
                         <input
                             value={formData.specialization}
-                            onChange={e => setFormData({ ...formData, specialization: e.target.value })}
+                            onChange={(event) => setFormData({ ...formData, specialization: event.target.value })}
                             placeholder="e.g., Mathematics, Science, English"
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            className="sm-form-input"
                         />
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Employment Status</label>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Employment Status</label>
                         <select
                             required
                             value={formData.employment_status}
-                            onChange={e => setFormData({ ...formData, employment_status: e.target.value })}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            onChange={(event) => setFormData({ ...formData, employment_status: event.target.value })}
+                            className="sm-form-select"
                         >
                             <option value="full_time">Full Time</option>
                             <option value="part_time">Part Time</option>
@@ -383,71 +504,211 @@ const TeacherDirectory = ({ teachers, setTeachers, t }) => {
                             <option value="substitute">Substitute</option>
                         </select>
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Hire Date</label>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Hire Date</label>
                         <input
                             required
                             type="date"
                             value={formData.hire_date}
-                            onChange={e => setFormData({ ...formData, hire_date: e.target.value })}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
+                            onChange={(event) => setFormData({ ...formData, hire_date: event.target.value })}
+                            className="sm-form-input"
                         />
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                    <div className="sm-form-actions">
                         <button
                             type="button"
-                            onClick={() => setIsModalOpen(false)}
-                            style={{
-                                padding: '0.5rem 1rem', borderRadius: '0.375rem',
-                                border: '1px solid var(--color-border)', background: 'white', cursor: 'pointer'
-                            }}
+                            onClick={handleCloseCreateModal}
+                            className="sm-btn-secondary"
+                            disabled={createTeacherMutation.isPending}
                         >
                             Cancel
                         </button>
-                        <button type="submit" className="btn-primary">Create Teacher</button>
+                        <button type="submit" className="btn-primary" disabled={createTeacherMutation.isPending}>
+                            {createTeacherMutation.isPending ? 'Creating...' : 'Create Teacher'}
+                        </button>
                     </div>
                 </form>
             </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingStatusAction)}
+                onClose={closeStatusModal}
+                title={pendingStatusAction?.nextIsActive ? 'Activate Teacher' : 'Deactivate Teacher'}
+            >
+                <div className="sm-confirm-copy">
+                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
+                    <strong>{pendingStatusAction?.teacherName}</strong>?
+                </div>
+                <div className="sm-form-actions">
+                    <button
+                        type="button"
+                        onClick={closeStatusModal}
+                        className="sm-btn-secondary"
+                        disabled={updateTeacherStatusMutation.isPending}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={confirmStatusChange}
+                        className="btn-primary"
+                        disabled={updateTeacherStatusMutation.isPending}
+                    >
+                        {updateTeacherStatusMutation.isPending ? 'Updating...' : 'Confirm'}
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
-};
+});
 
-const PerformanceEvaluation = ({ evaluations, onEvaluationAdded, teachers, t }) => {
+const StarRating = memo(function StarRating({ score }) {
+    const normalizedScore = Number.parseInt(score, 10) || 0;
+
+    return (
+        <div className="eval-stars">
+            {STAR_INDICES.map((starIndex) => {
+                const filled = starIndex <= normalizedScore;
+                return (
+                    <Star
+                        key={starIndex}
+                        size={14}
+                        fill={filled ? '#fbbf24' : 'transparent'}
+                        stroke={filled ? '#fbbf24' : '#d1d5db'}
+                    />
+                );
+            })}
+        </div>
+    );
+});
+
+const PerformanceEvaluation = memo(function PerformanceEvaluation({
+    evaluations,
+    evaluationsLoading,
+    evaluationsError,
+    onRetryEvaluations,
+    evaluationsQueryKey,
+    teachers
+}) {
+    const queryClient = useQueryClient();
+    const { showSuccess, showError, showWarning } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ reviewee_id: '', rating_score: 5, comments: '' });
+    const [formData, setFormData] = useState(createInitialEvaluationForm);
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-        try {
-            await managerService.createStaffEvaluation({
-                reviewee_id: parseInt(formData.reviewee_id),
-                rating_score: parseInt(formData.rating_score),
-                comments: formData.comments,
-                evaluation_date: new Date().toISOString().split('T')[0]
-            });
-            onEvaluationAdded();
+    const teacherOptions = useMemo(() => (
+        teachers.map((teacher) => ({
+            value: getTeacherId(teacher),
+            label: teacher.full_name
+        }))
+    ), [teachers]);
+
+    const createEvaluationMutation = useMutation({
+        mutationFn: (payload) => managerService.createStaffEvaluation(payload),
+        onSuccess: (createdEvaluation) => {
+            if (createdEvaluation?.id) {
+                queryClient.setQueryData(evaluationsQueryKey, (current = []) => {
+                    const currentEvaluations = Array.isArray(current) ? current : [];
+                    return [createdEvaluation, ...currentEvaluations];
+                });
+            } else {
+                queryClient.invalidateQueries({ queryKey: evaluationsQueryKey });
+            }
+
+            showSuccess('Evaluation saved.');
             setIsModalOpen(false);
-            setFormData({ reviewee_id: '', rating_score: 5, comments: '' });
-        } catch (error) {
-            console.error('Failed to create evaluation:', error);
-            alert('Failed to create evaluation');
+            setFormData(createInitialEvaluationForm());
+        },
+        onError: (error) => {
+            showError(getErrorMessage(error, 'Failed to create evaluation.'));
         }
-    };
+    });
 
-    const renderStars = (score) => {
-        const stars = [];
-        for (let i = 1; i <= 10; i++) {
-            stars.push(
-                <Star
-                    key={i}
-                    size={14}
-                    fill={i <= score ? '#fbbf24' : 'transparent'}
-                    stroke={i <= score ? '#fbbf24' : '#d1d5db'}
-                />
+    const handleSave = useCallback((event) => {
+        event.preventDefault();
+
+        if (!formData.reviewee_id) {
+            showWarning('Please select a teacher.');
+            return;
+        }
+
+        createEvaluationMutation.mutate({
+            reviewee_id: Number.parseInt(formData.reviewee_id, 10),
+            rating_score: Number.parseInt(formData.rating_score, 10),
+            comments: formData.comments,
+            evaluation_date: getTodayISO()
+        });
+    }, [createEvaluationMutation, formData, showWarning]);
+
+    const handleCloseModal = useCallback(() => {
+        if (createEvaluationMutation.isPending) return;
+        setIsModalOpen(false);
+        setFormData(createInitialEvaluationForm());
+    }, [createEvaluationMutation.isPending]);
+
+    const evaluationRows = useMemo(() => {
+        if (evaluationsLoading) {
+            return (
+                <tr>
+                    <td colSpan="4" className="sm-loading-state">
+                        Loading evaluations...
+                    </td>
+                </tr>
             );
         }
-        return stars;
-    };
+
+        if (evaluationsError) {
+            return (
+                <tr>
+                    <td colSpan="4">
+                        <QueryErrorState
+                            compact
+                            message={getErrorMessage(evaluationsError, 'Unable to load evaluations.')}
+                            onRetry={onRetryEvaluations}
+                        />
+                    </td>
+                </tr>
+            );
+        }
+
+        if (evaluations.length === 0) {
+            return (
+                <tr>
+                    <td colSpan="4" className="sm-empty-state">
+                        No evaluations yet. Click "New Evaluation" to add one.
+                    </td>
+                </tr>
+            );
+        }
+
+        return evaluations.map((evalItem) => (
+            <tr key={evalItem.id}>
+                <td>
+                    <div className="eval-teacher-info">
+                        <div className="eval-avatar">
+                            {(evalItem.reviewee_name || evalItem.reviewee_email)?.charAt(0)?.toUpperCase() || 'T'}
+                        </div>
+                        <span className="eval-name">{evalItem.reviewee_name || evalItem.reviewee_email}</span>
+                    </div>
+                </td>
+                <td>
+                    <div className="eval-rating-wrap">
+                        <StarRating score={evalItem.rating_score} />
+                        <span className={`eval-score ${evalItem.rating_score >= 7 ? 'good' : evalItem.rating_score >= 4 ? 'warn' : 'poor'}`}>
+                            {evalItem.rating_score}/10
+                        </span>
+                    </div>
+                </td>
+                <td className="eval-comments-cell">
+                    <p className="eval-comments">{evalItem.comments || 'No comments'}</p>
+                </td>
+                <td className="sm-muted-cell">
+                    {evalItem.evaluation_date
+                        ? new Date(evalItem.evaluation_date).toLocaleDateString()
+                        : 'N/A'}
+                </td>
+            </tr>
+        ));
+    }, [evaluations, evaluationsError, evaluationsLoading, onRetryEvaluations]);
 
     return (
         <div className="management-card">
@@ -468,154 +729,71 @@ const PerformanceEvaluation = ({ evaluations, onEvaluationAdded, teachers, t }) 
                         <th>Date</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {evaluations.length === 0 ? (
-                        <tr>
-                            <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                No evaluations yet. Click "New Evaluation" to add one.
-                            </td>
-                        </tr>
-                    ) : (
-                        evaluations.map((evalItem) => (
-                            <tr key={evalItem.id}>
-                                <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{
-                                            width: '32px', height: '32px', borderRadius: '50%',
-                                            background: '#fef3c7', color: '#d97706',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontWeight: 'bold', fontSize: '0.75rem'
-                                        }}>
-                                            {(evalItem.reviewee_name || evalItem.reviewee_email)?.charAt(0)?.toUpperCase() || 'T'}
-                                        </div>
-                                        <span style={{ fontWeight: '500' }}>{evalItem.reviewee_name || evalItem.reviewee_email}</span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <div style={{ display: 'flex', gap: '2px' }}>
-                                            {renderStars(evalItem.rating_score)}
-                                        </div>
-                                        <span style={{
-                                            fontWeight: 'bold',
-                                            color: evalItem.rating_score >= 7 ? 'var(--color-success)' :
-                                                   evalItem.rating_score >= 4 ? '#d97706' : 'var(--color-error)'
-                                        }}>
-                                            {evalItem.rating_score}/10
-                                        </span>
-                                    </div>
-                                </td>
-                                <td style={{ maxWidth: '300px' }}>
-                                    <p style={{
-                                        margin: 0, whiteSpace: 'nowrap', overflow: 'hidden',
-                                        textOverflow: 'ellipsis', color: 'var(--color-text-muted)'
-                                    }}>
-                                        {evalItem.comments || 'No comments'}
-                                    </p>
-                                </td>
-                                <td style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-                                    {new Date(evalItem.evaluation_date).toLocaleDateString()}
-                                </td>
-                            </tr>
-                        ))
-                    )}
-                </tbody>
+                <tbody>{evaluationRows}</tbody>
             </table>
 
-            {/* Evaluation Modal */}
             <Modal
                 isOpen={isModalOpen}
-                onClose={() => {
-                    setIsModalOpen(false);
-                    setFormData({ reviewee_id: '', rating_score: 5, comments: '' });
-                }}
+                onClose={handleCloseModal}
                 title="New Staff Evaluation"
             >
-                <form onSubmit={handleSave} style={{ display: 'grid', gap: '1rem' }}>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                            Select Teacher
-                        </label>
+                <form onSubmit={handleSave} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Select Teacher</label>
                         <SearchableSelect
-                            options={teachers.map(t => ({
-                                value: t.user_id || t.id,
-                                label: t.full_name
-                            }))}
+                            options={teacherOptions}
                             value={formData.reviewee_id}
-                            onChange={(val) => setFormData({ ...formData, reviewee_id: val })}
+                            onChange={(value) => setFormData({ ...formData, reviewee_id: value })}
                             placeholder="Select a teacher..."
                             searchPlaceholder="Search teachers..."
                         />
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                            Rating Score (1-10)
-                        </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Rating Score (1-10)</label>
+                        <div className="sm-range-row">
                             <input
                                 type="range"
                                 min="1"
                                 max="10"
                                 value={formData.rating_score}
-                                onChange={e => setFormData({ ...formData, rating_score: e.target.value })}
-                                style={{ flex: 1 }}
+                                onChange={(event) => setFormData({ ...formData, rating_score: event.target.value })}
+                                className="sm-range-input"
                             />
-                            <span style={{
-                                fontWeight: 'bold', fontSize: '1.25rem', minWidth: '40px', textAlign: 'center',
-                                color: formData.rating_score >= 7 ? 'var(--color-success)' :
-                                       formData.rating_score >= 4 ? '#d97706' : 'var(--color-error)'
-                            }}>
+                            <span className={`sm-range-score ${formData.rating_score >= 7 ? 'good' : formData.rating_score >= 4 ? 'warn' : 'poor'}`}>
                                 {formData.rating_score}
                             </span>
                         </div>
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                            Comments
-                        </label>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Comments</label>
                         <textarea
                             required
                             value={formData.comments}
-                            onChange={e => setFormData({ ...formData, comments: e.target.value })}
+                            onChange={(event) => setFormData({ ...formData, comments: event.target.value })}
                             placeholder="Enter evaluation comments..."
-                            style={{
-                                width: '100%', padding: '0.5rem', borderRadius: '0.375rem',
-                                border: '1px solid var(--color-border)', minHeight: '100px', resize: 'vertical'
-                            }}
+                            className="sm-form-textarea"
                         />
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+                    <div className="sm-form-actions">
                         <button
                             type="button"
-                            onClick={() => setIsModalOpen(false)}
-                            style={{
-                                padding: '0.5rem 1rem', borderRadius: '0.375rem',
-                                border: '1px solid var(--color-border)', background: 'white', cursor: 'pointer'
-                            }}
+                            onClick={handleCloseModal}
+                            className="sm-btn-secondary"
+                            disabled={createEvaluationMutation.isPending}
                         >
                             Cancel
                         </button>
-                        <button type="submit" className="btn-primary">Save Evaluation</button>
+                        <button type="submit" className="btn-primary" disabled={createEvaluationMutation.isPending}>
+                            {createEvaluationMutation.isPending ? 'Saving...' : 'Save Evaluation'}
+                        </button>
                     </div>
                 </form>
             </Modal>
         </div>
     );
-};
+});
 
-const ActivityLogs = ({ teachers, t }) => {
-    const getLoginStatus = (lastLogin) => {
-        if (!lastLogin) return { text: 'Never logged in', color: 'var(--color-text-muted)', bgColor: '#f3f4f6' };
-        const lastLoginDate = new Date(lastLogin);
-        const now = new Date();
-        const diffDays = Math.floor((now - lastLoginDate) / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 0) return { text: 'Today', color: 'var(--color-success)', bgColor: '#dcfce7' };
-        if (diffDays <= 7) return { text: `${diffDays}d ago`, color: '#2563eb', bgColor: '#dbeafe' };
-        if (diffDays <= 30) return { text: `${diffDays}d ago`, color: '#d97706', bgColor: '#fef3c7' };
-        return { text: `${diffDays}d ago`, color: 'var(--color-error)', bgColor: '#fee2e2' };
-    };
-
+const ActivityLogs = memo(function ActivityLogs({ teachers }) {
     return (
         <div className="management-card">
             <div className="table-header-actions">
@@ -634,7 +812,7 @@ const ActivityLogs = ({ teachers, t }) => {
                 <tbody>
                     {teachers.length === 0 ? (
                         <tr>
-                            <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                            <td colSpan="4" className="sm-empty-state">
                                 No teachers found.
                             </td>
                         </tr>
@@ -642,31 +820,25 @@ const ActivityLogs = ({ teachers, t }) => {
                         teachers.map((teacher) => {
                             const loginStatus = getLoginStatus(teacher.last_login);
                             return (
-                                <tr key={teacher.id || teacher.user_id}>
+                                <tr key={getTeacherId(teacher)}>
                                     <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <div style={{
-                                                width: '36px', height: '36px', borderRadius: '50%',
-                                                background: 'var(--color-primary-light)', color: 'var(--color-primary)',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                fontWeight: 'bold', fontSize: '0.875rem'
-                                            }}>
+                                        <div className="teacher-row-identity">
+                                            <div className="teacher-avatar">
                                                 {teacher.full_name?.charAt(0)?.toUpperCase() || 'T'}
                                             </div>
                                             <div>
-                                                <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
-                                                    {teacher.full_name}
-                                                </div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <Mail size={12} /> {teacher.email}
+                                                <div className="teacher-name">{teacher.full_name}</div>
+                                                <div className="teacher-email">
+                                                    <Mail size={12} />
+                                                    {teacher.email}
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
                                     <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Clock size={16} color="var(--color-text-muted)" />
-                                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                                        <div className="activity-login-wrap">
+                                            <Clock size={16} className="activity-login-icon" />
+                                            <span className="sm-muted-cell">
                                                 {teacher.last_login
                                                     ? new Date(teacher.last_login).toLocaleString()
                                                     : 'Never'}
@@ -674,18 +846,11 @@ const ActivityLogs = ({ teachers, t }) => {
                                         </div>
                                     </td>
                                     <td>
-                                        <span style={{
-                                            padding: '4px 10px',
-                                            borderRadius: '999px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: '500',
-                                            backgroundColor: loginStatus.bgColor,
-                                            color: loginStatus.color
-                                        }}>
+                                        <span className={`activity-badge activity-badge--${loginStatus.variant}`}>
                                             {loginStatus.text}
                                         </span>
                                     </td>
-                                    <td style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                                    <td className="sm-muted-cell">
                                         {teacher.date_joined
                                             ? new Date(teacher.date_joined).toLocaleDateString()
                                             : 'N/A'}
@@ -698,7 +863,6 @@ const ActivityLogs = ({ teachers, t }) => {
             </table>
         </div>
     );
-};
+});
 
 export default TeacherMonitoring;
-

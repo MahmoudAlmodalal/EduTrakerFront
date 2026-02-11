@@ -1,9 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Plus, Save, Send, Users, Trash2, Loader2, Check, X, ChevronDown, TrendingUp } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FileText, Plus, Save, Send, Users, Loader2, Check, ChevronDown } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import teacherService from '../../services/teacherService';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
+import {
+    useCreateTeacherAssignmentMutation,
+    useRecordTeacherMarkMutation,
+    useTeacherAllocations,
+    useTeacherAssignments,
+    useTeacherMarks,
+    useTeacherStudents
+} from '../../hooks/useTeacherQueries';
+import { teacherContainerVariants } from '../../utils/animations';
+import { toList, todayIsoDate } from '../../utils/helpers';
 
 // Skeleton Component
 const Skeleton = ({ className }) => (
@@ -13,13 +23,12 @@ const Skeleton = ({ className }) => (
 const Assessments = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const [loading, setLoading] = useState(true);
-    const [loadingGrades, setLoadingGrades] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const schoolId = useMemo(
+        () => user?.school_id ?? (typeof user?.school === 'number' ? user.school : null),
+        [user?.school, user?.school_id]
+    );
     const [activeTab, setActiveTab] = useState('gradebook');
-
-    // Data States
-    const [classes, setClasses] = useState([]);
-    const [assessments, setAssessments] = useState([]);
     const [grades, setGrades] = useState([]);
 
     // Selection States
@@ -27,7 +36,6 @@ const Assessments = () => {
     const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
 
     // UI States
-    const [saving, setSaving] = useState(false);
     const [savingStudentId, setSavingStudentId] = useState(null);
 
     const assessmentTypes = ['homework', 'quiz', 'midterm', 'final', 'project', 'participation', 'assignment'];
@@ -43,95 +51,121 @@ const Assessments = () => {
         assignment_code: `ASN-${Date.now().toString().slice(-6)}`
     });
 
-    // Initial Load - Fetch Classes and Assessments
+    const {
+        data: classesData,
+        isLoading: loadingClasses
+    } = useTeacherAllocations(todayIsoDate());
+
+    const {
+        data: assessmentsData,
+        isLoading: loadingAssessments
+    } = useTeacherAssignments();
+
+    const classes = useMemo(() => toList(classesData), [classesData]);
+    const assessments = useMemo(() => toList(assessmentsData), [assessmentsData]);
+
+    const loading = loadingClasses || loadingAssessments;
+
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                const [assignmentsData, allocationsData] = await Promise.all([
-                    teacherService.getAssignments(),
-                    teacherService.getSchedule(new Date().toISOString().split('T')[0])
-                ]);
-
-                const fetchedAssessments = assignmentsData.results || assignmentsData || [];
-                setAssessments(fetchedAssessments);
-
-                const allocations = allocationsData || [];
-                setClasses(allocations);
-
-                if (allocations.length > 0 && !selectedClass) {
-                    setSelectedClass(allocations[0].id.toString());
-                }
-
-                if (fetchedAssessments.length > 0 && !selectedAssessmentId) {
-                    setSelectedAssessmentId(fetchedAssessments[0].id.toString());
-                }
-            } catch (error) {
-                console.error("Error fetching assessment data:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
-
-    // Fetch Grades when Assessment/Class Changes
-    useEffect(() => {
-        const fetchGradesAndStudents = async () => {
-            if (!selectedAssessmentId || !selectedClass) return;
-
-            try {
-                setLoadingGrades(true);
-                const allocation = classes.find(c => c.id.toString() === selectedClass);
-
-                const studentFilters = {
-                    school_id: user.school_id,
-                    current_status: 'active',
-                    page_size: 100
-                };
-
-                if (allocation && allocation.class_room_id) {
-                    studentFilters.classroom_id = allocation.class_room_id;
-                }
-
-                const [marksData, studentsData] = await Promise.all([
-                    teacherService.getMarks({ assignment_id: selectedAssessmentId }),
-                    teacherService.getStudents(studentFilters)
-                ]);
-
-                const existingMarks = marksData.results || marksData || [];
-                const students = studentsData.results || studentsData || [];
-
-                const gradebookData = students.map(student => {
-                    const studentId = student.user_id || student.id;
-                    const mark = existingMarks.find(m => m.student_id === studentId);
-                    return {
-                        id: studentId,
-                        student_name: student.full_name || 'N/A',
-                        score: mark ? mark.score : '',
-                        feedback: mark ? mark.feedback : '',
-                        is_active: mark ? mark.is_active : false,
-                        mark_id: mark ? mark.id : null
-                    };
-                });
-
-                setGrades(gradebookData);
-            } catch (error) {
-                console.error("Error fetching grades:", error);
-            } finally {
-                setLoadingGrades(false);
-            }
-        };
-
-        if (selectedAssessmentId && selectedClass) {
-            fetchGradesAndStudents();
+        if (!selectedClass && classes.length > 0) {
+            setSelectedClass(classes[0].id.toString());
         }
-    }, [selectedAssessmentId, selectedClass, classes.length, user.school_id]);
+    }, [classes, selectedClass]);
 
-    const handleCreateAssessment = async (e) => {
+    const filteredAssessments = useMemo(
+        () => (selectedClass
+            ? assessments.filter((assessment) => assessment.course_allocation?.toString() === selectedClass)
+            : assessments),
+        [assessments, selectedClass]
+    );
+
+    useEffect(() => {
+        if (!selectedAssessmentId && filteredAssessments.length > 0) {
+            setSelectedAssessmentId(filteredAssessments[0].id.toString());
+            return;
+        }
+
+        if (
+            selectedAssessmentId
+            && !filteredAssessments.some((assessment) => assessment.id.toString() === selectedAssessmentId)
+        ) {
+            setSelectedAssessmentId(filteredAssessments[0]?.id?.toString() || '');
+        }
+    }, [filteredAssessments, selectedAssessmentId]);
+
+    const selectedAllocation = useMemo(
+        () => classes.find((item) => item.id.toString() === selectedClass),
+        [classes, selectedClass]
+    );
+
+    const studentFilters = useMemo(() => {
+        if (!selectedClass) {
+            return null;
+        }
+
+        const filters = {
+            current_status: 'active',
+            page_size: 100
+        };
+
+        if (schoolId) {
+            filters.school_id = schoolId;
+        }
+
+        if (selectedAllocation?.class_room_id) {
+            filters.classroom_id = selectedAllocation.class_room_id;
+        }
+
+        return filters;
+    }, [schoolId, selectedAllocation, selectedClass]);
+
+    const {
+        data: marksData,
+        isLoading: loadingMarks
+    } = useTeacherMarks(selectedAssessmentId, {
+        enabled: Boolean(selectedAssessmentId)
+    });
+
+    const {
+        data: studentsData,
+        isLoading: loadingStudents
+    } = useTeacherStudents(studentFilters || {}, {
+        enabled: Boolean(studentFilters)
+    });
+
+    const loadingGrades = loadingMarks || loadingStudents;
+    const createAssessmentMutation = useCreateTeacherAssignmentMutation();
+    const saveMarkMutation = useRecordTeacherMarkMutation();
+    const saving = createAssessmentMutation.isPending;
+
+    useEffect(() => {
+        if (!selectedAssessmentId || !selectedClass) {
+            setGrades([]);
+            return;
+        }
+
+        const existingMarks = toList(marksData);
+        const students = toList(studentsData);
+
+        const gradebookData = students.map((student) => {
+            const studentId = student.user_id || student.id;
+            const mark = existingMarks.find((item) => item.student_id === studentId);
+            return {
+                id: studentId,
+                student_name: student.full_name || 'N/A',
+                score: mark ? mark.score : '',
+                feedback: mark ? mark.feedback : '',
+                is_active: mark ? mark.is_active : false,
+                mark_id: mark ? mark.id : null
+            };
+        });
+
+        setGrades(gradebookData);
+    }, [marksData, selectedAssessmentId, selectedClass, studentsData]);
+
+    const handleCreateAssessment = useCallback(async (e) => {
         e.preventDefault();
         try {
-            setSaving(true);
             const payload = {
                 ...newAssessment,
                 exam_type: newAssessment.assignment_type,
@@ -139,8 +173,7 @@ const Assessments = () => {
                 assigned_date: new Date().toISOString().split('T')[0]
             };
 
-            const created = await teacherService.createAssignment(payload);
-            setAssessments([created, ...assessments]);
+            const created = await createAssessmentMutation.mutateAsync(payload);
             setSelectedAssessmentId(created.id.toString());
 
             if (created.course_allocation) {
@@ -162,14 +195,12 @@ const Assessments = () => {
         } catch (error) {
             console.error("Error creating assessment:", error);
             alert("Failed to create assessment");
-        } finally {
-            setSaving(false);
         }
-    };
+    }, [createAssessmentMutation, newAssessment, user.user_id]);
 
-    const handleSaveGrade = async (studentId) => {
+    const handleSaveGrade = useCallback(async (studentId) => {
         const gradeData = grades.find(g => g.id === studentId);
-        if (!gradeData || !gradeData.score) return;
+        if (!gradeData || gradeData.score === '' || gradeData.score === null) return;
 
         try {
             setSavingStudentId(studentId);
@@ -181,7 +212,7 @@ const Assessments = () => {
                 date_recorded: new Date().toISOString().split('T')[0]
             };
 
-            await teacherService.recordMark(payload);
+            await saveMarkMutation.mutateAsync(payload);
             setGrades(grades.map(g => g.id === studentId ? { ...g, is_active: true } : g));
         } catch (error) {
             console.error("Error saving grade:", error);
@@ -189,55 +220,57 @@ const Assessments = () => {
         } finally {
             setSavingStudentId(null);
         }
-    };
+    }, [grades, saveMarkMutation, selectedAssessmentId]);
 
-    const handleGradeChange = (id, value) => {
+    const handleGradeChange = useCallback((id, value) => {
         setGrades(grades.map(student =>
             student.id === id ? { ...student, score: value } : student
         ));
-    };
+    }, [grades]);
 
-    const handleFeedbackChange = (id, value) => {
+    const handleFeedbackChange = useCallback((id, value) => {
         setGrades(grades.map(student =>
             student.id === id ? { ...student, feedback: value } : student
         ));
-    };
+    }, [grades]);
 
-    const handlePublishResults = async () => {
+    const handlePublishResults = useCallback(async () => {
         const ungradedCount = grades.filter(g => !g.is_active && g.score).length;
         if (ungradedCount > 0) {
             if (window.confirm(`You have ${ungradedCount} unsaved grades. Save them all before publishing?`)) {
                 try {
                     const unsaved = grades.filter(g => !g.is_active && g.score);
                     await Promise.all(unsaved.map(g => handleSaveGrade(g.id)));
-                } catch (error) {
+                } catch {
                     return;
                 }
             }
         }
         alert('Results published successfully! Notifications sent to students and parents.');
-    };
-
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
-    };
-
-    const itemVariants = {
-        hidden: { y: 20, opacity: 0 },
-        visible: { y: 0, opacity: 1 }
-    };
+    }, [grades, handleSaveGrade]);
 
     const selectedAssessment = assessments.find(a => a.id.toString() === selectedAssessmentId);
-    const filteredAssessments = selectedClass
-        ? assessments.filter(a => a.course_allocation?.toString() === selectedClass)
-        : assessments;
+    const hasClasses = classes.length > 0;
+
+    const setActiveTabAndSyncUrl = useCallback((nextTab) => {
+        setActiveTab(nextTab);
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set('tab', nextTab);
+        setSearchParams(nextParams, { replace: true });
+    }, [searchParams, setSearchParams]);
+
+    useEffect(() => {
+        const requestedTab = searchParams.get('tab');
+        if (requestedTab === 'create' || requestedTab === 'gradebook') {
+            setActiveTab(requestedTab);
+        }
+    }, [searchParams]);
 
     return (
-        <motion.div
+        <Motion.div
             initial="hidden"
             animate="visible"
-            variants={containerVariants}
+            variants={teacherContainerVariants}
             className="max-w-7xl mx-auto space-y-6 pb-12 px-4 sm:px-6"
         >
             {/* Header */}
@@ -251,26 +284,26 @@ const Assessments = () => {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                     <button
-                        onClick={() => setActiveTab('gradebook')}
+                        onClick={() => setActiveTabAndSyncUrl('gradebook')}
                         className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'gradebook'
                             ? 'bg-indigo-600 text-white shadow-md'
                             : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
                             }`}
                     >
                         <FileText size={16} className="inline mr-2" />
-                        {t('teacher.assessments.gradebook')}
+                        {t('teacher.assessments.gradebook') || 'Gradebook'}
                     </button>
                     <button
-                        onClick={() => setActiveTab('create')}
+                        onClick={() => setActiveTabAndSyncUrl('create')}
                         className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'create'
                             ? 'bg-indigo-600 text-white shadow-md'
                             : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
                             }`}
                     >
                         <Plus size={16} className="inline mr-2" />
-                        {t('teacher.assessments.createAssessment')}
+                        {t('teacher.assessments.createAssessment') || 'Create Assessment'}
                     </button>
                 </div>
             </div>
@@ -278,7 +311,7 @@ const Assessments = () => {
             {/* Create Assessment Tab */}
             <AnimatePresence mode="wait">
                 {activeTab === 'create' && (
-                    <motion.div
+                    <Motion.div
                         key="create"
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -387,30 +420,40 @@ const Assessments = () => {
                                 ></textarea>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                            <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-gray-100">
                                 <button
                                     type="button"
-                                    onClick={() => setActiveTab('gradebook')}
+                                    onClick={() => setActiveTabAndSyncUrl('gradebook')}
                                     className="px-6 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     {t('teacher.assessments.cancel')}
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={saving}
-                                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    disabled={saving || !hasClasses}
+                                    className="inline-flex items-center justify-center gap-2 min-w-[190px] px-6 py-2.5 rounded-xl text-sm font-bold transition-colors border disabled:cursor-not-allowed"
+                                    style={{
+                                        backgroundColor: saving || !hasClasses ? '#A5B4FC' : '#4F46E5',
+                                        borderColor: saving || !hasClasses ? '#A5B4FC' : '#4F46E5',
+                                        color: '#FFFFFF'
+                                    }}
                                 >
                                     {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                    {saving ? 'Creating...' : t('teacher.assessments.createAssessment')}
+                                    {saving ? 'Creating...' : (t('teacher.assessments.createAssessment') || 'Create Assessment')}
                                 </button>
                             </div>
+                            {!hasClasses && (
+                                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                                    No classes available yet. Assign a class to this teacher before creating assessments.
+                                </p>
+                            )}
                         </form>
-                    </motion.div>
+                    </Motion.div>
                 )}
 
                 {/* Gradebook Tab */}
                 {activeTab === 'gradebook' && (
-                    <motion.div
+                    <Motion.div
                         key="gradebook"
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -536,7 +579,7 @@ const Assessments = () => {
                                         ))
                                     ) : grades.length > 0 ? (
                                         grades.map((g) => (
-                                            <motion.tr
+                                            <Motion.tr
                                                 key={g.id}
                                                 initial={{ opacity: 0 }}
                                                 animate={{ opacity: 1 }}
@@ -595,7 +638,7 @@ const Assessments = () => {
                                                         )}
                                                     </button>
                                                 </td>
-                                            </motion.tr>
+                                            </Motion.tr>
                                         ))
                                     ) : (
                                         <tr>
@@ -613,10 +656,10 @@ const Assessments = () => {
                                 </tbody>
                             </table>
                         </div>
-                    </motion.div>
+                    </Motion.div>
                 )}
             </AnimatePresence>
-        </motion.div>
+        </Motion.div>
     );
 };
 

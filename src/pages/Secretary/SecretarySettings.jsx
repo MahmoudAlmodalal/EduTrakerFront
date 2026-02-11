@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { User, Bell, Lock, Globe, Save, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import secretaryService from '../../services/secretaryService';
 import './Secretary.css';
 
 const SecretarySettings = () => {
     const { theme, toggleTheme, language, changeLanguage, t } = useTheme();
     const { user } = useAuth();
+    const { showSuccess, showError } = useToast();
     const [activeTab, setActiveTab] = useState('general');
     const [notifications, setNotifications] = useState({ email: true, newApplicationAlerts: true });
 
@@ -24,6 +26,8 @@ const SecretarySettings = () => {
         if (user?.user_id) {
             fetchProfile();
         }
+        // Profile fetch is intentionally keyed to user identity.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     const fetchProfile = async () => {
@@ -53,9 +57,9 @@ const SecretarySettings = () => {
                 office_number: profile.office_number,
                 department: profile.department
             });
-            alert('Profile updated successfully!');
+            showSuccess('Profile updated successfully!');
         } catch (error) {
-            alert('Error updating profile: ' + error.message);
+            showError('Error updating profile: ' + error.message);
         } finally {
             setLoading(false);
         }

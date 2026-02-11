@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import secretaryService from '../../services/secretaryService';
 import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getSecretaryIconStyle } from '../../utils/secretaryHelpers';
 import './Secretary.css';
 
 const SecretaryDashboard = () => {
@@ -114,18 +115,6 @@ const SecretaryDashboard = () => {
         }
     ];
 
-    const getIconStyle = (color) => {
-        const styles = {
-            indigo: { background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4f46e5' },
-            amber: { background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#d97706' },
-            green: { background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#059669' },
-            rose: { background: 'linear-gradient(135deg, #fce7f3, #fbcfe8)', color: '#e11d48' },
-            purple: { background: 'linear-gradient(135deg, #ede9fe, #ddd6fe)', color: '#7c3aed' },
-            blue: { background: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', color: '#2563eb' }
-        };
-        return styles[color] || styles.indigo;
-    };
-
     const quickAccessButtons = [
         { icon: UserPlus, label: 'Student Registry', sub: 'Manage all students', link: '/secretary/students' },
         { icon: CalendarIcon, label: 'Attendance Log', sub: 'Daily reports', link: '/secretary/attendance' },
@@ -174,7 +163,7 @@ const SecretaryDashboard = () => {
                             <span className="stat-title" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--sec-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 {stat.title}
                             </span>
-                            <div className="stat-icon" style={{ ...getIconStyle(stat.color), width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div className="stat-icon" style={{ ...getSecretaryIconStyle(stat.color), width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <stat.icon size={22} />
                             </div>
                         </div>
@@ -193,7 +182,7 @@ const SecretaryDashboard = () => {
             </div>
 
             {/* Content Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '24px', marginBottom: '32px' }}>
+            <div className="secretary-dashboard-main-grid">
                 {/* Attendance Trend Chart */}
                 <div className="chart-card" style={{ background: 'var(--sec-surface)', borderRadius: '16px', border: '1px solid var(--sec-border)', padding: '24px', boxShadow: 'var(--sec-shadow)' }}>
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -394,19 +383,6 @@ const SecretaryDashboard = () => {
                 </div>
             </div>
 
-            {/* Add keyframes for spinner animation */}
-            <style>{`
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-
-                @media (max-width: 1024px) {
-                    .secretary-dashboard > div:nth-child(3) {
-                        grid-template-columns: 1fr !important;
-                    }
-                }
-            `}</style>
         </div>
     );
 };

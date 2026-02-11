@@ -95,6 +95,9 @@ const secretaryService = {
     getMessages: async () => {
         return api.get('/user-messages/');
     },
+    getMessageThread: async (threadId) => {
+        return api.get(`/user-messages/threads/${threadId}/`);
+    },
     getNotifications: async () => {
         return api.get('/notifications/');
     },

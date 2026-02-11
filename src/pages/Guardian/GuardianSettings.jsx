@@ -1,61 +1,80 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { Save, Bell, Lock, Globe, Mail, Moon, Sun, Users, Loader2 } from 'lucide-react';
+import { Save, Bell, Lock, Globe, Mail, Moon, Sun, Users, Loader2, AlertCircle } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './Guardian.css';
+import { useAuth } from '../../context/AuthContext';
 import guardianService from '../../services/guardianService';
 
 const GuardianSettings = () => {
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('profile');
     const { theme, toggleTheme, language, changeLanguage, t } = useTheme();
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [profile, setProfile] = useState({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: ''
+    const { user } = useAuth();
+    const [profileDraft, setProfileDraft] = useState(null);
+
+    const {
+        data: profileData,
+        isLoading: loading,
+        error: profileError,
+        refetch: refetchProfile
+    } = useQuery({
+        queryKey: ['guardian', 'profile', user?.id],
+        queryFn: ({ signal }) => guardianService.getProfile(user.id, { signal }),
+        enabled: Boolean(user?.id)
     });
 
-    useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                const user = JSON.parse(localStorage.getItem('user'));
-                if (user) {
-                    const res = await guardianService.getProfile(user.id);
-                    const [firstName, ...lastNameParts] = (res.user?.full_name || '').split(' ');
-                    setProfile({
-                        firstName: firstName || '',
-                        lastName: lastNameParts.join(' ') || '',
-                        email: res.user?.email || '',
-                        phone: res.phone_number || ''
-                    });
-                }
-            } catch (error) {
-                console.error("Error fetching profile:", error);
-            } finally {
-                setLoading(false);
-            }
+    const baseProfile = useMemo(() => {
+        if (!profileData) {
+            return {
+                firstName: '',
+                lastName: '',
+                email: '',
+                phone: ''
+            };
+        }
+        const [firstName, ...lastNameParts] = (profileData.user?.full_name || '').split(' ');
+        return {
+            firstName: firstName || '',
+            lastName: lastNameParts.join(' ') || '',
+            email: profileData.user?.email || '',
+            phone: profileData.phone_number || ''
         };
+    }, [profileData]);
 
-        fetchProfile();
-    }, []);
+    const profile = profileDraft || baseProfile;
+
+    const updateProfileField = (field, value) => {
+        setProfileDraft((prev) => ({
+            ...(prev || baseProfile),
+            [field]: value
+        }));
+    };
+
+    const updateProfileMutation = useMutation({
+        mutationFn: (payload) => guardianService.updateProfile(user.id, payload),
+        onSuccess: () => {
+            setProfileDraft(null);
+            queryClient.invalidateQueries({ queryKey: ['guardian', 'profile', user?.id] });
+        }
+    });
 
     const handleSaveProfile = async (e) => {
         e.preventDefault();
-        setSaving(true);
+
+        if (!user?.id) {
+            return;
+        }
+
         try {
-            const user = JSON.parse(localStorage.getItem('user'));
-            await guardianService.updateProfile(user.id, {
+            await updateProfileMutation.mutateAsync({
                 user: {
                     full_name: `${profile.firstName} ${profile.lastName}`.trim()
                 },
                 phone_number: profile.phone
             });
-            // Update local storage if needed or show success message
-        } catch (error) {
-            console.error("Error updating profile:", error);
-        } finally {
-            setSaving(false);
+        } catch {
+            // Error is exposed through updateProfileMutation.error for UI feedback.
         }
     };
 
@@ -63,6 +82,23 @@ const GuardianSettings = () => {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="animate-spin text-primary" size={48} />
+            </div>
+        );
+    }
+
+    if (profileError) {
+        return (
+            <div>
+                <h1 className="guardian-page-title">{t('guardian.settings.title') || 'Settings'}</h1>
+                <div className="guardian-card flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle size={20} className="text-red-500" />
+                        <div>{profileError.message || t('common.somethingWentWrong') || 'Failed to load settings.'}</div>
+                    </div>
+                    <button className="btn-primary" onClick={() => refetchProfile()}>
+                        {t('common.retry') || 'Retry'}
+                    </button>
+                </div>
             </div>
         );
     }
@@ -151,7 +187,7 @@ const GuardianSettings = () => {
                                     <input
                                         type="text"
                                         value={profile.firstName}
-                                        onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                                        onChange={(e) => updateProfileField('firstName', e.target.value)}
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
                                 </div>
@@ -160,7 +196,7 @@ const GuardianSettings = () => {
                                     <input
                                         type="text"
                                         value={profile.lastName}
-                                        onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                                        onChange={(e) => updateProfileField('lastName', e.target.value)}
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
                                 </div>
@@ -181,17 +217,27 @@ const GuardianSettings = () => {
                                     <input
                                         type="text"
                                         value={profile.phone}
-                                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                                        onChange={(e) => updateProfileField('phone', e.target.value)}
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
                                 </div>
                             </div>
                             <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-                                <button className="btn-primary" type="submit" disabled={saving}>
-                                    {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                <button className="btn-primary" type="submit" disabled={updateProfileMutation.isPending}>
+                                    {updateProfileMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                                     {t('guardian.settings.profile.saveBtn') || 'Save Changes'}
                                 </button>
                             </div>
+                            {updateProfileMutation.isError && (
+                                <p style={{ marginTop: '1rem', color: '#ef4444', fontWeight: 500 }}>
+                                    {updateProfileMutation.error?.message || t('common.somethingWentWrong') || 'Failed to save profile.'}
+                                </p>
+                            )}
+                            {updateProfileMutation.isSuccess && (
+                                <p style={{ marginTop: '1rem', color: '#16a34a', fontWeight: 500 }}>
+                                    {t('guardian.settings.profile.saved') || 'Profile updated successfully.'}
+                                </p>
+                            )}
                         </form>
                     )}
 

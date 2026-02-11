@@ -38,8 +38,6 @@ const GuardianLinking = () => {
 
     useEffect(() => {
         fetchGuardians();
-        fetchStudents();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Clear messages after 5 seconds
@@ -99,6 +97,9 @@ const GuardianLinking = () => {
             is_primary: false,
             can_pickup: true,
         });
+        if (students.length === 0) {
+            await fetchStudents();
+        }
         await fetchGuardianLinks(guardian.user_id);
         setIsLinkModalOpen(true);
     };
@@ -637,13 +638,6 @@ const GuardianLinking = () => {
                     </div>
                 </form>
             </Modal>
-
-            <style>{`
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `}</style>
         </div>
     );
 };

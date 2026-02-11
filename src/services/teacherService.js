@@ -1,5 +1,12 @@
 import { api } from '../utils/api';
 
+const buildQueryString = (filters = {}) => {
+    const sanitized = Object.fromEntries(
+        Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    );
+    return new URLSearchParams(sanitized).toString();
+};
+
 const teacherService = {
     // Teacher Profile/Settings
     getProfile: async (id) => {
@@ -15,12 +22,11 @@ const teacherService = {
     },
 
     // Course Allocations / Classes
-    getSchedule: async (date) => {
-        // Backend expects 'date' query param
+    getSchedule: async (date = new Date().toISOString().split('T')[0]) => {
         return api.get(`/teacher/schedule/?date=${date}`);
     },
 
-    getCourseAllocations: async (filters = {}) => {
+    getCourseAllocations: async () => {
         // Use schedule endpoint to get active allocations
         const date = new Date().toISOString().split('T')[0];
         return api.get(`/teacher/schedule/?date=${date}`);
@@ -29,14 +35,14 @@ const teacherService = {
     getStudents: async (filters = {}) => {
         // Teacher specific student list logic if needed,
         // otherwise rely on class-filtered lists
-        const queryParams = new URLSearchParams(filters).toString();
+        const queryParams = buildQueryString(filters);
         // Teachers are StaffUsers, so they can access /manager/students/
         return api.get(`/manager/students/?${queryParams}`);
     },
 
     // Assignments
     getAssignments: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
+        const queryParams = buildQueryString(filters);
         return api.get(`/teacher/assignments/?${queryParams}`);
     },
     createAssignment: async (data) => {
@@ -54,8 +60,23 @@ const teacherService = {
 
     // Attendance
     getAttendance: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
+        const queryParams = buildQueryString(filters);
         return api.get(`/teacher/attendance/?${queryParams}`);
+    },
+    recordBulkAttendance: async (records = []) => {
+        if (!Array.isArray(records) || records.length === 0) {
+            return [];
+        }
+
+        try {
+            return await api.post('/teacher/attendance/bulk-record/', { records });
+        } catch (error) {
+            // Fallback for environments that do not expose bulk endpoint yet.
+            if ([404, 405].includes(error?.status)) {
+                return Promise.all(records.map((record) => teacherService.recordAttendance(record)));
+            }
+            throw error;
+        }
     },
     recordAttendance: async (data) => {
         return api.post('/teacher/attendance/record/', data);
@@ -63,7 +84,7 @@ const teacherService = {
 
     // Marks / Grading
     getMarks: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
+        const queryParams = buildQueryString(filters);
         return api.get(`/teacher/marks/?${queryParams}`);
     },
     recordMark: async (data) => {
@@ -95,7 +116,7 @@ const teacherService = {
 
     // Lesson Plans
     getLessonPlans: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
+        const queryParams = buildQueryString(filters);
         return api.get(`/teacher/lesson-plans/?${queryParams}`);
     },
     createLessonPlan: async (data) => {
@@ -113,7 +134,7 @@ const teacherService = {
 
     // Learning Materials
     getLearningMaterials: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
+        const queryParams = buildQueryString(filters);
         return api.get(`/teacher/learning-materials/?${queryParams}`);
     },
     createLearningMaterial: async (data) => {

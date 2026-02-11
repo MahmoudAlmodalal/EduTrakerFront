@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Search, CheckCircle, XCircle, Clock, AlertCircle, TrendingUp, Users } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import secretaryService from '../../services/secretaryService';
+import { getSecretaryIconStyle, getAttendanceStatusStyle, getAttendanceStatusIcon } from '../../utils/secretaryHelpers';
 import './Secretary.css';
 
 const SecretaryAttendance = () => {
@@ -13,20 +14,32 @@ const SecretaryAttendance = () => {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState('');
+    const [debouncedFilters, setDebouncedFilters] = useState({
+        dateFrom: new Date().toISOString().split('T')[0],
+        dateTo: new Date().toISOString().split('T')[0],
+        statusFilter: '',
+    });
 
     useEffect(() => {
-        fetchAttendance();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        const timer = setTimeout(() => {
+            setDebouncedFilters({ dateFrom, dateTo, statusFilter });
+        }, 400);
+
+        return () => clearTimeout(timer);
     }, [dateFrom, dateTo, statusFilter]);
 
-    const fetchAttendance = async () => {
+    useEffect(() => {
+        fetchAttendance(debouncedFilters);
+    }, [debouncedFilters]);
+
+    const fetchAttendance = async (filters) => {
         try {
             setLoading(true);
             setError('');
             const params = {};
-            if (dateFrom) params.date_from = dateFrom;
-            if (dateTo) params.date_to = dateTo;
-            if (statusFilter) params.status = statusFilter;
+            if (filters.dateFrom) params.date_from = filters.dateFrom;
+            if (filters.dateTo) params.date_to = filters.dateTo;
+            if (filters.statusFilter) params.status = filters.statusFilter;
             const data = await secretaryService.getAttendance(params);
             setRecords(data.results || data || []);
         } catch (err) {
@@ -34,31 +47,6 @@ const SecretaryAttendance = () => {
             setError('Failed to load attendance records.');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const getStatusStyle = (status) => {
-        switch (status) {
-            case 'present':
-                return { background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#059669' };
-            case 'absent':
-                return { background: 'linear-gradient(135deg, #fee2e2, #fecaca)', color: '#dc2626' };
-            case 'late':
-                return { background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#d97706' };
-            case 'excused':
-                return { background: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', color: '#2563eb' };
-            default:
-                return { background: 'var(--sec-border)', color: 'var(--sec-text-muted)' };
-        }
-    };
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'present': return <CheckCircle size={14} />;
-            case 'absent': return <XCircle size={14} />;
-            case 'late': return <Clock size={14} />;
-            case 'excused': return <AlertCircle size={14} />;
-            default: return null;
         }
     };
 
@@ -80,7 +68,6 @@ const SecretaryAttendance = () => {
     const totalPresent = records.filter(r => r.status === 'present').length;
     const totalAbsent = records.filter(r => r.status === 'absent').length;
     const totalLate = records.filter(r => r.status === 'late').length;
-    const totalExcused = records.filter(r => r.status === 'excused').length;
     const attendanceRate = records.length > 0 ? Math.round((totalPresent / records.length) * 100) : 0;
 
     const statCards = [
@@ -89,16 +76,6 @@ const SecretaryAttendance = () => {
         { label: 'Late', value: totalLate, icon: Clock, color: 'amber' },
         { label: 'Attendance Rate', value: `${attendanceRate}%`, icon: TrendingUp, color: 'indigo' },
     ];
-
-    const getIconStyle = (color) => {
-        const styles = {
-            green: { background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#059669' },
-            rose: { background: 'linear-gradient(135deg, #fce7f3, #fbcfe8)', color: '#e11d48' },
-            amber: { background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#d97706' },
-            indigo: { background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4f46e5' },
-        };
-        return styles[color] || styles.indigo;
-    };
 
     return (
         <div className="secretary-dashboard">
@@ -136,7 +113,7 @@ const SecretaryAttendance = () => {
                                 <p style={{ fontSize: '28px', fontWeight: '700', color: 'var(--sec-text-main)', margin: 0 }}>{stat.value}</p>
                             </div>
                             <div style={{
-                                ...getIconStyle(stat.color),
+                                ...getSecretaryIconStyle(stat.color),
                                 width: '48px',
                                 height: '48px',
                                 borderRadius: '12px',
@@ -250,55 +227,59 @@ const SecretaryAttendance = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredRecords.map((record) => (
-                                    <tr key={record.id}>
-                                        <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>#{record.id}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{
-                                                    width: '32px',
-                                                    height: '32px',
-                                                    borderRadius: '8px',
-                                                    background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
-                                                    color: '#4f46e5',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontWeight: '600',
-                                                    fontSize: '13px'
-                                                }}>
-                                                    {(record.student_name || 'S').charAt(0).toUpperCase()}
+                                {filteredRecords.map((record) => {
+                                    const StatusIcon = getAttendanceStatusIcon(record.status);
+
+                                    return (
+                                        <tr key={record.id}>
+                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>#{record.id}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <div style={{
+                                                        width: '32px',
+                                                        height: '32px',
+                                                        borderRadius: '8px',
+                                                        background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+                                                        color: '#4f46e5',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontWeight: '600',
+                                                        fontSize: '13px'
+                                                    }}>
+                                                        {(record.student_name || 'S').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <span style={{ fontWeight: '500', color: 'var(--sec-text-main)' }}>
+                                                        {record.student_name || '-'}
+                                                    </span>
                                                 </div>
-                                                <span style={{ fontWeight: '500', color: 'var(--sec-text-main)' }}>
-                                                    {record.student_name || '-'}
+                                            </td>
+                                            <td style={{ color: 'var(--sec-text-main)' }}>{record.course_name || '-'}</td>
+                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>{record.date || '-'}</td>
+                                            <td>
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '20px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    ...getAttendanceStatusStyle(record.status)
+                                                }}>
+                                                    {StatusIcon ? <StatusIcon size={14} /> : null}
+                                                    {getStatusLabel(record.status)}
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td style={{ color: 'var(--sec-text-main)' }}>{record.course_name || '-'}</td>
-                                        <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>{record.date || '-'}</td>
-                                        <td>
-                                            <span style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                padding: '6px 12px',
-                                                borderRadius: '20px',
-                                                fontSize: '12px',
-                                                fontWeight: '600',
-                                                ...getStatusStyle(record.status)
-                                            }}>
-                                                {getStatusIcon(record.status)}
-                                                {getStatusLabel(record.status)}
-                                            </span>
-                                        </td>
-                                        <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px', maxWidth: '180px' }}>
-                                            {record.note || '-'}
-                                        </td>
-                                        <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>
-                                            {record.recorded_by_name || '-'}
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px', maxWidth: '180px' }}>
+                                                {record.note || '-'}
+                                            </td>
+                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>
+                                                {record.recorded_by_name || '-'}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 {filteredRecords.length === 0 && (
                                     <tr>
                                         <td colSpan="7" style={{ textAlign: 'center', padding: '48px', color: 'var(--sec-text-muted)' }}>
@@ -312,13 +293,6 @@ const SecretaryAttendance = () => {
                     )}
                 </div>
             </div>
-
-            <style>{`
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `}</style>
         </div>
     );
 };

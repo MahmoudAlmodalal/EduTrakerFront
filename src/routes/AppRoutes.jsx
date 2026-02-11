@@ -185,6 +185,10 @@ const AppRoutes = () => {
                     <Route path="dashboard" element={<TeacherDashboard />} />
                     <Route path="classes" element={<ClassManagement />} />
                     <Route path="assessments" element={<Assessments />} />
+                    <Route path="assignments" element={<Navigate to="/teacher/assessments" replace />} />
+                    <Route path="assignments/new" element={<Navigate to="/teacher/assessments?tab=create" replace />} />
+                    <Route path="assignment" element={<Navigate to="/teacher/assessments" replace />} />
+                    <Route path="assignment/new" element={<Navigate to="/teacher/assessments?tab=create" replace />} />
                     <Route path="lesson-plans" element={<LessonPlans />} />
                     <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="settings" element={<TeacherSettings />} />

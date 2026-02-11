@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Award,
     TrendingUp,
@@ -14,69 +14,29 @@ import {
     BookOpen
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
-import { useAuth } from '../../../context/AuthContext';
-import studentService from '../../../services/studentService';
+import { useStudentData } from '../../../context/StudentDataContext';
 import '../Student.css';
 
 const StudentResults = () => {
     const { t } = useTheme();
-    const { user } = useAuth();
+    const {
+        dashboardData,
+        loading,
+        error,
+        refreshData
+    } = useStudentData();
     const [expandedSubject, setExpandedSubject] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [resultsData, setResultsData] = useState({
-        overallAverage: 0,
-        totalAssignments: 0,
-        gradedAssignments: 0,
-        marks: [],
-        byType: {}
-    });
 
-    const fetchResults = async () => {
-        if (!user) {
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await studentService.getDashboardStats();
-            // Expected structure: { statistics: { grades: { ... } } }
-            const stats = response?.statistics || response;
-            const grades = stats?.grades;
-
-            if (grades) {
-                setResultsData({
-                    overallAverage: grades.overall_average || 0,
-                    totalAssignments: grades.total_assignments || 0,
-                    gradedAssignments: grades.graded_assignments || 0,
-                    marks: Array.isArray(grades.marks) ? grades.marks : [],
-                    byType: grades.by_type || {}
-                });
-            } else {
-                console.warn('Grades data missing from statistics');
-            }
-        } catch (err) {
-            console.error('Error fetching results:', err);
-            setError('Failed to load academic results. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        let mounted = true;
-
-        if (user) {
-            fetchResults();
-        } else {
-            // If no user after mount, stop loading
-            setLoading(false);
-        }
-
-        return () => { mounted = false; };
-    }, [user]);
+    const resultsData = useMemo(() => {
+        const grades = dashboardData?.grades || {};
+        return {
+            overallAverage: grades.overall_average || 0,
+            totalAssignments: grades.total_assignments || 0,
+            gradedAssignments: grades.graded_assignments || 0,
+            marks: Array.isArray(grades.marks) ? grades.marks : [],
+            byType: grades.by_type || {}
+        };
+    }, [dashboardData]);
 
     const groupedResults = useMemo(() => {
         if (!resultsData.marks.length) return [];
@@ -135,7 +95,7 @@ const StudentResults = () => {
             <div className="dashboard-error">
                 <AlertCircle size={48} color="#ef4444" />
                 <p>{error}</p>
-                <button onClick={fetchResults} className="retry-btn">
+                <button onClick={refreshData} className="retry-btn">
                     <RefreshCw size={18} />
                     Try Again
                 </button>
@@ -341,393 +301,7 @@ const StudentResults = () => {
                     </div>
                 )}
             </div>
-
-            <style>{`
-                .dashboard-loading, .dashboard-error {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    min-height: 400px;
-                    text-align: center;
-                    gap: 1rem;
-                    background: white;
-                    border-radius: 20px;
-                    padding: 2rem;
-                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-                }
-
-                .animate-spin {
-                    animation: spin 1s linear infinite;
-                    color: var(--student-primary, #0891b2);
-                }
-
-                @keyframes spin {
-                    from { transform: rotate(0deg); }
-                    to { transform: rotate(360deg); }
-                }
-
-                .retry-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.75rem 1.5rem;
-                    background: var(--student-gradient, linear-gradient(135deg, #0891b2, #06b6d4));
-                    color: white;
-                    border: none;
-                    border-radius: 10px;
-                    font-weight: 600;
-                    cursor: pointer;
-                }
-
-                .empty-results {
-                    text-align: center;
-                    padding: 4rem 2rem;
-                    background: white;
-                    border-radius: 20px;
-                    color: #64748b;
-                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-                }
-
-                .empty-results svg {
-                    margin-bottom: 1rem;
-                    opacity: 0.5;
-                }
-
-                .results-stats-grid {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 1.25rem;
-                    margin-bottom: 2rem;
-                }
-                
-                @media (max-width: 1200px) {
-                    .results-stats-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
-                }
-                
-                @media (max-width: 640px) {
-                    .results-stats-grid {
-                        grid-template-columns: 1fr;
-                    }
-                }
-                
-                .result-stat-card {
-                    background: white;
-                    border-radius: 16px;
-                    padding: 1.5rem;
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                    box-shadow: 0 4px 20px rgba(8, 145, 178, 0.06);
-                    position: relative;
-                    overflow: hidden;
-                    transition: all 0.3s ease;
-                }
-                
-                .result-stat-card:hover {
-                    transform: translateY(-3px);
-                    box-shadow: 0 8px 30px rgba(8, 145, 178, 0.1);
-                }
-                
-                .result-stat-icon {
-                    width: 56px;
-                    height: 56px;
-                    border-radius: 14px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    flex-shrink: 0;
-                }
-                
-                .result-stat-content {
-                    flex: 1;
-                }
-                
-                .result-stat-value {
-                    display: block;
-                    font-size: 1.75rem;
-                    font-weight: 700;
-                    color: var(--color-text-main, #0f172a);
-                    line-height: 1.2;
-                }
-                
-                .result-stat-label {
-                    font-size: 0.8125rem;
-                    color: var(--color-text-muted, #64748b);
-                    text-transform: uppercase;
-                    letter-spacing: 0.03em;
-                    font-weight: 500;
-                }
-                
-                .gpa-ring {
-                    width: 48px;
-                    height: 48px;
-                    position: absolute;
-                    right: 1rem;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    opacity: 0.3;
-                }
-                
-                .results-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 1rem;
-                }
-                
-                .result-card {
-                    background: white;
-                    border-radius: 16px;
-                    box-shadow: 0 4px 20px rgba(8, 145, 178, 0.06);
-                    overflow: hidden;
-                    border-left: 4px solid var(--subject-color);
-                    transition: all 0.3s ease;
-                }
-                
-                .result-card:hover {
-                    box-shadow: 0 8px 30px rgba(8, 145, 178, 0.1);
-                }
-                
-                .result-card-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 1.5rem;
-                    padding: 1.25rem 1.5rem;
-                    cursor: pointer;
-                    transition: background 0.2s ease;
-                }
-                
-                .result-card-header:hover {
-                    background: #f8fafc;
-                }
-                
-                .result-subject-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                    flex: 1;
-                }
-                
-                .result-subject-indicator {
-                    width: 4px;
-                    height: 40px;
-                    border-radius: 2px;
-                }
-                
-                .result-subject-name {
-                    font-size: 1.125rem;
-                    font-weight: 600;
-                    color: var(--color-text-main, #0f172a);
-                    margin: 0 0 0.25rem;
-                }
-                
-                .result-assessments-count {
-                    font-size: 0.8125rem;
-                    color: var(--color-text-muted, #64748b);
-                }
-                
-                .result-grade-section {
-                    display: flex;
-                    align-items: center;
-                    gap: 1.5rem;
-                }
-                
-                .result-letter-grade {
-                    font-size: 1.75rem;
-                    font-weight: 700;
-                }
-                
-                .result-percentage {
-                    text-align: right;
-                }
-                
-                .grade-value {
-                    display: block;
-                    font-size: 1rem;
-                    font-weight: 600;
-                    color: var(--color-text-main, #0f172a);
-                }
-                
-                .trend-badge {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                    font-size: 0.6875rem;
-                    font-weight: 600;
-                    padding: 0.125rem 0.5rem;
-                    border-radius: 20px;
-                    margin-top: 0.25rem;
-                }
-                
-                .trend-up {
-                    background: #dcfce7;
-                    color: #16a34a;
-                }
-                
-                .trend-down {
-                    background: #fef2f2;
-                    color: #dc2626;
-                }
-                
-                .trend-stable {
-                    background: #f1f5f9;
-                    color: #64748b;
-                }
-                
-                .result-progress-ring {
-                    width: 48px;
-                    height: 48px;
-                }
-                
-                .result-progress-ring svg {
-                    transform: rotate(-90deg);
-                }
-                
-                .expand-btn {
-                    width: 36px;
-                    height: 36px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: #f8fafc;
-                    border: none;
-                    border-radius: 8px;
-                    color: var(--color-text-muted, #64748b);
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-                
-                .expand-btn:hover {
-                    background: var(--student-primary, #0891b2);
-                    color: white;
-                }
-                
-                .result-card.expanded .expand-btn {
-                    transform: rotate(180deg);
-                }
-                
-                .result-card-details {
-                    max-height: 0;
-                    overflow: hidden;
-                    transition: max-height 0.3s ease;
-                }
-                
-                .result-card.expanded .result-card-details {
-                    max-height: 800px;
-                    overflow-y: auto;
-                }
-                
-                .assessments-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                
-                .assessments-table th,
-                .assessments-table td {
-                    padding: 0.875rem 1.5rem;
-                    text-align: left;
-                }
-                
-                .assessments-table th {
-                    background: #f8fafc;
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    color: var(--color-text-muted, #64748b);
-                    text-transform: uppercase;
-                    letter-spacing: 0.04em;
-                    border-top: 1px solid rgba(8, 145, 178, 0.08);
-                }
-                
-                .assessments-table td {
-                    border-top: 1px solid rgba(8, 145, 178, 0.05);
-                }
-                
-                .assessment-title {
-                    font-weight: 500;
-                    color: var(--color-text-main, #1e293b);
-                }
-                
-                .assessment-date {
-                    color: var(--color-text-muted, #64748b);
-                    font-size: 0.875rem;
-                }
-                
-                .assessment-score {
-                    font-weight: 700;
-                    color: var(--color-text-main, #1e293b);
-                }
-
-                .type-badge {
-                    font-size: 0.6875rem;
-                    font-weight: 600;
-                    padding: 0.125rem 0.5rem;
-                    border-radius: 4px;
-                    background: #f1f5f9;
-                    color: #64748b;
-                    text-transform: capitalize;
-                }
-
-                .percentage-display {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                }
-
-                .percentage-bar-bg {
-                    flex: 1;
-                    height: 6px;
-                    background: #f1f5f9;
-                    border-radius: 3px;
-                    overflow: hidden;
-                    min-width: 60px;
-                }
-
-                .percentage-bar-fill {
-                    height: 100%;
-                    border-radius: 3px;
-                    transition: width 0.5s ease;
-                }
-
-                .percentage-text {
-                    font-size: 0.8125rem;
-                    font-weight: 600;
-                    min-width: 35px;
-                }
-                
-                [data-theme="dark"] .result-stat-card,
-                [data-theme="dark"] .result-card,
-                [data-theme="dark"] .dashboard-loading,
-                [data-theme="dark"] .dashboard-error,
-                [data-theme="dark"] .empty-results {
-                    background: #1e293b;
-                }
-                
-                [data-theme="dark"] .result-stat-value,
-                [data-theme="dark"] .result-subject-name,
-                [data-theme="dark"] .grade-value,
-                [data-theme="dark"] .assessment-title,
-                [data-theme="dark"] .assessment-score,
-                [data-theme="dark"] .percentage-text {
-                    color: #f1f5f9;
-                }
-                
-                [data-theme="dark"] .assessments-table th {
-                    background: rgba(30, 41, 59, 0.5);
-                }
-                
-                [data-theme="dark"] .result-card-header:hover {
-                    background: rgba(30, 41, 59, 0.8);
-                }
-
-                [data-theme="dark"] .type-badge,
-                [data-theme="dark"] .percentage-bar-bg {
-                    background: #334155;
-                }
-            `}</style>
-        </div>
+</div>
     );
 };
 

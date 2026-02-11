@@ -1,79 +1,113 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import './Guardian.css';
-import { FileText, UserCheck, AlertTriangle, Loader2 } from 'lucide-react';
+import { FileText, UserCheck, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import guardianService from '../../services/guardianService';
+
+const normalizeList = (value) => {
+    if (Array.isArray(value)) {
+        return value;
+    }
+    if (Array.isArray(value?.results)) {
+        return value.results;
+    }
+    return [];
+};
 
 const ChildrenMonitoring = () => {
     const { t } = useTheme();
-    const [children, setChildren] = useState([]);
+    const { user } = useAuth();
     const [selectedChild, setSelectedChild] = useState(null);
     const [activeTab, setActiveTab] = useState('results');
-    const [loading, setLoading] = useState(true);
-    const [dataLoading, setDataLoading] = useState(false);
+    const behavior = useMemo(
+        () => [
+            { id: 1, date: '2023-10-01', typeKey: 'positive', comment: 'Helped a classmate.' },
+            { id: 2, date: '2023-09-25', typeKey: 'negative', comment: 'Talking during class.' }
+        ],
+        []
+    );
 
-    const [results, setResults] = useState([]);
-    const [attendance, setAttendance] = useState([]);
-    const [behavior, setBehavior] = useState([]); // Still mocked
+    const {
+        data: linkedStudents = [],
+        isLoading: childrenLoading,
+        error: childrenError,
+        refetch: refetchChildren
+    } = useQuery({
+        queryKey: ['guardian', 'children', user?.id],
+        queryFn: ({ signal }) => guardianService.getLinkedStudents(user.id, { signal }),
+        enabled: Boolean(user?.id)
+    });
 
-    useEffect(() => {
-        const fetchChildren = async () => {
-            try {
-                // Get user ID from local storage or decode token
-                const user = JSON.parse(localStorage.getItem('user'));
-                if (user) {
-                    const res = await guardianService.getLinkedStudents(user.id);
-                    const childData = res.map(link => ({
-                        id: link.student_id,
-                        name: link.student_name
-                    }));
-                    setChildren(childData);
-                    if (childData.length > 0) {
-                        setSelectedChild(childData[0].id);
-                    }
-                }
-            } catch (error) {
-                console.error("Error fetching children:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const children = useMemo(() => {
+        return normalizeList(linkedStudents).map((link) => ({
+            id: link.student_id,
+            name: link.student_name
+        }));
+    }, [linkedStudents]);
 
-        fetchChildren();
-    }, []);
+    const effectiveSelectedChild = selectedChild || children[0]?.id || null;
 
-    const fetchChildData = useCallback(async () => {
-        if (!selectedChild) return;
-        setDataLoading(true);
-        try {
-            if (activeTab === 'results') {
-                const res = await guardianService.getMarks(selectedChild);
-                setResults(res.results || []);
-            } else if (activeTab === 'attendance') {
-                const res = await guardianService.getAttendance(selectedChild);
-                setAttendance(res.results || []);
-            } else if (activeTab === 'behavior') {
-                // Mock behavior as it's not in backend
-                setBehavior([
-                    { id: 1, date: "2023-10-01", typeKey: "positive", comment: "Helped a classmate." },
-                    { id: 2, date: "2023-09-25", typeKey: "negative", comment: "Talking during class." }
-                ]);
-            }
-        } catch (error) {
-            console.error("Error fetching child data:", error);
-        } finally {
-            setDataLoading(false);
-        }
-    }, [selectedChild, activeTab]);
+    const {
+        data: marksData,
+        isFetching: marksLoading,
+        error: marksError,
+        refetch: refetchMarks
+    } = useQuery({
+        queryKey: ['guardian', 'marks', effectiveSelectedChild],
+        queryFn: ({ signal }) => guardianService.getMarks(effectiveSelectedChild, { signal }),
+        enabled: Boolean(effectiveSelectedChild) && activeTab === 'results'
+    });
 
-    useEffect(() => {
-        fetchChildData();
-    }, [fetchChildData]);
+    const {
+        data: attendanceData,
+        isFetching: attendanceLoading,
+        error: attendanceError,
+        refetch: refetchAttendance
+    } = useQuery({
+        queryKey: ['guardian', 'attendance', effectiveSelectedChild],
+        queryFn: ({ signal }) => guardianService.getAttendance(effectiveSelectedChild, { signal }),
+        enabled: Boolean(effectiveSelectedChild) && activeTab === 'attendance'
+    });
+
+    const results = normalizeList(marksData);
+    const attendance = normalizeList(attendanceData);
+    const loading = childrenLoading;
+    const dataLoading = marksLoading || attendanceLoading;
+    const error = childrenError || marksError || attendanceError;
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="animate-spin text-primary" size={48} />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="guardian-monitoring">
+                <h1 className="guardian-page-title">{t('guardian.monitoring.title')}</h1>
+                <div className="guardian-card flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle size={20} className="text-red-500" />
+                        <div>{error.message || t('common.somethingWentWrong') || 'Failed to load monitoring data.'}</div>
+                    </div>
+                    <button
+                        className="btn-primary"
+                        onClick={() => {
+                            refetchChildren();
+                            if (activeTab === 'results') {
+                                refetchMarks();
+                            } else if (activeTab === 'attendance') {
+                                refetchAttendance();
+                            }
+                        }}
+                    >
+                        {t('common.retry') || 'Retry'}
+                    </button>
+                </div>
             </div>
         );
     }
@@ -88,11 +122,14 @@ const ChildrenMonitoring = () => {
                     <button
                         key={child.id}
                         onClick={() => setSelectedChild(child.id)}
-                        className={`child-selector-btn ${selectedChild === child.id ? 'active' : ''}`}
+                        className={`child-selector-btn ${effectiveSelectedChild === child.id ? 'active' : ''}`}
                     >
                         {child.name}
                     </button>
                 ))}
+                {children.length === 0 && (
+                    <div className="text-muted">{t('noData')}</div>
+                )}
             </div>
 
             {/* Tabs */}
@@ -200,6 +237,9 @@ const ChildrenMonitoring = () => {
                                     <td>{beh.comment}</td>
                                 </tr>
                             ))}
+                            {behavior.length === 0 && (
+                                <tr><td colSpan="3" className="text-center py-4">{t('noData')}</td></tr>
+                            )}
                         </tbody>
                     </table>
                 )}
@@ -209,4 +249,3 @@ const ChildrenMonitoring = () => {
 };
 
 export default ChildrenMonitoring;
-

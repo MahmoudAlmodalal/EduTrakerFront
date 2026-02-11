@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
     BookOpen,
@@ -10,42 +10,58 @@ import {
     Sparkles,
     Bell,
     MessageSquare,
-    RefreshCw
+    RefreshCw,
+    Menu,
+    X,
+    ChevronLeft
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import studentService from '../../services/studentService';
+import { StudentDataProvider, useStudentData } from '../../context/StudentDataContext';
 import './Student.css';
 
-const StudentLayout = () => {
+const StudentLayoutContent = () => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
-    const navigate = useNavigate();
-    const [stats, setStats] = useState({ attendance: '0%', gpa: '0.0', classroom: '...' });
-    const [loading, setLoading] = useState(true);
+    const { dashboardData, loading } = useStudentData();
+    const location = useLocation();
 
+    // Initialize sidebar state based on screen width
+    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 992);
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 992);
+
+    // Handle window resize
     useEffect(() => {
-        const fetchLayoutStats = async () => {
-            try {
-                const response = await studentService.getDashboardStats();
-                const { statistics } = response || {};
-
-                setStats({
-                    attendance: `${statistics?.attendance?.attendance_rate || 0}%`,
-                    gpa: statistics?.grades?.overall_average ? (statistics.grades.overall_average / 25).toFixed(1) : '0.0', // Assuming 100 base to 4.0 scale
-                    classroom: `${statistics?.profile?.current_classroom?.classroom_name || ''} • ${statistics?.profile?.current_classroom?.grade_name || ''}`
-                });
-            } catch (error) {
-                console.error('Error fetching layout stats:', error);
-            } finally {
-                setLoading(false);
+        const handleResize = () => {
+            const mobile = window.innerWidth <= 992;
+            setIsMobile(mobile);
+            if (mobile && isSidebarOpen) {
+                setIsSidebarOpen(false);
+            } else if (!mobile && !isSidebarOpen) {
+                // Optional: Auto-open on desktop resize? 
+                // Let's keep user preference or default to open if coming from mobile
+                setIsSidebarOpen(true);
             }
         };
 
-        if (user) {
-            fetchLayoutStats();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Close sidebar on route change on mobile
+    useEffect(() => {
+        if (isMobile) {
+            setIsSidebarOpen(false);
         }
-    }, [user]);
+    }, [location, isMobile]);
+
+    const stats = {
+        attendance: `${dashboardData?.attendance?.attendance_rate || 0}%`,
+        gpa: dashboardData?.grades?.overall_average
+            ? (dashboardData.grades.overall_average / 25).toFixed(1)
+            : '0.0',
+        classroom: `${dashboardData?.profile?.current_classroom?.classroom_name || ''} • ${dashboardData?.profile?.current_classroom?.grade_name || ''}`
+    };
 
     const navItems = [
         { path: '/student/dashboard', labelKey: 'student.nav.dashboard', icon: LayoutDashboard },
@@ -56,24 +72,24 @@ const StudentLayout = () => {
         { path: '/student/settings', labelKey: 'student.nav.settings', icon: Settings },
     ];
 
-
-    const handleLogout = () => {
-        logout();
-    };
-
-    // Get user initials for avatar
     const getInitials = () => {
         if (user?.full_name) {
-            return user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            return user.full_name.split(' ').map((name) => name[0]).join('').toUpperCase().slice(0, 2);
         }
         return 'ST';
     };
 
     return (
         <div className="student-layout">
-            {/* Premium Sidebar */}
-            <aside className="student-sidebar">
-                {/* Brand Section */}
+            {/* Sidebar Overlay for Mobile */}
+            {isMobile && isSidebarOpen && (
+                <div
+                    className="student-sidebar-overlay"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
+            <aside className={`student-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
                 <div className="student-brand">
                     <div className="student-brand-icon">
                         <Sparkles size={24} />
@@ -82,17 +98,20 @@ const StudentLayout = () => {
                         <span className="student-brand-name">{t('app.name') || 'EduTraker'}</span>
                         <span className="student-brand-role">Student Portal</span>
                     </div>
+                    <button
+                        className="student-sidebar-close-btn"
+                        onClick={() => setIsSidebarOpen(false)}
+                    >
+                        {isMobile ? <X size={20} /> : <ChevronLeft size={20} />}
+                    </button>
                 </div>
 
-                {/* Navigation */}
                 <nav className="student-nav">
                     {navItems.map((item) => (
                         <NavLink
                             key={item.path}
                             to={item.path}
-                            className={({ isActive }) =>
-                                `student-nav-item ${isActive ? 'active' : ''}`
-                            }
+                            className={({ isActive }) => `student-nav-item ${isActive ? 'active' : ''}`}
                         >
                             <div className="student-nav-icon">
                                 <item.icon size={20} strokeWidth={1.5} />
@@ -102,28 +121,28 @@ const StudentLayout = () => {
                     ))}
                 </nav>
 
-                {/* Bottom Section */}
                 <div className="student-sidebar-footer">
-                    {/* Quick Stats */}
                     <div className="student-quick-stats">
                         <div className="student-stat-mini">
-                            <span className="student-stat-value">{loading ? <RefreshCw className="animate-spin" size={14} /> : stats.attendance}</span>
+                            <span className="student-stat-value">
+                                {loading ? <RefreshCw className="animate-spin" size={14} /> : stats.attendance}
+                            </span>
                             <span className="student-stat-label">Attendance</span>
                         </div>
                         <div className="student-stat-divider"></div>
                         <div className="student-stat-mini">
-                            <span className="student-stat-value">{loading ? <RefreshCw className="animate-spin" size={14} /> : stats.gpa}</span>
+                            <span className="student-stat-value">
+                                {loading ? <RefreshCw className="animate-spin" size={14} /> : stats.gpa}
+                            </span>
                             <span className="student-stat-label">GPA</span>
                         </div>
                     </div>
 
-                    {/* Logout Button */}
-                    <button className="student-logout-btn" onClick={handleLogout}>
+                    <button className="student-logout-btn" onClick={logout}>
                         <LogOut size={18} />
                         <span>{t('header.logout') || 'Logout'}</span>
                     </button>
 
-                    {/* User Profile */}
                     <div className="student-profile">
                         <div className="student-avatar">
                             {getInitials()}
@@ -140,13 +159,40 @@ const StudentLayout = () => {
                 </div>
             </aside>
 
-            {/* Main Content */}
-            <main className="student-main">
+            <main className={`student-main ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+                {/* Top Trigger Button - Visible ONLY when sidebar is closed */}
+                {!isSidebarOpen && (
+                    <div className="student-main-header">
+                        <button
+                            className="student-trigger-btn"
+                            onClick={() => setIsSidebarOpen(true)}
+                        >
+                            <Menu size={24} />
+                        </button>
+
+                        {/* Mobile Brand Display */}
+                        {isMobile && (
+                            <div className="student-mobile-brand-display">
+                                <Sparkles size={20} className="text-primary" />
+                                <span className="font-bold">EduTraker</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="student-content-wrapper">
                     <Outlet />
                 </div>
             </main>
         </div>
+    );
+};
+
+const StudentLayout = () => {
+    return (
+        <StudentDataProvider>
+            <StudentLayoutContent />
+        </StudentDataProvider>
     );
 };
 

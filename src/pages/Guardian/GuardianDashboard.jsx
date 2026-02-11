@@ -1,43 +1,139 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import './Guardian.css';
-import { Bell, Calendar, TrendingUp, Loader2 } from 'lucide-react';
+import { Bell, Calendar, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../context/ThemeContext';
 import guardianService from '../../services/guardianService';
 import notificationService from '../../services/notificationService';
 
+const normalizeList = (value) => {
+    if (Array.isArray(value)) {
+        return value;
+    }
+    if (Array.isArray(value?.results)) {
+        return value.results;
+    }
+    return [];
+};
+
 const GuardianDashboard = () => {
     const { t } = useTheme();
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState(null);
-    const [notifications, setNotifications] = useState([]);
-    const [upcomingEvents, setUpcomingEvents] = useState([]);
+    const queryClient = useQueryClient();
 
-    useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                const [statsRes, notificationsRes] = await Promise.all([
-                    guardianService.getDashboardStats(),
-                    guardianService.getNotifications()
-                ]);
-                setStats(statsRes.statistics);
-                setNotifications(notificationsRes.results || []);
+    const {
+        data: dashboardData,
+        isLoading: dashboardLoading,
+        error: dashboardError,
+        refetch: refetchDashboard
+    } = useQuery({
+        queryKey: ['guardian', 'dashboard'],
+        queryFn: ({ signal }) => guardianService.getDashboardStats({ signal })
+    });
 
-                // Use upcoming events from backend (assignments)
-                setUpcomingEvents(statsRes.statistics?.upcoming_events || []);
-            } catch (error) {
-                console.error("Error fetching dashboard data:", error);
-            } finally {
-                setLoading(false);
+    const {
+        data: notificationsData,
+        isLoading: notificationsLoading,
+        error: notificationsError,
+        refetch: refetchNotifications
+    } = useQuery({
+        queryKey: ['guardian', 'notifications'],
+        queryFn: ({ signal }) => guardianService.getNotifications({ signal })
+    });
+
+    const updateNotificationsCache = (updater) => {
+        queryClient.setQueryData(['guardian', 'notifications'], (oldData) => {
+            const current = normalizeList(oldData);
+            if (current.length === 0) {
+                return oldData;
             }
-        };
 
-        fetchDashboardData();
-    }, []);
+            const updated = updater(current);
+
+            if (Array.isArray(oldData)) {
+                return updated;
+            }
+
+            if (oldData && typeof oldData === 'object') {
+                return {
+                    ...oldData,
+                    results: updated
+                };
+            }
+
+            return {
+                results: updated
+            };
+        });
+    };
+
+    const markAllAsReadMutation = useMutation({
+        mutationFn: () => notificationService.markAllAsRead(),
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['guardian', 'notifications'] });
+            const previous = queryClient.getQueryData(['guardian', 'notifications']);
+            updateNotificationsCache((items) => items.map((item) => ({ ...item, is_read: true })));
+            return { previous };
+        },
+        onError: (_error, _variables, context) => {
+            if (context?.previous) {
+                queryClient.setQueryData(['guardian', 'notifications'], context.previous);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['guardian', 'notifications'] });
+        }
+    });
+
+    const markAsReadMutation = useMutation({
+        mutationFn: (notificationId) => notificationService.markAsRead(notificationId),
+        onMutate: async (notificationId) => {
+            await queryClient.cancelQueries({ queryKey: ['guardian', 'notifications'] });
+            const previous = queryClient.getQueryData(['guardian', 'notifications']);
+            updateNotificationsCache((items) =>
+                items.map((item) =>
+                    item.id === notificationId ? { ...item, is_read: true } : item
+                )
+            );
+            return { previous };
+        },
+        onError: (_error, _variables, context) => {
+            if (context?.previous) {
+                queryClient.setQueryData(['guardian', 'notifications'], context.previous);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['guardian', 'notifications'] });
+        }
+    });
+
+    const stats = dashboardData?.statistics;
+    const children = normalizeList(stats?.children);
+    const notifications = normalizeList(notificationsData);
+    const upcomingEvents = normalizeList(stats?.upcoming_events);
+    const loading = dashboardLoading || notificationsLoading;
+    const error = dashboardError || notificationsError;
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="animate-spin text-primary" size={48} />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="guardian-dashboard">
+                <h1 className="guardian-page-title">{t('guardian.dashboard.title')}</h1>
+                <div className="guardian-card flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle size={20} className="text-red-500" />
+                        <div>{error.message || t('common.somethingWentWrong') || 'Failed to load dashboard data.'}</div>
+                    </div>
+                    <button className="btn-primary" onClick={() => { refetchDashboard(); refetchNotifications(); }}>
+                        {t('common.retry') || 'Retry'}
+                    </button>
+                </div>
             </div>
         );
     }
@@ -54,7 +150,7 @@ const GuardianDashboard = () => {
                         <TrendingUp size={20} color="#4f46e5" />
                     </div>
                     <div className="children-list">
-                        {stats?.children?.map(child => (
+                        {children.map(child => (
                             <div key={child.id} className="child-summary-item">
                                 <div className="child-avatar">{child.name.charAt(0)}</div>
                                 <div>
@@ -63,7 +159,7 @@ const GuardianDashboard = () => {
                                 </div>
                             </div>
                         ))}
-                        {(!stats?.children || stats.children.length === 0) && (
+                        {children.length === 0 && (
                             <div className="text-muted text-center py-4">{t('noData')}</div>
                         )}
                     </div>
@@ -76,11 +172,9 @@ const GuardianDashboard = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {notifications.some(n => !n.is_read) && (
                                 <button
-                                    onClick={async () => {
-                                        await notificationService.markAllAsRead();
-                                        setNotifications(notifications.map(n => ({ ...n, is_read: true })));
-                                    }}
+                                    onClick={() => markAllAsReadMutation.mutate()}
                                     style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                                    disabled={markAllAsReadMutation.isPending}
                                 >
                                     {t('header.markAllRead')}
                                 </button>
@@ -93,10 +187,9 @@ const GuardianDashboard = () => {
                             <div
                                 key={notif.id}
                                 className={`notification-item ${notif.is_read ? '' : 'unread'}`}
-                                onClick={async () => {
+                                onClick={() => {
                                     if (!notif.is_read) {
-                                        await notificationService.markAsRead(notif.id);
-                                        setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                                        markAsReadMutation.mutate(notif.id);
                                     }
                                 }}
                                 style={{ cursor: 'pointer' }}
@@ -121,8 +214,8 @@ const GuardianDashboard = () => {
                         {upcomingEvents.map(event => (
                             <div key={event.id} className="event-item">
                                 <div className="event-date-box">
-                                    <div className="event-month">{event.date.split(' ')[0]}</div>
-                                    <div className="event-day">{event.date.split(' ')[1].replace(',', '')}</div>
+                                    <div className="event-month">{event.date?.split(' ')?.[0] || '-'}</div>
+                                    <div className="event-day">{event.date?.split(' ')?.[1]?.replace(',', '') || '-'}</div>
                                 </div>
                                 <div>
                                     <div className="event-title">{event.title}</div>
@@ -138,4 +231,3 @@ const GuardianDashboard = () => {
 };
 
 export default GuardianDashboard;
-

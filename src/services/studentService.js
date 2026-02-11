@@ -11,26 +11,20 @@ const studentService = {
         }
     },
 
-    // Get subjects (courses) with mapped fields
-    getSubjects: async () => {
-        try {
-            const response = await studentService.getDashboardStats();
-            // structure: { statistics: { courses: { courses: [...] } } }
-            const coursesData = response.statistics?.courses?.courses || [];
+    // Map subjects from existing dashboard payload (no extra API call)
+    getSubjects: (dashboardPayload = {}) => {
+        const stats = dashboardPayload?.statistics || dashboardPayload;
+        const coursesData = stats?.courses?.courses || [];
 
-            return coursesData.map(course => ({
-                id: course.course_id,
-                classroom_id: course.classroom_id,
-                name: course.course_name,
-                teacher: course.teacher_name,
-                grade: course.grade_name || 'N/A',
-                courseCode: course.course_code,
-                classroom: course.classroom_name
-            }));
-        } catch (error) {
-            console.error("Error fetching subjects:", error);
-            return [];
-        }
+        return coursesData.map((course) => ({
+            id: course.course_id,
+            classroom_id: course.classroom_id,
+            name: course.course_name,
+            teacher: course.teacher_name,
+            grade: course.grade_name || 'N/A',
+            courseCode: course.course_code,
+            classroom: course.classroom_name
+        }));
     },
 
     // Get student profile
