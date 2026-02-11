@@ -24,6 +24,7 @@ const UserManagement = () => {
 
     const [isEditing, setIsEditing] = useState(false);
     const [currentUserId, setCurrentUserId] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -96,6 +97,8 @@ const UserManagement = () => {
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
 
         const payload = {
             email: formData.email,
@@ -124,6 +127,8 @@ const UserManagement = () => {
             resetForm();
         } catch (err) {
             showError('Operation failed: ' + err.message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -446,7 +451,9 @@ const UserManagement = () => {
                     </div>
                     <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>
                         <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">{t('common.cancel')}</Button>
-                        <Button variant="primary" type="submit">{isEditing ? 'Update User' : t('common.create')}</Button>
+                        <Button variant="primary" type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? 'Saving...' : (isEditing ? 'Update User' : t('common.create'))}
+                        </Button>
                     </div>
                 </form>
             </Modal>

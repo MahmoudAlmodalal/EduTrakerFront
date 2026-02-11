@@ -8,11 +8,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/ui/Toast';
 
-console.log('App.jsx loaded');
-
 function App() {
-    console.log('App component rendering...');
-
     const queryClient = React.useMemo(
         () =>
             new QueryClient({

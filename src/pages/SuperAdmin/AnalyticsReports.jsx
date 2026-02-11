@@ -145,7 +145,7 @@ const AnalyticsReports = () => {
                         ) : error ? (
                             <div className={styles.errorState}>{error}</div>
                         ) : (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
                                 <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-light)" />
                                     <XAxis
@@ -193,7 +193,7 @@ const AnalyticsReports = () => {
                         {loading ? (
                             <div className={styles.loaderPlaceholder} />
                         ) : (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
                                 <BarChart data={teacherData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                                     <XAxis
                                         dataKey="name"

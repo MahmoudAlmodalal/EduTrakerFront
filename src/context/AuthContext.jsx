@@ -53,7 +53,6 @@ export const AuthProvider = ({ children }) => {
 
                     // If no session info, user just logged in - skip check
                     if (!sessionInfo) {
-                        console.log('Fresh login - skipping session check');
                         setUser(parsedUser);
                         setPermissions(roleConfig?.permissions || []);
                         setPortalType(savedPortalType);
@@ -63,8 +62,6 @@ export const AuthProvider = ({ children }) => {
 
                     // Check session status
                     const sessionCheck = SessionManager.checkSession();
-
-                    console.log('Session check:', sessionCheck);
 
                     if (!sessionCheck.isValid) {
                         // Session expired and cannot extend - force logout
@@ -78,7 +75,6 @@ export const AuthProvider = ({ children }) => {
 
                     if (sessionCheck.shouldExtend) {
                         // Session expired but can extend - refresh token
-                        console.log('🔄 Extending session...');
                         try {
                             const response = await api.post('/auth/token/refresh/', {
                                 refresh: refreshToken
@@ -90,9 +86,7 @@ export const AuthProvider = ({ children }) => {
                             // Extend session
                             const extensionResult = SessionManager.extendSession();
 
-                            if (extensionResult.success) {
-                                console.log('✅ Session extended:', extensionResult.reason);
-                            } else {
+                            if (!extensionResult.success) {
                                 console.error('❌ Failed to extend session:', extensionResult.reason);
                                 localStorage.clear();
                                 sessionCache.clear();
@@ -116,16 +110,6 @@ export const AuthProvider = ({ children }) => {
                     setPortalType(savedPortalType);
                     setWorkstreamId(savedWorkstreamId);
 
-                    // Log session stats
-                    const stats = SessionManager.getSessionStats();
-                    if (stats) {
-                        console.log('📊 Session stats:', {
-                            timeRemaining: SessionManager.formatTimeRemaining(stats.timeRemainingInCurrentPeriod),
-                            extensionsUsed: stats.extensionCount,
-                            extensionsLeft: stats.extensionsLeft
-                        });
-                    }
-
                 } catch (e) {
                     console.error('Failed to restore session:', e);
                     localStorage.clear();
@@ -144,8 +128,6 @@ export const AuthProvider = ({ children }) => {
      * @param {string|number} wsId - Optional workstream ID
      */
     const login = useCallback((authData, type = 'PORTAL', wsId = null) => {
-        console.log('AuthContext.login called with:', { authData, type, wsId });
-
         const { user: backendUser, tokens } = authData;
 
         // 1. Store tokens and metadata
@@ -158,8 +140,6 @@ export const AuthProvider = ({ children }) => {
         const backendRole = backendUser.role?.toLowerCase();
         const roleKey = ROLE_MAP[backendRole] || backendRole?.toUpperCase();
         const roleConfig = getRoleConfig(roleKey);
-
-        console.log('Role mapping:', { backendRole, roleKey, roleConfig });
 
         // 2. Set the authenticated user state
         const userData = {
@@ -178,16 +158,10 @@ export const AuthProvider = ({ children }) => {
         setPermissions(roleConfig?.permissions || []);
 
         // 4. Initialize session tracking
-        const sessionInfo = SessionManager.initSession();
-        console.log('✅ Session initialized:', {
-            duration: '30 minutes',
-            maxExtensions: 2,
-            totalMaxTime: '90 minutes'
-        });
+        SessionManager.initSession();
 
         // 5. Redirect to the role's base path
         const basePath = getBasePath(roleKey);
-        console.log('Navigating to:', basePath);
         navigate(basePath);
     }, [navigate]);
 
@@ -196,12 +170,18 @@ export const AuthProvider = ({ children }) => {
         const savedPortalType = localStorage.getItem('portalType');
         const savedWorkstreamId = localStorage.getItem('workstreamId');
 
-        console.log('Initiating logout: clearing local state');
-
         // Determine the correct login path before clearing storage
         let loginPath = '/login/portal'; // Default to portal login
         if (savedPortalType === 'WORKSTREAM' && savedWorkstreamId) {
             loginPath = `/login/workstream/${savedWorkstreamId}`;
+        }
+
+        // Preserve the latest portal context for correct redirect after logout/back navigation
+        if (savedPortalType) {
+            localStorage.setItem('lastPortalType', savedPortalType);
+        }
+        if (savedWorkstreamId) {
+            localStorage.setItem('lastWorkstreamId', savedWorkstreamId);
         }
 
         // 1. Clear local storage immediately
@@ -222,14 +202,12 @@ export const AuthProvider = ({ children }) => {
         setWorkstreamId(null);
 
         // 4. Redirect to the appropriate login page
-        console.log('Redirecting to:', loginPath);
         navigate(loginPath, { replace: true });
 
         // 5. Attempt to notify backend (best effort, in background)
         if (refreshToken) {
             try {
                 await authService.logout(refreshToken);
-                console.log('Backend logout successful');
             } catch (e) {
                 console.warn('Backend logout failed, local cleanup already complete', e);
             }

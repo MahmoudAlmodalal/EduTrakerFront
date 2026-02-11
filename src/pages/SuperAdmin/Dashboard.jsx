@@ -36,8 +36,6 @@ const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) =
 };
 
 const Dashboard = () => {
-    console.log('Dashboard component rendering...');
-
     const { t } = useTheme();
     const { user } = useAuth();
     const [statsData, setStatsData] = useState(null);
@@ -48,13 +46,10 @@ const Dashboard = () => {
     const [activities, setActivities] = useState([]);
     const [chartData, setChartData] = useState([]);
 
-    console.log('Dashboard - user:', user);
-
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                console.log('Fetching dashboard data...');
 
                 const [statsRes, unreadRes] = await Promise.all([
                     reportService.getDashboardStats().catch(err => {
@@ -67,7 +62,6 @@ const Dashboard = () => {
                     })
                 ]);
 
-                console.log('Dashboard data fetched:', statsRes);
                 setStatsData(statsRes.statistics || {});
                 setUnreadNotifications(unreadRes.unread_count || 0);
                 setActivities(statsRes.recent_activity || []);

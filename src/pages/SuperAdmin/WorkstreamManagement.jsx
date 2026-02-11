@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Settings, Edit, Trash2, MapPin, Users, School, Layers, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useToast } from '../../components/ui/Toast';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import SearchableSelect from '../../components/ui/SearchableSelect';
@@ -11,6 +12,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 
 const WorkstreamManagement = () => {
     const { t } = useTheme();
+    const { showSuccess, showError, showWarning } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [workstreams, setWorkstreams] = useState([]);
     const [managers, setManagers] = useState([]);
@@ -63,8 +65,28 @@ const WorkstreamManagement = () => {
         fetchManagers();
     }, []);
 
+    const isDuplicateNameError = (err) => {
+        const message = (err?.message || '').toLowerCase();
+        const data = err?.data;
+        return (
+            message.includes('workstream with this name already exists') ||
+            message.includes('already exists') ||
+            data?.workstream_name?.some?.((item) => String(item).toLowerCase().includes('already exists'))
+        );
+    };
+
     const handleCreateWorkstream = async (e) => {
         e.preventDefault();
+        const normalizedName = formData.name.trim().toLowerCase();
+        const hasLocalDuplicate = workstreams.some((ws) => {
+            if (isEditing && ws.id === currentWorkstreamId) return false;
+            return (ws.workstream_name || '').trim().toLowerCase() === normalizedName;
+        });
+
+        if (hasLocalDuplicate) {
+            showWarning(`Workstream name "${formData.name.trim()}" already exists. Try a different name.`, 4500);
+            return;
+        }
 
         const payload = {
             workstream_name: formData.name,
@@ -84,8 +106,13 @@ const WorkstreamManagement = () => {
             await fetchWorkstreams();
             setIsModalOpen(false);
             resetForm();
+            showSuccess(isEditing ? 'Workstream updated successfully.' : 'Workstream created successfully.');
         } catch (err) {
-            alert('Operation failed: ' + err.message);
+            if (isDuplicateNameError(err)) {
+                showWarning(`Workstream name "${formData.name.trim()}" already exists. Try a different name.`, 4500);
+                return;
+            }
+            showError('Operation failed: ' + err.message);
         }
     };
 
@@ -100,8 +127,9 @@ const WorkstreamManagement = () => {
                 await workstreamService.updateWorkstream(id, { is_active: true });
             }
             await fetchWorkstreams();
+            showSuccess(`Workstream ${currentStatus ? 'deactivated' : 'activated'} successfully.`);
         } catch (err) {
-            alert('Status update failed: ' + err.message);
+            showError('Status update failed: ' + err.message);
         }
     };
 
@@ -201,7 +229,7 @@ const WorkstreamManagement = () => {
                     <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: 'var(--color-bg-surface)', borderRadius: '12px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
                         <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--color-text-primary)' }}>User Distribution by Workstream</h3>
                         <div style={{ width: '100%', height: 300 }}>
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
                                 <BarChart
                                     data={workstreams}
                                     margin={{ top: 20, right: 30, left: 20, bottom: 5 }}

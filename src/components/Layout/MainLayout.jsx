@@ -5,8 +5,6 @@ import Header from './Header';
 import styles from './MainLayout.module.css';
 
 const MainLayout = () => {
-    console.log('MainLayout rendering...');
-
     const [isSidebarOpen, setSidebarOpen] = useState(true);
 
     const toggleSidebar = () => {
