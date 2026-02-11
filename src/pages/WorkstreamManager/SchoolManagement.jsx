@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MapPin, Users, Edit, CheckCircle, Eye, Trash2, X } from 'lucide-react';
+import { Plus, Search, MapPin, Users, Edit, CheckCircle, Eye, Trash2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import { api } from '../../utils/api';
 import Modal from '../../components/ui/Modal';
 import './Workstream.css';
@@ -9,8 +10,14 @@ import './Workstream.css';
 const SchoolManagement = () => {
     const { t } = useTheme();
     const { user, workstreamId } = useAuth();
+    const { showSuccess, showError, showInfo } = useToast();
     const [loading, setLoading] = useState(true);
     const [showCreateForm, setShowCreateForm] = useState(false);
+    const [showActivateAllModal, setShowActivateAllModal] = useState(false);
+    const [isActivatingAll, setIsActivatingAll] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [schoolToDelete, setSchoolToDelete] = useState(null);
     const [schools, setSchools] = useState([]);
     const [newSchool, setNewSchool] = useState({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
     const [searchTerm, setSearchTerm] = useState('');
@@ -79,34 +86,54 @@ const SchoolManagement = () => {
             setShowCreateForm(false);
         } catch (error) {
             console.error('Failed to save school:', error);
-            alert(`Error: ${error.message}`);
+            showError(`Error: ${error.message}`);
         }
     };
 
     const handleActivateAll = async () => {
-        if (window.confirm(t('workstream.schools.confirmActivate'))) {
-            try {
-                const result = await api.post('/school/activate-all/');
-                // Optionally show how many were activated
-                if (result?.activated !== undefined) {
-                    alert(`Activated ${result.activated} schools${result.errors?.length ? `, with ${result.errors.length} errors` : ''}.`);
+        setIsActivatingAll(true);
+        try {
+            const result = await api.post('/school/activate-all/');
+            if (result?.activated !== undefined) {
+                if (result.activated > 0) {
+                    showSuccess(
+                        `Activated ${result.activated} school${result.activated === 1 ? '' : 's'}${result.errors?.length ? ` (${result.errors.length} issue${result.errors.length === 1 ? '' : 's'})` : ''}.`
+                    );
+                } else {
+                    showInfo('All schools are already active.');
                 }
-                fetchSchools();
-            } catch (error) {
-                console.error('Failed to activate schools:', error);
-                alert(`Error: ${error.message}`);
+            } else {
+                showSuccess('Schools activated successfully.');
             }
+            setShowActivateAllModal(false);
+            fetchSchools();
+        } catch (error) {
+            console.error('Failed to activate schools:', error);
+            showError(`Error: ${error.message}`);
+        } finally {
+            setIsActivatingAll(false);
         }
     };
 
-    const handleDeleteSchool = async (id) => {
-        if (window.confirm(t('workstream.schools.confirmDelete'))) {
-            try {
-                await api.post(`/school/${id}/deactivate/`);
-                fetchSchools();
-            } catch (error) {
-                console.error('Failed to delete school:', error);
-            }
+    const handleRequestDeleteSchool = (school) => {
+        setSchoolToDelete(school);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteSchool = async () => {
+        if (!schoolToDelete?.id) return;
+        setIsDeleting(true);
+        try {
+            await api.post(`/school/${schoolToDelete.id}/deactivate/`);
+            showSuccess(`"${schoolToDelete.school_name}" deactivated successfully.`);
+            setShowDeleteModal(false);
+            setSchoolToDelete(null);
+            fetchSchools();
+        } catch (error) {
+            console.error('Failed to delete school:', error);
+            showError(`Error: ${error.message}`);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -164,7 +191,11 @@ const SchoolManagement = () => {
                         <p className="workstream-subtitle">{t('workstream.schools.subtitle')}</p>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
-                        <button className="btn-secondary" onClick={handleActivateAll} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'white', border: '1px solid #e2e8f0', padding: '0.5rem 1rem', borderRadius: '0.375rem', cursor: 'pointer' }}>
+                        <button
+                            className="btn-secondary workstream-activate-all-btn"
+                            onClick={() => setShowActivateAllModal(true)}
+                            type="button"
+                        >
                             <CheckCircle size={18} />
                             {t('workstream.schools.activateAll')}
                         </button>
@@ -241,6 +272,91 @@ const SchoolManagement = () => {
                         </button>
                     </div>
                 </form>
+            </Modal>
+
+            <Modal
+                isOpen={showActivateAllModal}
+                onClose={() => !isActivatingAll && setShowActivateAllModal(false)}
+                title={t('workstream.schools.activateAll')}
+            >
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                    <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
+                        {t('workstream.schools.confirmActivate')}
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowActivateAllModal(false)}
+                            disabled={isActivatingAll}
+                            style={{
+                                padding: '0.55rem 1rem',
+                                borderRadius: '0.5rem',
+                                border: '1px solid var(--color-border)',
+                                background: 'var(--color-bg-surface)',
+                                color: 'var(--color-text-main)',
+                                cursor: isActivatingAll ? 'not-allowed' : 'pointer',
+                                opacity: isActivatingAll ? 0.65 : 1
+                            }}
+                        >
+                            {t('common.cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleActivateAll}
+                            disabled={isActivatingAll}
+                            className="btn-primary"
+                        >
+                            {isActivatingAll ? t('common.loading') : t('workstream.schools.activateAll')}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={showDeleteModal}
+                onClose={() => !isDeleting && setShowDeleteModal(false)}
+                title="Deactivate School"
+            >
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                    <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
+                        {t('workstream.schools.confirmDelete')}
+                    </p>
+                    {schoolToDelete?.school_name && (
+                        <p style={{ margin: 0, fontWeight: 600, color: 'var(--color-text-main)' }}>
+                            {schoolToDelete.school_name}
+                        </p>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowDeleteModal(false);
+                                setSchoolToDelete(null);
+                            }}
+                            disabled={isDeleting}
+                            style={{
+                                padding: '0.55rem 1rem',
+                                borderRadius: '0.5rem',
+                                border: '1px solid var(--color-border)',
+                                background: 'var(--color-bg-surface)',
+                                color: 'var(--color-text-main)',
+                                cursor: isDeleting ? 'not-allowed' : 'pointer',
+                                opacity: isDeleting ? 0.65 : 1
+                            }}
+                        >
+                            {t('common.cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDeleteSchool}
+                            disabled={isDeleting}
+                            className="btn-primary"
+                            style={{ background: 'linear-gradient(135deg, #dc2626, #ef4444)' }}
+                        >
+                            {isDeleting ? t('common.loading') : 'Deactivate'}
+                        </button>
+                    </div>
+                </div>
             </Modal>
 
             {/* View School Details Modal */}
@@ -398,7 +514,7 @@ const SchoolManagement = () => {
                                             <Edit size={18} />
                                         </button>
                                         <button
-                                            onClick={() => handleDeleteSchool(school.id)}
+                                            onClick={() => handleRequestDeleteSchool(school)}
                                             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
                                             title="Deactivate School"
                                         >

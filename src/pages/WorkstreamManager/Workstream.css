@@ -504,6 +504,37 @@
     box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
 }
 
+.workstream-activate-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(16, 185, 129, 0.12));
+    color: var(--color-text-main);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.workstream-activate-all-btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(79, 70, 229, 0.4);
+    box-shadow: 0 8px 18px rgba(79, 70, 229, 0.12);
+}
+
+[data-theme='dark'] .workstream-activate-all-btn {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.24), rgba(16, 185, 129, 0.2));
+    border-color: rgba(148, 163, 184, 0.4);
+    color: #e2e8f0;
+}
+
+[data-theme='dark'] .workstream-activate-all-btn:hover {
+    border-color: rgba(129, 140, 248, 0.65);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.45);
+}
+
 .data-table {
     width: 100%;
     border-collapse: separate;
