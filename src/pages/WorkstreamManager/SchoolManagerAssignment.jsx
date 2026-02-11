@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, Shield, School, Mail, Trash2, Edit, X } from 'lucide-react';
+import { UserPlus, Search, School, Mail, Trash2, Edit } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import { api } from '../../utils/api';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import Modal from '../../components/ui/Modal';
@@ -10,8 +11,12 @@ import './Workstream.css';
 const SchoolManagerAssignment = () => {
     const { t } = useTheme();
     const { user } = useAuth();
+    const { showSuccess, showError, showWarning } = useToast();
     const [loading, setLoading] = useState(true);
     const [showAssignForm, setShowAssignForm] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [managerToDelete, setManagerToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [managers, setManagers] = useState([]);
     const [schools, setSchools] = useState([]);
     const [newManager, setNewManager] = useState({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
@@ -53,6 +58,24 @@ const SchoolManagerAssignment = () => {
         fetchData();
     }, []);
 
+    const isDuplicateManagerError = (error) => {
+        const msg = (error?.message || '').toLowerCase();
+        const data = error?.data;
+        const hasApiDuplicate =
+            msg.includes('already exists') ||
+            msg.includes('duplicate') ||
+            data?.email?.some?.((item) => String(item).toLowerCase().includes('already exists')) ||
+            data?.full_name?.some?.((item) => String(item).toLowerCase().includes('already exists'));
+
+        const normalizedName = (newManager.full_name || '').trim().toLowerCase();
+        const hasLocalDuplicateName = managers.some((m) => {
+            if (newManager.isEditing && m.id === newManager.id) return false;
+            return (m.full_name || '').trim().toLowerCase() === normalizedName;
+        });
+
+        return hasApiDuplicate || hasLocalDuplicateName;
+    };
+
     const handleAssignManager = async (e) => {
         e.preventDefault();
         try {
@@ -79,20 +102,36 @@ const SchoolManagerAssignment = () => {
             fetchData();
             setNewManager({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
             setShowAssignForm(false);
+            showSuccess(newManager.isEditing ? 'Manager updated successfully.' : 'Manager assigned successfully.');
         } catch (error) {
             console.error('Failed to save manager:', error);
-            alert(`Error: ${error.message}`);
+            if (isDuplicateManagerError(error)) {
+                showWarning(`Manager name "${newManager.full_name.trim()}" already exists. Please use a different name.`);
+                return;
+            }
+            showError(`Error: ${error.message}`);
         }
     };
 
-    const handleDeleteManager = async (id) => {
-        if (window.confirm(t('workstream.assignments.confirmDelete'))) {
-            try {
-                await api.post(`/users/${id}/deactivate/`);
-                fetchData();
-            } catch (error) {
-                console.error('Failed to deactivate manager:', error);
-            }
+    const handleRequestDeleteManager = (manager) => {
+        setManagerToDelete(manager);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteManager = async () => {
+        if (!managerToDelete?.id) return;
+        setIsDeleting(true);
+        try {
+            await api.post(`/users/${managerToDelete.id}/deactivate/`);
+            showSuccess(`"${managerToDelete.full_name}" deactivated successfully.`);
+            setShowDeleteModal(false);
+            setManagerToDelete(null);
+            fetchData();
+        } catch (error) {
+            console.error('Failed to deactivate manager:', error);
+            showError(`Error: ${error.message}`);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -216,6 +255,53 @@ const SchoolManagerAssignment = () => {
                 </form>
             </Modal>
 
+            <Modal
+                isOpen={showDeleteModal}
+                onClose={() => !isDeleting && setShowDeleteModal(false)}
+                title="Deactivate Manager"
+            >
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                    <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
+                        {t('workstream.assignments.confirmDelete')}
+                    </p>
+                    {managerToDelete?.full_name && (
+                        <p style={{ margin: 0, fontWeight: 600, color: 'var(--color-text-main)' }}>
+                            {managerToDelete.full_name}
+                        </p>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowDeleteModal(false);
+                                setManagerToDelete(null);
+                            }}
+                            disabled={isDeleting}
+                            style={{
+                                padding: '0.55rem 1rem',
+                                borderRadius: '0.5rem',
+                                border: '1px solid var(--color-border)',
+                                background: 'var(--color-bg-surface)',
+                                color: 'var(--color-text-main)',
+                                cursor: isDeleting ? 'not-allowed' : 'pointer',
+                                opacity: isDeleting ? 0.65 : 1
+                            }}
+                        >
+                            {t('common.cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDeleteManager}
+                            disabled={isDeleting}
+                            className="btn-primary"
+                            style={{ background: 'linear-gradient(135deg, #dc2626, #ef4444)' }}
+                        >
+                            {isDeleting ? t('common.loading') : 'Deactivate'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
             <div className="management-card">
                 <div className="table-header-actions">
                     <div style={{ position: 'relative', width: '300px' }}>
@@ -283,7 +369,7 @@ const SchoolManagerAssignment = () => {
                                             <Edit size={18} />
                                         </button>
                                         <button
-                                            onClick={() => handleDeleteManager(manager.id)}
+                                            onClick={() => handleRequestDeleteManager(manager)}
                                             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
                                             title="Deactivate Manager"
                                         >

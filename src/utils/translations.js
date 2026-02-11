@@ -13,6 +13,10 @@ export const translations = {
 
         // Header
         'header.notifications': 'Notifications',
+        'header.newNotifications': 'new notifications',
+        'header.noNewNotifications': 'No new notifications',
+        'header.noNotifications': 'No notifications',
+        'header.markAllRead': 'Mark all as read',
         'header.viewAll': 'View All Notifications',
         'header.logout': 'Logout',
         'header.menu': 'Menu',
@@ -961,6 +965,10 @@ export const translations = {
 
         // Header
         'header.notifications': 'الإشعارات',
+        'header.newNotifications': 'إشعارات جديدة',
+        'header.noNewNotifications': 'لا توجد إشعارات جديدة',
+        'header.noNotifications': 'لا توجد إشعارات',
+        'header.markAllRead': 'تعيين الكل كمقروء',
         'header.viewAll': 'عرض لكل الإشعارات',
         'header.logout': 'تسجيل الخروج',
         'auth.logout': 'تسجيل الخروج',

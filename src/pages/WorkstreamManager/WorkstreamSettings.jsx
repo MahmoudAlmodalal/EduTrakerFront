@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { Save, Bell, Lock, Globe, Mail, Moon, Sun, Monitor, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import workstreamService from '../../services/workstreamService';
 import './Workstream.css';
 
@@ -9,6 +10,7 @@ const WorkstreamSettings = () => {
     const [activeTab, setActiveTab] = useState('profile');
     const { theme, toggleTheme, language, changeLanguage, t } = useTheme();
     const { user } = useAuth();
+    const { showSuccess, showError } = useToast();
     const [profileData, setProfileData] = useState({
         first_name: '',
         last_name: '',
@@ -47,9 +49,9 @@ const WorkstreamSettings = () => {
                 email: profileData.email
             };
             await workstreamService.updateUserProfile(user.id, payload);
-            alert('Profile updated successfully!');
+            showSuccess('Profile updated successfully.');
         } catch (error) {
-            alert('Failed to update profile: ' + error.message);
+            showError('Failed to update profile: ' + error.message);
         } finally {
             setSaving(false);
         }

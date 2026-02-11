@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Users, BookOpen, AlertCircle, FileText, Download } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useToast } from '../../components/ui/Toast';
 import reportService from '../../services/reportService';
 import './Workstream.css';
 
 const WorkstreamReports = () => {
     const { t } = useTheme();
+    const { showError, showWarning, showSuccess } = useToast();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -43,11 +45,47 @@ const WorkstreamReports = () => {
         ? (schoolStats.reduce((sum, s) => sum + (s.attendance || 0), 0) / schoolStats.length).toFixed(1)
         : 0;
 
-    const handleExport = async (format) => {
+    const handleExport = async (format, section, reportLabel) => {
+        if (loading) {
+            showWarning(`Please wait. ${reportLabel} is still loading.`);
+            return;
+        }
+
+        if (!schoolStats.length) {
+            showWarning(`No data available for ${reportLabel}. Add schools/stats first, then try export again.`);
+            return;
+        }
+
         try {
-            await reportService.exportReport(format);
+            const attendanceRows = schoolStats.map((row) => ({
+                school: row.school,
+                present_percentage: row.attendance,
+                absent_percentage: row.absent,
+                status: row.attendance >= 90 ? 'Optimal' : 'Needs Attention',
+            }));
+
+            const utilizationRows = schoolStats.map((row) => ({
+                school: row.school,
+                teachers: row.teachers,
+                classrooms: row.classrooms,
+                utilization_percentage: row.utilization,
+                capacity_state: row.utilization > 100 ? 'Over Capacity' : 'Within Capacity',
+            }));
+
+            const exportData = section === 'utilization' ? utilizationRows : attendanceRows;
+            const reportType = section === 'utilization'
+                ? 'workstream_resource_utilization'
+                : 'workstream_attendance';
+
+            await reportService.exportReport(format, reportType, exportData);
+            showSuccess(`${reportLabel} exported successfully.`);
         } catch (err) {
-            alert('Export failed: ' + err.message);
+            const rawMessage = String(err?.message || '').toLowerCase();
+            if (rawMessage.includes('no data to export') || rawMessage.includes('invalid report type')) {
+                showError(`Export failed for ${reportLabel}: no exportable data was found.`);
+                return;
+            }
+            showError(`Export failed for ${reportLabel}: ${err.message}`);
         }
     };
 
@@ -108,7 +146,7 @@ const WorkstreamReports = () => {
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <h3 className="chart-title">{t('workstream.reports.monthlyAttendance')}</h3>
                         <button
-                            onClick={() => handleExport('pdf')}
+                            onClick={() => handleExport('pdf', 'attendance', 'Monthly Attendance')}
                             style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}
                         >
                             <Download size={18} />
@@ -155,7 +193,7 @@ const WorkstreamReports = () => {
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <h3 className="chart-title">{t('workstream.reports.resourceUtilization')}</h3>
                         <button
-                            onClick={() => handleExport('csv')}
+                            onClick={() => handleExport('csv', 'utilization', 'Resource Utilization')}
                             style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}
                         >
                             <Download size={18} />
