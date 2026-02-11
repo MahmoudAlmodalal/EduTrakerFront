@@ -119,6 +119,11 @@ const managerService = {
         return res.data !== undefined ? res.data : res;
     },
 
+    activateGrade: async (id) => {
+        const res = await api.post(`/grades/${id}/activate/`);
+        return res.data !== undefined ? res.data : res;
+    },
+
     // ============================================
     // Course Management (scoped to school)
     // Backend: /api/school/<schoolId>/courses/

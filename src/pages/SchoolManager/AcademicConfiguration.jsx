@@ -8,12 +8,14 @@ import {
     CheckCircle,
     Search,
     GraduationCap,
+    Layers,
     Power,
     Edit,
     Building
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import managerService from '../../services/managerService';
 import './SchoolManager.css';
 
@@ -94,6 +96,8 @@ const AcademicConfiguration = () => {
         switch (activeTab) {
             case 'academic-year':
                 return <AcademicYearManagement academicYears={academicYears} schoolId={schoolId} onUpdated={fetchAcademicYears} />;
+            case 'grades':
+                return <GradeManagement />;
             case 'subjects':
                 return <SubjectAllocation courses={courses} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
             case 'classrooms':
@@ -111,6 +115,7 @@ const AcademicConfiguration = () => {
 
     const tabs = [
         { id: 'academic-year', label: 'Academic Year', icon: GraduationCap, hasWarning: !hasActiveAcademicYear && !loading },
+        { id: 'grades', label: 'Grades', icon: Layers },
         { id: 'subjects', label: 'Subjects', icon: BookOpen },
         { id: 'classrooms', label: 'Classrooms', icon: Building },
         { id: 'teachers', label: 'Teachers', icon: Users },
@@ -215,6 +220,7 @@ const AcademicConfiguration = () => {
 // Academic Year Management Tab
 // ============================================
 const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
+    const { showSuccess, showError } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ start_date: '', end_date: '' });
     const [saving, setSaving] = useState(false);
@@ -222,7 +228,7 @@ const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!schoolId) {
-            alert('Error: School ID not found.');
+            showError('Error: School ID not found.');
             return;
         }
         setSaving(true);
@@ -232,39 +238,32 @@ const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
                 start_date: formData.start_date,
                 end_date: formData.end_date
             });
-            alert('Academic year created successfully!');
+            showSuccess('Academic year created successfully.');
             setIsModalOpen(false);
             setFormData({ start_date: '', end_date: '' });
             onUpdated();
         } catch (error) {
             console.error('Failed to create academic year:', error);
             const msg = error?.response?.data?.detail || error?.response?.data?.non_field_errors?.[0] || error.message || 'Failed to create academic year.';
-            alert(msg);
+            showError(msg);
         } finally {
             setSaving(false);
         }
     };
 
-    const handleActivate = async (id) => {
+    const handleToggleStatus = async (ay) => {
         try {
-            await managerService.activateAcademicYear(id);
-            alert('Academic year activated!');
+            if (ay.is_active) {
+                await managerService.deactivateAcademicYear(ay.id);
+                showSuccess('Academic year deactivated.');
+            } else {
+                await managerService.activateAcademicYear(ay.id);
+                showSuccess('Academic year activated.');
+            }
             onUpdated();
         } catch (error) {
-            console.error('Failed to activate:', error);
-            alert(error?.response?.data?.detail || 'Failed to activate academic year.');
-        }
-    };
-
-    const handleDeactivate = async (id) => {
-        if (!window.confirm('Are you sure you want to deactivate this academic year?')) return;
-        try {
-            await managerService.deactivateAcademicYear(id);
-            alert('Academic year deactivated!');
-            onUpdated();
-        } catch (error) {
-            console.error('Failed to deactivate:', error);
-            alert(error?.response?.data?.detail || 'Failed to deactivate academic year.');
+            console.error('Failed to toggle status:', error);
+            showError(error?.response?.data?.detail || 'Failed to update academic year status.');
         }
     };
 
@@ -300,7 +299,6 @@ const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
                             <th>Start Date</th>
                             <th>End Date</th>
                             <th>Status</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -310,34 +308,14 @@ const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
                                 <td>{ay.start_date}</td>
                                 <td>{ay.end_date}</td>
                                 <td>
-                                    <span style={{
-                                        padding: '2px 8px',
-                                        borderRadius: '999px',
-                                        fontSize: '12px',
-                                        background: ay.is_active ? 'var(--color-success-light, #dcfce7)' : 'var(--color-error-light, #fee2e2)',
-                                        color: ay.is_active ? 'var(--color-success, #16a34a)' : 'var(--color-error, #dc2626)'
-                                    }}>
+                                    <span
+                                        className={`status-badge ${ay.is_active ? 'status-active' : 'status-inactive'}`}
+                                        onClick={() => handleToggleStatus(ay)}
+                                        style={{ cursor: 'pointer' }}
+                                        title={ay.is_active ? 'Click to deactivate' : 'Click to activate'}
+                                    >
                                         {ay.is_active ? 'Active' : 'Inactive'}
                                     </span>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        {ay.is_active ? (
-                                            <button
-                                                onClick={() => handleDeactivate(ay.id)}
-                                                style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.875rem' }}
-                                            >
-                                                <Power size={14} /> Deactivate
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => handleActivate(ay.id)}
-                                                style={{ color: 'var(--color-success, #16a34a)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.875rem' }}
-                                            >
-                                                <Power size={14} /> Activate
-                                            </button>
-                                        )}
-                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -390,25 +368,220 @@ const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
                     </div>
                 </div>
             )}
+
         </div>
     );
 };
 
 // Sub-components for Tabs
-const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+const GradeManagement = () => {
+    const { showSuccess, showError, showWarning } = useToast();
     const [grades, setGrades] = useState([]);
-    const [formData, setFormData] = useState({ grade_id: '', course_code: '', name: '' });
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [formData, setFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
+
+    const fetchGrades = async () => {
+        try {
+            const data = await managerService.getGrades({ include_inactive: true });
+            setGrades(data.results || data || []);
+        } catch (error) {
+            console.error('Failed to fetch grades:', error);
+            setGrades([]);
+        }
+    };
 
     useEffect(() => {
-        const fetchGrades = async () => {
-            try {
-                const data = await managerService.getGrades();
-                setGrades(data.results || data);
-            } catch (error) {
-                console.error('Failed to fetch grades:', error);
+        fetchGrades();
+    }, []);
+
+    const handleCreateGrade = async (e) => {
+        e.preventDefault();
+        if (!formData.name || !formData.numeric_level || !formData.min_age || !formData.max_age) {
+            showWarning('Please complete all grade fields.');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            await managerService.createGrade({
+                name: formData.name.trim(),
+                numeric_level: parseInt(formData.numeric_level, 10),
+                min_age: parseInt(formData.min_age, 10),
+                max_age: parseInt(formData.max_age, 10),
+            });
+            showSuccess('Grade created successfully.');
+            setIsModalOpen(false);
+            setFormData({ name: '', numeric_level: '', min_age: '', max_age: '' });
+            fetchGrades();
+        } catch (error) {
+            console.error('Failed to create grade:', error);
+            const msg = error?.response?.data?.numeric_level?.[0] || error?.response?.data?.detail || error?.message || 'Failed to create grade.';
+            showError(msg);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleToggleGrade = async (grade) => {
+        try {
+            if (grade.is_active) {
+                await managerService.deactivateGrade(grade.id);
+                showSuccess('Grade deactivated.');
+            } else {
+                await managerService.activateGrade(grade.id);
+                showSuccess('Grade activated.');
             }
-        };
+            fetchGrades();
+        } catch (error) {
+            console.error('Failed to toggle grade status:', error);
+            showError(error?.response?.data?.detail || 'Failed to update grade status.');
+        }
+    };
+
+    return (
+        <div className="management-card">
+            <div className="table-header-actions">
+                <h3 className="chart-title">Grade Management</h3>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                    <Plus size={18} />
+                    Add Grade
+                </button>
+            </div>
+
+            {grades.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    No grades found. Create your first grade.
+                </div>
+            ) : (
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>Grade</th>
+                            <th>Level</th>
+                            <th>Age Range</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {grades.map((grade) => (
+                            <tr key={grade.id}>
+                                <td style={{ fontWeight: 600 }}>{grade.name}</td>
+                                <td>{grade.numeric_level}</td>
+                                <td>{grade.min_age} - {grade.max_age}</td>
+                                <td>
+                                    <span
+                                        className={`status-badge ${grade.is_active ? 'status-active' : 'status-inactive'}`}
+                                        onClick={() => handleToggleGrade(grade)}
+                                        style={{ cursor: 'pointer' }}
+                                        title={grade.is_active ? 'Click to deactivate' : 'Click to activate'}
+                                    >
+                                        {grade.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+
+            {isModalOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '0.5rem', width: '420px',
+                        border: '1px solid var(--color-border)'
+                    }}>
+                        <h3 style={{ margin: 0, marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add Grade</h3>
+                        <form onSubmit={handleCreateGrade} style={{ display: 'grid', gap: '0.85rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Grade Name</label>
+                                <input
+                                    required
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    placeholder="e.g. Grade 7"
+                                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Numeric Level</label>
+                                <input
+                                    required
+                                    type="number"
+                                    min="1"
+                                    value={formData.numeric_level}
+                                    onChange={(e) => setFormData({ ...formData, numeric_level: e.target.value })}
+                                    placeholder="e.g. 7"
+                                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Min Age</label>
+                                    <input
+                                        required
+                                        type="number"
+                                        min="1"
+                                        value={formData.min_age}
+                                        onChange={(e) => setFormData({ ...formData, min_age: e.target.value })}
+                                        style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Max Age</label>
+                                    <input
+                                        required
+                                        type="number"
+                                        min="1"
+                                        value={formData.max_age}
+                                        onChange={(e) => setFormData({ ...formData, max_age: e.target.value })}
+                                        style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsModalOpen(false)}
+                                    style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-primary" disabled={saving}>
+                                    {saving ? 'Saving...' : 'Add Grade'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
+    const { showSuccess, showError, showWarning } = useToast();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
+    const [grades, setGrades] = useState([]);
+    const [formData, setFormData] = useState({ grade_id: '', course_code: '', name: '' });
+    const [gradeForm, setGradeForm] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
+    const [creatingGrade, setCreatingGrade] = useState(false);
+
+    const fetchGrades = async () => {
+        try {
+            const data = await managerService.getGrades({ include_inactive: false });
+            setGrades(data.results || data || []);
+        } catch (error) {
+            console.error('Failed to fetch grades:', error);
+            setGrades([]);
+        }
+    };
+
+    useEffect(() => {
         fetchGrades();
     }, []);
 
@@ -416,7 +589,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
         e.preventDefault();
 
         if (!schoolId) {
-            alert('Error: School ID not found. Please log out and log in again.');
+            showError('Error: School ID not found. Please log out and log in again.');
             console.error('Cannot create course: schoolId is undefined.');
             return;
         }
@@ -429,22 +602,52 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
             onCourseUpdated();
             setIsModalOpen(false);
             setFormData({ grade_id: '', course_code: '', name: '' });
+            showSuccess('Subject created successfully.');
         } catch (error) {
             console.error('Failed to create course:', error);
-            alert('Failed to create course. Please check your permissions.');
+            showError('Failed to create course. Please check your permissions.');
+        }
+    };
+
+    const handleCreateGrade = async (e) => {
+        e.preventDefault();
+        if (!gradeForm.name || !gradeForm.numeric_level || !gradeForm.min_age || !gradeForm.max_age) {
+            showWarning('Please fill all grade fields.');
+            return;
+        }
+        setCreatingGrade(true);
+        try {
+            const created = await managerService.createGrade({
+                name: gradeForm.name.trim(),
+                numeric_level: parseInt(gradeForm.numeric_level, 10),
+                min_age: parseInt(gradeForm.min_age, 10),
+                max_age: parseInt(gradeForm.max_age, 10),
+            });
+            showSuccess('Grade created successfully.');
+            setIsGradeModalOpen(false);
+            setGradeForm({ name: '', numeric_level: '', min_age: '', max_age: '' });
+            await fetchGrades();
+            if (created?.id) {
+                setFormData((prev) => ({ ...prev, grade_id: String(created.id) }));
+            }
+        } catch (error) {
+            console.error('Failed to create grade:', error);
+            const msg = error?.response?.data?.numeric_level?.[0] || error?.response?.data?.detail || error?.message || 'Failed to create grade.';
+            showError(msg);
+        } finally {
+            setCreatingGrade(false);
         }
     };
 
     const handleRemove = async (id) => {
-        if (!window.confirm('Are you sure you want to deactivate this subject?')) return;
         try {
             // Backend returns 204 No Content on success
             await managerService.deactivateCourse(schoolId, id);
-            alert('Subject deactivated successfully!');
+            showSuccess('Subject deactivated successfully.');
             onCourseUpdated();
         } catch (error) {
             console.error('Failed to deactivate course:', error);
-            alert(error.message || 'Failed to deactivate subject. Please check network and permissions.');
+            showError(error.message || 'Failed to deactivate subject. Please check network and permissions.');
         }
     };
 
@@ -505,7 +708,16 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                         <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add Subject to School</h2>
                         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Grade</label>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <label style={{ fontSize: '0.875rem' }}>Grade</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsGradeModalOpen(true)}
+                                        style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                                    >
+                                        + Add Grade
+                                    </button>
+                                </div>
                                 <select
                                     required
                                     value={formData.grade_id}
@@ -541,6 +753,80 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
                                 <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
                                 <button type="submit" className="btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {isGradeModalOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '0.5rem', width: '420px',
+                        border: '1px solid var(--color-border)'
+                    }}>
+                        <h3 style={{ margin: 0, marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add Specific Grade</h3>
+                        <form onSubmit={handleCreateGrade} style={{ display: 'grid', gap: '0.85rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Grade Name</label>
+                                <input
+                                    required
+                                    value={gradeForm.name}
+                                    onChange={(e) => setGradeForm({ ...gradeForm, name: e.target.value })}
+                                    placeholder="e.g. Grade 7"
+                                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Numeric Level</label>
+                                <input
+                                    required
+                                    type="number"
+                                    min="1"
+                                    value={gradeForm.numeric_level}
+                                    onChange={(e) => setGradeForm({ ...gradeForm, numeric_level: e.target.value })}
+                                    placeholder="e.g. 7"
+                                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Min Age</label>
+                                    <input
+                                        required
+                                        type="number"
+                                        min="1"
+                                        value={gradeForm.min_age}
+                                        onChange={(e) => setGradeForm({ ...gradeForm, min_age: e.target.value })}
+                                        style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Max Age</label>
+                                    <input
+                                        required
+                                        type="number"
+                                        min="1"
+                                        value={gradeForm.max_age}
+                                        onChange={(e) => setGradeForm({ ...gradeForm, max_age: e.target.value })}
+                                        style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsGradeModalOpen(false)}
+                                    style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-primary" disabled={creatingGrade}>
+                                    {creatingGrade ? 'Saving...' : 'Add Grade'}
+                                </button>
                             </div>
                         </form>
                     </div>

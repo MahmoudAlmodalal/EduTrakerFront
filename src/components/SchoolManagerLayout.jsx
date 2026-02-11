@@ -9,7 +9,6 @@ import {
     Briefcase,
     UserCheck,
     Sparkles,
-    Bell,
     MessageSquare,
     Menu,
     X
@@ -17,9 +16,9 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import '../pages/SchoolManager/SchoolManager.css';
-import notificationService from '../services/notificationService';
 import managerService from '../services/managerService';
 import { useCachedApi } from '../hooks/useCachedApi';
+import NotificationDropdown from './shared/NotificationDropdown';
 
 const SchoolManagerLayout = () => {
     const { t } = useTheme();
@@ -68,17 +67,6 @@ const SchoolManagerLayout = () => {
     // Check if we have a valid token
     const hasValidToken = !!user && !!localStorage.getItem('accessToken');
 
-    // Fetch unread count with caching (2 minute TTL)
-    const { data: unreadData, error: unreadError } = useCachedApi(
-        () => notificationService.getUnreadCount(),
-        {
-            enabled: hasValidToken,
-            cacheKey: `unread_count_${user?.id}`,
-            ttl: 2 * 60 * 1000, // 2 minutes
-            dependencies: [user?.id]
-        }
-    );
-
     // Fetch dashboard stats for sidebar quick stats (5 minute TTL)
     const { data: dashboardData } = useCachedApi(
         () => managerService.getDashboardStats(),
@@ -91,17 +79,6 @@ const SchoolManagerLayout = () => {
     );
 
     const sidebarStats = dashboardData?.statistics || {};
-
-    // If we get 401 errors, logout the user
-    useEffect(() => {
-        if (unreadError?.includes('401')) {
-            console.warn('Token expired, logging out...');
-            logout();
-            navigate('/login');
-        }
-    }, [unreadError, logout, navigate]);
-
-    const unreadCount = unreadData?.unread_count || 0;
 
     const getInitials = () => {
         if (user?.name) {
@@ -199,40 +176,6 @@ const SchoolManagerLayout = () => {
                     paddingTop: '20px',
                     borderTop: '1px solid rgba(255, 255, 255, 0.06)'
                 }}>
-                    <div
-                        onClick={() => navigate('/school-manager/communication')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            padding: '12px 16px',
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            borderRadius: '12px',
-                            marginBottom: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        <div style={{ position: 'relative' }}>
-                            <Bell size={18} style={{ color: 'rgba(226, 232, 240, 0.7)' }} />
-                            {unreadCount > 0 && (
-                                <span style={{
-                                    position: 'absolute',
-                                    top: '-4px',
-                                    right: '-4px',
-                                    width: '10px',
-                                    height: '10px',
-                                    background: '#ef4444',
-                                    borderRadius: '50%',
-                                    border: '2px solid #0f172a'
-                                }}></span>
-                            )}
-                        </div>
-                        <span style={{ fontSize: '0.875rem', color: 'rgba(226, 232, 240, 0.7)' }}>
-                            {unreadCount > 0 ? `${unreadCount} ${t('header.newNotifications')}` : t('header.noNewNotifications')}
-                        </span>
-                    </div>
-
                     {/* User Card */}
                     <div style={{
                         display: 'flex',
@@ -294,6 +237,21 @@ const SchoolManagerLayout = () => {
             </aside>
 
             <main className={`school-manager-main ${!isSidebarOpen ? 'expanded' : ''}`}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', position: 'relative' }}>
+                    <NotificationDropdown
+                        communicationPath="/school-manager/communication"
+                        allowedRoutePrefixes={[
+                            '/school-manager/dashboard',
+                            '/school-manager/configuration',
+                            '/school-manager/reports',
+                            '/school-manager/teachers',
+                            '/school-manager/departments',
+                            '/school-manager/secretaries',
+                            '/school-manager/communication',
+                            '/school-manager/settings',
+                        ]}
+                    />
+                </div>
                 <Outlet />
             </main>
         </div>
