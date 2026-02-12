@@ -107,6 +107,18 @@ const QueryErrorState = ({ message, onRetry, compact = false }) => (
     </div>
 );
 
+const TableCard = memo(function TableCard({ left, right, children }) {
+    return (
+        <div className="management-card">
+            <div className="table-header-actions">
+                {left}
+                {right}
+            </div>
+            {children}
+        </div>
+    );
+});
+
 const TeacherMonitoring = () => {
     const { t } = useTheme();
     const { user } = useAuth();
@@ -159,7 +171,13 @@ const TeacherMonitoring = () => {
         }
 
         if (teachersLoading) {
-            return <div className="sm-loading-state">Loading teacher data...</div>;
+            return (
+                <div className="management-card">
+                    <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        {t('common.loading') || 'Loading...'}
+                    </div>
+                </div>
+            );
         }
 
         if (teachersError) {
@@ -203,7 +221,7 @@ const TeacherMonitoring = () => {
     };
 
     return (
-        <div className="teacher-monitoring-page">
+        <div className="management-page teacher-monitoring-page">
             <div className="school-manager-header">
                 <h1 className="school-manager-title">{t('school.teachers.title') || 'Teacher Monitoring'}</h1>
             </div>
@@ -225,14 +243,13 @@ const TeacherMonitoring = () => {
                 })}
             </div>
 
-            <div className="tab-content">
-                {renderTabContent()}
-            </div>
+            {renderTabContent()}
         </div>
     );
 };
 
 const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, teachersQueryKey }) {
+    const { t } = useTheme();
     const queryClient = useQueryClient();
     const { showSuccess, showError } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -401,23 +418,31 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
     }, [toggleTeacherStatusMutation]);
 
     return (
-        <div className="management-card">
-            <div className="table-header-actions">
-                <div className="sm-search-wrap">
-                    <Search size={18} className="sm-search-icon" />
+        <TableCard
+            left={(
+                <div style={{ position: 'relative', width: '300px' }}>
+                    <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                     <input
                         type="text"
-                        placeholder="Search teachers..."
+                        placeholder={t('common.search') || 'Search teachers...'}
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
-                        className="sm-search-input"
+                        style={{
+                            width: '100%',
+                            padding: '0.5rem 0.5rem 0.5rem 2.25rem',
+                            borderRadius: '0.375rem',
+                            border: '1px solid var(--color-border)'
+                        }}
                     />
                 </div>
+            )}
+            right={(
                 <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
                     <Plus size={18} />
                     Add Teacher
                 </button>
-            </div>
+            )}
+        >
 
             <table className="data-table">
                 <thead>
@@ -432,7 +457,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                 <tbody>
                     {filteredTeachers.length === 0 ? (
                         <tr>
-                            <td colSpan="5" className="sm-empty-state">
+                            <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
                                 No teachers found.
                             </td>
                         </tr>
@@ -443,49 +468,55 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                             && updateTeacherStatusMutation.variables?.teacherId === id;
 
                         return (
-                            <tr key={id} className={isActive ? '' : 'inactive-row'}>
+                            <tr key={id}>
                                 <td>
-                                    <div className="teacher-row-identity">
-                                        <div className="teacher-avatar">
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{
+                                            width: '36px', height: '36px', borderRadius: '50%',
+                                            background: '#f3e8ff', color: '#9333ea',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontWeight: 'bold', fontSize: '0.875rem'
+                                        }}>
                                             {teacher.full_name?.charAt(0)?.toUpperCase() || 'T'}
                                         </div>
                                         <div>
-                                            <div className="teacher-name">{teacher.full_name}</div>
-                                            <div className="teacher-email">
+                                            <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
+                                                {teacher.full_name}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <Mail size={12} />
                                                 {teacher.email}
                                             </div>
                                         </div>
                                     </div>
                                 </td>
-                                <td className={`sm-muted-cell ${!teacher.school_name ? 'empty' : ''}`}>
+                                <td style={{ color: teacher.school_name ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
                                     {teacher.school_name || 'Not assigned'}
                                 </td>
-                                <td className={`teacher-specialization ${!teacher.specialization ? 'empty' : ''}`}>
+                                <td style={{ color: teacher.specialization ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
                                     {teacher.specialization || 'Not specified'}
                                 </td>
                                 <td>
-                                    <span
-                                        className={`status-badge ${isActive ? 'status-active' : 'status-inactive'}`}
+                                    <button
+                                        type="button"
+                                        className={`status-badge ${isActive ? 'status-active active' : 'status-inactive inactive'} status-toggle-btn`}
                                         onClick={() => handleStatusBadgeToggle(teacher)}
                                         style={{
-                                            cursor: toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id ? 'wait' : 'pointer',
                                             opacity: toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id ? 0.75 : 1
                                         }}
-                                        title={toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id ? 'Updating status...' : 'Click to toggle status'}
+                                        disabled={toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id}
+                                        title="Click to toggle status"
                                     >
-                                        {toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id
-                                            ? 'Updating...'
-                                            : (isActive ? 'Active' : 'Inactive')}
-                                    </span>
+                                        {isActive ? 'Active' : 'Inactive'}
+                                    </button>
                                 </td>
                                 <td>
-                                    <div className="table-actions">
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
                                         {isActive ? (
                                             <button
                                                 onClick={() => requestStatusChange(teacher, false)}
                                                 title="Deactivate Teacher"
-                                                className="icon-btn danger"
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
                                                 disabled={isUpdatingThisTeacher}
                                             >
                                                 <Trash2 size={18} />
@@ -494,7 +525,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                                             <button
                                                 onClick={() => requestStatusChange(teacher, true)}
                                                 title="Activate Teacher"
-                                                className="icon-btn success"
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-success)' }}
                                                 disabled={isUpdatingThisTeacher}
                                             >
                                                 <UserCheck size={18} />
@@ -622,7 +653,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                     </button>
                 </div>
             </Modal>
-        </div>
+        </TableCard>
     );
 });
 
@@ -775,14 +806,15 @@ const PerformanceEvaluation = memo(function PerformanceEvaluation({
     }, [evaluations, evaluationsError, evaluationsLoading, onRetryEvaluations]);
 
     return (
-        <div className="management-card">
-            <div className="table-header-actions">
-                <h3 className="chart-title">Performance Evaluations</h3>
+        <TableCard
+            left={<h3 className="chart-title">Performance Evaluations</h3>}
+            right={(
                 <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
                     <Plus size={18} />
                     New Evaluation
                 </button>
-            </div>
+            )}
+        >
 
             <table className="data-table">
                 <thead>
@@ -853,7 +885,7 @@ const PerformanceEvaluation = memo(function PerformanceEvaluation({
                     </div>
                 </form>
             </Modal>
-        </div>
+        </TableCard>
     );
 });
 

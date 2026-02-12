@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, UserCheck, UserX, Mail, Briefcase } from 'lucide-react';
+import { Search, Plus, Edit, Mail, Briefcase } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import managerService from '../../services/managerService';
 import Modal from '../../components/ui/Modal';
+import { useToast } from '../../components/ui/Toast';
 import './SchoolManager.css';
 
 const SecretaryMonitoring = () => {
     const { t } = useTheme();
     const { user } = useAuth();
+    const { showSuccess, showError } = useToast();
     const [secretaries, setSecretaries] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [togglingId, setTogglingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -27,11 +30,12 @@ const SecretaryMonitoring = () => {
     const fetchSecretaries = async () => {
         try {
             setLoading(true);
-            const data = await managerService.getSecretaries();
+            const data = await managerService.getSecretaries({ include_inactive: true });
             setSecretaries(Array.isArray(data) ? data : (data?.results || []));
         } catch (err) {
             console.error('Error fetching secretaries:', err);
             setSecretaries([]);
+            showError('Failed to load secretaries.');
         } finally {
             setLoading(false);
         }
@@ -111,6 +115,7 @@ const SecretaryMonitoring = () => {
                     updatePayload.password = formData.password;
                 }
                 await managerService.updateSecretary(editId, updatePayload);
+                showSuccess('Secretary updated successfully.');
             } else {
                 if (!formData.password) {
                     setError('Password is required for new secretary.');
@@ -125,6 +130,7 @@ const SecretaryMonitoring = () => {
                     hire_date: formData.hire_date || undefined
                 };
                 await managerService.createSecretary(createPayload);
+                showSuccess('Secretary created successfully.');
             }
             setShowModal(false);
             resetForm();
@@ -142,27 +148,24 @@ const SecretaryMonitoring = () => {
         }
     };
 
-    const handleDeactivate = async (secretary) => {
+    const handleToggleStatus = async (secretary) => {
         const id = secretary.user_id || secretary.id;
-        const name = secretary.full_name || secretary.name || 'this secretary';
-        if (!window.confirm(`Are you sure you want to deactivate ${name}?`)) return;
+        const isActive = secretary.is_active !== false;
+        setTogglingId(id);
         try {
-            await managerService.deactivateSecretary(id);
+            if (isActive) {
+                await managerService.deactivateSecretary(id);
+                showSuccess('Secretary deactivated successfully.');
+            } else {
+                await managerService.activateSecretary(id);
+                showSuccess('Secretary activated successfully.');
+            }
             await fetchSecretaries();
         } catch (err) {
-            console.error('Error deactivating secretary:', err);
-            alert('Failed to deactivate secretary.');
-        }
-    };
-
-    const handleActivate = async (secretary) => {
-        const id = secretary.user_id || secretary.id;
-        try {
-            await managerService.activateSecretary(id);
-            await fetchSecretaries();
-        } catch (err) {
-            console.error('Error activating secretary:', err);
-            alert('Failed to activate secretary.');
+            console.error('Error toggling secretary status:', err);
+            showError(isActive ? 'Failed to deactivate secretary.' : 'Failed to activate secretary.');
+        } finally {
+            setTogglingId(null);
         }
     };
 
@@ -257,9 +260,15 @@ const SecretaryMonitoring = () => {
                                                 </div>
                                             </td>
                                             <td>
-                                                <span className={`status-badge ${isActive ? 'status-active' : 'status-inactive'}`}>
+                                                <button
+                                                    type="button"
+                                                    className={`status-badge ${isActive ? 'status-active active' : 'status-inactive inactive'} status-toggle-btn`}
+                                                    onClick={() => handleToggleStatus(sec)}
+                                                    disabled={togglingId === id}
+                                                    title={isActive ? 'Click to deactivate' : 'Click to activate'}
+                                                >
                                                     {isActive ? 'Active' : 'Inactive'}
-                                                </span>
+                                                </button>
                                             </td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -270,23 +279,6 @@ const SecretaryMonitoring = () => {
                                                     >
                                                         <Edit size={18} />
                                                     </button>
-                                                    {isActive ? (
-                                                        <button
-                                                            onClick={() => handleDeactivate(sec)}
-                                                            title="Deactivate"
-                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
-                                                        >
-                                                            <Trash2 size={18} />
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleActivate(sec)}
-                                                            title="Activate"
-                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-success)' }}
-                                                        >
-                                                            <UserCheck size={18} />
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
