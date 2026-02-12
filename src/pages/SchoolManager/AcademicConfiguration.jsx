@@ -6,18 +6,121 @@ import {
     AlertTriangle,
     Plus,
     CheckCircle,
-    Search,
     GraduationCap,
     Layers,
-    Power,
     Edit,
-    Building
+    Building,
+    UserCheck,
+    Trash2
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import managerService from '../../services/managerService';
+import Modal from '../../components/ui/Modal';
 import './SchoolManager.css';
+
+const getErrorMessage = (error, fallbackMessage) => {
+    const responseData = error?.response?.data;
+
+    if (typeof responseData === 'string' && responseData.trim()) {
+        return responseData;
+    }
+
+    if (responseData?.detail) {
+        return responseData.detail;
+    }
+
+    if (responseData && typeof responseData === 'object') {
+        const flattened = Object.values(responseData)
+            .flat()
+            .map((value) => (Array.isArray(value) ? value[0] : value))
+            .map((value) => (typeof value === 'string' ? value : ''))
+            .filter(Boolean)
+            .join(' ');
+
+        if (flattened) {
+            return flattened;
+        }
+    }
+
+    if (typeof error?.message === 'string' && error.message.trim()) {
+        return error.message;
+    }
+
+    return fallbackMessage;
+};
+
+const runMobileAction = (event, actions) => {
+    const action = event.target.value;
+    event.target.value = '';
+    if (!action || !actions[action]) return;
+    actions[action]();
+};
+
+const RowActions = ({
+    isActive,
+    onUpdate,
+    onActivate,
+    onDeactivate,
+    updateTitle = 'Update',
+    activateTitle = 'Activate',
+    deactivateTitle = 'Deactivate'
+}) => (
+    <>
+        <div className="table-actions sm-row-actions-desktop">
+            <button
+                type="button"
+                className="icon-btn"
+                title={updateTitle}
+                onClick={onUpdate}
+                style={{ color: 'var(--color-primary)' }}
+            >
+                <Edit size={17} />
+            </button>
+            {isActive ? (
+                <button
+                    type="button"
+                    className="icon-btn danger"
+                    title={deactivateTitle}
+                    onClick={onDeactivate}
+                >
+                    <Trash2 size={17} />
+                </button>
+            ) : (
+                <button
+                    type="button"
+                    className="icon-btn success"
+                    title={activateTitle}
+                    onClick={onActivate}
+                >
+                    <UserCheck size={17} />
+                </button>
+            )}
+        </div>
+        <div className="sm-row-actions-mobile">
+            <select
+                className="sm-action-select"
+                defaultValue=""
+                onChange={(event) =>
+                    runMobileAction(event, {
+                        update: onUpdate,
+                        activate: onActivate,
+                        deactivate: onDeactivate
+                    })
+                }
+            >
+                <option value="">Actions</option>
+                <option value="update">Update</option>
+                {isActive ? (
+                    <option value="deactivate">Deactivate</option>
+                ) : (
+                    <option value="activate">Activate</option>
+                )}
+            </select>
+        </div>
+    </>
+);
 
 const AcademicConfiguration = () => {
     const { t } = useTheme();
@@ -45,7 +148,7 @@ const AcademicConfiguration = () => {
             setLoading(true);
             try {
                 const [coursesData, teachersData, academicYearsData] = await Promise.all([
-                    managerService.getCourses(schoolId),
+                    managerService.getCourses(schoolId, { include_inactive: true }),
                     managerService.getTeachers(),
                     managerService.getAcademicYears({ school_id: schoolId, include_inactive: true })
                 ]);
@@ -66,7 +169,7 @@ const AcademicConfiguration = () => {
     const fetchCourses = async () => {
         if (!schoolId) return;
         try {
-            const data = await managerService.getCourses(schoolId);
+            const data = await managerService.getCourses(schoolId, { include_inactive: true });
             setCourses(data.results || data || []);
         } catch (error) {
             console.error('Failed to fetch courses:', error);
@@ -377,9 +480,14 @@ const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
 const GradeManagement = () => {
     const { showSuccess, showError, showWarning } = useToast();
     const [grades, setGrades] = useState([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [editingGrade, setEditingGrade] = useState(null);
+    const [pendingStatusAction, setPendingStatusAction] = useState(null);
+    const [togglingGradeId, setTogglingGradeId] = useState(null);
     const [formData, setFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
+    const [editFormData, setEditFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
 
     const fetchGrades = async () => {
         try {
@@ -395,47 +503,142 @@ const GradeManagement = () => {
         fetchGrades();
     }, []);
 
-    const handleCreateGrade = async (e) => {
-        e.preventDefault();
+    const resetCreateForm = () => {
+        setFormData({ name: '', numeric_level: '', min_age: '', max_age: '' });
+    };
+
+    const validateAges = (minAge, maxAge) => {
+        if (Number.parseInt(minAge, 10) > Number.parseInt(maxAge, 10)) {
+            showWarning('Minimum age must be less than or equal to maximum age.');
+            return false;
+        }
+        return true;
+    };
+
+    const handleCreateGrade = async (event) => {
+        event.preventDefault();
         if (!formData.name || !formData.numeric_level || !formData.min_age || !formData.max_age) {
             showWarning('Please complete all grade fields.');
+            return;
+        }
+        if (!validateAges(formData.min_age, formData.max_age)) {
             return;
         }
 
         setSaving(true);
         try {
-            await managerService.createGrade({
+            const createdGrade = await managerService.createGrade({
                 name: formData.name.trim(),
-                numeric_level: parseInt(formData.numeric_level, 10),
-                min_age: parseInt(formData.min_age, 10),
-                max_age: parseInt(formData.max_age, 10),
+                numeric_level: Number.parseInt(formData.numeric_level, 10),
+                min_age: Number.parseInt(formData.min_age, 10),
+                max_age: Number.parseInt(formData.max_age, 10),
             });
+            setGrades((prev) => [...prev, createdGrade].sort((a, b) => a.numeric_level - b.numeric_level));
             showSuccess('Grade created successfully.');
-            setIsModalOpen(false);
-            setFormData({ name: '', numeric_level: '', min_age: '', max_age: '' });
-            fetchGrades();
+            setIsCreateModalOpen(false);
+            resetCreateForm();
         } catch (error) {
             console.error('Failed to create grade:', error);
-            const msg = error?.response?.data?.numeric_level?.[0] || error?.response?.data?.detail || error?.message || 'Failed to create grade.';
-            showError(msg);
+            showError(getErrorMessage(error, 'Failed to create grade.'));
         } finally {
             setSaving(false);
         }
     };
 
-    const handleToggleGrade = async (grade) => {
+    const handleOpenEdit = (grade) => {
+        if (!grade.is_active) {
+            showError('Cannot update an inactive grade. Activate it first.');
+            return;
+        }
+        setEditingGrade(grade);
+        setEditFormData({
+            name: grade.name || '',
+            numeric_level: String(grade.numeric_level || ''),
+            min_age: String(grade.min_age || ''),
+            max_age: String(grade.max_age || ''),
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateGrade = async (event) => {
+        event.preventDefault();
+        if (!editingGrade) return;
+        if (!editFormData.name || !editFormData.numeric_level || !editFormData.min_age || !editFormData.max_age) {
+            showWarning('Please complete all grade fields.');
+            return;
+        }
+        if (!validateAges(editFormData.min_age, editFormData.max_age)) {
+            return;
+        }
+
+        setSaving(true);
         try {
-            if (grade.is_active) {
-                await managerService.deactivateGrade(grade.id);
-                showSuccess('Grade deactivated.');
-            } else {
-                await managerService.activateGrade(grade.id);
-                showSuccess('Grade activated.');
-            }
-            fetchGrades();
+            const updated = await managerService.updateGrade(editingGrade.id, {
+                name: editFormData.name.trim(),
+                numeric_level: Number.parseInt(editFormData.numeric_level, 10),
+                min_age: Number.parseInt(editFormData.min_age, 10),
+                max_age: Number.parseInt(editFormData.max_age, 10),
+            });
+            setGrades((prev) => prev
+                .map((grade) => (grade.id === updated.id ? updated : grade))
+                .sort((a, b) => a.numeric_level - b.numeric_level));
+            showSuccess('Grade updated successfully.');
+            setIsEditModalOpen(false);
+            setEditingGrade(null);
+        } catch (error) {
+            console.error('Failed to update grade:', error);
+            showError(getErrorMessage(error, 'Failed to update grade.'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const updateGradeStatus = async (grade, nextIsActive) => {
+        if (nextIsActive) {
+            await managerService.activateGrade(grade.id);
+        } else {
+            await managerService.deactivateGrade(grade.id);
+        }
+        setGrades((prev) =>
+            prev.map((item) =>
+                item.id === grade.id
+                    ? { ...item, is_active: nextIsActive }
+                    : item
+            )
+        );
+        showSuccess(nextIsActive ? 'Grade activated.' : 'Grade deactivated.');
+    };
+
+    const confirmStatusChange = async () => {
+        if (!pendingStatusAction) return;
+        try {
+            await updateGradeStatus(pendingStatusAction.grade, pendingStatusAction.nextIsActive);
+            setPendingStatusAction(null);
+        } catch (error) {
+            console.error('Failed to update grade status:', error);
+            showError(getErrorMessage(error, 'Failed to update grade status.'));
+        }
+    };
+
+    const handleStatusBadgeToggle = async (grade) => {
+        if (togglingGradeId) return;
+
+        setTogglingGradeId(grade.id);
+        try {
+            const response = await managerService.toggleGradeStatus(grade.id);
+            setGrades((prev) =>
+                prev.map((item) =>
+                    item.id === grade.id
+                        ? { ...item, is_active: response.is_active }
+                        : item
+                )
+            );
+            showSuccess(response.message || 'Grade status updated.');
         } catch (error) {
             console.error('Failed to toggle grade status:', error);
-            showError(error?.response?.data?.detail || 'Failed to update grade status.');
+            showError(getErrorMessage(error, 'Failed to update grade status.'));
+        } finally {
+            setTogglingGradeId(null);
         }
     };
 
@@ -443,7 +646,7 @@ const GradeManagement = () => {
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">Grade Management</h3>
-                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                <button className="btn-primary" onClick={() => setIsCreateModalOpen(true)}>
                     <Plus size={18} />
                     Add Grade
                 </button>
@@ -461,23 +664,38 @@ const GradeManagement = () => {
                             <th>Level</th>
                             <th>Age Range</th>
                             <th>Status</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {grades.map((grade) => (
-                            <tr key={grade.id}>
+                            <tr key={grade.id} className={grade.is_active ? '' : 'inactive-row'}>
                                 <td style={{ fontWeight: 600 }}>{grade.name}</td>
                                 <td>{grade.numeric_level}</td>
                                 <td>{grade.min_age} - {grade.max_age}</td>
                                 <td>
                                     <span
                                         className={`status-badge ${grade.is_active ? 'status-active' : 'status-inactive'}`}
-                                        onClick={() => handleToggleGrade(grade)}
-                                        style={{ cursor: 'pointer' }}
-                                        title={grade.is_active ? 'Click to deactivate' : 'Click to activate'}
+                                        onClick={() => handleStatusBadgeToggle(grade)}
+                                        style={{
+                                            cursor: togglingGradeId === grade.id ? 'wait' : 'pointer',
+                                            opacity: togglingGradeId === grade.id ? 0.75 : 1
+                                        }}
+                                        title={togglingGradeId === grade.id ? 'Updating status...' : 'Click to toggle status'}
                                     >
-                                        {grade.is_active ? 'Active' : 'Inactive'}
+                                        {togglingGradeId === grade.id ? 'Updating...' : (grade.is_active ? 'Active' : 'Inactive')}
                                     </span>
+                                </td>
+                                <td>
+                                    <RowActions
+                                        isActive={grade.is_active}
+                                        onUpdate={() => handleOpenEdit(grade)}
+                                        onActivate={() => setPendingStatusAction({ grade, nextIsActive: true })}
+                                        onDeactivate={() => setPendingStatusAction({ grade, nextIsActive: false })}
+                                        updateTitle="Update Grade"
+                                        activateTitle="Activate Grade"
+                                        deactivateTitle="Deactivate Grade"
+                                    />
                                 </td>
                             </tr>
                         ))}
@@ -485,79 +703,145 @@ const GradeManagement = () => {
                 </table>
             )}
 
-            {isModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '0.5rem', width: '420px',
-                        border: '1px solid var(--color-border)'
-                    }}>
-                        <h3 style={{ margin: 0, marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add Grade</h3>
-                        <form onSubmit={handleCreateGrade} style={{ display: 'grid', gap: '0.85rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Grade Name</label>
-                                <input
-                                    required
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    placeholder="e.g. Grade 7"
-                                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Numeric Level</label>
-                                <input
-                                    required
-                                    type="number"
-                                    min="1"
-                                    value={formData.numeric_level}
-                                    onChange={(e) => setFormData({ ...formData, numeric_level: e.target.value })}
-                                    placeholder="e.g. 7"
-                                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Min Age</label>
-                                    <input
-                                        required
-                                        type="number"
-                                        min="1"
-                                        value={formData.min_age}
-                                        onChange={(e) => setFormData({ ...formData, min_age: e.target.value })}
-                                        style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Max Age</label>
-                                    <input
-                                        required
-                                        type="number"
-                                        min="1"
-                                        value={formData.max_age}
-                                        onChange={(e) => setFormData({ ...formData, max_age: e.target.value })}
-                                        style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                    />
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn-primary" disabled={saving}>
-                                    {saving ? 'Saving...' : 'Add Grade'}
-                                </button>
-                            </div>
-                        </form>
+            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Add Grade">
+                <form onSubmit={handleCreateGrade} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Grade Name</label>
+                        <input
+                            required
+                            value={formData.name}
+                            onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                            placeholder="e.g. Grade 7"
+                            className="sm-form-input"
+                        />
                     </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Numeric Level</label>
+                        <input
+                            required
+                            type="number"
+                            min="1"
+                            value={formData.numeric_level}
+                            onChange={(event) => setFormData({ ...formData, numeric_level: event.target.value })}
+                            placeholder="e.g. 7"
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div className="sm-form-field">
+                            <label className="sm-form-label">Min Age</label>
+                            <input
+                                required
+                                type="number"
+                                min="0"
+                                value={formData.min_age}
+                                onChange={(event) => setFormData({ ...formData, min_age: event.target.value })}
+                                className="sm-form-input"
+                            />
+                        </div>
+                        <div className="sm-form-field">
+                            <label className="sm-form-label">Max Age</label>
+                            <input
+                                required
+                                type="number"
+                                min="0"
+                                value={formData.max_age}
+                                onChange={(event) => setFormData({ ...formData, max_age: event.target.value })}
+                                className="sm-form-input"
+                            />
+                        </div>
+                    </div>
+                    <div className="sm-form-actions">
+                        <button
+                            type="button"
+                            onClick={() => setIsCreateModalOpen(false)}
+                            className="sm-btn-secondary"
+                            disabled={saving}
+                        >
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={saving}>
+                            {saving ? 'Saving...' : 'Add Grade'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Update Grade">
+                <form onSubmit={handleUpdateGrade} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Grade Name</label>
+                        <input
+                            required
+                            value={editFormData.name}
+                            onChange={(event) => setEditFormData({ ...editFormData, name: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Numeric Level</label>
+                        <input
+                            required
+                            type="number"
+                            min="1"
+                            value={editFormData.numeric_level}
+                            onChange={(event) => setEditFormData({ ...editFormData, numeric_level: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div className="sm-form-field">
+                            <label className="sm-form-label">Min Age</label>
+                            <input
+                                required
+                                type="number"
+                                min="0"
+                                value={editFormData.min_age}
+                                onChange={(event) => setEditFormData({ ...editFormData, min_age: event.target.value })}
+                                className="sm-form-input"
+                            />
+                        </div>
+                        <div className="sm-form-field">
+                            <label className="sm-form-label">Max Age</label>
+                            <input
+                                required
+                                type="number"
+                                min="0"
+                                value={editFormData.max_age}
+                                onChange={(event) => setEditFormData({ ...editFormData, max_age: event.target.value })}
+                                className="sm-form-input"
+                            />
+                        </div>
+                    </div>
+                    <div className="sm-form-actions">
+                        <button type="button" onClick={() => setIsEditModalOpen(false)} className="sm-btn-secondary" disabled={saving}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={saving}>
+                            {saving ? 'Saving...' : 'Update Grade'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingStatusAction)}
+                onClose={() => setPendingStatusAction(null)}
+                title={pendingStatusAction?.nextIsActive ? 'Activate Grade' : 'Deactivate Grade'}
+            >
+                <p className="sm-confirm-copy">
+                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
+                    <strong>{pendingStatusAction?.grade?.name}</strong>?
+                </p>
+                <div className="sm-form-actions">
+                    <button type="button" onClick={() => setPendingStatusAction(null)} className="sm-btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="button" onClick={confirmStatusChange} className="btn-primary">
+                        Confirm
+                    </button>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };
@@ -566,10 +850,17 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
     const { showSuccess, showError, showWarning } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [grades, setGrades] = useState([]);
+    const [editingSubject, setEditingSubject] = useState(null);
+    const [pendingStatusAction, setPendingStatusAction] = useState(null);
     const [formData, setFormData] = useState({ grade_id: '', course_code: '', name: '' });
+    const [editFormData, setEditFormData] = useState({ grade_id: '', course_code: '', name: '' });
     const [gradeForm, setGradeForm] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
     const [creatingGrade, setCreatingGrade] = useState(false);
+    const [savingSubject, setSavingSubject] = useState(false);
+    const [togglingCourseId, setTogglingCourseId] = useState(null);
+    const [courseStatusOverrides, setCourseStatusOverrides] = useState({});
 
     const fetchGrades = async () => {
         try {
@@ -585,32 +876,70 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
         fetchGrades();
     }, []);
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-
+    const handleSave = async (event) => {
+        event.preventDefault();
         if (!schoolId) {
-            showError('Error: School ID not found. Please log out and log in again.');
-            console.error('Cannot create course: schoolId is undefined.');
+            showError('School ID not found. Please log out and log in again.');
             return;
         }
 
+        setSavingSubject(true);
         try {
             await managerService.createCourse(schoolId, {
                 ...formData,
-                grade_id: parseInt(formData.grade_id)
+                grade_id: Number.parseInt(formData.grade_id, 10)
             });
             onCourseUpdated();
             setIsModalOpen(false);
             setFormData({ grade_id: '', course_code: '', name: '' });
             showSuccess('Subject created successfully.');
         } catch (error) {
-            console.error('Failed to create course:', error);
-            showError('Failed to create course. Please check your permissions.');
+            console.error('Failed to create subject:', error);
+            showError(getErrorMessage(error, 'Failed to create subject.'));
+        } finally {
+            setSavingSubject(false);
         }
     };
 
-    const handleCreateGrade = async (e) => {
-        e.preventDefault();
+    const handleOpenEdit = (subject) => {
+        if (!subject.is_active) {
+            showError('Cannot update an inactive subject. Activate it first.');
+            return;
+        }
+        setEditingSubject(subject);
+        setEditFormData({
+            grade_id: String(subject.grade || ''),
+            course_code: subject.course_code || '',
+            name: subject.name || '',
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateSubject = async (event) => {
+        event.preventDefault();
+        if (!editingSubject) return;
+
+        setSavingSubject(true);
+        try {
+            await managerService.updateCourse(schoolId, editingSubject.id, {
+                grade_id: Number.parseInt(editFormData.grade_id, 10),
+                course_code: editFormData.course_code.trim(),
+                name: editFormData.name.trim(),
+            });
+            onCourseUpdated();
+            setIsEditModalOpen(false);
+            setEditingSubject(null);
+            showSuccess('Subject updated successfully.');
+        } catch (error) {
+            console.error('Failed to update subject:', error);
+            showError(getErrorMessage(error, 'Failed to update subject.'));
+        } finally {
+            setSavingSubject(false);
+        }
+    };
+
+    const handleCreateGrade = async (event) => {
+        event.preventDefault();
         if (!gradeForm.name || !gradeForm.numeric_level || !gradeForm.min_age || !gradeForm.max_age) {
             showWarning('Please fill all grade fields.');
             return;
@@ -619,9 +948,9 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
         try {
             const created = await managerService.createGrade({
                 name: gradeForm.name.trim(),
-                numeric_level: parseInt(gradeForm.numeric_level, 10),
-                min_age: parseInt(gradeForm.min_age, 10),
-                max_age: parseInt(gradeForm.max_age, 10),
+                numeric_level: Number.parseInt(gradeForm.numeric_level, 10),
+                min_age: Number.parseInt(gradeForm.min_age, 10),
+                max_age: Number.parseInt(gradeForm.max_age, 10),
             });
             showSuccess('Grade created successfully.');
             setIsGradeModalOpen(false);
@@ -632,22 +961,47 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
             }
         } catch (error) {
             console.error('Failed to create grade:', error);
-            const msg = error?.response?.data?.numeric_level?.[0] || error?.response?.data?.detail || error?.message || 'Failed to create grade.';
-            showError(msg);
+            showError(getErrorMessage(error, 'Failed to create grade.'));
         } finally {
             setCreatingGrade(false);
         }
     };
 
-    const handleRemove = async (id) => {
+    const updateSubjectStatus = async (subject, nextIsActive) => {
+        if (nextIsActive) {
+            await managerService.activateCourse(schoolId, subject.id);
+        } else {
+            await managerService.deactivateCourse(schoolId, subject.id);
+        }
+        onCourseUpdated();
+        showSuccess(nextIsActive ? 'Subject activated successfully.' : 'Subject deactivated successfully.');
+    };
+
+    const confirmStatusChange = async () => {
+        if (!pendingStatusAction) return;
         try {
-            // Backend returns 204 No Content on success
-            await managerService.deactivateCourse(schoolId, id);
-            showSuccess('Subject deactivated successfully.');
+            await updateSubjectStatus(pendingStatusAction.subject, pendingStatusAction.nextIsActive);
+            setPendingStatusAction(null);
+        } catch (error) {
+            console.error('Failed to update subject status:', error);
+            showError(getErrorMessage(error, 'Failed to update subject status.'));
+        }
+    };
+
+    const handleStatusBadgeToggle = async (subject) => {
+        if (!schoolId || togglingCourseId) return;
+
+        setTogglingCourseId(subject.id);
+        try {
+            const response = await managerService.toggleCourseStatus(schoolId, subject.id);
+            setCourseStatusOverrides((prev) => ({ ...prev, [subject.id]: response.is_active }));
+            showSuccess(response.message || 'Subject status updated.');
             onCourseUpdated();
         } catch (error) {
-            console.error('Failed to deactivate course:', error);
-            showError(error.message || 'Failed to deactivate subject. Please check network and permissions.');
+            console.error('Failed to toggle subject status:', error);
+            showError(getErrorMessage(error, 'Failed to update subject status.'));
+        } finally {
+            setTogglingCourseId(null);
         }
     };
 
@@ -671,179 +1025,242 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {courses.map((item) => (
-                        <tr key={item.id}>
-                            <td className="font-medium text-gray-900">{item.grade_name || item.grade}</td>
+                    {courses.length === 0 ? (
+                        <tr>
+                            <td colSpan="5" className="sm-empty-state">No subjects found.</td>
+                        </tr>
+                    ) : courses.map((item) => {
+                        const isCourseActive = courseStatusOverrides[item.id] ?? item.is_active;
+                        return (
+                        <tr key={item.id} className={isCourseActive ? '' : 'inactive-row'}>
+                            <td>{item.grade_name || item.grade}</td>
                             <td>{item.course_code}</td>
                             <td>{item.name}</td>
                             <td>
-                                <span style={{
-                                    padding: '2px 8px',
-                                    borderRadius: '999px',
-                                    fontSize: '12px',
-                                    background: item.is_active ? 'var(--color-success-light)' : 'var(--color-error-light)',
-                                    color: item.is_active ? 'var(--color-success)' : 'var(--color-error)'
-                                }}>
-                                    {item.is_active ? 'Active' : 'Inactive'}
+                                <span
+                                    className={`status-badge ${isCourseActive ? 'status-active' : 'status-inactive'}`}
+                                    onClick={() => handleStatusBadgeToggle(item)}
+                                    style={{
+                                        cursor: togglingCourseId === item.id ? 'wait' : 'pointer',
+                                        opacity: togglingCourseId === item.id ? 0.75 : 1
+                                    }}
+                                    title={togglingCourseId === item.id ? 'Updating status...' : 'Click to toggle status'}
+                                >
+                                    {togglingCourseId === item.id ? 'Updating...' : (isCourseActive ? 'Active' : 'Inactive')}
                                 </span>
                             </td>
                             <td>
-                                <button onClick={() => handleRemove(item.id)} style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer' }}>Deactivate</button>
+                                <RowActions
+                                    isActive={isCourseActive}
+                                    onUpdate={() => handleOpenEdit(item)}
+                                    onActivate={() => setPendingStatusAction({ subject: item, nextIsActive: true })}
+                                    onDeactivate={() => setPendingStatusAction({ subject: item, nextIsActive: false })}
+                                    updateTitle="Update Subject"
+                                    activateTitle="Activate Subject"
+                                    deactivateTitle="Deactivate Subject"
+                                />
                             </td>
                         </tr>
-                    ))}
+                    )})}
                 </tbody>
             </table>
 
-            {/* Modal */}
-            {isModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '400px',
-                        border: '1px solid var(--color-border)'
-                    }}>
-                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add Subject to School</h2>
-                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                    <label style={{ fontSize: '0.875rem' }}>Grade</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsGradeModalOpen(true)}
-                                        style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
-                                    >
-                                        + Add Grade
-                                    </button>
-                                </div>
-                                <select
-                                    required
-                                    value={formData.grade_id}
-                                    onChange={e => setFormData({ ...formData, grade_id: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                >
-                                    <option value="">Select Grade</option>
-                                    {grades.map(g => (
-                                        <option key={g.id} value={g.id}>{g.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Course Code</label>
-                                <input
-                                    required
-                                    placeholder="e.g. MATH101"
-                                    value={formData.course_code}
-                                    onChange={e => setFormData({ ...formData, course_code: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Name</label>
-                                <input
-                                    required
-                                    placeholder="e.g. Mathematics"
-                                    value={formData.name}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
-                                <button type="submit" className="btn-primary">Save</button>
-                            </div>
-                        </form>
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Subject to School">
+                <form onSubmit={handleSave} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                            <label className="sm-form-label" style={{ marginBottom: 0 }}>Grade</label>
+                            <button
+                                type="button"
+                                onClick={() => setIsGradeModalOpen(true)}
+                                style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                            >
+                                + Add Grade
+                            </button>
+                        </div>
+                        <select
+                            required
+                            value={formData.grade_id}
+                            onChange={(event) => setFormData({ ...formData, grade_id: event.target.value })}
+                            className="sm-form-select"
+                        >
+                            <option value="">Select Grade</option>
+                            {grades.map((grade) => (
+                                <option key={grade.id} value={grade.id}>{grade.name}</option>
+                            ))}
+                        </select>
                     </div>
-                </div>
-            )}
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Course Code</label>
+                        <input
+                            required
+                            placeholder="e.g. MATH101"
+                            value={formData.course_code}
+                            onChange={(event) => setFormData({ ...formData, course_code: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Name</label>
+                        <input
+                            required
+                            placeholder="e.g. Mathematics"
+                            value={formData.name}
+                            onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div className="sm-form-actions">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="sm-btn-secondary" disabled={savingSubject}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={savingSubject}>
+                            {savingSubject ? 'Saving...' : 'Save'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
-            {isGradeModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '0.5rem', width: '420px',
-                        border: '1px solid var(--color-border)'
-                    }}>
-                        <h3 style={{ margin: 0, marginBottom: '1rem', color: 'var(--color-text-main)' }}>Add Specific Grade</h3>
-                        <form onSubmit={handleCreateGrade} style={{ display: 'grid', gap: '0.85rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Grade Name</label>
-                                <input
-                                    required
-                                    value={gradeForm.name}
-                                    onChange={(e) => setGradeForm({ ...gradeForm, name: e.target.value })}
-                                    placeholder="e.g. Grade 7"
-                                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Numeric Level</label>
-                                <input
-                                    required
-                                    type="number"
-                                    min="1"
-                                    value={gradeForm.numeric_level}
-                                    onChange={(e) => setGradeForm({ ...gradeForm, numeric_level: e.target.value })}
-                                    placeholder="e.g. 7"
-                                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Min Age</label>
-                                    <input
-                                        required
-                                        type="number"
-                                        min="1"
-                                        value={gradeForm.min_age}
-                                        onChange={(e) => setGradeForm({ ...gradeForm, min_age: e.target.value })}
-                                        style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.875rem' }}>Max Age</label>
-                                    <input
-                                        required
-                                        type="number"
-                                        min="1"
-                                        value={gradeForm.max_age}
-                                        onChange={(e) => setGradeForm({ ...gradeForm, max_age: e.target.value })}
-                                        style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                    />
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsGradeModalOpen(false)}
-                                    style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn-primary" disabled={creatingGrade}>
-                                    {creatingGrade ? 'Saving...' : 'Add Grade'}
-                                </button>
-                            </div>
-                        </form>
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Update Subject">
+                <form onSubmit={handleUpdateSubject} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Grade</label>
+                        <select
+                            required
+                            value={editFormData.grade_id}
+                            onChange={(event) => setEditFormData({ ...editFormData, grade_id: event.target.value })}
+                            className="sm-form-select"
+                        >
+                            <option value="">Select Grade</option>
+                            {grades.map((grade) => (
+                                <option key={grade.id} value={grade.id}>{grade.name}</option>
+                            ))}
+                        </select>
                     </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Course Code</label>
+                        <input
+                            required
+                            value={editFormData.course_code}
+                            onChange={(event) => setEditFormData({ ...editFormData, course_code: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Name</label>
+                        <input
+                            required
+                            value={editFormData.name}
+                            onChange={(event) => setEditFormData({ ...editFormData, name: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div className="sm-form-actions">
+                        <button type="button" onClick={() => setIsEditModalOpen(false)} className="sm-btn-secondary" disabled={savingSubject}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={savingSubject}>
+                            {savingSubject ? 'Saving...' : 'Update Subject'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal isOpen={isGradeModalOpen} onClose={() => setIsGradeModalOpen(false)} title="Add Specific Grade">
+                <form onSubmit={handleCreateGrade} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Grade Name</label>
+                        <input
+                            required
+                            value={gradeForm.name}
+                            onChange={(event) => setGradeForm({ ...gradeForm, name: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Numeric Level</label>
+                        <input
+                            required
+                            type="number"
+                            min="1"
+                            value={gradeForm.numeric_level}
+                            onChange={(event) => setGradeForm({ ...gradeForm, numeric_level: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div className="sm-form-field">
+                            <label className="sm-form-label">Min Age</label>
+                            <input
+                                required
+                                type="number"
+                                min="0"
+                                value={gradeForm.min_age}
+                                onChange={(event) => setGradeForm({ ...gradeForm, min_age: event.target.value })}
+                                className="sm-form-input"
+                            />
+                        </div>
+                        <div className="sm-form-field">
+                            <label className="sm-form-label">Max Age</label>
+                            <input
+                                required
+                                type="number"
+                                min="0"
+                                value={gradeForm.max_age}
+                                onChange={(event) => setGradeForm({ ...gradeForm, max_age: event.target.value })}
+                                className="sm-form-input"
+                            />
+                        </div>
+                    </div>
+                    <div className="sm-form-actions">
+                        <button type="button" onClick={() => setIsGradeModalOpen(false)} className="sm-btn-secondary" disabled={creatingGrade}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={creatingGrade}>
+                            {creatingGrade ? 'Saving...' : 'Add Grade'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingStatusAction)}
+                onClose={() => setPendingStatusAction(null)}
+                title={pendingStatusAction?.nextIsActive ? 'Activate Subject' : 'Deactivate Subject'}
+            >
+                <p className="sm-confirm-copy">
+                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
+                    <strong>{pendingStatusAction?.subject?.name}</strong>?
+                </p>
+                <div className="sm-form-actions">
+                    <button type="button" onClick={() => setPendingStatusAction(null)} className="sm-btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="button" onClick={confirmStatusChange} className="btn-primary">
+                        Confirm
+                    </button>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };
 
 const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasActiveAcademicYear }) => {
+    const { showSuccess, showError, showWarning } = useToast();
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [selectedTeacher, setSelectedTeacher] = useState('');
+    const [pendingStatusAction, setPendingStatusAction] = useState(null);
+    const [togglingAllocationId, setTogglingAllocationId] = useState(null);
+    const [allocationStatusOverrides, setAllocationStatusOverrides] = useState({});
 
     const handleOpenAssign = (course) => {
         if (!hasActiveAcademicYear) {
-            alert('No active academic year found. Please go to the "Academic Year" tab and create/activate one first.');
+            showWarning('No active academic year found. Please go to the "Academic Year" tab and create/activate one first.');
+            return;
+        }
+        if (!course.is_active) {
+            showError('Cannot update teacher allocation for an inactive subject.');
             return;
         }
         setSelectedCourse(course);
@@ -851,19 +1268,62 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
         setIsAssignModalOpen(true);
     };
 
-    const handleAssign = async (e) => {
-        e.preventDefault();
+    const handleAssign = async (event) => {
+        event.preventDefault();
         if (!selectedCourse || !selectedTeacher) return;
 
         try {
             await managerService.assignTeacherToCourse(schoolId, selectedCourse.id, selectedTeacher);
             setIsAssignModalOpen(false);
-            alert('Teacher assigned successfully!');
+            showSuccess('Teacher allocation updated successfully.');
             onCourseUpdated();
         } catch (error) {
             console.error('Failed to assign teacher:', error);
-            const msg = error?.response?.data?.detail || error?.response?.data?.non_field_errors?.[0] || error.message || 'Failed to assign teacher.';
-            alert(msg);
+            showError(getErrorMessage(error, 'Failed to update teacher allocation.'));
+        }
+    };
+
+    const handleAllocationStatusChange = async (course, nextIsActive) => {
+        if (!course?.allocation_id) {
+            showWarning('No allocation found for this subject. Assign a teacher first.');
+            return;
+        }
+
+        const response = await managerService.toggleCourseAllocationStatus(schoolId, course.allocation_id);
+        setAllocationStatusOverrides((prev) => ({ ...prev, [course.allocation_id]: response.is_active }));
+        onCourseUpdated();
+        showSuccess(response.message || (nextIsActive ? 'Teacher allocation activated.' : 'Teacher allocation deactivated.'));
+    };
+
+    const confirmStatusChange = async () => {
+        if (!pendingStatusAction) return;
+        try {
+            await handleAllocationStatusChange(pendingStatusAction.course, pendingStatusAction.nextIsActive);
+            setPendingStatusAction(null);
+        } catch (error) {
+            console.error('Failed to update teacher allocation status:', error);
+            showError(getErrorMessage(error, 'Failed to update teacher allocation status.'));
+        }
+    };
+
+    const handleStatusBadgeToggle = async (course) => {
+        if (!course?.allocation_id) {
+            showWarning('No allocation found for this subject. Assign a teacher first.');
+            return;
+        }
+        if (togglingAllocationId) return;
+
+        setTogglingAllocationId(course.allocation_id);
+        try {
+            const response = await managerService.toggleCourseAllocationStatus(schoolId, course.allocation_id);
+            setAllocationStatusOverrides((prev) => ({ ...prev, [course.allocation_id]: response.is_active }));
+            onCourseUpdated();
+            showSuccess(response.message || 'Teacher allocation status updated.');
+        } catch (error) {
+            console.error('Failed to toggle teacher allocation status:', error);
+            showError(getErrorMessage(error, 'Failed to update teacher allocation status.'));
+        } finally {
+            setTogglingAllocationId(null);
         }
     };
 
@@ -877,79 +1337,115 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                     <tr>
                         <th>Subject</th>
                         <th>Grade</th>
+                        <th>Classroom Name</th>
                         <th>Assigned Teacher</th>
+                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {courses.length === 0 ? (
                         <tr>
-                            <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                            <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
                                 No subjects found. Configure subjects first.
                             </td>
                         </tr>
-                    ) : courses.map((item) => (
-                        <tr key={item.id}>
+                    ) : courses.map((item) => {
+                        const hasAllocation = Boolean(item.allocation_id);
+                        const isAllocationActive = hasAllocation
+                            ? (allocationStatusOverrides[item.allocation_id] ?? (item.allocation_is_active !== false))
+                            : null;
+                        return (
+                        <tr key={item.id} className={item.is_active ? '' : 'inactive-row'}>
                             <td>{item.name}</td>
                             <td>{item.grade_name || item.grade}</td>
+                            <td>{item.classroom_name || 'Not Allocated'}</td>
+                            <td>{item.teacher_name || 'Unassigned'}</td>
                             <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--color-bg-body)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--color-text-main)' }}>
-                                        {item.teacher_name ? item.teacher_name.charAt(0) : 'U'}
-                                    </div>
-                                    {item.teacher_name || 'Unassigned'}
-                                </div>
+                                <span
+                                    className={`status-badge ${hasAllocation ? (isAllocationActive ? 'status-active' : 'status-inactive') : 'status-inactive'}`}
+                                    onClick={() => handleStatusBadgeToggle(item)}
+                                    style={{
+                                        cursor: hasAllocation && togglingAllocationId !== item.allocation_id ? 'pointer' : (hasAllocation ? 'wait' : 'not-allowed'),
+                                        opacity: togglingAllocationId === item.allocation_id ? 0.75 : (hasAllocation ? 1 : 0.7)
+                                    }}
+                                    title={
+                                        hasAllocation
+                                            ? (togglingAllocationId === item.allocation_id ? 'Updating status...' : 'Click to toggle status')
+                                            : 'No allocation to toggle'
+                                    }
+                                >
+                                    {togglingAllocationId === item.allocation_id
+                                        ? 'Updating...'
+                                        : (hasAllocation ? (isAllocationActive ? 'Active' : 'Inactive') : 'Not Allocated')}
+                                </span>
                             </td>
                             <td>
-                                <button
-                                    onClick={() => handleOpenAssign(item)}
-                                    style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}
-                                >
-                                    Assign
-                                </button>
+                                <RowActions
+                                    isActive={hasAllocation ? isAllocationActive : false}
+                                    onUpdate={() => handleOpenAssign(item)}
+                                    onActivate={() => setPendingStatusAction({ course: item, nextIsActive: true })}
+                                    onDeactivate={() => setPendingStatusAction({ course: item, nextIsActive: false })}
+                                    updateTitle="Update Allocation"
+                                    activateTitle="Activate Allocation"
+                                    deactivateTitle="Deactivate Allocation"
+                                />
                             </td>
                         </tr>
-                    ))}
+                    )})}
                 </tbody>
             </table>
 
-            {/* Assign Teacher Modal */}
-            {isAssignModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '400px',
-                        border: '1px solid var(--color-border)'
-                    }}>
-                        <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-main)' }}>Assign Teacher</h2>
-                        <p style={{ marginBottom: '1rem', color: 'var(--color-text-muted)' }}>
-                            Assigning teacher for <strong>{selectedCourse?.name} ({selectedCourse?.grade_name})</strong>
-                        </p>
-                        <form onSubmit={handleAssign} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Select Teacher</label>
-                                <select
-                                    required
-                                    value={selectedTeacher}
-                                    onChange={e => setSelectedTeacher(e.target.value)}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem' }}
-                                >
-                                    <option value="">Select a teacher...</option>
-                                    {teachers.map(teacher => (
-                                        <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>{teacher.full_name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-                                <button type="button" onClick={() => setIsAssignModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
-                                <button type="submit" className="btn-primary">Assign Teacher</button>
-                            </div>
-                        </form>
-                    </div>
+            <Modal
+                isOpen={Boolean(pendingStatusAction)}
+                onClose={() => setPendingStatusAction(null)}
+                title={pendingStatusAction?.nextIsActive ? 'Activate Allocation' : 'Deactivate Allocation'}
+            >
+                <p className="sm-confirm-copy">
+                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
+                    <strong>{pendingStatusAction?.course?.name} allocation</strong>?
+                </p>
+                <div className="sm-form-actions">
+                    <button type="button" onClick={() => setPendingStatusAction(null)} className="sm-btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="button" onClick={confirmStatusChange} className="btn-primary">
+                        Confirm
+                    </button>
                 </div>
-            )}
+            </Modal>
+
+            <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title="Assign Teacher">
+                <p style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--color-text-muted)' }}>
+                    Assigning teacher for <strong>{selectedCourse?.name} ({selectedCourse?.grade_name})</strong>
+                </p>
+                <form onSubmit={handleAssign} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Select Teacher</label>
+                        <select
+                            required
+                            value={selectedTeacher}
+                            onChange={(event) => setSelectedTeacher(event.target.value)}
+                            className="sm-form-select"
+                        >
+                            <option value="">Select a teacher...</option>
+                            {teachers.map((teacher) => (
+                                <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>
+                                    {teacher.full_name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="sm-form-actions">
+                        <button type="button" onClick={() => setIsAssignModalOpen(false)} className="sm-btn-secondary">
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary">
+                            Assign Teacher
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
@@ -958,21 +1454,28 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
 // Classroom Management Tab
 // ============================================
 const ClassroomManagement = ({ schoolId, academicYears }) => {
+    const { showSuccess, showError, showWarning } = useToast();
     const [classrooms, setClassrooms] = useState([]);
+    const [courses, setCourses] = useState([]);
     const [grades, setGrades] = useState([]);
     const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingClassroom, setEditingClassroom] = useState(null);
+    const [pendingStatusAction, setPendingStatusAction] = useState(null);
     const [formData, setFormData] = useState({ grade_id: '', classroom_name: '' });
+    const [editFormData, setEditFormData] = useState({ grade_id: '', classroom_name: '' });
     const [saving, setSaving] = useState(false);
     const [loadingClassrooms, setLoadingClassrooms] = useState(false);
+    const [togglingClassroomId, setTogglingClassroomId] = useState(null);
 
-    const activeAcademicYear = academicYears.find(ay => ay.is_active);
+    const activeAcademicYear = academicYears.find((year) => year.is_active);
 
     useEffect(() => {
         if (activeAcademicYear && !selectedAcademicYear) {
             setSelectedAcademicYear(String(activeAcademicYear.id));
         }
-    }, [activeAcademicYear]);
+    }, [activeAcademicYear, selectedAcademicYear]);
 
     useEffect(() => {
         const fetchGrades = async () => {
@@ -989,8 +1492,20 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
     useEffect(() => {
         if (schoolId && selectedAcademicYear) {
             fetchClassrooms();
+            fetchCoursesForYear();
         }
     }, [schoolId, selectedAcademicYear]);
+
+    const fetchCoursesForYear = async () => {
+        if (!schoolId) return;
+        try {
+            const data = await managerService.getCourses(schoolId, { include_inactive: true });
+            setCourses(data.results || data || []);
+        } catch (error) {
+            console.error('Failed to fetch courses for classroom teacher mapping:', error);
+            setCourses([]);
+        }
+    };
 
     const fetchClassrooms = async () => {
         if (!schoolId || !selectedAcademicYear) return;
@@ -1006,41 +1521,129 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
         }
     };
 
-    const handleCreate = async (e) => {
-        e.preventDefault();
+    const handleCreate = async (event) => {
+        event.preventDefault();
         if (!schoolId || !selectedAcademicYear) {
-            alert('Please select an academic year first.');
+            showWarning('Please select an academic year first.');
             return;
         }
         setSaving(true);
         try {
-            await managerService.createClassroom(schoolId, selectedAcademicYear, {
-                grade_id: parseInt(formData.grade_id),
+            const created = await managerService.createClassroom(schoolId, selectedAcademicYear, {
+                grade_id: Number.parseInt(formData.grade_id, 10),
                 classroom_name: formData.classroom_name
             });
-            alert('Classroom created successfully!');
+            setClassrooms((prev) => [...prev, created]);
+            showSuccess('Classroom created successfully.');
             setIsModalOpen(false);
             setFormData({ grade_id: '', classroom_name: '' });
-            fetchClassrooms();
         } catch (error) {
             console.error('Failed to create classroom:', error);
-            const msg = error?.response?.data?.detail || error?.response?.data?.classroom_name?.[0] || error?.response?.data?.non_field_errors?.[0] || error.message || 'Failed to create classroom.';
-            alert(msg);
+            showError(getErrorMessage(error, 'Failed to create classroom.'));
         } finally {
             setSaving(false);
         }
     };
 
-    const handleDeactivate = async (classroomId) => {
-        if (!window.confirm('Are you sure you want to deactivate this classroom?')) return;
-        try {
-            await managerService.deactivateClassroom(schoolId, selectedAcademicYear, classroomId);
-            alert('Classroom deactivated!');
-            fetchClassrooms();
-        } catch (error) {
-            console.error('Failed to deactivate classroom:', error);
-            alert(error?.response?.data?.detail || 'Failed to deactivate classroom.');
+    const handleOpenEdit = (classroom) => {
+        if (!classroom.is_active) {
+            showError('Cannot update an inactive classroom. Activate it first.');
+            return;
         }
+        setEditingClassroom(classroom);
+        setEditFormData({
+            grade_id: String(classroom.grade || ''),
+            classroom_name: classroom.classroom_name || '',
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateClassroom = async (event) => {
+        event.preventDefault();
+        if (!editingClassroom) return;
+
+        setSaving(true);
+        try {
+            const updated = await managerService.updateClassroom(
+                schoolId,
+                selectedAcademicYear,
+                editingClassroom.id,
+                {
+                    grade_id: Number.parseInt(editFormData.grade_id, 10),
+                    classroom_name: editFormData.classroom_name.trim(),
+                }
+            );
+            setClassrooms((prev) =>
+                prev.map((classroom) => (classroom.id === updated.id ? updated : classroom))
+            );
+            showSuccess('Classroom updated successfully.');
+            setIsEditModalOpen(false);
+            setEditingClassroom(null);
+        } catch (error) {
+            console.error('Failed to update classroom:', error);
+            showError(getErrorMessage(error, 'Failed to update classroom.'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const updateClassroomStatus = async (classroom, nextIsActive) => {
+        if (nextIsActive) {
+            await managerService.activateClassroom(schoolId, selectedAcademicYear, classroom.id);
+        } else {
+            await managerService.deactivateClassroom(schoolId, selectedAcademicYear, classroom.id);
+        }
+        setClassrooms((prev) =>
+            prev.map((item) =>
+                item.id === classroom.id
+                    ? { ...item, is_active: nextIsActive }
+                    : item
+            )
+        );
+        showSuccess(nextIsActive ? 'Classroom activated.' : 'Classroom deactivated.');
+    };
+
+    const confirmStatusChange = async () => {
+        if (!pendingStatusAction) return;
+        try {
+            await updateClassroomStatus(pendingStatusAction.classroom, pendingStatusAction.nextIsActive);
+            setPendingStatusAction(null);
+        } catch (error) {
+            console.error('Failed to update classroom status:', error);
+            showError(getErrorMessage(error, 'Failed to update classroom status.'));
+        }
+    };
+
+    const handleStatusBadgeToggle = async (classroom) => {
+        if (!schoolId || !selectedAcademicYear || togglingClassroomId) return;
+
+        setTogglingClassroomId(classroom.id);
+        try {
+            const response = await managerService.toggleClassroomStatus(schoolId, selectedAcademicYear, classroom.id);
+            setClassrooms((prev) =>
+                prev.map((item) =>
+                    item.id === classroom.id
+                        ? { ...item, is_active: response.is_active }
+                        : item
+                )
+            );
+            showSuccess(response.message || 'Classroom status updated.');
+        } catch (error) {
+            console.error('Failed to toggle classroom status:', error);
+            showError(getErrorMessage(error, 'Failed to update classroom status.'));
+        } finally {
+            setTogglingClassroomId(null);
+        }
+    };
+
+    const getAssignedTeacherName = (classroom) => {
+        if (classroom.homeroom_teacher_name) return classroom.homeroom_teacher_name;
+        const courseWithTeacher = courses.find(
+            (course) =>
+                (course.grade_name || course.grade) === (classroom.grade_name || classroom.grade) &&
+                !!course.teacher_name
+        );
+        return courseWithTeacher?.teacher_name || 'Not assigned';
     };
 
     return (
@@ -1050,13 +1653,13 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                     <select
                         value={selectedAcademicYear}
-                        onChange={e => setSelectedAcademicYear(e.target.value)}
+                        onChange={(event) => setSelectedAcademicYear(event.target.value)}
                         style={{ padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', fontSize: '0.875rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
                     >
                         <option value="">Select Academic Year</option>
-                        {academicYears.map(ay => (
-                            <option key={ay.id} value={ay.id}>
-                                {ay.academic_year_code} {ay.is_active ? '(Active)' : ''}
+                        {academicYears.map((year) => (
+                            <option key={year.id} value={year.id}>
+                                {year.academic_year_code} {year.is_active ? '(Active)' : '(Inactive)'}
                             </option>
                         ))}
                     </select>
@@ -1103,31 +1706,34 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {classrooms.map((cr) => (
-                            <tr key={cr.id}>
-                                <td style={{ fontWeight: 600 }}>{cr.classroom_name}</td>
-                                <td>{cr.grade_name || cr.grade}</td>
-                                <td>{cr.homeroom_teacher_name || 'Not assigned'}</td>
+                        {classrooms.map((classroom) => (
+                            <tr key={classroom.id} className={classroom.is_active ? '' : 'inactive-row'}>
+                                <td style={{ fontWeight: 600 }}>{classroom.classroom_name}</td>
+                                <td>{classroom.grade_name || classroom.grade}</td>
+                                <td>{getAssignedTeacherName(classroom)}</td>
                                 <td>
-                                    <span style={{
-                                        padding: '2px 8px',
-                                        borderRadius: '999px',
-                                        fontSize: '12px',
-                                        background: cr.is_active ? 'var(--color-success-light, #dcfce7)' : 'var(--color-error-light, #fee2e2)',
-                                        color: cr.is_active ? 'var(--color-success, #16a34a)' : 'var(--color-error, #dc2626)'
-                                    }}>
-                                        {cr.is_active ? 'Active' : 'Inactive'}
+                                    <span
+                                        className={`status-badge ${classroom.is_active ? 'status-active' : 'status-inactive'}`}
+                                        onClick={() => handleStatusBadgeToggle(classroom)}
+                                        style={{
+                                            cursor: togglingClassroomId === classroom.id ? 'wait' : 'pointer',
+                                            opacity: togglingClassroomId === classroom.id ? 0.75 : 1
+                                        }}
+                                        title={togglingClassroomId === classroom.id ? 'Updating status...' : 'Click to toggle status'}
+                                    >
+                                        {togglingClassroomId === classroom.id ? 'Updating...' : (classroom.is_active ? 'Active' : 'Inactive')}
                                     </span>
                                 </td>
                                 <td>
-                                    {cr.is_active && (
-                                        <button
-                                            onClick={() => handleDeactivate(cr.id)}
-                                            style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.875rem' }}
-                                        >
-                                            <Power size={14} /> Deactivate
-                                        </button>
-                                    )}
+                                    <RowActions
+                                        isActive={classroom.is_active}
+                                        onUpdate={() => handleOpenEdit(classroom)}
+                                        onActivate={() => setPendingStatusAction({ classroom, nextIsActive: true })}
+                                        onDeactivate={() => setPendingStatusAction({ classroom, nextIsActive: false })}
+                                        updateTitle="Update Classroom"
+                                        activateTitle="Activate Classroom"
+                                        deactivateTitle="Deactivate Classroom"
+                                    />
                                 </td>
                             </tr>
                         ))}
@@ -1135,55 +1741,100 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
                 </table>
             )}
 
-            {/* Create Classroom Modal */}
-            {isModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '420px',
-                        border: '1px solid var(--color-border)'
-                    }}>
-                        <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Create Classroom</h2>
-                        <p style={{ marginBottom: '1.5rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-                            Add a new classroom for the selected academic year.
-                        </p>
-                        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>Grade</label>
-                                <select
-                                    required
-                                    value={formData.grade_id}
-                                    onChange={e => setFormData({ ...formData, grade_id: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
-                                >
-                                    <option value="">Select Grade</option>
-                                    {grades.map(g => (
-                                        <option key={g.id} value={g.id}>{g.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>Classroom Name</label>
-                                <input
-                                    required
-                                    placeholder="e.g. Class 1-A"
-                                    value={formData.classroom_name}
-                                    onChange={e => setFormData({ ...formData, classroom_name: e.target.value })}
-                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
-                                <button type="submit" className="btn-primary" disabled={saving}>
-                                    {saving ? 'Creating...' : 'Create'}
-                                </button>
-                            </div>
-                        </form>
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Classroom">
+                <p style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--color-text-muted)' }}>
+                    Add a new classroom for the selected academic year.
+                </p>
+                <form onSubmit={handleCreate} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Grade</label>
+                        <select
+                            required
+                            value={formData.grade_id}
+                            onChange={(event) => setFormData({ ...formData, grade_id: event.target.value })}
+                            className="sm-form-select"
+                        >
+                            <option value="">Select Grade</option>
+                            {grades.map((grade) => (
+                                <option key={grade.id} value={grade.id}>{grade.name}</option>
+                            ))}
+                        </select>
                     </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Classroom Name</label>
+                        <input
+                            required
+                            placeholder="e.g. Class 1-A"
+                            value={formData.classroom_name}
+                            onChange={(event) => setFormData({ ...formData, classroom_name: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div className="sm-form-actions">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="sm-btn-secondary" disabled={saving}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={saving}>
+                            {saving ? 'Creating...' : 'Create'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Update Classroom">
+                <form onSubmit={handleUpdateClassroom} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Grade</label>
+                        <select
+                            required
+                            value={editFormData.grade_id}
+                            onChange={(event) => setEditFormData({ ...editFormData, grade_id: event.target.value })}
+                            className="sm-form-select"
+                        >
+                            <option value="">Select Grade</option>
+                            {grades.map((grade) => (
+                                <option key={grade.id} value={grade.id}>{grade.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">Classroom Name</label>
+                        <input
+                            required
+                            value={editFormData.classroom_name}
+                            onChange={(event) => setEditFormData({ ...editFormData, classroom_name: event.target.value })}
+                            className="sm-form-input"
+                        />
+                    </div>
+                    <div className="sm-form-actions">
+                        <button type="button" onClick={() => setIsEditModalOpen(false)} className="sm-btn-secondary" disabled={saving}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={saving}>
+                            {saving ? 'Saving...' : 'Update Classroom'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingStatusAction)}
+                onClose={() => setPendingStatusAction(null)}
+                title={pendingStatusAction?.nextIsActive ? 'Activate Classroom' : 'Deactivate Classroom'}
+            >
+                <p className="sm-confirm-copy">
+                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
+                    <strong>{pendingStatusAction?.classroom?.classroom_name}</strong>?
+                </p>
+                <div className="sm-form-actions">
+                    <button type="button" onClick={() => setPendingStatusAction(null)} className="sm-btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="button" onClick={confirmStatusChange} className="btn-primary">
+                        Confirm
+                    </button>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };

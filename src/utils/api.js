@@ -2,8 +2,18 @@ import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
+const getCookie = (name) => {
+    const cookieValue = `; ${document.cookie}`;
+    const parts = cookieValue.split(`; ${name}=`);
+    if (parts.length === 2) {
+        return parts.pop().split(';').shift();
+    }
+    return null;
+};
+
 const apiClient = axios.create({
     baseURL: BASE_URL,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -12,6 +22,7 @@ const apiClient = axios.create({
 // Separate instance for refreshing to avoid recursive interceptor calls
 const refreshClient = axios.create({
     baseURL: BASE_URL,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -24,6 +35,15 @@ apiClient.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        const method = (config.method || '').toLowerCase();
+        if (['post', 'put', 'patch', 'delete'].includes(method)) {
+            const csrfToken = getCookie('csrftoken');
+            if (csrfToken) {
+                config.headers['X-CSRFToken'] = csrfToken;
+            }
+        }
+
         return config;
     },
     (error) => {
@@ -114,4 +134,3 @@ export const api = {
     patch: (endpoint, body, config) => apiClient.patch(endpoint, body, config),
     delete: (endpoint, config) => apiClient.delete(endpoint, config),
 };
-

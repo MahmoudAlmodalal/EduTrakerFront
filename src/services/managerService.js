@@ -124,6 +124,11 @@ const managerService = {
         return res.data !== undefined ? res.data : res;
     },
 
+    toggleGradeStatus: async (id) => {
+        const res = await api.post(`/grades/${id}/toggle-status/`);
+        return res.data !== undefined ? res.data : res;
+    },
+
     // ============================================
     // Course Management (scoped to school)
     // Backend: /api/school/<schoolId>/courses/
@@ -145,6 +150,16 @@ const managerService = {
 
     deactivateCourse: async (schoolId, courseId) => {
         const res = await api.post(`/school/${schoolId}/courses/${courseId}/deactivate/`);
+        return res.data !== undefined ? res.data : res;
+    },
+
+    activateCourse: async (schoolId, courseId) => {
+        const res = await api.post(`/school/${schoolId}/courses/${courseId}/activate/`);
+        return res.data !== undefined ? res.data : res;
+    },
+
+    toggleCourseStatus: async (schoolId, courseId) => {
+        const res = await api.post(`/school/${schoolId}/courses/${courseId}/toggle-status/`);
         return res.data !== undefined ? res.data : res;
     },
 
@@ -178,6 +193,21 @@ const managerService = {
 
     deactivateClassroom: async (schoolId, academicYearId, classroomId) => {
         const res = await api.post(`/school/${schoolId}/academic-year/${academicYearId}/classrooms/${classroomId}/deactivate/`);
+        return res.data !== undefined ? res.data : res;
+    },
+
+    activateClassroom: async (schoolId, academicYearId, classroomId) => {
+        const res = await api.post(`/school/${schoolId}/academic-year/${academicYearId}/classrooms/${classroomId}/activate/`);
+        return res.data !== undefined ? res.data : res;
+    },
+
+    toggleClassroomStatus: async (schoolId, academicYearId, classroomId) => {
+        const res = await api.post(`/school/${schoolId}/academic-year/${academicYearId}/classrooms/${classroomId}/toggle-status/`);
+        return res.data !== undefined ? res.data : res;
+    },
+
+    toggleCourseAllocationStatus: async (schoolId, allocationId) => {
+        const res = await api.post(`/school/${schoolId}/course-allocations/${allocationId}/toggle-status/`);
         return res.data !== undefined ? res.data : res;
     },
 

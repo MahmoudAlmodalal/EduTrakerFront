@@ -16,10 +16,23 @@ import reportService from '../../services/reportService';
 import './SchoolManager.css';
 
 const AcademicReports = () => {
-    const { t } = useTheme();
+    const { t, theme } = useTheme();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(null);
+    const isDarkTheme = theme === 'dark';
+    const iconSvgProps = {
+        strokeWidth: isDarkTheme ? 3 : 2.6,
+        absoluteStrokeWidth: true,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        fill: 'none'
+    };
+    const iconTone = (lightBg, lightColor, darkBg, darkColor) => ({
+        backgroundColor: isDarkTheme ? darkBg : lightBg,
+        color: isDarkTheme ? darkColor : lightColor,
+        border: isDarkTheme ? `1px solid ${darkColor}33` : '1px solid transparent'
+    });
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -37,10 +50,38 @@ const AcademicReports = () => {
     }, []);
 
     const reportTypes = [
-        { id: 'attendance', backendId: 'attendance', name: 'Attendance Trends', description: 'Monthly student and teacher attendance overview.', icon: Calendar, color: 'blue' },
-        { id: 'performance', backendId: 'student_performance', name: 'Academic Performance', description: 'Grade distribution and subject performance metrics.', icon: TrendingUp, color: 'green' },
-        { id: 'enrollment', backendId: 'student_list', name: 'Enrollment Report', description: 'New admissions and student retention statistics.', icon: Users, color: 'purple' },
-        { id: 'teacher', backendId: 'teacher_evaluations', name: 'Teacher Evaluations', description: 'Summary of annual teacher performance reviews.', icon: FileText, color: 'orange' }
+        {
+            id: 'attendance',
+            backendId: 'attendance',
+            name: 'Attendance Trends',
+            description: 'Monthly student and teacher attendance overview.',
+            icon: Calendar,
+            iconStyle: iconTone('var(--color-info-light)', 'var(--color-info)', 'rgba(96, 165, 250, 0.22)', '#BFDBFE')
+        },
+        {
+            id: 'performance',
+            backendId: 'student_performance',
+            name: 'Academic Performance',
+            description: 'Grade distribution and subject performance metrics.',
+            icon: TrendingUp,
+            iconStyle: iconTone('var(--color-success-light)', 'var(--color-success)', 'rgba(52, 211, 153, 0.2)', '#86EFAC')
+        },
+        {
+            id: 'enrollment',
+            backendId: 'student_list',
+            name: 'Enrollment Report',
+            description: 'New admissions and student retention statistics.',
+            icon: Users,
+            iconStyle: iconTone('var(--color-primary-light)', 'var(--color-primary)', 'rgba(129, 140, 248, 0.22)', '#C7D2FE')
+        },
+        {
+            id: 'teacher',
+            backendId: 'teacher_evaluations',
+            name: 'Teacher Evaluations',
+            description: 'Summary of annual teacher performance reviews.',
+            icon: FileText,
+            iconStyle: iconTone('var(--color-warning-light)', 'var(--color-warning)', 'rgba(251, 191, 36, 0.22)', '#FDE68A')
+        }
     ];
 
     const handleDownload = async (report) => {
@@ -68,8 +109,8 @@ const AcademicReports = () => {
             <div className="stats-grid">
                 <div className="stat-card">
                     <div className="stat-header">
-                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-                            <TrendingUp size={20} />
+                        <div className="stat-icon-wrapper" style={iconTone('var(--color-primary-light)', 'var(--color-primary)', 'rgba(129, 140, 248, 0.22)', '#C7D2FE')}>
+                            <TrendingUp size={20} {...iconSvgProps} />
                         </div>
                         {/* Trend will be calculated from real backend data in future */}
                     </div>
@@ -81,8 +122,8 @@ const AcademicReports = () => {
 
                 <div className="stat-card">
                     <div className="stat-header">
-                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-success-light)', color: 'var(--color-success)' }}>
-                            <Users size={20} />
+                        <div className="stat-icon-wrapper" style={iconTone('var(--color-success-light)', 'var(--color-success)', 'rgba(52, 211, 153, 0.2)', '#86EFAC')}>
+                            <Users size={20} {...iconSvgProps} />
                         </div>
                         {/* Trend will be calculated from real backend data in future */}
                     </div>
@@ -92,8 +133,8 @@ const AcademicReports = () => {
 
                 <div className="stat-card">
                     <div className="stat-header">
-                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-warning-light)', color: 'var(--color-warning)' }}>
-                            <FileText size={20} />
+                        <div className="stat-icon-wrapper" style={iconTone('var(--color-warning-light)', 'var(--color-warning)', 'rgba(251, 191, 36, 0.22)', '#FDE68A')}>
+                            <FileText size={20} {...iconSvgProps} />
                         </div>
                         {/* Trend will be calculated from real backend data in future */}
                     </div>
@@ -103,8 +144,8 @@ const AcademicReports = () => {
 
                 <div className="stat-card">
                     <div className="stat-header">
-                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'var(--color-error-light)', color: 'var(--color-error)' }}>
-                            <BookOpen size={20} />
+                        <div className="stat-icon-wrapper" style={iconTone('var(--color-error-light)', 'var(--color-error)', 'rgba(248, 113, 113, 0.22)', '#FCA5A5')}>
+                            <BookOpen size={20} {...iconSvgProps} />
                         </div>
                         {/* Trend will be calculated from real backend data in future */}
                     </div>
@@ -149,10 +190,9 @@ const AcademicReports = () => {
                                 <div style={{
                                     padding: '10px',
                                     borderRadius: '10px',
-                                    backgroundColor: `var(--color-${report.color}-light)`,
-                                    color: `var(--color-${report.color})`
+                                    ...report.iconStyle
                                 }}>
-                                    <report.icon size={24} />
+                                    <report.icon size={24} {...iconSvgProps} />
                                 </div>
                                 <button
                                     onClick={(e) => {
@@ -167,7 +207,7 @@ const AcademicReports = () => {
                                         cursor: 'pointer'
                                     }}
                                 >
-                                    <Download size={18} className={downloading === report.id ? 'animate-bounce' : ''} />
+                                    <Download size={18} {...iconSvgProps} className={downloading === report.id ? 'animate-bounce' : ''} />
                                 </button>
                             </div>
                             <div>
@@ -190,7 +230,7 @@ const AcademicReports = () => {
                                     cursor: 'pointer'
                                 }}>
                                     View Report
-                                    <ChevronRight size={16} />
+                                    <ChevronRight size={16} {...iconSvgProps} />
                                 </button>
                             </div>
                         </div>
@@ -203,7 +243,7 @@ const AcademicReports = () => {
                 <div className="table-header-actions">
                     <h3 className="chart-title">Subject Performance Distribution</h3>
                     <div style={{ position: 'relative' }}>
-                        <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                        <Search size={16} {...iconSvgProps} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                         <input
                             type="text"
                             placeholder="Filter subjects..."

@@ -732,6 +732,32 @@
     align-items: center;
 }
 
+.inactive-row td {
+    opacity: 0.72;
+}
+
+.inactive-row td:last-child {
+    opacity: 1;
+}
+
+.sm-row-actions-desktop {
+    display: flex;
+}
+
+.sm-row-actions-mobile {
+    display: none;
+}
+
+.sm-action-select {
+    min-width: 110px;
+    padding: 0.4rem 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    color: var(--color-text-main);
+    font-size: 0.75rem;
+}
+
 .icon-btn {
     background: transparent;
     border: none;
@@ -1053,6 +1079,18 @@
     .teacher-monitoring-tabs {
         width: 100%;
         overflow-x: auto;
+    }
+
+    .sm-row-actions-desktop {
+        display: none;
+    }
+
+    .sm-row-actions-mobile {
+        display: block;
+    }
+
+    .sm-action-select {
+        min-width: 95px;
     }
 
     .teacher-monitoring-page .table-header-actions {
