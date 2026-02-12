@@ -1,22 +1,27 @@
 // filepath: /home/mahmoud/Desktop/front/EduTrakerFront/src/components/shared/Communication/CommunicationForm.jsx
 import { useState } from 'react';
-import { Search, Send, ShieldCheck } from 'lucide-react';
+import { Search, Send } from 'lucide-react';
 import Button from '../../ui/Button';
 import styles from './Communication.module.css';
 import { api } from '../../../utils/api';
 import { useTheme } from '../../../context/ThemeContext';
+import { useToast } from '../../ui/Toast';
 
 const CommunicationForm = ({
     onSuccess,
     onCancel,
     initialRecipient = null,
     isReply = false,
-    parentMessage = null
+    parentMessage = null,
+    role = 'user'
 }) => {
     const { t } = useTheme();
+    const { showSuccess, showError, showWarning } = useToast();
+    const MIN_RECIPIENT_SEARCH_CHARS = 1;
     const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
     const [recipientSearchResults, setRecipientSearchResults] = useState([]);
     const [_isSearchingUsers, setIsSearchingUsers] = useState(false);
+    const [isSending, setIsSending] = useState(false);
     const [formData, setFormData] = useState({
         recipient_id: initialRecipient?.id || null,
         recipient_name: initialRecipient?.full_name || initialRecipient?.email || '',
@@ -26,21 +31,46 @@ const CommunicationForm = ({
 
     const handleUserSearch = async (term) => {
         setRecipientSearchTerm(term);
-        if (term.length < 2) {
+        const normalizedTerm = term.trim();
+        if (normalizedTerm.length < MIN_RECIPIENT_SEARCH_CHARS) {
             setRecipientSearchResults([]);
             return;
         }
 
         setIsSearchingUsers(true);
         try {
-            const response = await api.get('/user-messages/search/', { params: { search: term } });
+            const response = await api.get('/user-messages/search/', { params: { search: normalizedTerm } });
             const results = response.results || response;
             setRecipientSearchResults(Array.isArray(results) ? results : []);
         } catch (err) {
             console.error('Error searching users:', err);
+            setRecipientSearchResults([]);
+            showError(t('communication.searchFailed') || 'Failed to search recipients.');
         } finally {
             setIsSearchingUsers(false);
         }
+    };
+
+    const extractErrorMessage = (err) => {
+        const data = err?.data || err?.response?.data;
+        if (!data) return err?.message || t('communication.sendFailed') || 'Failed to send message.';
+
+        if (typeof data === 'string') {
+            return data;
+        }
+
+        if (data.detail) {
+            return data.detail;
+        }
+
+        const firstKey = Object.keys(data)[0];
+        if (firstKey) {
+            const firstVal = data[firstKey];
+            if (Array.isArray(firstVal)) return firstVal.join(', ');
+            if (typeof firstVal === 'string') return firstVal;
+        }
+
+        return err?.message || t('communication.sendFailed') || 'Failed to send message.';
     };
 
     const handleSelectRecipient = (user) => {
@@ -60,23 +90,32 @@ const CommunicationForm = ({
     };
 
     const handleSend = async () => {
-        if (!formData.body.trim()) return;
+        if (!formData.body.trim()) {
+            showWarning(t('communication.emptyMessage') || 'Please write a message before sending.');
+            return;
+        }
 
-        // Determine recipient payload
+        // For School Manager compose flow, force recipient selection from scoped search.
+        if (!formData.recipient_id && role === 'school_manager') {
+            showError(t('communication.noRecipient') || 'Please select a recipient from the list.');
+            return;
+        }
+
+        // Determine recipient payload (fallback to email only for non-school-manager roles).
         let recipientPayload = {};
         if (formData.recipient_id) {
             recipientPayload = { recipient_ids: [formData.recipient_id] };
         } else {
             const emailInput = (recipientSearchTerm.trim() || formData.recipient_name || '').trim();
-            if (emailInput) {
-                recipientPayload = { recipient_emails: [emailInput] };
-            } else {
-                alert(t('communication.noRecipient') || 'Please select or type a recipient email.');
+            if (!emailInput) {
+                showError(t('communication.noRecipient') || 'Please select or type a recipient email.');
                 return;
             }
+            recipientPayload = { recipient_emails: [emailInput] };
         }
 
         try {
+            setIsSending(true);
             const basePayload = {
                 subject: formData.subject || t('communication.noSubject'),
                 body: formData.body,
@@ -89,19 +128,20 @@ const CommunicationForm = ({
             const payload = { ...basePayload, ...recipientPayload };
 
             await api.post('/user-messages/', payload);
-            if (onSuccess) onSuccess();
+            showSuccess(
+                isReply
+                    ? (t('communication.replySent') || 'Reply sent successfully.')
+                    : (t('communication.messageSent') || 'Message sent successfully.')
+            );
 
             // Clear form body if it was a success
             setFormData(prev => ({ ...prev, body: '' }));
+            if (onSuccess) onSuccess();
         } catch (err) {
             console.error('Failed to send message:', err);
-            const detail = err?.response?.data;
-            if (detail) {
-                const errorMsg = detail.recipient_emails
-                    ? (Array.isArray(detail.recipient_emails) ? detail.recipient_emails.join(', ') : detail.recipient_emails)
-                    : (typeof detail === 'string' ? detail : JSON.stringify(detail));
-                alert(errorMsg);
-            }
+            showError(extractErrorMessage(err));
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -132,7 +172,7 @@ const CommunicationForm = ({
                                         value={recipientSearchTerm}
                                         onChange={(e) => handleUserSearch(e.target.value)}
                                     />
-                                    {recipientSearchTerm.length >= 2 && (
+                                    {recipientSearchTerm.trim().length >= MIN_RECIPIENT_SEARCH_CHARS && (
                                         <div className={styles.searchResults}>
                                             {recipientSearchResults.length > 0 ? (
                                                 recipientSearchResults.map(user => (
@@ -145,7 +185,11 @@ const CommunicationForm = ({
                                             ) : (
                                                 <div className={styles.searchResultItem} style={{ opacity: 0.7, cursor: 'default' }}>
                                                     <div className={styles.resultName}>{t('communication.noResults') || 'No users found'}</div>
-                                                    <div className={styles.resultEmail}>{t('communication.typeEmailHint') || 'Type a full email and click Send'}</div>
+                                                    <div className={styles.resultEmail}>
+                                                        {role === 'school_manager'
+                                                            ? (t('communication.recipientRequired') || 'Choose a recipient from available users.')
+                                                            : (t('communication.typeEmailHint') || 'Type a full email and click Send')}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -194,7 +238,7 @@ const CommunicationForm = ({
                     variant="primary"
                     onClick={handleSend}
                     icon={Send}
-                    disabled={false} // always clickable
+                    disabled={isSending || !formData.body.trim() || (!isReply && !formData.recipient_id && role === 'school_manager')}
                 >
                     {t('communication.send')}
                 </Button>

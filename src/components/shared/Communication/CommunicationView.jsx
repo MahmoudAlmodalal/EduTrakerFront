@@ -315,9 +315,9 @@ const CommunicationView = ({ role = 'user' }) => {
                                         onSuccess={() => {
                                             fetchData();
                                             fetchHistory(selectedItem.partner.id);
-                                            showSuccess(t('communication.replySent'));
                                         }}
                                         initialRecipient={selectedItem.partner}
+                                        role={role}
                                     />
                                 </div>
                             )}
@@ -341,6 +341,7 @@ const CommunicationView = ({ role = 'user' }) => {
                         <CommunicationForm
                             onSuccess={() => { setIsComposeOpen(false); fetchData(); }}
                             onCancel={() => setIsComposeOpen(false)}
+                            role={role}
                         />
                     </div>
                 </div>
