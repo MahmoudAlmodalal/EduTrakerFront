@@ -57,16 +57,17 @@ export const roleConfigs = {
         permissions: [
             'view-teachers', 'manage-teachers',
             'view-secretaries', 'manage-secretaries',
-            'view-departments', 'manage-departments',
             'view-academic-config', 'manage-academic-config',
             'view-reports', 'export-reports'
         ],
         navigation: [
             { path: 'dashboard', labelKey: 'schoolManager.nav.dashboard', icon: 'LayoutDashboard' },
+            { path: 'grades', labelKey: 'schoolManager.nav.grades', icon: 'Layers' },
+            { path: 'academic-year', labelKey: 'schoolManager.nav.academicYear', icon: 'GraduationCap' },
             { path: 'configuration', labelKey: 'schoolManager.nav.configuration', icon: 'Cog' },
-            { path: 'reports', labelKey: 'schoolManager.nav.reports', icon: 'BarChart3' },
             { path: 'teachers', labelKey: 'schoolManager.nav.teachers', icon: 'Users' },
-            { path: 'departments', labelKey: 'schoolManager.nav.departments', icon: 'Building' },
+            { path: 'activity-log', labelKey: 'schoolManager.nav.activityLog', icon: 'Activity' },
+            { path: 'reports', labelKey: 'schoolManager.nav.reports', icon: 'BarChart3' },
             { path: 'secretaries', labelKey: 'schoolManager.nav.secretaries', icon: 'UserCheck' },
             { path: 'communication', labelKey: 'schoolManager.nav.communication', icon: 'MessageSquare' },
             { path: 'settings', labelKey: 'schoolManager.nav.settings', icon: 'Settings' },

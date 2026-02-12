@@ -95,6 +95,16 @@ const managerService = {
         return res.data !== undefined ? res.data : res;
     },
 
+    toggleTeacherStatus: async (id) => {
+        const res = await api.post(`/teacher/teachers/${id}/toggle-status/`);
+        return res.data !== undefined ? res.data : res;
+    },
+
+    getTeacherActivityLogs: async (params = {}) => {
+        const res = await api.get('/teacher/teachers/activity-logs/', { params });
+        return res.data !== undefined ? res.data : res;
+    },
+
     // ============================================
     // Grade Management
     // Backend: /api/grades/
@@ -212,30 +222,6 @@ const managerService = {
     },
 
     // ============================================
-    // Department Management
-    // Backend: /api/school/<schoolId>/departments/
-    // ============================================
-    getDepartments: async (schoolId, params = {}) => {
-        const res = await api.get(`/school/${schoolId}/departments/`, { params });
-        return res.data !== undefined ? res.data : res;
-    },
-
-    createDepartment: async (schoolId, data) => {
-        const res = await api.post(`/school/${schoolId}/departments/create/`, data);
-        return res.data !== undefined ? res.data : res;
-    },
-
-    updateDepartment: async (schoolId, deptId, data) => {
-        const res = await api.patch(`/school/${schoolId}/departments/${deptId}/`, data);
-        return res.data !== undefined ? res.data : res;
-    },
-
-    deactivateDepartment: async (schoolId, deptId) => {
-        const res = await api.post(`/school/${schoolId}/departments/${deptId}/deactivate/`);
-        return res.data !== undefined ? res.data : res;
-    },
-
-    // ============================================
     // Profile / Settings
     // Backend: PATCH /api/profile/update/
     // ============================================
@@ -317,8 +303,8 @@ const managerService = {
     // ============================================
     // Activity Logs
     // ============================================
-    getActivityLogs: async () => {
-        const res = await api.get('/activity-logs/');
+    getActivityLogs: async (params = {}) => {
+        const res = await api.get('/activity-logs/', { params });
         return res.data !== undefined ? res.data : res;
     },
 

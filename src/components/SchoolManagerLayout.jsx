@@ -6,10 +6,12 @@ import {
     LogOut,
     FileBarChart,
     Users,
-    Briefcase,
+    Layers,
+    GraduationCap,
     UserCheck,
     Sparkles,
     MessageSquare,
+    Activity,
     Menu,
     X
 } from 'lucide-react';
@@ -45,12 +47,14 @@ const SchoolManagerLayout = () => {
 
     const navItems = [
         { path: '/school-manager/dashboard', labelKey: 'schoolManager.nav.dashboard', icon: LayoutDashboard },
+        { path: '/school-manager/grades', labelKey: 'schoolManager.nav.grades', icon: Layers },
+        { path: '/school-manager/academic-year', labelKey: 'schoolManager.nav.academicYear', icon: GraduationCap },
         { path: '/school-manager/configuration', labelKey: 'schoolManager.nav.configuration', icon: Settings },
-        { path: '/school-manager/reports', labelKey: 'schoolManager.nav.reports', icon: FileBarChart },
         { path: '/school-manager/teachers', labelKey: 'schoolManager.nav.teachers', icon: UserCheck },
-        { path: '/school-manager/departments', labelKey: 'schoolManager.nav.departments', icon: Briefcase },
         { path: '/school-manager/secretaries', labelKey: 'schoolManager.nav.secretaries', icon: Users },
+        { path: '/school-manager/reports', labelKey: 'schoolManager.nav.reports', icon: FileBarChart },
         { path: '/school-manager/communication', labelKey: 'schoolManager.nav.communication', icon: MessageSquare },
+        { path: '/school-manager/activity-log', labelKey: 'schoolManager.nav.activityLog', icon: Activity },
         { path: '/school-manager/settings', labelKey: 'schoolManager.nav.settings', icon: Settings },
     ];
 
@@ -242,10 +246,12 @@ const SchoolManagerLayout = () => {
                         communicationPath="/school-manager/communication"
                         allowedRoutePrefixes={[
                             '/school-manager/dashboard',
+                            '/school-manager/grades',
+                            '/school-manager/academic-year',
                             '/school-manager/configuration',
                             '/school-manager/reports',
                             '/school-manager/teachers',
-                            '/school-manager/departments',
+                            '/school-manager/activity-log',
                             '/school-manager/secretaries',
                             '/school-manager/communication',
                             '/school-manager/settings',

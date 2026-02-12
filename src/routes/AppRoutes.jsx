@@ -33,10 +33,12 @@ import WorkstreamReports from '../pages/WorkstreamManager/WorkstreamReports';
 // School Manager Pages
 import SchoolManagerLayout from '../components/SchoolManagerLayout';
 import SchoolDashboard from '../pages/SchoolManager/SchoolDashboard';
+import GradesManagement from '../pages/SchoolManager/GradesManagement';
+import AcademicYearManagementPage from '../pages/SchoolManager/AcademicYearManagementPage';
 import AcademicConfiguration from '../pages/SchoolManager/AcademicConfiguration';
 import AcademicReports from '../pages/SchoolManager/AcademicReports';
 import TeacherMonitoring from '../pages/SchoolManager/TeacherMonitoring';
-import DepartmentManagement from '../pages/SchoolManager/DepartmentManagement';
+import SystemActivityLog from '../pages/SchoolManager/SystemActivityLog';
 import SecretaryMonitoring from '../pages/SchoolManager/SecretaryMonitoring';
 import SchoolManagerSettings from '../pages/SchoolManager/SchoolManagerSettings';
 
@@ -130,10 +132,12 @@ const AppRoutes = () => {
                 <Route path="/school-manager" element={<SchoolManagerLayout />}>
                     <Route index element={<Navigate to="dashboard" replace />} />
                     <Route path="dashboard" element={<SchoolDashboard />} />
+                    <Route path="grades" element={<GradesManagement />} />
+                    <Route path="academic-year" element={<AcademicYearManagementPage />} />
                     <Route path="configuration" element={<AcademicConfiguration />} />
                     <Route path="reports" element={<AcademicReports />} />
                     <Route path="teachers" element={<TeacherMonitoring />} />
-                    <Route path="departments" element={<DepartmentManagement />} />
+                    <Route path="activity-log" element={<SystemActivityLog />} />
                     <Route path="secretaries" element={<SecretaryMonitoring />} />
                     <Route path="communication" element={<GeneralCommunication />} />
                     <Route path="settings" element={<SchoolManagerSettings />} />

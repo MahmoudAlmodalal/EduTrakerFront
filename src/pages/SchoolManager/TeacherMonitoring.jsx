@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Users, Star, Activity, Clock, Search, Plus, Mail, UserCheck, Trash2 } from 'lucide-react';
+import { Users, Star, Search, Plus, Mail, UserCheck, Trash2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
@@ -16,6 +16,33 @@ const normalizeList = (response) => {
     if (Array.isArray(response?.results)) return response.results;
     if (Array.isArray(response)) return response;
     return [];
+};
+
+const mapTeachersCache = (cachedValue, mapper) => {
+    if (Array.isArray(cachedValue)) {
+        return cachedValue.map(mapper);
+    }
+    if (cachedValue && Array.isArray(cachedValue.results)) {
+        return {
+            ...cachedValue,
+            results: cachedValue.results.map(mapper)
+        };
+    }
+    return cachedValue;
+};
+
+const prependTeacherToCache = (cachedValue, teacherToAdd) => {
+    if (Array.isArray(cachedValue)) {
+        return [teacherToAdd, ...cachedValue];
+    }
+    if (cachedValue && Array.isArray(cachedValue.results)) {
+        return {
+            ...cachedValue,
+            count: typeof cachedValue.count === 'number' ? cachedValue.count + 1 : cachedValue.count,
+            results: [teacherToAdd, ...cachedValue.results]
+        };
+    }
+    return [teacherToAdd];
 };
 
 const getTeacherId = (teacher) => teacher?.user_id || teacher?.id;
@@ -38,19 +65,6 @@ const createInitialEvaluationForm = () => ({
     rating_score: 5,
     comments: ''
 });
-
-const getLoginStatus = (lastLogin) => {
-    if (!lastLogin) return { text: 'Never logged in', variant: 'never' };
-
-    const lastLoginDate = new Date(lastLogin);
-    const now = new Date();
-    const diffDays = Math.floor((now - lastLoginDate) / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return { text: 'Today', variant: 'today' };
-    if (diffDays <= 7) return { text: `${diffDays}d ago`, variant: 'week' };
-    if (diffDays <= 30) return { text: `${diffDays}d ago`, variant: 'month' };
-    return { text: `${diffDays}d ago`, variant: 'stale' };
-};
 
 const getErrorMessage = (error, fallbackMessage) => {
     const responseData = error?.response?.data;
@@ -113,7 +127,7 @@ const TeacherMonitoring = () => {
         refetch: refetchTeachers
     } = useQuery({
         queryKey: teachersQueryKey,
-        queryFn: () => managerService.getTeachers({ school_id: schoolId }),
+        queryFn: () => managerService.getTeachers({ school_id: schoolId, include_inactive: true }),
         select: normalizeList,
         enabled: hasSchoolId,
         staleTime: 5 * 60 * 1000
@@ -134,8 +148,7 @@ const TeacherMonitoring = () => {
 
     const tabs = useMemo(() => ([
         { id: 'directory', label: t('school.teachers.directory') || 'Directory', icon: Users },
-        { id: 'performance', label: t('school.teachers.performance') || 'Performance', icon: Star },
-        { id: 'activity', label: 'Activity Log', icon: Activity }
+        { id: 'performance', label: t('school.teachers.performance') || 'Performance', icon: Star }
     ]), [t]);
 
     const renderTabContent = () => {
@@ -178,8 +191,6 @@ const TeacherMonitoring = () => {
                         teachers={teachers}
                     />
                 );
-            case 'activity':
-                return <ActivityLogs teachers={teachers} />;
             default:
                 return (
                     <TeacherDirectory
@@ -247,12 +258,12 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
             const createdTeacherId = getTeacherId(createdTeacher);
 
             if (createdTeacherId) {
-                queryClient.setQueryData(teachersQueryKey, (current = []) => {
-                    const currentTeachers = Array.isArray(current) ? current : [];
+                queryClient.setQueryData(teachersQueryKey, (current) => {
+                    const currentTeachers = normalizeList(current);
                     if (currentTeachers.some((teacher) => getTeacherId(teacher) === createdTeacherId)) {
-                        return currentTeachers;
+                        return current;
                     }
-                    return [createdTeacher, ...currentTeachers];
+                    return prependTeacherToCache(current, createdTeacher);
                 });
             } else {
                 queryClient.invalidateQueries({ queryKey: teachersQueryKey });
@@ -277,9 +288,8 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
             await queryClient.cancelQueries({ queryKey: teachersQueryKey });
 
             const previousTeachers = queryClient.getQueryData(teachersQueryKey) || [];
-            queryClient.setQueryData(teachersQueryKey, (current = []) => {
-                const currentTeachers = Array.isArray(current) ? current : [];
-                return currentTeachers.map((teacher) => (
+            queryClient.setQueryData(teachersQueryKey, (current) => {
+                return mapTeachersCache(current, (teacher) => (
                     getTeacherId(teacher) === teacherId
                         ? { ...teacher, is_active: nextIsActive }
                         : teacher
@@ -296,6 +306,40 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
         },
         onSuccess: (_response, variables) => {
             showSuccess(variables.nextIsActive ? 'Teacher activated.' : 'Teacher deactivated.');
+        }
+    });
+
+    const toggleTeacherStatusMutation = useMutation({
+        mutationFn: (teacherId) => managerService.toggleTeacherStatus(teacherId),
+        onMutate: async (teacherId) => {
+            await queryClient.cancelQueries({ queryKey: teachersQueryKey });
+            const previousTeachers = queryClient.getQueryData(teachersQueryKey) || [];
+
+            queryClient.setQueryData(teachersQueryKey, (current) => (
+                mapTeachersCache(current, (teacher) => (
+                    getTeacherId(teacher) === teacherId
+                        ? { ...teacher, is_active: !(teacher.is_active !== false) }
+                        : teacher
+                ))
+            ));
+
+            return { previousTeachers, teacherId };
+        },
+        onError: (error, _teacherId, context) => {
+            if (context?.previousTeachers) {
+                queryClient.setQueryData(teachersQueryKey, context.previousTeachers);
+            }
+            showError(getErrorMessage(error, 'Failed to update teacher status.'));
+        },
+        onSuccess: (response, teacherId) => {
+            queryClient.setQueryData(teachersQueryKey, (current) => (
+                mapTeachersCache(current, (teacher) => (
+                    getTeacherId(teacher) === teacherId
+                        ? { ...teacher, is_active: response?.is_active }
+                        : teacher
+                ))
+            ));
+            showSuccess(response?.message || 'Teacher status updated.');
         }
     });
 
@@ -350,6 +394,12 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
         setPendingStatusAction(null);
     }, [pendingStatusAction, updateTeacherStatusMutation]);
 
+    const handleStatusBadgeToggle = useCallback((teacher) => {
+        const teacherId = getTeacherId(teacher);
+        if (!teacherId || toggleTeacherStatusMutation.isPending) return;
+        toggleTeacherStatusMutation.mutate(teacherId);
+    }, [toggleTeacherStatusMutation]);
+
     return (
         <div className="management-card">
             <div className="table-header-actions">
@@ -373,6 +423,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                 <thead>
                     <tr>
                         <th>Teacher</th>
+                        <th>School</th>
                         <th>Specialization</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -381,7 +432,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                 <tbody>
                     {filteredTeachers.length === 0 ? (
                         <tr>
-                            <td colSpan="4" className="sm-empty-state">
+                            <td colSpan="5" className="sm-empty-state">
                                 No teachers found.
                             </td>
                         </tr>
@@ -392,7 +443,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                             && updateTeacherStatusMutation.variables?.teacherId === id;
 
                         return (
-                            <tr key={id}>
+                            <tr key={id} className={isActive ? '' : 'inactive-row'}>
                                 <td>
                                     <div className="teacher-row-identity">
                                         <div className="teacher-avatar">
@@ -407,12 +458,25 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                                         </div>
                                     </div>
                                 </td>
+                                <td className={`sm-muted-cell ${!teacher.school_name ? 'empty' : ''}`}>
+                                    {teacher.school_name || 'Not assigned'}
+                                </td>
                                 <td className={`teacher-specialization ${!teacher.specialization ? 'empty' : ''}`}>
                                     {teacher.specialization || 'Not specified'}
                                 </td>
                                 <td>
-                                    <span className={`status-badge ${isActive ? 'status-active' : 'status-inactive'}`}>
-                                        {isActive ? 'Active' : 'Inactive'}
+                                    <span
+                                        className={`status-badge ${isActive ? 'status-active' : 'status-inactive'}`}
+                                        onClick={() => handleStatusBadgeToggle(teacher)}
+                                        style={{
+                                            cursor: toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id ? 'wait' : 'pointer',
+                                            opacity: toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id ? 0.75 : 1
+                                        }}
+                                        title={toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id ? 'Updating status...' : 'Click to toggle status'}
+                                    >
+                                        {toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id
+                                            ? 'Updating...'
+                                            : (isActive ? 'Active' : 'Inactive')}
                                     </span>
                                 </td>
                                 <td>
@@ -789,78 +853,6 @@ const PerformanceEvaluation = memo(function PerformanceEvaluation({
                     </div>
                 </form>
             </Modal>
-        </div>
-    );
-});
-
-const ActivityLogs = memo(function ActivityLogs({ teachers }) {
-    return (
-        <div className="management-card">
-            <div className="table-header-actions">
-                <h3 className="chart-title">Teacher Activity & Presence</h3>
-            </div>
-
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Teacher</th>
-                        <th>Last Login</th>
-                        <th>Status</th>
-                        <th>Joined</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {teachers.length === 0 ? (
-                        <tr>
-                            <td colSpan="4" className="sm-empty-state">
-                                No teachers found.
-                            </td>
-                        </tr>
-                    ) : (
-                        teachers.map((teacher) => {
-                            const loginStatus = getLoginStatus(teacher.last_login);
-                            return (
-                                <tr key={getTeacherId(teacher)}>
-                                    <td>
-                                        <div className="teacher-row-identity">
-                                            <div className="teacher-avatar">
-                                                {teacher.full_name?.charAt(0)?.toUpperCase() || 'T'}
-                                            </div>
-                                            <div>
-                                                <div className="teacher-name">{teacher.full_name}</div>
-                                                <div className="teacher-email">
-                                                    <Mail size={12} />
-                                                    {teacher.email}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className="activity-login-wrap">
-                                            <Clock size={16} className="activity-login-icon" />
-                                            <span className="sm-muted-cell">
-                                                {teacher.last_login
-                                                    ? new Date(teacher.last_login).toLocaleString()
-                                                    : 'Never'}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span className={`activity-badge activity-badge--${loginStatus.variant}`}>
-                                            {loginStatus.text}
-                                        </span>
-                                    </td>
-                                    <td className="sm-muted-cell">
-                                        {teacher.date_joined
-                                            ? new Date(teacher.date_joined).toLocaleDateString()
-                                            : 'N/A'}
-                                    </td>
-                                </tr>
-                            );
-                        })
-                    )}
-                </tbody>
-            </table>
         </div>
     );
 });

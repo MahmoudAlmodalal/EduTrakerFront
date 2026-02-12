@@ -125,7 +125,7 @@ const RowActions = ({
 const AcademicConfiguration = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('academic-year');
+    const [activeTab, setActiveTab] = useState('subjects');
     const [courses, setCourses] = useState([]);
     const [teachers, setTeachers] = useState([]);
     const [academicYears, setAcademicYears] = useState([]);
@@ -197,10 +197,6 @@ const AcademicConfiguration = () => {
     const renderTabContent = () => {
         if (loading) return <div>Loading...</div>;
         switch (activeTab) {
-            case 'academic-year':
-                return <AcademicYearManagement academicYears={academicYears} schoolId={schoolId} onUpdated={fetchAcademicYears} />;
-            case 'grades':
-                return <GradeManagement />;
             case 'subjects':
                 return <SubjectAllocation courses={courses} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
             case 'classrooms':
@@ -212,13 +208,11 @@ const AcademicConfiguration = () => {
             case 'conflicts':
                 return <ConflictDetection conflicts={conflicts} />;
             default:
-                return <AcademicYearManagement academicYears={academicYears} schoolId={schoolId} onUpdated={fetchAcademicYears} />;
+                return <SubjectAllocation courses={courses} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
         }
     };
 
     const tabs = [
-        { id: 'academic-year', label: 'Academic Year', icon: GraduationCap, hasWarning: !hasActiveAcademicYear && !loading },
-        { id: 'grades', label: 'Grades', icon: Layers },
         { id: 'subjects', label: 'Subjects', icon: BookOpen },
         { id: 'classrooms', label: 'Classrooms', icon: Building },
         { id: 'teachers', label: 'Teachers', icon: Users },
@@ -322,7 +316,7 @@ const AcademicConfiguration = () => {
 // ============================================
 // Academic Year Management Tab
 // ============================================
-const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
+export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
     const { showSuccess, showError } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ start_date: '', end_date: '' });
@@ -477,7 +471,7 @@ const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
 };
 
 // Sub-components for Tabs
-const GradeManagement = () => {
+export const GradeManagement = () => {
     const { showSuccess, showError, showWarning } = useToast();
     const [grades, setGrades] = useState([]);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

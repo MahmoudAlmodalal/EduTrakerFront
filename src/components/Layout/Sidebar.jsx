@@ -15,7 +15,6 @@ import {
     Calendar,
     FileText,
     UserCheck,
-    Layers,
     LogOut
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
@@ -37,12 +36,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             { path: '/super-admin/activity', label: t('nav.activity'), icon: ClipboardList },
         ],
         SCHOOL_MANAGER: [
-            { path: '/school-manager', label: t('school.nav.dashboard'), icon: LayoutDashboard },
-            { path: '/school-manager/configuration', label: t('school.nav.configuration'), icon: Calendar },
-            { path: '/school-manager/reports', label: t('school.nav.reports'), icon: FileText },
-            { path: '/school-manager/teachers', label: t('school.nav.teachers'), icon: GraduationCap },
-            { path: '/school-manager/departments', label: t('school.nav.departments'), icon: Layers },
-            { path: '/school-manager/secretaries', label: t('school.nav.secretaries'), icon: UserCheck },
+            { path: '/school-manager/dashboard', label: t('schoolManager.nav.dashboard'), icon: LayoutDashboard },
+            { path: '/school-manager/grades', label: t('schoolManager.nav.grades'), icon: Calendar },
+            { path: '/school-manager/academic-year', label: t('schoolManager.nav.academicYear'), icon: GraduationCap },
+            { path: '/school-manager/configuration', label: t('schoolManager.nav.configuration'), icon: Calendar },
+            { path: '/school-manager/teachers', label: t('schoolManager.nav.teachers'), icon: GraduationCap },
+            { path: '/school-manager/activity-log', label: t('schoolManager.nav.activityLog'), icon: ClipboardList },
+            { path: '/school-manager/reports', label: t('schoolManager.nav.reports'), icon: FileText },
+            { path: '/school-manager/secretaries', label: t('schoolManager.nav.secretaries'), icon: UserCheck },
         ],
     };
 
@@ -76,7 +77,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                             <NavLink
                                 to={link.path}
                                 className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-                                end={link.path === '/super-admin' || link.path === '/school-manager'}
+                                end={link.path === '/super-admin' || link.path === '/school-manager/dashboard'}
                             >
                                 <link.icon size={20} />
                                 <span className={styles.linkText}>{link.label}</span>

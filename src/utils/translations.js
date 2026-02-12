@@ -362,10 +362,12 @@ export const translations = {
 
         // School Manager Specific
         'schoolManager.nav.dashboard': 'Dashboard',
+        'schoolManager.nav.grades': 'Grades',
+        'schoolManager.nav.academicYear': 'Academic Year',
         'schoolManager.nav.configuration': 'Academic Configuration',
         'schoolManager.nav.reports': 'Reports',
         'schoolManager.nav.teachers': 'Teachers',
-        'schoolManager.nav.departments': 'Departments',
+        'schoolManager.nav.activityLog': 'Activity Log',
         'schoolManager.nav.secretaries': 'Secretaries',
         'schoolManager.nav.communication': 'Communication',
         'schoolManager.nav.settings': 'Settings',
@@ -513,10 +515,12 @@ export const translations = {
 
         // School Manager Navigation
         'schoolManager.nav.dashboard': 'Overview',
+        'schoolManager.nav.grades': 'Grades',
+        'schoolManager.nav.academicYear': 'Academic Year',
         'schoolManager.nav.configuration': 'Academic Config',
         'schoolManager.nav.reports': 'Reports',
         'schoolManager.nav.teachers': 'Teacher Monitoring',
-        'schoolManager.nav.departments': 'Departments',
+        'schoolManager.nav.activityLog': 'Activity Log',
         'schoolManager.nav.secretaries': 'Secretary Monitoring',
         'schoolManager.nav.communication': 'Communication',
         'schoolManager.nav.settings': 'Settings',
@@ -618,26 +622,6 @@ export const translations = {
         'school.teachers.cancel': 'Cancel',
         'school.teachers.save': 'Save',
         'school.teachers.confirmDelete': 'Are you sure you want to delete this teacher?',
-
-        // Department Management
-        'school.departments.title': 'Department Management',
-        'school.departments.subtitle': 'Organize and manage school departments.',
-        'school.departments.searchPlaceholder': 'Search departments...',
-        'school.departments.addDepartment': 'Add Department',
-        'school.departments.name': 'Department Name',
-        'school.departments.head': 'Head of Department',
-        'school.departments.teachers': 'Teachers',
-        'school.departments.subjects': 'Subjects',
-        'school.departments.actions': 'Actions',
-        'school.departments.edit': 'Edit',
-        'school.departments.delete': 'Delete',
-        'school.departments.addNewDepartment': 'Add New Department',
-        'school.departments.editDepartment': 'Edit Department',
-        'school.departments.description': 'Description',
-        'school.departments.selectHead': 'Select Head',
-        'school.departments.cancel': 'Cancel',
-        'school.departments.save': 'Save',
-        'school.departments.confirmDelete': 'Are you sure you want to delete this department?',
 
         // Secretary Monitoring
         'school.secretaries.title': 'Secretary Monitoring',
@@ -1297,7 +1281,6 @@ export const translations = {
         'school.nav.configuration': 'التهيئة الأكاديمية',
         'school.nav.reports': 'التقارير الأكاديمية',
         'school.nav.teachers': 'مراقبة المعلمين',
-        'school.nav.departments': 'إدارة الأقسام',
         'school.nav.secretaries': 'مراقبة السكرتارية',
 
         // Teacher Specific
@@ -1443,10 +1426,11 @@ export const translations = {
 
         // School Manager Navigation
         'schoolManager.nav.dashboard': 'لوحة التحكم',
+        'schoolManager.nav.grades': 'الصفوف',
+        'schoolManager.nav.academicYear': 'العام الدراسي',
         'schoolManager.nav.configuration': 'الإعدادات الأكاديمية',
         'schoolManager.nav.reports': 'التقارير',
         'schoolManager.nav.teachers': 'المعلمون',
-        'schoolManager.nav.departments': 'الأقسام',
         'schoolManager.nav.secretaries': 'السكرتارية',
         'schoolManager.nav.communication': 'الاتصالات',
         'schoolManager.nav.settings': 'الإعدادات',
@@ -1548,26 +1532,6 @@ export const translations = {
         'school.teachers.cancel': 'إلغاء',
         'school.teachers.save': 'حفظ',
         'school.teachers.confirmDelete': 'هل أنت متأكد من حذف هذا المعلم؟',
-
-        // Department Management
-        'school.departments.title': 'إدارة الأقسام',
-        'school.departments.subtitle': 'تنظيم وإدارة أقسام المدرسة.',
-        'school.departments.searchPlaceholder': 'بحث عن قسم...',
-        'school.departments.addDepartment': 'إضافة قسم',
-        'school.departments.name': 'اسم القسم',
-        'school.departments.head': 'رئيس القسم',
-        'school.departments.teachers': 'المعلمون',
-        'school.departments.subjects': 'المواد',
-        'school.departments.actions': 'الإجراءات',
-        'school.departments.edit': 'تعديل',
-        'school.departments.delete': 'حذف',
-        'school.departments.addNewDepartment': 'إضافة قسم جديد',
-        'school.departments.editDepartment': 'تعديل قسم',
-        'school.departments.description': 'الوصف',
-        'school.departments.selectHead': 'اختر الرئيس',
-        'school.departments.cancel': 'إلغاء',
-        'school.departments.save': 'حفظ',
-        'school.departments.confirmDelete': 'هل أنت متأكد من حذف هذا القسم؟',
 
         // Secretary Monitoring
         'school.secretaries.title': 'متابعة السكرتارية',

@@ -722,6 +722,79 @@
     margin-top: 2px;
 }
 
+.activity-user-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--sm-primary-dark);
+    border: 1px solid rgba(79, 70, 229, 0.22);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.activity-details-wrap {
+    display: grid;
+    gap: 0.35rem;
+    max-width: 420px;
+}
+
+.activity-details-main {
+    margin: 0;
+    color: var(--color-text-main);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.activity-details-target {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0.2rem 0.5rem;
+    border-radius: 8px;
+    background: var(--color-bg-muted);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border-subtle);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.activity-time-wrap {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 112px;
+}
+
+.activity-time-main {
+    color: var(--color-text-main);
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.activity-time-sub {
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+}
+
+[data-theme='dark'] .activity-user-type-badge {
+    background: rgba(79, 70, 229, 0.2);
+    border-color: rgba(99, 102, 241, 0.38);
+    color: #c7d2fe;
+}
+
+[data-theme='dark'] .activity-details-target {
+    background: rgba(15, 23, 42, 0.55);
+    border-color: rgba(71, 85, 105, 0.55);
+    color: #94a3b8;
+}
+
 .teacher-specialization.empty {
     color: var(--color-text-muted);
 }

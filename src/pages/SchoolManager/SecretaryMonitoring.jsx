@@ -206,6 +206,7 @@ const SecretaryMonitoring = () => {
                         <thead>
                             <tr>
                                 <th>Secretary</th>
+                                <th>School</th>
                                 <th>Department</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -214,7 +215,7 @@ const SecretaryMonitoring = () => {
                         <tbody>
                             {filteredSecretaries.length === 0 ? (
                                 <tr>
-                                    <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                    <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
                                         No secretaries found.
                                     </td>
                                 </tr>
@@ -243,6 +244,9 @@ const SecretaryMonitoring = () => {
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </td>
+                                            <td style={{ color: sec.school_name ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                                {sec.school_name || 'Not assigned'}
                                             </td>
                                             <td>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
