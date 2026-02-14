@@ -753,6 +753,7 @@ export const translations = {
         'guardian.nav.dashboard': 'Overview',
         'guardian.nav.monitoring': 'Children Monitoring',
         'guardian.nav.communication': 'Communication',
+        'guardian.nav.info': 'Info',
         'guardian.nav.settings': 'Settings',
 
         // Guardian Settings
@@ -1668,6 +1669,7 @@ export const translations = {
         'guardian.nav.dashboard': 'نظرة عامة',
         'guardian.nav.monitoring': 'متابعة الأبناء',
         'guardian.nav.communication': 'التواصل',
+        'guardian.nav.info': 'المعلومات',
         'guardian.nav.settings': 'الإعدادات',
 
         // Guardian Settings

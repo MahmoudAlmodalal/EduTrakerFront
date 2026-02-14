@@ -63,6 +63,7 @@ import StudentSettings from '../pages/Student/Settings/StudentSettings';
 import GuardianLayout from '../components/GuardianLayout';
 import GuardianDashboard from '../pages/Guardian/GuardianDashboard';
 import ChildrenMonitoring from '../pages/Guardian/ChildrenMonitoring';
+import GuardianInfo from '../pages/Guardian/GuardianInfo';
 import GuardianSettings from '../pages/Guardian/GuardianSettings';
 
 // Teacher Pages
@@ -178,6 +179,7 @@ const AppRoutes = () => {
                     <Route path="dashboard" element={<GuardianDashboard />} />
                     <Route path="monitoring" element={<ChildrenMonitoring />} />
                     <Route path="communication" element={<GeneralCommunication />} />
+                    <Route path="info" element={<GuardianInfo />} />
                     <Route path="settings" element={<GuardianSettings />} />
                 </Route>
             </Route>

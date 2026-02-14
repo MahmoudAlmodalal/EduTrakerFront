@@ -4,22 +4,33 @@ import {
     LayoutDashboard,
     Users, // For Children Monitoring
     MessageSquare, // For Communication
+    Info,
     Settings, // For Settings
     LogOut,
     ShieldCheck, // Guardian Icon/Brand
+    Sparkles,
     Menu,
     X,
     ChevronLeft
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import NotificationDropdown from './shared/NotificationDropdown';
 import '../pages/Guardian/Guardian.css';
 
 const SIDEBAR_BREAKPOINT = 1024;
 
 const GuardianLayout = () => {
     const { t } = useTheme();
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
+
+    const getInitials = () => {
+        const name = user?.full_name || user?.name || user?.displayName || '';
+        if (name) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+        return 'GU';
+    };
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(
         typeof window !== 'undefined' ? window.innerWidth > SIDEBAR_BREAKPOINT : true
@@ -47,6 +58,7 @@ const GuardianLayout = () => {
         { path: '/guardian/dashboard', labelKey: 'guardian.nav.dashboard', icon: LayoutDashboard },
         { path: '/guardian/monitoring', labelKey: 'guardian.nav.monitoring', icon: Users },
         { path: '/guardian/communication', labelKey: 'guardian.nav.communication', icon: MessageSquare },
+        { path: '/guardian/info', labelKey: 'guardian.nav.info', icon: Info },
         { path: '/guardian/settings', labelKey: 'guardian.nav.settings', icon: Settings },
     ];
 
@@ -63,8 +75,10 @@ const GuardianLayout = () => {
             {/* Sidebar */}
             <aside className={`guardian-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
                 <div className="guardian-brand">
-                    <ShieldCheck size={32} />
-                    <span>{t('app.name')}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Sparkles size={28} />
+                        <span>{t('app.name')}</span>
+                    </div>
 
                     {/* Close Button (Mobile & Desktop) */}
                     <button
@@ -76,9 +90,51 @@ const GuardianLayout = () => {
                     </button>
                 </div>
 
-                <div className="user-profile" style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--color-bg-body)', borderRadius: '0.5rem' }}>
-                    <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>{t('header.welcome') || 'Welcome,'}</div>
-                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{t('auth.role.guardian')}</div>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px',
+                    background: 'rgba(255,255,255,0.04)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    marginBottom: '1.5rem'
+                }}>
+                    <div style={{
+                        width: '42px',
+                        height: '42px',
+                        background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: '700',
+                        fontSize: '0.875rem',
+                        flexShrink: 0,
+                        boxShadow: 'var(--shadow-md)'
+                    }}>
+                        {getInitials()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: '#ffffff',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            {user?.full_name || user?.name || user?.displayName || t('auth.role.guardian')}
+                        </div>
+                        <div style={{
+                            fontSize: '0.6875rem',
+                            color: 'rgba(148,163,184,0.8)',
+                            textTransform: 'capitalize'
+                        }}>
+                            {t('auth.role.guardian')}
+                        </div>
+                    </div>
                 </div>
 
                 <nav className="guardian-nav">
@@ -103,7 +159,7 @@ const GuardianLayout = () => {
 
                 <div style={{ marginTop: 'auto' }}>
                     <button
-                        className="guardian-nav-item"
+                        className="guardian-nav-item guardian-logout-btn"
                         style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}
                         onClick={handleLogout}
                     >
@@ -115,11 +171,8 @@ const GuardianLayout = () => {
 
             {/* Main Content */}
             <main className={`guardian-main ${isSidebarOpen ? '' : 'sidebar-closed'}`}>
-                {!isSidebarOpen && (
-                    <div
-                        className="guardian-header-actions"
-                        style={{ position: isMobile ? 'relative' : 'sticky', top: 0, zIndex: 10 }}
-                    >
+                <div className="guardian-topbar">
+                    {!isSidebarOpen && (
                         <button
                             className="guardian-trigger-btn"
                             onClick={() => setIsSidebarOpen(true)}
@@ -127,15 +180,28 @@ const GuardianLayout = () => {
                         >
                             <Menu size={24} />
                         </button>
+                    )}
 
-                        {isMobile && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <ShieldCheck size={24} style={{ color: 'var(--color-primary)' }} />
-                                <span style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{t('app.name')}</span>
-                            </div>
-                        )}
+                    {!isSidebarOpen && isMobile && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <ShieldCheck size={24} style={{ color: 'var(--color-primary)' }} />
+                            <span style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{t('app.name')}</span>
+                        </div>
+                    )}
+
+                    <div style={{ marginLeft: 'auto', position: 'relative' }}>
+                        <NotificationDropdown
+                            communicationPath="/guardian/communication"
+                            allowedRoutePrefixes={[
+                                '/guardian/dashboard',
+                                '/guardian/monitoring',
+                                '/guardian/communication',
+                                '/guardian/info',
+                                '/guardian/settings',
+                            ]}
+                        />
                     </div>
-                )}
+                </div>
 
                 <Outlet />
             </main>

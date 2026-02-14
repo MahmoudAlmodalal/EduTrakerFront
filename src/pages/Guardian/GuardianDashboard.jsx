@@ -1,10 +1,11 @@
 import React from 'react';
 import './Guardian.css';
-import { Bell, Calendar, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
+import { Bell, Calendar, TrendingUp, Loader2, AlertCircle, Users, AlertTriangle, GraduationCap } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../context/ThemeContext';
 import guardianService from '../../services/guardianService';
 import notificationService from '../../services/notificationService';
+import { useAuth } from '../../context/AuthContext';
 
 const normalizeList = (value) => {
     if (Array.isArray(value)) {
@@ -16,8 +17,21 @@ const normalizeList = (value) => {
     return [];
 };
 
+const StatCard = ({ icon: Icon, value, label, color, bg }) => (
+    <div className="guardian-stat-card">
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon size={24} style={{ color }} />
+        </div>
+        <div>
+            <div className="guardian-stat-value">{value}</div>
+            <div className="guardian-stat-label">{label}</div>
+        </div>
+    </div>
+);
+
 const GuardianDashboard = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const queryClient = useQueryClient();
 
     const {
@@ -36,12 +50,12 @@ const GuardianDashboard = () => {
         error: notificationsError,
         refetch: refetchNotifications
     } = useQuery({
-        queryKey: ['guardian', 'notifications'],
-        queryFn: ({ signal }) => guardianService.getNotifications({ signal })
+        queryKey: ['guardian', 'notifications', user?.id],
+        queryFn: () => notificationService.getNotifications({ page_size: 5 })
     });
 
     const updateNotificationsCache = (updater) => {
-        queryClient.setQueryData(['guardian', 'notifications'], (oldData) => {
+        queryClient.setQueryData(['guardian', 'notifications', user?.id], (oldData) => {
             const current = normalizeList(oldData);
             if (current.length === 0) {
                 return oldData;
@@ -66,29 +80,31 @@ const GuardianDashboard = () => {
         });
     };
 
+    const notifQueryKey = ['guardian', 'notifications', user?.id];
+
     const markAllAsReadMutation = useMutation({
         mutationFn: () => notificationService.markAllAsRead(),
         onMutate: async () => {
-            await queryClient.cancelQueries({ queryKey: ['guardian', 'notifications'] });
-            const previous = queryClient.getQueryData(['guardian', 'notifications']);
+            await queryClient.cancelQueries({ queryKey: notifQueryKey });
+            const previous = queryClient.getQueryData(notifQueryKey);
             updateNotificationsCache((items) => items.map((item) => ({ ...item, is_read: true })));
             return { previous };
         },
         onError: (_error, _variables, context) => {
             if (context?.previous) {
-                queryClient.setQueryData(['guardian', 'notifications'], context.previous);
+                queryClient.setQueryData(notifQueryKey, context.previous);
             }
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['guardian', 'notifications'] });
+            queryClient.invalidateQueries({ queryKey: notifQueryKey });
         }
     });
 
     const markAsReadMutation = useMutation({
         mutationFn: (notificationId) => notificationService.markAsRead(notificationId),
         onMutate: async (notificationId) => {
-            await queryClient.cancelQueries({ queryKey: ['guardian', 'notifications'] });
-            const previous = queryClient.getQueryData(['guardian', 'notifications']);
+            await queryClient.cancelQueries({ queryKey: notifQueryKey });
+            const previous = queryClient.getQueryData(notifQueryKey);
             updateNotificationsCache((items) =>
                 items.map((item) =>
                     item.id === notificationId ? { ...item, is_read: true } : item
@@ -98,11 +114,11 @@ const GuardianDashboard = () => {
         },
         onError: (_error, _variables, context) => {
             if (context?.previous) {
-                queryClient.setQueryData(['guardian', 'notifications'], context.previous);
+                queryClient.setQueryData(notifQueryKey, context.previous);
             }
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['guardian', 'notifications'] });
+            queryClient.invalidateQueries({ queryKey: notifQueryKey });
         }
     });
 
@@ -141,6 +157,12 @@ const GuardianDashboard = () => {
     return (
         <div className="guardian-dashboard">
             <h1 className="guardian-page-title">{t('guardian.dashboard.title')}</h1>
+
+            <div className="guardian-stats-row">
+                <StatCard icon={Users} value={stats?.total_children ?? 0} label="Linked Children" color="#2563eb" bg="#dbeafe" />
+                <StatCard icon={AlertTriangle} value={stats?.total_absences ?? 0} label="Total Absences" color="#ea580c" bg="#ffedd5" />
+                <StatCard icon={GraduationCap} value={children.length} label="Active Students" color="#16a34a" bg="#dcfce7" />
+            </div>
 
             <div className="guardian-dashboard-grid">
                 {/* Children Summary */}

@@ -162,6 +162,7 @@ export const roleConfigs = {
             { path: 'dashboard', labelKey: 'guardian.nav.dashboard', icon: 'LayoutDashboard' },
             { path: 'monitoring', labelKey: 'guardian.nav.monitoring', icon: 'Users' },
             { path: 'communication', labelKey: 'guardian.nav.communication', icon: 'MessageSquare' },
+            { path: 'info', labelKey: 'guardian.nav.info', icon: 'Info' },
             { path: 'settings', labelKey: 'guardian.nav.settings', icon: 'Settings' },
         ],
         dashboard: {

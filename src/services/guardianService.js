@@ -29,6 +29,14 @@ const guardianService = {
         );
     },
 
+    // Get guardian school info
+    getSchoolInfo: async (guardianId, config = {}) => {
+        return requestWithContext(
+            () => api.get(`/guardian/guardians/${guardianId}/school-info/`, config),
+            'load school info'
+        );
+    },
+
     // Get student attendance
     getAttendance: async (studentId, config = {}) => {
         return requestWithContext(
