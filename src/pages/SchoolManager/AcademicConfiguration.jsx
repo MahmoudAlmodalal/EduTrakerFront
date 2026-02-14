@@ -135,13 +135,8 @@ const AcademicConfiguration = () => {
     const hasActiveAcademicYear = academicYears.some(ay => ay.is_active);
 
     useEffect(() => {
-        // Debug logging
-        console.log('User object:', user);
-        console.log('School ID:', schoolId);
-
         const fetchData = async () => {
             if (!schoolId) {
-                console.warn('No school ID found for user. User object:', user);
                 setLoading(false);
                 return;
             }
@@ -174,17 +169,6 @@ const AcademicConfiguration = () => {
         } catch (error) {
             console.error('Failed to fetch courses:', error);
             setCourses([]);
-        }
-    }
-
-    const fetchAcademicYears = async () => {
-        if (!schoolId) return;
-        try {
-            const data = await managerService.getAcademicYears({ school_id: schoolId, include_inactive: true });
-            setAcademicYears(data.results || data || []);
-        } catch (error) {
-            console.error('Failed to fetch academic years:', error);
-            setAcademicYears([]);
         }
     }
 
@@ -228,8 +212,7 @@ const AcademicConfiguration = () => {
 
             {/* Warning banner when no active academic year */}
             {!loading && !hasActiveAcademicYear && (
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: '1rem',
+                <div className="sm-config-warning" style={{
                     padding: '1rem 1.5rem', marginBottom: '1.5rem',
                     background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                     border: '1px solid #f59e0b',
@@ -254,16 +237,7 @@ const AcademicConfiguration = () => {
             )}
 
             {/* Enhanced Tab Navigation */}
-            <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginBottom: '2rem',
-                padding: '0.5rem',
-                background: 'var(--color-bg-body)',
-                borderRadius: '14px',
-                border: '1px solid var(--color-border)',
-                flexWrap: 'wrap'
-            }}>
+            <div className="sm-config-tabs">
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -389,47 +363,43 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                     </button>
                 </div>
             ) : (
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Academic Year</th>
-                            <th>Start Date</th>
-                            <th>End Date</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {academicYears.map((ay) => (
-                            <tr key={ay.id}>
-                                <td style={{ fontWeight: 600 }}>{ay.academic_year_code}</td>
-                                <td>{ay.start_date}</td>
-                                <td>{ay.end_date}</td>
-                                <td>
-                                    <span
-                                        className={`status-badge ${ay.is_active ? 'status-active' : 'status-inactive'}`}
-                                        onClick={() => handleToggleStatus(ay)}
-                                        style={{ cursor: 'pointer' }}
-                                        title={ay.is_active ? 'Click to deactivate' : 'Click to activate'}
-                                    >
-                                        {ay.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </td>
+                <div className="sm-table-scroll">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Academic Year</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Status</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {academicYears.map((ay) => (
+                                <tr key={ay.id}>
+                                    <td style={{ fontWeight: 600 }}>{ay.academic_year_code}</td>
+                                    <td>{ay.start_date}</td>
+                                    <td>{ay.end_date}</td>
+                                    <td>
+                                        <span
+                                            className={`status-badge ${ay.is_active ? 'status-active' : 'status-inactive'}`}
+                                            onClick={() => handleToggleStatus(ay)}
+                                            style={{ cursor: 'pointer' }}
+                                            title={ay.is_active ? 'Click to deactivate' : 'Click to activate'}
+                                        >
+                                            {ay.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
 
             {/* Create Academic Year Modal */}
             {isModalOpen && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--color-bg-surface)', padding: '2rem', borderRadius: '0.5rem', width: '420px',
-                        border: '1px solid var(--color-border)'
-                    }}>
+                <div className="sm-modal-backdrop">
+                    <div className="sm-modal-panel">
                         <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Create Academic Year</h2>
                         <p style={{ marginBottom: '1.5rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
                             The academic year code will be auto-generated from the dates (e.g. 2025-2026).
@@ -651,50 +621,52 @@ export const GradeManagement = () => {
                     No grades found. Create your first grade.
                 </div>
             ) : (
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Grade</th>
-                            <th>Level</th>
-                            <th>Age Range</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {grades.map((grade) => (
-                            <tr key={grade.id} className={grade.is_active ? '' : 'inactive-row'}>
-                                <td style={{ fontWeight: 600 }}>{grade.name}</td>
-                                <td>{grade.numeric_level}</td>
-                                <td>{grade.min_age} - {grade.max_age}</td>
-                                <td>
-                                    <span
-                                        className={`status-badge ${grade.is_active ? 'status-active' : 'status-inactive'}`}
-                                        onClick={() => handleStatusBadgeToggle(grade)}
-                                        style={{
-                                            cursor: togglingGradeId === grade.id ? 'wait' : 'pointer',
-                                            opacity: togglingGradeId === grade.id ? 0.75 : 1
-                                        }}
-                                        title={togglingGradeId === grade.id ? 'Updating status...' : 'Click to toggle status'}
-                                    >
-                                        {togglingGradeId === grade.id ? 'Updating...' : (grade.is_active ? 'Active' : 'Inactive')}
-                                    </span>
-                                </td>
-                                <td>
-                                    <RowActions
-                                        isActive={grade.is_active}
-                                        onUpdate={() => handleOpenEdit(grade)}
-                                        onActivate={() => setPendingStatusAction({ grade, nextIsActive: true })}
-                                        onDeactivate={() => setPendingStatusAction({ grade, nextIsActive: false })}
-                                        updateTitle="Update Grade"
-                                        activateTitle="Activate Grade"
-                                        deactivateTitle="Deactivate Grade"
-                                    />
-                                </td>
+                <div className="sm-table-scroll">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Grade</th>
+                                <th>Level</th>
+                                <th>Age Range</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {grades.map((grade) => (
+                                <tr key={grade.id} className={grade.is_active ? '' : 'inactive-row'}>
+                                    <td style={{ fontWeight: 600 }}>{grade.name}</td>
+                                    <td>{grade.numeric_level}</td>
+                                    <td>{grade.min_age} - {grade.max_age}</td>
+                                    <td>
+                                        <span
+                                            className={`status-badge ${grade.is_active ? 'status-active' : 'status-inactive'}`}
+                                            onClick={() => handleStatusBadgeToggle(grade)}
+                                            style={{
+                                                cursor: togglingGradeId === grade.id ? 'wait' : 'pointer',
+                                                opacity: togglingGradeId === grade.id ? 0.75 : 1
+                                            }}
+                                            title={togglingGradeId === grade.id ? 'Updating status...' : 'Click to toggle status'}
+                                        >
+                                            {togglingGradeId === grade.id ? 'Updating...' : (grade.is_active ? 'Active' : 'Inactive')}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <RowActions
+                                            isActive={grade.is_active}
+                                            onUpdate={() => handleOpenEdit(grade)}
+                                            onActivate={() => setPendingStatusAction({ grade, nextIsActive: true })}
+                                            onDeactivate={() => setPendingStatusAction({ grade, nextIsActive: false })}
+                                            updateTitle="Update Grade"
+                                            activateTitle="Activate Grade"
+                                            deactivateTitle="Deactivate Grade"
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
 
             <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Add Grade">
@@ -721,7 +693,7 @@ export const GradeManagement = () => {
                             className="sm-form-input"
                         />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="sm-form-grid-two">
                         <div className="sm-form-field">
                             <label className="sm-form-label">Min Age</label>
                             <input
@@ -783,7 +755,7 @@ export const GradeManagement = () => {
                             className="sm-form-input"
                         />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="sm-form-grid-two">
                         <div className="sm-form-field">
                             <label className="sm-form-label">Min Age</label>
                             <input
@@ -1008,56 +980,58 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                     Add Subject
                 </button>
             </div>
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Grade</th>
-                        <th>Code</th>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {courses.length === 0 ? (
+            <div className="sm-table-scroll">
+                <table className="data-table">
+                    <thead>
                         <tr>
-                            <td colSpan="5" className="sm-empty-state">No subjects found.</td>
+                            <th>Grade</th>
+                            <th>Code</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Actions</th>
                         </tr>
-                    ) : courses.map((item) => {
-                        const isCourseActive = courseStatusOverrides[item.id] ?? item.is_active;
-                        return (
-                        <tr key={item.id} className={isCourseActive ? '' : 'inactive-row'}>
-                            <td>{item.grade_name || item.grade}</td>
-                            <td>{item.course_code}</td>
-                            <td>{item.name}</td>
-                            <td>
-                                <span
-                                    className={`status-badge ${isCourseActive ? 'status-active' : 'status-inactive'}`}
-                                    onClick={() => handleStatusBadgeToggle(item)}
-                                    style={{
-                                        cursor: togglingCourseId === item.id ? 'wait' : 'pointer',
-                                        opacity: togglingCourseId === item.id ? 0.75 : 1
-                                    }}
-                                    title={togglingCourseId === item.id ? 'Updating status...' : 'Click to toggle status'}
-                                >
-                                    {togglingCourseId === item.id ? 'Updating...' : (isCourseActive ? 'Active' : 'Inactive')}
-                                </span>
-                            </td>
-                            <td>
-                                <RowActions
-                                    isActive={isCourseActive}
-                                    onUpdate={() => handleOpenEdit(item)}
-                                    onActivate={() => setPendingStatusAction({ subject: item, nextIsActive: true })}
-                                    onDeactivate={() => setPendingStatusAction({ subject: item, nextIsActive: false })}
-                                    updateTitle="Update Subject"
-                                    activateTitle="Activate Subject"
-                                    deactivateTitle="Deactivate Subject"
-                                />
-                            </td>
-                        </tr>
-                    )})}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {courses.length === 0 ? (
+                            <tr>
+                                <td colSpan="5" className="sm-empty-state">No subjects found.</td>
+                            </tr>
+                        ) : courses.map((item) => {
+                            const isCourseActive = courseStatusOverrides[item.id] ?? item.is_active;
+                            return (
+                            <tr key={item.id} className={isCourseActive ? '' : 'inactive-row'}>
+                                <td>{item.grade_name || item.grade}</td>
+                                <td>{item.course_code}</td>
+                                <td>{item.name}</td>
+                                <td>
+                                    <span
+                                        className={`status-badge ${isCourseActive ? 'status-active' : 'status-inactive'}`}
+                                        onClick={() => handleStatusBadgeToggle(item)}
+                                        style={{
+                                            cursor: togglingCourseId === item.id ? 'wait' : 'pointer',
+                                            opacity: togglingCourseId === item.id ? 0.75 : 1
+                                        }}
+                                        title={togglingCourseId === item.id ? 'Updating status...' : 'Click to toggle status'}
+                                    >
+                                        {togglingCourseId === item.id ? 'Updating...' : (isCourseActive ? 'Active' : 'Inactive')}
+                                    </span>
+                                </td>
+                                <td>
+                                    <RowActions
+                                        isActive={isCourseActive}
+                                        onUpdate={() => handleOpenEdit(item)}
+                                        onActivate={() => setPendingStatusAction({ subject: item, nextIsActive: true })}
+                                        onDeactivate={() => setPendingStatusAction({ subject: item, nextIsActive: false })}
+                                        updateTitle="Update Subject"
+                                        activateTitle="Activate Subject"
+                                        deactivateTitle="Deactivate Subject"
+                                    />
+                                </td>
+                            </tr>
+                        )})}
+                    </tbody>
+                </table>
+            </div>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Subject to School">
                 <form onSubmit={handleSave} className="sm-modal-form">
@@ -1182,7 +1156,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                             className="sm-form-input"
                         />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="sm-form-grid-two">
                         <div className="sm-form-field">
                             <label className="sm-form-label">Min Age</label>
                             <input
@@ -1326,69 +1300,71 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
             <div className="table-header-actions">
                 <h3 className="chart-title">Teacher Allocations</h3>
             </div>
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Subject</th>
-                        <th>Grade</th>
-                        <th>Classroom Name</th>
-                        <th>Assigned Teacher</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {courses.length === 0 ? (
+            <div className="sm-table-scroll">
+                <table className="data-table">
+                    <thead>
                         <tr>
-                            <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                No subjects found. Configure subjects first.
-                            </td>
+                            <th>Subject</th>
+                            <th>Grade</th>
+                            <th>Classroom Name</th>
+                            <th>Assigned Teacher</th>
+                            <th>Status</th>
+                            <th>Actions</th>
                         </tr>
-                    ) : courses.map((item) => {
-                        const hasAllocation = Boolean(item.allocation_id);
-                        const isAllocationActive = hasAllocation
-                            ? (allocationStatusOverrides[item.allocation_id] ?? (item.allocation_is_active !== false))
-                            : null;
-                        return (
-                        <tr key={item.id} className={item.is_active ? '' : 'inactive-row'}>
-                            <td>{item.name}</td>
-                            <td>{item.grade_name || item.grade}</td>
-                            <td>{item.classroom_name || 'Not Allocated'}</td>
-                            <td>{item.teacher_name || 'Unassigned'}</td>
-                            <td>
-                                <span
-                                    className={`status-badge ${hasAllocation ? (isAllocationActive ? 'status-active' : 'status-inactive') : 'status-inactive'}`}
-                                    onClick={() => handleStatusBadgeToggle(item)}
-                                    style={{
-                                        cursor: hasAllocation && togglingAllocationId !== item.allocation_id ? 'pointer' : (hasAllocation ? 'wait' : 'not-allowed'),
-                                        opacity: togglingAllocationId === item.allocation_id ? 0.75 : (hasAllocation ? 1 : 0.7)
-                                    }}
-                                    title={
-                                        hasAllocation
-                                            ? (togglingAllocationId === item.allocation_id ? 'Updating status...' : 'Click to toggle status')
-                                            : 'No allocation to toggle'
-                                    }
-                                >
-                                    {togglingAllocationId === item.allocation_id
-                                        ? 'Updating...'
-                                        : (hasAllocation ? (isAllocationActive ? 'Active' : 'Inactive') : 'Not Allocated')}
-                                </span>
-                            </td>
-                            <td>
-                                <RowActions
-                                    isActive={hasAllocation ? isAllocationActive : false}
-                                    onUpdate={() => handleOpenAssign(item)}
-                                    onActivate={() => setPendingStatusAction({ course: item, nextIsActive: true })}
-                                    onDeactivate={() => setPendingStatusAction({ course: item, nextIsActive: false })}
-                                    updateTitle="Update Allocation"
-                                    activateTitle="Activate Allocation"
-                                    deactivateTitle="Deactivate Allocation"
-                                />
-                            </td>
-                        </tr>
-                    )})}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {courses.length === 0 ? (
+                            <tr>
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                    No subjects found. Configure subjects first.
+                                </td>
+                            </tr>
+                        ) : courses.map((item) => {
+                            const hasAllocation = Boolean(item.allocation_id);
+                            const isAllocationActive = hasAllocation
+                                ? (allocationStatusOverrides[item.allocation_id] ?? (item.allocation_is_active !== false))
+                                : null;
+                            return (
+                            <tr key={item.id} className={item.is_active ? '' : 'inactive-row'}>
+                                <td>{item.name}</td>
+                                <td>{item.grade_name || item.grade}</td>
+                                <td>{item.classroom_name || 'Not Allocated'}</td>
+                                <td>{item.teacher_name || 'Unassigned'}</td>
+                                <td>
+                                    <span
+                                        className={`status-badge ${hasAllocation ? (isAllocationActive ? 'status-active' : 'status-inactive') : 'status-inactive'}`}
+                                        onClick={() => handleStatusBadgeToggle(item)}
+                                        style={{
+                                            cursor: hasAllocation && togglingAllocationId !== item.allocation_id ? 'pointer' : (hasAllocation ? 'wait' : 'not-allowed'),
+                                            opacity: togglingAllocationId === item.allocation_id ? 0.75 : (hasAllocation ? 1 : 0.7)
+                                        }}
+                                        title={
+                                            hasAllocation
+                                                ? (togglingAllocationId === item.allocation_id ? 'Updating status...' : 'Click to toggle status')
+                                                : 'No allocation to toggle'
+                                        }
+                                    >
+                                        {togglingAllocationId === item.allocation_id
+                                            ? 'Updating...'
+                                            : (hasAllocation ? (isAllocationActive ? 'Active' : 'Inactive') : 'Not Allocated')}
+                                    </span>
+                                </td>
+                                <td>
+                                    <RowActions
+                                        isActive={hasAllocation ? isAllocationActive : false}
+                                        onUpdate={() => handleOpenAssign(item)}
+                                        onActivate={() => setPendingStatusAction({ course: item, nextIsActive: true })}
+                                        onDeactivate={() => setPendingStatusAction({ course: item, nextIsActive: false })}
+                                        updateTitle="Update Allocation"
+                                        activateTitle="Activate Allocation"
+                                        deactivateTitle="Deactivate Allocation"
+                                    />
+                                </td>
+                            </tr>
+                        )})}
+                    </tbody>
+                </table>
+            </div>
 
             <Modal
                 isOpen={Boolean(pendingStatusAction)}
@@ -1644,7 +1620,7 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">Classroom Management</h3>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <div className="sm-inline-controls">
                     <select
                         value={selectedAcademicYear}
                         onChange={(event) => setSelectedAcademicYear(event.target.value)}
@@ -1689,50 +1665,52 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
                     </button>
                 </div>
             ) : (
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Classroom Name</th>
-                            <th>Grade</th>
-                            <th>Homeroom Teacher</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {classrooms.map((classroom) => (
-                            <tr key={classroom.id} className={classroom.is_active ? '' : 'inactive-row'}>
-                                <td style={{ fontWeight: 600 }}>{classroom.classroom_name}</td>
-                                <td>{classroom.grade_name || classroom.grade}</td>
-                                <td>{getAssignedTeacherName(classroom)}</td>
-                                <td>
-                                    <span
-                                        className={`status-badge ${classroom.is_active ? 'status-active' : 'status-inactive'}`}
-                                        onClick={() => handleStatusBadgeToggle(classroom)}
-                                        style={{
-                                            cursor: togglingClassroomId === classroom.id ? 'wait' : 'pointer',
-                                            opacity: togglingClassroomId === classroom.id ? 0.75 : 1
-                                        }}
-                                        title={togglingClassroomId === classroom.id ? 'Updating status...' : 'Click to toggle status'}
-                                    >
-                                        {togglingClassroomId === classroom.id ? 'Updating...' : (classroom.is_active ? 'Active' : 'Inactive')}
-                                    </span>
-                                </td>
-                                <td>
-                                    <RowActions
-                                        isActive={classroom.is_active}
-                                        onUpdate={() => handleOpenEdit(classroom)}
-                                        onActivate={() => setPendingStatusAction({ classroom, nextIsActive: true })}
-                                        onDeactivate={() => setPendingStatusAction({ classroom, nextIsActive: false })}
-                                        updateTitle="Update Classroom"
-                                        activateTitle="Activate Classroom"
-                                        deactivateTitle="Deactivate Classroom"
-                                    />
-                                </td>
+                <div className="sm-table-scroll">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Classroom Name</th>
+                                <th>Grade</th>
+                                <th>Homeroom Teacher</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {classrooms.map((classroom) => (
+                                <tr key={classroom.id} className={classroom.is_active ? '' : 'inactive-row'}>
+                                    <td style={{ fontWeight: 600 }}>{classroom.classroom_name}</td>
+                                    <td>{classroom.grade_name || classroom.grade}</td>
+                                    <td>{getAssignedTeacherName(classroom)}</td>
+                                    <td>
+                                        <span
+                                            className={`status-badge ${classroom.is_active ? 'status-active' : 'status-inactive'}`}
+                                            onClick={() => handleStatusBadgeToggle(classroom)}
+                                            style={{
+                                                cursor: togglingClassroomId === classroom.id ? 'wait' : 'pointer',
+                                                opacity: togglingClassroomId === classroom.id ? 0.75 : 1
+                                            }}
+                                            title={togglingClassroomId === classroom.id ? 'Updating status...' : 'Click to toggle status'}
+                                        >
+                                            {togglingClassroomId === classroom.id ? 'Updating...' : (classroom.is_active ? 'Active' : 'Inactive')}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <RowActions
+                                            isActive={classroom.is_active}
+                                            onUpdate={() => handleOpenEdit(classroom)}
+                                            onActivate={() => setPendingStatusAction({ classroom, nextIsActive: true })}
+                                            onDeactivate={() => setPendingStatusAction({ classroom, nextIsActive: false })}
+                                            updateTitle="Update Classroom"
+                                            activateTitle="Activate Classroom"
+                                            deactivateTitle="Deactivate Classroom"
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Classroom">
@@ -1855,7 +1833,7 @@ const TimetableGenerator = () => {
                 <p className="text-gray-500 mb-6" style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
                     Automatically generate the weekly timetable based on subject allocations and teacher availability.
                 </p>
-                <div className="flex gap-4" style={{ display: 'flex', gap: '1rem' }}>
+                <div className="sm-inline-controls" style={{ gap: '1rem' }}>
                     <button className="btn-primary" onClick={() => setIsGenerated(true)}>
                         <Calendar size={18} />
                         {isGenerated ? 'Regenerate Timetable' : 'Generate Timetable'}
@@ -1870,13 +1848,13 @@ const TimetableGenerator = () => {
                 <div className="table-header-actions">
                     <h3 className="chart-title">Generated Timetable Preview</h3>
                 </div>
-                <div className="p-6" style={{ padding: '1.5rem', overflowX: 'auto' }}>
+                <div className="p-6 sm-timetable-wrap" style={{ padding: '1.5rem', overflowX: 'auto' }}>
                     {!isGenerated ? (
                         <div style={{ background: 'var(--color-bg-body)', padding: '2rem', borderRadius: '0.5rem', border: '2px dashed var(--color-border)', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             Timetable not yet generated. Click "Generate Timetable" to start.
                         </div>
                     ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                        <table className="sm-timetable-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                             <thead>
                                 <tr>
                                     <th style={{ padding: '0.75rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', textAlign: 'center' }}>Time / Day</th>
@@ -1928,18 +1906,18 @@ const ConflictDetection = ({ conflicts }) => (
             {conflicts.length > 0 ? (
                 <div style={{ padding: '0' }}>
                     {conflicts.map((conflict) => (
-                        <div key={conflict.id} style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                        <div key={conflict.id} className="sm-conflict-row" style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
                             <div style={{ color: 'var(--color-error)', marginTop: '2px' }}>
                                 <AlertTriangle size={20} />
                             </div>
-                            <div>
+                            <div className="sm-conflict-content">
                                 <h4 style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '0.25rem' }}>{conflict.type}</h4>
                                 <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>{conflict.description}</p>
                                 <span style={{ display: 'inline-block', marginTop: '0.5rem', padding: '2px 8px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: '600', background: '#fee2e2', color: '#991b1b' }}>
                                     {conflict.severity} Severity
                                 </span>
                             </div>
-                            <div style={{ marginLeft: 'auto' }}>
+                            <div className="sm-conflict-action" style={{ marginLeft: 'auto' }}>
                                 <button style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem', color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer' }}>
                                     Resolve
                                 </button>

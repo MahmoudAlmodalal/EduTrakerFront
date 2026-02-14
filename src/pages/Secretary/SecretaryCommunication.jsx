@@ -1,398 +1,402 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Send, Plus, MessageSquare, Search } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
+import { Menu, MessageSquare, Plus, Send, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/ui/Toast';
-import secretaryService from '../../services/secretaryService';
 import notificationService from '../../services/notificationService';
+import secretaryService from '../../services/secretaryService';
+import { AvatarInitial, EmptyState, LoadingSpinner, PageHeader } from './components';
+import './Secretary.css';
 
 const SecretaryCommunication = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
     const { showSuccess, showError } = useToast();
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState('internal');
+
+    const [activeTab, setActiveTab] = useState('received');
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingThread, setLoadingThread] = useState(false);
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-    const { user } = useAuth();
     const [messages, setMessages] = useState([]);
     const [notifications, setNotifications] = useState([]);
+    const [threadMessages, setThreadMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
-
-    const fetchData = async () => {
-        if (!user) return; // Added user check
-        try {
-            setLoading(true);
-            const [msgsRes, notifsRes] = await Promise.all([
-                secretaryService.getMessages(),
-                notificationService.getNotifications()
-            ]);
-
-            const rawMessages = msgsRes.results || msgsRes;
-
-            const mappedMsgs = rawMessages.map(m => {
-                const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
-                const isSentByMe = m.sender?.id === user?.id;
-
-                return {
-                    ...m,
-                    type: isSentByMe ? 'sent' : 'received',
-                    read: myReceipt ? myReceipt.is_read : true
-                };
-            });
-
-            setMessages(mappedMsgs);
-            setNotifications(notifsRes.results || notifsRes);
-        } catch (error) {
-            console.error('Error fetching communication data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     useEffect(() => {
         if (location.state?.activeTab) {
-            setActiveTab(location.state.activeTab);
+            const targetTab = location.state.activeTab === 'internal' ? 'received' : location.state.activeTab;
+            setActiveTab(targetTab);
         }
     }, [location.state]);
 
+    const fetchData = useCallback(async () => {
+        if (!user) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const [messagesRes, notificationsRes] = await Promise.all([
+                secretaryService.getMessages(),
+                notificationService.getNotifications(),
+            ]);
+
+            const rawMessages = messagesRes.results || messagesRes || [];
+            const mappedMessages = rawMessages.map((message) => {
+                const myReceipt = message.receipts?.find((receipt) => receipt.recipient?.id === user.id);
+                const isSentByMe = message.sender?.id === user.id;
+
+                return {
+                    ...message,
+                    type: isSentByMe ? 'sent' : 'received',
+                    read: myReceipt ? myReceipt.is_read : true,
+                };
+            });
+
+            setMessages(mappedMessages);
+            setNotifications(notificationsRes.results || notificationsRes || []);
+        } catch (error) {
+            console.error('Error fetching communication data:', error);
+            showError('Failed to load communication data.');
+        } finally {
+            setLoading(false);
+        }
+    }, [showError, user]);
+
     useEffect(() => {
         fetchData();
-        // Deliberately refetch when tab/user changes.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, activeTab]); // Added user to dependencies
+    }, [fetchData, activeTab]);
 
-    const [threadMessages, setThreadMessages] = useState([]);
-    const [loadingThread, setLoadingThread] = useState(false);
-
-    const handleMessageClick = async (msg) => {
-        setSelectedMessage(msg);
+    const handleMessageClick = useCallback(async (message) => {
+        setSelectedMessage(message);
         setLoadingThread(true);
         setThreadMessages([]);
-        try {
-            const data = await secretaryService.getMessageThread(msg.thread_id);
-            setThreadMessages(data.results || data);
+        setIsDrawerOpen(false);
 
-            const myReceipt = msg.receipts?.find(r => r.recipient?.id === user?.id);
-            if (activeTab !== 'notifications' && !msg.read && myReceipt) {
-                await secretaryService.markMessageRead(msg.id);
-                setMessages(msgs => msgs.map(m => m.id === msg.id ? { ...m, read: true } : m));
+        try {
+            const data = await secretaryService.getMessageThread(message.thread_id);
+            setThreadMessages(data.results || data || []);
+
+            const myReceipt = message.receipts?.find((receipt) => receipt.recipient?.id === user?.id);
+            if (activeTab !== 'notifications' && !message.read && myReceipt) {
+                await secretaryService.markMessageRead(message.id);
+                setMessages((previous) => previous.map((item) => (
+                    item.id === message.id ? { ...item, read: true } : item
+                )));
             }
-        } catch (err) {
-            console.error('Error fetching thread:', err);
-            setThreadMessages([msg]);
+        } catch (error) {
+            console.error('Error fetching thread:', error);
+            setThreadMessages([message]);
         } finally {
             setLoadingThread(false);
         }
-    };
+    }, [activeTab, user?.id]);
 
-    const handleNotificationClick = async (notif) => {
-        if (!notif.is_read) {
+    const handleNotificationClick = useCallback(async (notification) => {
+        if (!notification.is_read) {
             try {
-                await notificationService.markAsRead(notif.id);
-                setNotifications(notifs => notifs.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                await notificationService.markAsRead(notification.id);
+                setNotifications((previous) => previous.map((item) => (
+                    item.id === notification.id ? { ...item, is_read: true } : item
+                )));
             } catch (error) {
                 console.error('Error marking notification read:', error);
+                showError('Failed to mark notification as read.');
             }
         }
-    };
+    }, [showError]);
 
-    const handleMarkAllRead = async () => {
+    const handleMarkAllRead = useCallback(async () => {
         try {
             await notificationService.markAllAsRead();
-            setNotifications(notifs => notifs.map(n => ({ ...n, is_read: true })));
-            showSuccess('All notifications marked as read');
+            setNotifications((previous) => previous.map((item) => ({ ...item, is_read: true })));
+            showSuccess('All notifications marked as read.');
         } catch (error) {
             console.error('Error marking all notifications read:', error);
-            showError('Failed to mark notifications as read');
+            showError('Failed to mark notifications as read.');
         }
-    };
+    }, [showError, showSuccess]);
 
-    const handleSendMessage = async () => {
-        if (!newMessage || !selectedMessage) return;
+    const handleSendMessage = useCallback(async () => {
+        if (!newMessage.trim() || !selectedMessage || !user) {
+            return;
+        }
 
         try {
-            let targetRecipientId = null;
+            let recipientId = null;
 
-            // Determine recipient based on message direction
-            if (selectedMessage.sender?.id === user?.id) {
-                // User is the sender - reply to the first recipient
+            if (selectedMessage.sender?.id === user.id) {
                 const receipts = selectedMessage.receipts || [];
-
-                if (receipts.length > 0 && receipts[0]?.recipient?.id) {
-                    targetRecipientId = receipts[0].recipient.id;
-                } else {
-                    showError('Could not determine recipient for reply. This message has no recipients.');
-                    console.error('FAILED: No recipients found in receipts array');
-                    console.error('Receipts data:', JSON.stringify(selectedMessage.receipts, null, 2));
-                    return;
-                }
+                recipientId = receipts[0]?.recipient?.id || null;
             } else {
-                // User is the recipient - reply to the sender
-                if (selectedMessage.sender?.id) {
-                    targetRecipientId = selectedMessage.sender.id;
-                } else {
-                    showError('Could not determine sender for reply. Sender information is missing.');
-                    console.error('FAILED: No sender found');
-                    console.error('Sender data:', JSON.stringify(selectedMessage.sender, null, 2));
-                    return;
-                }
+                recipientId = selectedMessage.sender?.id || null;
+            }
+
+            if (!recipientId) {
+                showError('Could not determine recipient for reply.');
+                return;
             }
 
             await secretaryService.sendMessage({
-                recipient_ids: [targetRecipientId],
+                recipient_ids: [recipientId],
                 body: newMessage,
                 subject: `Re: ${selectedMessage.subject}`,
                 thread_id: selectedMessage.thread_id,
-                parent_message: selectedMessage.id
+                parent_message: selectedMessage.id,
             });
 
             setNewMessage('');
-            showSuccess('Message sent successfully!');
+            showSuccess('Message sent successfully.');
 
-            // Refresh thread
             const threadData = await secretaryService.getMessageThread(selectedMessage.thread_id);
-            setThreadMessages(threadData.results || threadData);
-
+            setThreadMessages(threadData.results || threadData || []);
             await fetchData();
         } catch (error) {
             console.error('Error sending message:', error);
-            showError('Error sending message: ' + (error.response?.data?.detail || error.message));
+            showError(`Error sending message: ${error.response?.data?.detail || error.message}`);
         }
-    };
+    }, [fetchData, newMessage, selectedMessage, showError, showSuccess, user]);
 
-    const filteredItems = activeTab === 'notifications'
-        ? notifications
-        : messages.filter(m => {
-            const typeMatch = m.type === activeTab;
-            const searchLower = searchTerm.toLowerCase();
-            const senderName = (m.sender?.full_name || m.sender?.email || '');
-            const senderMatch = senderName.toLowerCase().includes(searchLower);
-            const subjectMatch = (m.subject || '').toLowerCase().includes(searchLower);
+    const filteredItems = useMemo(() => {
+        const search = searchTerm.trim().toLowerCase();
 
-            return typeMatch && (senderMatch || subjectMatch);
+        if (activeTab === 'notifications') {
+            return notifications.filter((notification) => {
+                if (!search) {
+                    return true;
+                }
+
+                const title = (notification.title || '').toLowerCase();
+                const message = (notification.message || '').toLowerCase();
+                return title.includes(search) || message.includes(search);
+            });
+        }
+
+        return messages.filter((message) => {
+            const matchesType = message.type === activeTab;
+            if (!matchesType) {
+                return false;
+            }
+
+            if (!search) {
+                return true;
+            }
+
+            const senderName = (message.sender?.full_name || message.sender?.email || '').toLowerCase();
+            const subject = (message.subject || '').toLowerCase();
+            const body = (message.body || '').toLowerCase();
+
+            return senderName.includes(search) || subject.includes(search) || body.includes(search);
         });
+    }, [activeTab, messages, notifications, searchTerm]);
+
+    const tabOptions = useMemo(() => {
+        return [
+            { value: 'received', label: t('communication.received') || 'Received' },
+            { value: 'sent', label: t('communication.sent') || 'Sent' },
+            { value: 'notifications', label: t('communication.notifications') || 'Notifications' },
+        ];
+    }, [t]);
 
     return (
-        <div className="secretary-dashboard" style={{ height: 'calc(100vh - 64px)', paddingBottom: 0 }}>
-            <header className="secretary-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                    <h1>{t('secretary.communication.title')}</h1>
-                    <p>{t('secretary.communication.subtitle')}</p>
-                </div>
-                <button className="btn-primary">
-                    <Plus size={18} style={{ marginRight: '8px' }} />
-                    {t('communication.compose')}
-                </button>
-            </header>
+        <div className="secretary-dashboard sec-communication-page">
+            <PageHeader
+                title={t('secretary.communication.title') || 'Communication'}
+                subtitle={t('secretary.communication.subtitle') || 'Internal messages and notifications'}
+                action={(
+                    <div className="sec-comm-header-actions">
+                        <button
+                            type="button"
+                            className="btn-secondary sec-mobile-drawer-toggle"
+                            onClick={() => setIsDrawerOpen((previous) => !previous)}
+                        >
+                            <Menu size={18} />
+                            Inbox
+                        </button>
+                        <button type="button" className="btn-primary">
+                            <Plus size={18} />
+                            {t('communication.compose') || 'Compose'}
+                        </button>
+                    </div>
+                )}
+            />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '1.5rem', height: 'calc(100% - 120px)' }}>
-                {/* Sidebar / List */}
-                <div className="message-sidebar" style={{ background: 'var(--sec-surface)', borderRadius: '0.5rem', border: '1px solid var(--sec-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--sec-border)' }}>
-                        <div className="search-wrapper" style={{ marginBottom: '1rem', width: '100%', maxWidth: 'none' }}>
+            <div className="sec-communication-grid">
+                <button
+                    type="button"
+                    className={`sec-drawer-backdrop ${isDrawerOpen ? 'is-visible' : ''}`}
+                    onClick={() => setIsDrawerOpen(false)}
+                    aria-label="Close message drawer"
+                />
+
+                <aside className={`message-sidebar sec-comm-sidebar ${isDrawerOpen ? 'is-open' : ''}`}>
+                    <div className="sec-comm-sidebar-head">
+                        <div className="search-wrapper sec-search-wrapper sec-search-full">
                             <Search size={16} className="search-icon" />
                             <input
                                 type="text"
-                                placeholder={activeTab === 'notifications' ? t('communication.searchNotifications') : t('communication.searchMessages')}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
                                 className="search-input"
+                                placeholder={activeTab === 'notifications'
+                                    ? (t('communication.searchNotifications') || 'Search notifications')
+                                    : (t('communication.searchMessages') || 'Search messages')}
+                                value={searchTerm}
+                                onChange={(event) => setSearchTerm(event.target.value)}
                             />
                         </div>
-                        <div style={{ display: 'flex', gap: '0.25rem', padding: '0.25rem', background: 'var(--sec-border)', borderRadius: '0.5rem' }}>
-                            {['received', 'sent', 'notifications'].map(tab => (
+
+                        <div className="sec-comm-tabs">
+                            {tabOptions.map((tab) => (
                                 <button
-                                    key={tab}
-                                    onClick={() => { setActiveTab(tab); setSelectedMessage(null); }}
-                                    style={{
-                                        flex: 1,
-                                        padding: '0.5rem',
-                                        fontSize: '0.75rem',
-                                        borderRadius: '0.375rem',
-                                        background: activeTab === tab ? 'var(--sec-surface)' : 'transparent',
-                                        color: activeTab === tab ? 'var(--sec-primary)' : 'var(--sec-text-muted)',
-                                        border: activeTab === tab ? '1px solid var(--sec-border)' : 'none',
-                                        cursor: 'pointer',
-                                        fontWeight: 600,
-                                        textTransform: 'capitalize',
-                                        boxShadow: activeTab === tab ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                                    key={tab.value}
+                                    type="button"
+                                    className={`sec-comm-tab ${activeTab === tab.value ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setActiveTab(tab.value);
+                                        setSelectedMessage(null);
                                     }}
                                 >
-                                    {tab === 'received' ? t('communication.received') :
-                                        tab === 'sent' ? t('communication.sent') :
-                                            tab === 'notifications' ? t('communication.notifications') : tab}
+                                    {tab.label}
                                 </button>
                             ))}
                         </div>
-                        {activeTab === 'notifications' && notifications.some(n => !n.is_read) && (
-                            <div style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--sec-border)' }}>
-                                <button
-                                    onClick={handleMarkAllRead}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: 'var(--sec-primary)' }}
-                                >
-                                    {t('header.markAllRead')}
-                                </button>
-                            </div>
-                        )}
+
+                        {activeTab === 'notifications' && notifications.some((notification) => !notification.is_read) ? (
+                            <button type="button" className="view-all-btn" onClick={handleMarkAllRead}>
+                                {t('header.markAllRead') || 'Mark all read'}
+                            </button>
+                        ) : null}
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
-                        {loading ? <p className="p-4 text-center">Loading...</p> : filteredItems.length === 0 && (
-                            <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>{t('communication.noItems')}</div>
-                        )}
-
-                        {activeTab === 'notifications' ? (
-                            filteredItems.map(notif => (
-                                <div
-                                    key={notif.id}
-                                    onClick={() => handleNotificationClick(notif)}
-                                    style={{
-                                        padding: '1rem',
-                                        borderBottom: '1px solid var(--sec-border)',
-                                        cursor: 'pointer',
-                                        background: notif.is_read ? 'var(--sec-surface)' : 'var(--sec-border)',
-                                        borderLeft: notif.is_read ? 'none' : '4px solid var(--sec-primary)'
-                                    }}
+                    <div className="sec-comm-list">
+                        {loading ? (
+                            <LoadingSpinner message="Loading communication items..." />
+                        ) : filteredItems.length === 0 ? (
+                            <EmptyState message={t('communication.noItems') || 'No messages available.'} />
+                        ) : activeTab === 'notifications' ? (
+                            filteredItems.map((notification) => (
+                                <button
+                                    key={notification.id}
+                                    type="button"
+                                    className={`sec-comm-item ${notification.is_read ? '' : 'is-unread'}`}
+                                    onClick={() => handleNotificationClick(notification)}
                                 >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--sec-text-main)' }}>{notif.title}</span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--sec-text-muted)' }}>{notif.created_at?.split('T')[0]}</span>
+                                    <div className="sec-comm-item-top">
+                                        <strong>{notification.title}</strong>
+                                        <span>{notification.created_at?.split('T')[0]}</span>
                                     </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--sec-text-muted)' }}>{notif.message}</div>
-                                </div>
+                                    <p>{notification.message}</p>
+                                </button>
                             ))
                         ) : (
-                            filteredItems.map(msg => (
-                                <div
-                                    key={msg.id}
-                                    onClick={() => handleMessageClick(msg)}
-                                    style={{
-                                        padding: '1rem',
-                                        borderBottom: '1px solid var(--sec-border)',
-                                        cursor: 'pointer',
-                                        background: selectedMessage?.id === msg.id ? 'rgba(79, 70, 229, 0.1)' : (msg.read ? 'var(--sec-surface)' : 'var(--sec-border)'),
-                                        borderLeft: !msg.read ? '4px solid var(--sec-primary)' : (selectedMessage?.id === msg.id ? '4px solid var(--sec-border)' : 'none')
-                                    }}
+                            filteredItems.map((message) => (
+                                <button
+                                    key={message.id}
+                                    type="button"
+                                    className={`sec-comm-item ${selectedMessage?.id === message.id ? 'is-selected' : ''} ${message.read ? '' : 'is-unread'}`}
+                                    onClick={() => handleMessageClick(message)}
                                 >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                        <span style={{ fontWeight: msg.read ? 400 : 700, fontSize: '0.9rem', color: 'var(--sec-text-main)' }}>
-                                            {msg.sender?.full_name || msg.sender?.email}
-                                        </span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--sec-text-muted)' }}>{new Date(msg.sent_at || msg.created_at).toLocaleDateString()}</span>
+                                    <div className="sec-comm-item-top">
+                                        <strong>{message.sender?.full_name || message.sender?.email || 'Unknown'}</strong>
+                                        <span>{new Date(message.sent_at || message.created_at).toLocaleDateString()}</span>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--sec-primary)', marginBottom: '0.25rem' }}>
-                                        {msg.sender?.role}
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: msg.read ? 400 : 600, color: 'var(--sec-text-main)', marginBottom: '0.25rem' }}>{msg.subject}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--sec-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {msg.body?.substring(0, 50)}...
-                                    </div>
-                                </div>
+                                    <p className="sec-comm-role">{message.sender?.role || ''}</p>
+                                    <p className="sec-comm-subject">{message.subject}</p>
+                                    <p className="sec-comm-preview">{message.body?.substring(0, 64)}...</p>
+                                </button>
                             ))
                         )}
                     </div>
-                </div>
+                </aside>
 
-                {/* Content Area */}
-                <div className="message-content" style={{ background: 'var(--sec-surface)', borderRadius: '0.5rem', border: '1px solid var(--sec-border)', display: 'flex', flexDirection: 'column' }}>
+                <section className="message-content sec-comm-content">
                     {activeTab === 'notifications' ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--sec-text-muted)', marginTop: '3rem' }}>
-                            <MessageSquare size={48} style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
-                            <h3 style={{ color: 'var(--sec-text-main)' }}>{t('communication.notificationCenter')}</h3>
-                            <p>{t('communication.notificationDesc')}</p>
-                        </div>
+                        <EmptyState
+                            icon={MessageSquare}
+                            message={t('communication.notificationDesc') || 'Select a notification on the left to view it.'}
+                        />
                     ) : selectedMessage ? (
                         <>
-                            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--sec-border)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div className="sec-comm-thread-head">
+                                <h2>{selectedMessage.subject}</h2>
+                                <div className="sec-comm-thread-meta">
+                                    <AvatarInitial name={selectedMessage.sender?.full_name || 'User'} color="indigo" />
                                     <div>
-                                        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--sec-text-main)', marginBottom: '0.5rem' }}>
-                                            {selectedMessage.subject}
-                                        </h2>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--sec-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: 'var(--sec-text-muted)', fontSize: '1.2rem' }}>
-                                                {(selectedMessage.sender?.full_name || 'U').charAt(0)}
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--sec-text-main)' }}>
-                                                    {selectedMessage.sender?.full_name || selectedMessage.sender?.email}
-                                                </div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--sec-text-muted)' }}>
-                                                    {selectedMessage.type === 'sent'
-                                                        ? `${t('communication.to')}: ${selectedMessage.receipts?.[0]?.recipient?.full_name || selectedMessage.receipts?.[0]?.recipient?.email || '...'}`
-                                                        : `${t('communication.from')}: ${selectedMessage.sender?.full_name || selectedMessage.sender?.email}`}
-                                                    &bull; {new Date(selectedMessage.sent_at || selectedMessage.created_at).toLocaleString()}
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <p>{selectedMessage.sender?.full_name || selectedMessage.sender?.email || 'Unknown'}</p>
+                                        <span>
+                                            {selectedMessage.type === 'sent'
+                                                ? `${t('communication.to') || 'To'}: ${selectedMessage.receipts?.[0]?.recipient?.full_name || selectedMessage.receipts?.[0]?.recipient?.email || '...'}`
+                                                : `${t('communication.from') || 'From'}: ${selectedMessage.sender?.full_name || selectedMessage.sender?.email || '...'}`}
+                                            {' • '}
+                                            {new Date(selectedMessage.sent_at || selectedMessage.created_at).toLocaleString()}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div style={{ padding: '2rem', flex: 1, overflowY: 'auto' }}>
+                            <div className="sec-comm-thread-body">
                                 {loadingThread ? (
-                                    <div style={{ textAlign: 'center', color: 'var(--sec-text-muted)', fontStyle: 'italic' }}>Loading conversation...</div>
+                                    <LoadingSpinner message="Loading conversation..." />
                                 ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                        {threadMessages.map(m => (
-                                            <div
-                                                key={m.id}
-                                                style={{
-                                                    alignSelf: m.sender?.id === user?.id ? 'flex-end' : 'flex-start',
-                                                    maxWidth: '80%',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    alignItems: m.sender?.id === user?.id ? 'flex-end' : 'flex-start'
-                                                }}
-                                            >
-                                                <div style={{
-                                                    padding: '0.75rem 1rem',
-                                                    borderRadius: '1rem',
-                                                    background: m.sender?.id === user?.id ? 'var(--sec-primary)' : 'var(--sec-border)',
-                                                    color: m.sender?.id === user?.id ? 'white' : 'var(--sec-text-main)',
-                                                    borderBottomRightRadius: m.sender?.id === user?.id ? '0' : '1rem',
-                                                    borderBottomLeftRadius: m.sender?.id === user?.id ? '1rem' : '0',
-                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                                }}>
-                                                    <p style={{ margin: 0, fontSize: '0.9rem', whiteSpace: 'pre-line' }}>{m.body}</p>
+                                    <div className="sec-thread-list">
+                                        {threadMessages.map((message) => {
+                                            const mine = message.sender?.id === user?.id;
+
+                                            return (
+                                                <div
+                                                    key={message.id}
+                                                    className={`sec-thread-message ${mine ? 'mine' : 'theirs'}`}
+                                                >
+                                                    <div className="sec-thread-bubble">
+                                                        <p>{message.body}</p>
+                                                    </div>
+                                                    <span>
+                                                        {message.sender?.full_name || 'User'}
+                                                        {' • '}
+                                                        {new Date(message.sent_at).toLocaleTimeString([], {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                        })}
+                                                    </span>
                                                 </div>
-                                                <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--sec-text-muted)', display: 'flex', gap: '8px' }}>
-                                                    <span>{m.sender?.full_name || 'User'}</span>
-                                                    <span>{new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
 
-                            <div style={{ padding: '1rem', borderTop: '1px solid var(--sec-border)', background: 'var(--sec-border)', borderBottomLeftRadius: '0.5rem', borderBottomRightRadius: '0.5rem' }}>
-                                <div style={{ display: 'flex', gap: '1rem' }}>
-                                    <input
-                                        type="text"
-                                        placeholder={t('communication.typeReply')}
-                                        value={newMessage}
-                                        onChange={(e) => setNewMessage(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                                        style={{ flex: 1, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid var(--sec-border)', background: 'var(--sec-surface)', color: 'var(--sec-text-main)' }}
-                                    />
-                                    <button className="btn-primary" onClick={handleSendMessage}>
-                                        <Send size={18} style={{ marginRight: '8px' }} />
-                                        {t('communication.send')}
-                                    </button>
-                                </div>
+                            <div className="sec-comm-reply">
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder={t('communication.typeReply') || 'Type your reply...'}
+                                    value={newMessage}
+                                    onChange={(event) => setNewMessage(event.target.value)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                            event.preventDefault();
+                                            handleSendMessage();
+                                        }
+                                    }}
+                                />
+                                <button type="button" className="btn-primary" onClick={handleSendMessage}>
+                                    <Send size={18} />
+                                    {t('communication.send') || 'Send'}
+                                </button>
                             </div>
                         </>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--sec-text-muted)' }}>
-                            <MessageSquare size={64} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                            <p style={{ fontSize: '1.1rem' }}>{t('communication.selectMessage')}</p>
-                        </div>
+                        <EmptyState
+                            icon={MessageSquare}
+                            message={t('communication.selectMessage') || 'Select a message to view details.'}
+                        />
                     )}
-                </div>
+                </section>
             </div>
         </div>
     );

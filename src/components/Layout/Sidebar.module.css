@@ -249,3 +249,13 @@
     margin-left: 0;
     margin-right: auto;
 }
+
+@media (max-width: 1024px) {
+    .sidebar {
+        width: min(82vw, 280px);
+    }
+
+    .logo {
+        padding: 0 var(--spacing-4);
+    }
+}

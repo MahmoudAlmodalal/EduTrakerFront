@@ -1,6 +1,8 @@
 import axios from 'axios';
+import offlineQueue from './offlineQueue';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const MUTATION_METHODS = ['post', 'put', 'patch', 'delete'];
 
 const getCookie = (name) => {
     const cookieValue = `; ${document.cookie}`;
@@ -9,6 +11,86 @@ const getCookie = (name) => {
         return parts.pop().split(';').shift();
     }
     return null;
+};
+
+const getHeaderValue = (headers, key) => {
+    if (!headers) {
+        return undefined;
+    }
+
+    if (typeof headers.get === 'function') {
+        return headers.get(key);
+    }
+
+    const normalizedKey = key.toLowerCase();
+    const headerEntry = Object.entries(headers).find(([headerName]) => headerName.toLowerCase() === normalizedKey);
+    return headerEntry?.[1];
+};
+
+const buildQueueHeaders = (headers) => {
+    const allowedHeaders = ['authorization', 'x-csrftoken', 'content-type'];
+    const queueHeaders = {};
+
+    allowedHeaders.forEach((name) => {
+        const value = getHeaderValue(headers, name);
+        if (value !== undefined && value !== null && value !== '') {
+            queueHeaders[name] = value;
+        }
+    });
+
+    return queueHeaders;
+};
+
+const buildRequestUrl = (requestConfig) => {
+    try {
+        return apiClient.getUri(requestConfig);
+    } catch {
+        const base = requestConfig?.baseURL || BASE_URL;
+        const path = requestConfig?.url || '';
+        return `${base}${path}`;
+    }
+};
+
+const normalizeRequestBody = (body) => {
+    if (typeof body !== 'string') {
+        return body;
+    }
+
+    try {
+        return JSON.parse(body);
+    } catch {
+        return body;
+    }
+};
+
+const isAuthMutation = (url) => {
+    if (!url) {
+        return false;
+    }
+
+    return url.includes('/auth/');
+};
+
+const shouldQueueOfflineMutation = (requestConfig) => {
+    if (!requestConfig) {
+        return false;
+    }
+
+    if (requestConfig._skipOfflineQueue) {
+        return false;
+    }
+
+    const method = (requestConfig.method || '').toLowerCase();
+    if (!MUTATION_METHODS.includes(method)) {
+        return false;
+    }
+
+    const url = requestConfig.url || '';
+    if (isAuthMutation(url)) {
+        return false;
+    }
+
+    return true;
 };
 
 const apiClient = axios.create({
@@ -37,7 +119,7 @@ apiClient.interceptors.request.use(
         }
 
         const method = (config.method || '').toLowerCase();
-        if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        if (MUTATION_METHODS.includes(method)) {
             const csrfToken = getCookie('csrftoken');
             if (csrfToken) {
                 config.headers['X-CSRFToken'] = csrfToken;
@@ -80,12 +162,35 @@ apiClient.interceptors.response.use(
                     // Retry original request with new token
                     originalRequest.headers.Authorization = `Bearer ${access}`;
                     return apiClient(originalRequest);
-                } catch (refreshError) {
+                } catch {
                     // Refresh token is also invalid/expired
                     console.error('Session expired. Please log in again.');
-                    localStorage.clear();
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refreshToken');
                     window.location.href = '/login';
                 }
+            }
+        }
+
+        // Queue offline mutations for background sync when there is no server response.
+        if (!error.response && shouldQueueOfflineMutation(originalRequest)) {
+            try {
+                const queuedAt = Date.now();
+                const queueId = await offlineQueue.enqueue({
+                    url: buildRequestUrl(originalRequest),
+                    method: originalRequest.method,
+                    body: normalizeRequestBody(originalRequest.data),
+                    headers: buildQueueHeaders(originalRequest.headers),
+                    timestamp: queuedAt,
+                });
+
+                return {
+                    _offlineQueued: true,
+                    _queuedAt: queuedAt,
+                    _queueId: queueId,
+                };
+            } catch (queueError) {
+                console.error('Failed to queue offline mutation:', queueError);
             }
         }
 

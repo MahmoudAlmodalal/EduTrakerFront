@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -14,14 +14,32 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import '../pages/WorkstreamManager/Workstream.css';
 
+const SIDEBAR_BREAKPOINT = 1024;
+
 const SecretaryLayout = () => {
     const { t } = useTheme();
     const { logout } = useAuth();
     const navigate = useNavigate();
-    const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const [isMobile, setIsMobile] = useState(
+        typeof window !== 'undefined' ? window.innerWidth <= SIDEBAR_BREAKPOINT : false
+    );
+    const [isSidebarOpen, setSidebarOpen] = useState(
+        typeof window !== 'undefined' ? window.innerWidth > SIDEBAR_BREAKPOINT : true
+    );
+
+    useEffect(() => {
+        const handleResize = () => {
+            const mobile = window.innerWidth <= SIDEBAR_BREAKPOINT;
+            setIsMobile(mobile);
+            setSidebarOpen(!mobile);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const toggleSidebar = () => {
-        setSidebarOpen(!isSidebarOpen);
+        setSidebarOpen((prev) => !prev);
     };
 
     const navItems = [
@@ -40,6 +58,13 @@ const SecretaryLayout = () => {
 
     return (
         <div className={`workstream-layout ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
+            {isMobile && isSidebarOpen && (
+                <div
+                    className="workstream-sidebar-overlay"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar Toggle Button (Visible when sidebar is closed) */}
             {!isSidebarOpen && (
                 <button
@@ -74,6 +99,11 @@ const SecretaryLayout = () => {
                         <NavLink
                             key={item.path}
                             to={item.path}
+                            onClick={() => {
+                                if (isMobile) {
+                                    setSidebarOpen(false);
+                                }
+                            }}
                             className={({ isActive }) =>
                                 `workstream-nav-item ${isActive ? 'active' : ''}`
                             }

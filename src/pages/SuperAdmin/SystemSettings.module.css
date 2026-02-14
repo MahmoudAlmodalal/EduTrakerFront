@@ -251,13 +251,139 @@
     justify-content: flex-end;
 }
 
+@media (max-width: 1024px) {
+    .container {
+        gap: var(--spacing-6);
+    }
+
+    .title {
+        font-size: clamp(1.8rem, 5vw, 2.2rem);
+        letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+        font-size: var(--font-size-base);
+    }
+
+    .tabsContainer {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .tabButton {
+        flex: 1 1 auto;
+        justify-content: center;
+        padding: 11px 16px;
+    }
+
+    .contentCard {
+        max-width: 100%;
+        padding: var(--spacing-6);
+    }
+}
+
 @media (max-width: 768px) {
+    .container {
+        gap: var(--spacing-4);
+    }
+
+    .title {
+        font-size: clamp(1.45rem, 8vw, 1.85rem);
+    }
+
+    .subtitle {
+        font-size: var(--font-size-sm);
+    }
+
+    .tabsContainer {
+        padding: 6px;
+        border-radius: 14px;
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .tabButton {
+        flex: 0 0 auto;
+        min-width: max-content;
+        padding: 10px 14px;
+        font-size: 0.8125rem;
+        gap: 8px;
+    }
+
+    .contentCard {
+        padding: var(--spacing-4);
+        border-radius: 16px;
+    }
+
+    .cardHeader {
+        margin-bottom: var(--spacing-5);
+        padding-bottom: var(--spacing-4);
+    }
+
+    .cardTitle {
+        font-size: 1.2rem;
+    }
+
+    .cardSubtitle {
+        font-size: 0.875rem;
+    }
+
+    .form {
+        gap: var(--spacing-4);
+    }
+
     .radioGroup {
         grid-template-columns: 1fr;
     }
 
-    .tabsContainer {
-        width: auto;
-        overflow-x: auto;
+    .radioItem {
+        justify-content: flex-start;
+        padding: 1rem;
+    }
+
+    .checkboxItem {
+        padding: var(--spacing-4);
+        gap: var(--spacing-3);
+    }
+
+    .checkboxItem input {
+        width: 20px;
+        height: 20px;
+    }
+
+    .actions {
+        justify-content: stretch;
+    }
+
+    .actions>* {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        gap: 6px;
+    }
+
+    .tabButton {
+        padding: 9px 12px;
+        font-size: 0.75rem;
+    }
+
+    .tabButton svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .input,
+    .select,
+    .textarea {
+        padding: 0.85rem 0.875rem;
+        font-size: 0.8125rem;
+    }
+
+    .label {
+        font-size: 0.875rem;
     }
 }

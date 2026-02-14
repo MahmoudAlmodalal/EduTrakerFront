@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { initSyncManager } from './utils/syncManager'
 
 const updateSW = registerSW({
   onNeedRefresh() {
@@ -13,10 +14,10 @@ const updateSW = registerSW({
       }),
     )
   },
-  onOfflineReady() {
-    console.log('EduTraker is ready to work offline')
-  },
+  onOfflineReady() {},
 })
+
+initSyncManager()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

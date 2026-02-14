@@ -1,21 +1,74 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+    Bell,
+    Clock,
     Globe,
+    Lock,
+    Mail,
     Moon,
+    Shield,
     Sun,
     User,
-    Mail,
-    Lock,
-    Bell,
-    Shield,
-    Clock
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../ui/Toast';
 import Button from '../ui/Button';
-import { api } from '../../utils/api';
-import styles from '../../pages/SuperAdmin/SystemSettings.module.css';
+import settingsService from '../../services/settingsService';
+import styles from './UnifiedSettingsPage.module.css';
+
+const LEGACY_SECRETARY_SETTINGS_KEY = 'secretary.settings.preferences.v1';
+const SETTINGS_MIGRATION_FLAG_KEY = 'settings_preferences_migrated_v1';
+
+const TIMEZONE_OPTIONS = [
+    { value: 'UTC', label: 'UTC' },
+    { value: 'Asia/Gaza', label: 'Asia/Gaza' },
+    { value: 'Asia/Jerusalem', label: 'Asia/Jerusalem' },
+    { value: 'Asia/Amman', label: 'Asia/Amman' },
+    { value: 'Europe/London', label: 'Europe/London' },
+    { value: 'America/New_York', label: 'America/New_York' },
+];
+
+const getDetectedTimezone = () => {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    } catch {
+        return 'UTC';
+    }
+};
+
+const asBoolean = (value, fallback = false) => {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    return fallback;
+};
+
+const normalizeServerSettings = (serverData, fallbackUser = null) => {
+    if (!serverData || typeof serverData !== 'object') {
+        return {
+            full_name: fallbackUser?.full_name || fallbackUser?.displayName || fallbackUser?.name || '',
+            email: fallbackUser?.email || '',
+            timezone: getDetectedTimezone(),
+            email_notifications: true,
+            in_app_alerts: true,
+            sms_notifications: false,
+            enable_2fa: false,
+        };
+    }
+
+    return {
+        full_name: serverData.full_name || fallbackUser?.full_name || fallbackUser?.displayName || fallbackUser?.name || '',
+        email: serverData.email || fallbackUser?.email || '',
+        timezone: typeof serverData.timezone === 'string' && serverData.timezone.trim()
+            ? serverData.timezone.trim()
+            : getDetectedTimezone(),
+        email_notifications: asBoolean(serverData.email_notifications, true),
+        in_app_alerts: asBoolean(serverData.in_app_alerts, true),
+        sms_notifications: asBoolean(serverData.sms_notifications, false),
+        enable_2fa: asBoolean(serverData.enable_2fa, false),
+    };
+};
 
 const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your account preferences.' }) => {
     const { theme, toggleTheme, language, changeLanguage, t } = useTheme();
@@ -23,371 +76,690 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
     const { showSuccess, showError } = useToast();
 
     const [activeTab, setActiveTab] = useState('general');
-    const [saving, setSaving] = useState(false);
-
-    const initialName = useMemo(
-        () => user?.full_name || user?.displayName || user?.name || '',
-        [user]
-    );
-    const initialEmail = useMemo(() => user?.email || '', [user]);
-
-    const [profileData, setProfileData] = useState({
-        full_name: initialName,
-        email: initialEmail,
+    const [loadingSettings, setLoadingSettings] = useState(true);
+    const [savingState, setSavingState] = useState({
+        profile: false,
+        security: false,
+        preferences: false,
+        notifications: false,
     });
 
-    useEffect(() => {
-        setProfileData({
-            full_name: initialName,
-            email: initialEmail,
-        });
-    }, [initialName, initialEmail]);
+    const [profileForm, setProfileForm] = useState({
+        full_name: user?.full_name || user?.displayName || user?.name || '',
+        email: user?.email || '',
+    });
 
-    const [securityData, setSecurityData] = useState({
+    const [generalForm, setGeneralForm] = useState({
+        timezone: getDetectedTimezone(),
+    });
+
+    const [notificationsForm, setNotificationsForm] = useState({
+        emailNotifications: true,
+        inAppAlerts: true,
+        smsNotifications: false,
+    });
+
+    const [securityForm, setSecurityForm] = useState({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
         enable2FA: false,
     });
 
-    const [notificationData, setNotificationData] = useState({
-        emailNotifications: true,
-        inAppAlerts: true,
-        smsNotifications: false,
-    });
+    const translate = useCallback((key, fallback) => {
+        const translatedValue = t(key);
+        return !translatedValue || translatedValue === key ? fallback : translatedValue;
+    }, [t]);
 
-    const tabs = [
-        { id: 'general', label: t('settings.general') || 'General', icon: Globe },
-        { id: 'profile', label: t('settings.profile') || 'Profile', icon: User },
-        { id: 'security', label: t('settings.security') || 'Security', icon: Shield },
-        { id: 'notifications', label: t('settings.notifications') || 'Notifications', icon: Bell },
-    ];
+    const updateSavingState = useCallback((field, value) => {
+        setSavingState((prev) => {
+            if (prev[field] === value) {
+                return prev;
+            }
+            return { ...prev, [field]: value };
+        });
+    }, []);
 
-    const handleSaveProfile = async (e) => {
-        e.preventDefault();
-        setSaving(true);
+    const syncCachedUser = useCallback((updates) => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
         try {
-            await api.patch('/profile/update/', {
-                full_name: profileData.full_name,
-                email: profileData.email,
+            const rawUser = window.localStorage.getItem('user');
+            if (!rawUser) {
+                return;
+            }
+
+            const parsedUser = JSON.parse(rawUser);
+            const mergedUser = {
+                ...parsedUser,
+                ...updates,
+                displayName: updates.full_name || parsedUser.displayName,
+            };
+            window.localStorage.setItem('user', JSON.stringify(mergedUser));
+        } catch {
+            // Ignore malformed user cache.
+        }
+    }, []);
+
+    const applySettingsToState = useCallback((settings) => {
+        setProfileForm({
+            full_name: settings.full_name,
+            email: settings.email,
+        });
+
+        setGeneralForm({
+            timezone: settings.timezone,
+        });
+
+        setNotificationsForm({
+            emailNotifications: settings.email_notifications,
+            inAppAlerts: settings.in_app_alerts,
+            smsNotifications: settings.sms_notifications,
+        });
+
+        setSecurityForm((prev) => ({
+            ...prev,
+            enable2FA: settings.enable_2fa,
+        }));
+
+        syncCachedUser({
+            full_name: settings.full_name,
+            email: settings.email,
+            timezone: settings.timezone,
+            email_notifications: settings.email_notifications,
+            in_app_alerts: settings.in_app_alerts,
+            sms_notifications: settings.sms_notifications,
+            enable_2fa: settings.enable_2fa,
+        });
+    }, [syncCachedUser]);
+
+    const migrateLegacySecretarySettings = useCallback(async (serverSettings) => {
+        if (typeof window === 'undefined') {
+            return null;
+        }
+
+        if (window.localStorage.getItem(SETTINGS_MIGRATION_FLAG_KEY) === 'true') {
+            return null;
+        }
+
+        const rawLegacySettings = window.localStorage.getItem(LEGACY_SECRETARY_SETTINGS_KEY);
+        if (!rawLegacySettings) {
+            window.localStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
+            return null;
+        }
+
+        let parsedLegacy;
+        try {
+            parsedLegacy = JSON.parse(rawLegacySettings);
+        } catch {
+            window.localStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
+            return null;
+        }
+
+        const migrationPayload = {};
+        const legacyTimezone = parsedLegacy?.timezone;
+        const legacyNotifications = parsedLegacy?.notifications;
+
+        if (
+            typeof legacyTimezone === 'string' &&
+            legacyTimezone.trim() &&
+            legacyTimezone.trim() !== serverSettings.timezone
+        ) {
+            migrationPayload.timezone = legacyTimezone.trim();
+        }
+
+        if (
+            legacyNotifications &&
+            Object.prototype.hasOwnProperty.call(legacyNotifications, 'emailNotifications')
+        ) {
+            const value = Boolean(legacyNotifications.emailNotifications);
+            if (value !== serverSettings.email_notifications) {
+                migrationPayload.email_notifications = value;
+            }
+        }
+
+        if (
+            legacyNotifications &&
+            Object.prototype.hasOwnProperty.call(legacyNotifications, 'inAppAlerts')
+        ) {
+            const value = Boolean(legacyNotifications.inAppAlerts);
+            if (value !== serverSettings.in_app_alerts) {
+                migrationPayload.in_app_alerts = value;
+            }
+        }
+
+        if (
+            legacyNotifications &&
+            Object.prototype.hasOwnProperty.call(legacyNotifications, 'smsNotifications')
+        ) {
+            const value = Boolean(legacyNotifications.smsNotifications);
+            if (value !== serverSettings.sms_notifications) {
+                migrationPayload.sms_notifications = value;
+            }
+        }
+
+        if (!Object.keys(migrationPayload).length) {
+            window.localStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
+            return null;
+        }
+
+        try {
+            await settingsService.updateProfileSettings(migrationPayload);
+            window.localStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
+            return {
+                ...serverSettings,
+                ...migrationPayload,
+            };
+        } catch (error) {
+            showError(`Failed to migrate legacy settings: ${error.message}`);
+            return null;
+        }
+    }, [showError]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadSettings = async () => {
+            setLoadingSettings(true);
+            try {
+                const response = await settingsService.getProfileSettings();
+                const normalized = normalizeServerSettings(response, user);
+                if (cancelled) {
+                    return;
+                }
+
+                applySettingsToState(normalized);
+
+                const migratedSettings = await migrateLegacySecretarySettings(normalized);
+                if (!cancelled && migratedSettings) {
+                    applySettingsToState(normalizeServerSettings(migratedSettings, user));
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    showError(`Failed to load settings: ${error.message}`);
+                    applySettingsToState(normalizeServerSettings(null, user));
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoadingSettings(false);
+                }
+            }
+        };
+
+        loadSettings();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [applySettingsToState, migrateLegacySecretarySettings, showError, user]);
+
+    const tabs = useMemo(() => ([
+        { id: 'general', label: translate('settings.general', 'General'), icon: Globe },
+        { id: 'profile', label: translate('settings.profile', 'Profile'), icon: User },
+        { id: 'security', label: translate('settings.security', 'Security'), icon: Shield },
+        { id: 'notifications', label: translate('settings.notifications', 'Notifications'), icon: Bell },
+    ]), [translate]);
+
+    const timezoneOptions = useMemo(() => {
+        if (!generalForm.timezone) {
+            return TIMEZONE_OPTIONS;
+        }
+
+        const exists = TIMEZONE_OPTIONS.some((option) => option.value === generalForm.timezone);
+        if (exists) {
+            return TIMEZONE_OPTIONS;
+        }
+
+        return [{ value: generalForm.timezone, label: generalForm.timezone }, ...TIMEZONE_OPTIONS];
+    }, [generalForm.timezone]);
+
+    const handleSaveProfile = useCallback(async (event) => {
+        event.preventDefault();
+        const fullName = profileForm.full_name.trim();
+        const email = profileForm.email.trim();
+
+        if (!fullName) {
+            showError('Full name is required.');
+            return;
+        }
+        if (!email) {
+            showError('Email address is required.');
+            return;
+        }
+
+        updateSavingState('profile', true);
+        try {
+            await settingsService.updateProfileSettings({
+                full_name: fullName,
+                email,
             });
+            setProfileForm({ full_name: fullName, email });
+            syncCachedUser({ full_name: fullName, email });
             showSuccess('Profile updated successfully.');
         } catch (error) {
             showError(`Failed to update profile: ${error.message}`);
         } finally {
-            setSaving(false);
+            updateSavingState('profile', false);
         }
-    };
+    }, [profileForm, showError, showSuccess, syncCachedUser, updateSavingState]);
 
-    const handleSaveSecurity = async (e) => {
-        e.preventDefault();
+    const handleSaveGeneral = useCallback(async (event) => {
+        event.preventDefault();
+        updateSavingState('preferences', true);
 
-        if (!securityData.newPassword) {
-            showError('Please enter a new password.');
-            return;
-        }
-        if (securityData.newPassword !== securityData.confirmPassword) {
-            showError('New password and confirmation do not match.');
-            return;
-        }
-
-        setSaving(true);
         try {
-            await api.patch('/profile/update/', {
-                password: securityData.newPassword,
+            await settingsService.updateProfileSettings({
+                timezone: generalForm.timezone,
             });
-            showSuccess('Security settings updated successfully.');
-            setSecurityData((prev) => ({
+            syncCachedUser({ timezone: generalForm.timezone });
+            showSuccess('General preferences saved successfully.');
+        } catch (error) {
+            showError(`Failed to save preferences: ${error.message}`);
+        } finally {
+            updateSavingState('preferences', false);
+        }
+    }, [generalForm.timezone, showError, showSuccess, syncCachedUser, updateSavingState]);
+
+    const handleSaveNotifications = useCallback(async (event) => {
+        event.preventDefault();
+        updateSavingState('notifications', true);
+
+        try {
+            await settingsService.updateProfileSettings({
+                email_notifications: notificationsForm.emailNotifications,
+                in_app_alerts: notificationsForm.inAppAlerts,
+                sms_notifications: notificationsForm.smsNotifications,
+            });
+            syncCachedUser({
+                email_notifications: notificationsForm.emailNotifications,
+                in_app_alerts: notificationsForm.inAppAlerts,
+                sms_notifications: notificationsForm.smsNotifications,
+            });
+            showSuccess('Notification preferences saved successfully.');
+        } catch (error) {
+            showError(`Failed to save notifications: ${error.message}`);
+        } finally {
+            updateSavingState('notifications', false);
+        }
+    }, [notificationsForm, showError, showSuccess, syncCachedUser, updateSavingState]);
+
+    const handleSaveSecurity = useCallback(async (event) => {
+        event.preventDefault();
+
+        const hasPasswordInput = Boolean(securityForm.newPassword || securityForm.confirmPassword || securityForm.currentPassword);
+
+        if (securityForm.newPassword || securityForm.confirmPassword) {
+            if (securityForm.newPassword.length < 8) {
+                showError('New password must be at least 8 characters.');
+                return;
+            }
+            if (securityForm.newPassword !== securityForm.confirmPassword) {
+                showError('New password and confirmation do not match.');
+                return;
+            }
+        }
+
+        const payload = {
+            enable_2fa: securityForm.enable2FA,
+        };
+
+        if (securityForm.newPassword) {
+            payload.password = securityForm.newPassword;
+        } else if (hasPasswordInput) {
+            showError('Please enter a valid new password.');
+            return;
+        }
+
+        updateSavingState('security', true);
+        try {
+            await settingsService.updateProfileSettings(payload);
+            syncCachedUser({ enable_2fa: securityForm.enable2FA });
+            setSecurityForm((prev) => ({
                 ...prev,
                 currentPassword: '',
                 newPassword: '',
                 confirmPassword: '',
             }));
+            showSuccess('Security settings updated successfully.');
         } catch (error) {
             showError(`Failed to update security settings: ${error.message}`);
         } finally {
-            setSaving(false);
+            updateSavingState('security', false);
         }
-    };
+    }, [securityForm, showError, showSuccess, syncCachedUser, updateSavingState]);
 
-    const handleSavePreferences = (e) => {
-        e.preventDefault();
-        showSuccess('Preferences saved successfully.');
-    };
+    const renderGeneralTab = () => (
+        <form className={styles.form} onSubmit={handleSaveGeneral}>
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="settings-language">
+                    {translate('settings.language', 'Language')}
+                </label>
+                <div className={styles.control}>
+                    <Globe className={styles.controlIcon} size={18} aria-hidden="true" />
+                    <select
+                        id="settings-language"
+                        className={styles.select}
+                        value={language}
+                        onChange={(event) => changeLanguage(event.target.value)}
+                    >
+                        <option value="en">English</option>
+                        <option value="ar">Arabic</option>
+                    </select>
+                </div>
+            </div>
 
-    const handleSaveNotifications = (e) => {
-        e.preventDefault();
-        showSuccess('Notification preferences saved successfully.');
-    };
+            <div className={styles.fieldGroup}>
+                <p className={styles.label}>{translate('settings.theme', 'Theme')}</p>
+                <div className={styles.themeGrid}>
+                    <label className={`${styles.themeOption} ${theme === 'light' ? styles.themeOptionActive : ''}`}>
+                        <input
+                            type="radio"
+                            name="theme"
+                            value="light"
+                            checked={theme === 'light'}
+                            onChange={() => theme === 'dark' && toggleTheme()}
+                        />
+                        <Sun size={18} aria-hidden="true" />
+                        <span>{translate('settings.lightMode', 'Light')}</span>
+                    </label>
+                    <label className={`${styles.themeOption} ${theme === 'dark' ? styles.themeOptionActive : ''}`}>
+                        <input
+                            type="radio"
+                            name="theme"
+                            value="dark"
+                            checked={theme === 'dark'}
+                            onChange={() => theme === 'light' && toggleTheme()}
+                        />
+                        <Moon size={18} aria-hidden="true" />
+                        <span>{translate('settings.darkMode', 'Dark')}</span>
+                    </label>
+                </div>
+            </div>
 
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'general':
-                return (
-                    <div className={styles.contentCard}>
-                        <div className={styles.cardHeader}>
-                            <h2 className={styles.cardTitle}>{t('settings.general') || 'General Settings'}</h2>
-                            <p className={styles.cardSubtitle}>System language, appearance, and time preferences.</p>
-                        </div>
-                        <form className={styles.form} onSubmit={handleSavePreferences}>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>{t('settings.language') || 'Language'}</label>
-                                <div style={{ position: 'relative' }}>
-                                    <Globe size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary)' }} />
-                                    <select
-                                        className={styles.select}
-                                        value={language}
-                                        onChange={(e) => changeLanguage(e.target.value)}
-                                        style={{ paddingLeft: '48px' }}
-                                    >
-                                        <option value="en">English</option>
-                                        <option value="ar">Arabic</option>
-                                    </select>
-                                </div>
-                            </div>
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="settings-timezone">
+                    {translate('settings.timeZone', 'Time Zone')}
+                </label>
+                <div className={styles.control}>
+                    <Clock className={styles.controlIcon} size={18} aria-hidden="true" />
+                    <select
+                        id="settings-timezone"
+                        className={styles.select}
+                        value={generalForm.timezone}
+                        onChange={(event) => {
+                            setGeneralForm((prev) => ({ ...prev, timezone: event.target.value }));
+                        }}
+                    >
+                        {timezoneOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
 
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>{t('settings.theme') || 'Theme'}</label>
-                                <div className={styles.radioGroup}>
-                                    <label className={`${styles.radioItem} ${theme === 'light' ? styles.activeRadio : ''}`}>
-                                        <input
-                                            type="radio"
-                                            name="theme"
-                                            value="light"
-                                            checked={theme === 'light'}
-                                            onChange={() => theme === 'dark' && toggleTheme()}
-                                        />
-                                        <Sun size={18} />
-                                        {t('settings.lightMode') || 'Light'}
-                                    </label>
-                                    <label className={`${styles.radioItem} ${theme === 'dark' ? styles.activeRadio : ''}`}>
-                                        <input
-                                            type="radio"
-                                            name="theme"
-                                            value="dark"
-                                            checked={theme === 'dark'}
-                                            onChange={() => theme === 'light' && toggleTheme()}
-                                        />
-                                        <Moon size={18} />
-                                        {t('settings.darkMode') || 'Dark'}
-                                    </label>
-                                </div>
-                            </div>
+            <div className={styles.actions}>
+                <Button variant="primary" type="submit" disabled={savingState.preferences}>
+                    {savingState.preferences ? 'Saving...' : translate('settings.saveChanges', 'Save Changes')}
+                </Button>
+            </div>
+        </form>
+    );
 
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>{t('settings.timeZone') || 'Time Zone'}</label>
-                                <div style={{ position: 'relative' }}>
-                                    <Clock size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary)' }} />
-                                    <select className={styles.select} style={{ paddingLeft: '48px' }}>
-                                        <option>(GMT+02:00) Jerusalem</option>
-                                        <option>(GMT+00:00) UTC</option>
-                                    </select>
-                                </div>
-                            </div>
+    const renderProfileTab = () => (
+        <form className={styles.form} onSubmit={handleSaveProfile}>
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="settings-full-name">
+                    {translate('settings.fullName', 'Full Name')}
+                </label>
+                <div className={styles.control}>
+                    <User className={styles.controlIcon} size={18} aria-hidden="true" />
+                    <input
+                        id="settings-full-name"
+                        className={styles.input}
+                        type="text"
+                        value={profileForm.full_name}
+                        onChange={(event) => {
+                            setProfileForm((prev) => ({ ...prev, full_name: event.target.value }));
+                        }}
+                    />
+                </div>
+            </div>
 
-                            <div className={styles.actions}>
-                                <Button variant="primary" type="submit">
-                                    {t('settings.saveChanges') || 'Save Changes'}
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                );
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="settings-email">
+                    {translate('settings.emailAddress', 'Email Address')}
+                </label>
+                <div className={styles.control}>
+                    <Mail className={styles.controlIcon} size={18} aria-hidden="true" />
+                    <input
+                        id="settings-email"
+                        className={styles.input}
+                        type="email"
+                        value={profileForm.email}
+                        onChange={(event) => {
+                            setProfileForm((prev) => ({ ...prev, email: event.target.value }));
+                        }}
+                    />
+                </div>
+            </div>
 
-            case 'profile':
-                return (
-                    <div className={styles.contentCard}>
-                        <div className={styles.cardHeader}>
-                            <h2 className={styles.cardTitle}>{t('settings.profile') || 'Profile'}</h2>
-                            <p className={styles.cardSubtitle}>Update your personal information.</p>
-                        </div>
-                        <form className={styles.form} onSubmit={handleSaveProfile}>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>{t('settings.fullName') || 'Full Name'}</label>
-                                <div style={{ position: 'relative' }}>
-                                    <User size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary)' }} />
-                                    <input
-                                        type="text"
-                                        className={styles.input}
-                                        style={{ paddingLeft: '48px' }}
-                                        value={profileData.full_name}
-                                        onChange={(e) => setProfileData((prev) => ({ ...prev, full_name: e.target.value }))}
-                                    />
-                                </div>
-                            </div>
+            <div className={styles.actions}>
+                <Button variant="primary" type="submit" disabled={savingState.profile}>
+                    {savingState.profile ? 'Saving...' : translate('settings.updateProfile', 'Update Profile')}
+                </Button>
+            </div>
+        </form>
+    );
 
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>{t('settings.emailAddress') || 'Email Address'}</label>
-                                <div style={{ position: 'relative' }}>
-                                    <Mail size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary)' }} />
-                                    <input
-                                        type="email"
-                                        className={styles.input}
-                                        style={{ paddingLeft: '48px' }}
-                                        value={profileData.email}
-                                        onChange={(e) => setProfileData((prev) => ({ ...prev, email: e.target.value }))}
-                                    />
-                                </div>
-                            </div>
+    const renderSecurityTab = () => (
+        <form className={styles.form} onSubmit={handleSaveSecurity}>
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="settings-current-password">
+                    {translate('settings.currentPassword', 'Current Password')}
+                </label>
+                <div className={styles.control}>
+                    <Lock className={styles.controlIcon} size={18} aria-hidden="true" />
+                    <input
+                        id="settings-current-password"
+                        className={styles.input}
+                        type="password"
+                        value={securityForm.currentPassword}
+                        onChange={(event) => {
+                            setSecurityForm((prev) => ({ ...prev, currentPassword: event.target.value }));
+                        }}
+                        autoComplete="current-password"
+                    />
+                </div>
+            </div>
 
-                            <div className={styles.actions}>
-                                <Button variant="primary" type="submit" disabled={saving}>
-                                    {saving ? 'Saving...' : (t('settings.updateProfile') || 'Update Profile')}
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                );
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="settings-new-password">
+                    {translate('settings.newPassword', 'New Password')}
+                </label>
+                <div className={styles.control}>
+                    <Lock className={styles.controlIcon} size={18} aria-hidden="true" />
+                    <input
+                        id="settings-new-password"
+                        className={styles.input}
+                        type="password"
+                        value={securityForm.newPassword}
+                        onChange={(event) => {
+                            setSecurityForm((prev) => ({ ...prev, newPassword: event.target.value }));
+                        }}
+                        autoComplete="new-password"
+                    />
+                </div>
+            </div>
 
-            case 'security':
-                return (
-                    <div className={styles.contentCard}>
-                        <div className={styles.cardHeader}>
-                            <h2 className={styles.cardTitle}>{t('settings.security') || 'Security'}</h2>
-                            <p className={styles.cardSubtitle}>Change your password and security controls.</p>
-                        </div>
-                        <form className={styles.form} onSubmit={handleSaveSecurity}>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>{t('settings.currentPassword') || 'Current Password'}</label>
-                                <input
-                                    type="password"
-                                    className={styles.input}
-                                    value={securityData.currentPassword}
-                                    onChange={(e) => setSecurityData((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                                />
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>{t('settings.newPassword') || 'New Password'}</label>
-                                <input
-                                    type="password"
-                                    className={styles.input}
-                                    value={securityData.newPassword}
-                                    onChange={(e) => setSecurityData((prev) => ({ ...prev, newPassword: e.target.value }))}
-                                />
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.label}>{t('settings.confirmPassword') || 'Confirm Password'}</label>
-                                <input
-                                    type="password"
-                                    className={styles.input}
-                                    value={securityData.confirmPassword}
-                                    onChange={(e) => setSecurityData((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                                />
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.checkboxItem}>
-                                    <input
-                                        type="checkbox"
-                                        checked={securityData.enable2FA}
-                                        onChange={(e) => setSecurityData((prev) => ({ ...prev, enable2FA: e.target.checked }))}
-                                    />
-                                    <div>
-                                        <span style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                                            {t('settings.enable2FA') || 'Enable Two-Factor Authentication'}
-                                        </span>
-                                        <p className={styles.hint}>Add an extra security step when signing in.</p>
-                                    </div>
-                                </label>
-                            </div>
-                            <div className={styles.actions}>
-                                <Button variant="primary" type="submit" icon={Shield} disabled={saving}>
-                                    {saving ? 'Saving...' : (t('settings.updateSecurity') || 'Update Security')}
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                );
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="settings-confirm-password">
+                    {translate('settings.confirmPassword', 'Confirm Password')}
+                </label>
+                <div className={styles.control}>
+                    <Lock className={styles.controlIcon} size={18} aria-hidden="true" />
+                    <input
+                        id="settings-confirm-password"
+                        className={styles.input}
+                        type="password"
+                        value={securityForm.confirmPassword}
+                        onChange={(event) => {
+                            setSecurityForm((prev) => ({ ...prev, confirmPassword: event.target.value }));
+                        }}
+                        autoComplete="new-password"
+                    />
+                </div>
+            </div>
 
-            case 'notifications':
-                return (
-                    <div className={styles.contentCard}>
-                        <div className={styles.cardHeader}>
-                            <h2 className={styles.cardTitle}>{t('settings.notifications') || 'Notifications'}</h2>
-                            <p className={styles.cardSubtitle}>Control how alerts are delivered to you.</p>
-                        </div>
-                        <form className={styles.form} onSubmit={handleSaveNotifications}>
-                            <div className={styles.formGroup}>
-                                <label className={styles.checkboxItem}>
-                                    <input
-                                        type="checkbox"
-                                        checked={notificationData.emailNotifications}
-                                        onChange={(e) => setNotificationData((prev) => ({ ...prev, emailNotifications: e.target.checked }))}
-                                    />
-                                    <div>
-                                        <span style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                                            {t('settings.enableEmailNotifications') || 'Email Notifications'}
-                                        </span>
-                                        <p className={styles.hint}>Receive important updates by email.</p>
-                                    </div>
-                                </label>
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.checkboxItem}>
-                                    <input
-                                        type="checkbox"
-                                        checked={notificationData.inAppAlerts}
-                                        onChange={(e) => setNotificationData((prev) => ({ ...prev, inAppAlerts: e.target.checked }))}
-                                    />
-                                    <div>
-                                        <span style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                                            {t('settings.enableInAppAlerts') || 'In-App Alerts'}
-                                        </span>
-                                        <p className={styles.hint}>Show notification badges and alert popups.</p>
-                                    </div>
-                                </label>
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label className={styles.checkboxItem}>
-                                    <input
-                                        type="checkbox"
-                                        checked={notificationData.smsNotifications}
-                                        onChange={(e) => setNotificationData((prev) => ({ ...prev, smsNotifications: e.target.checked }))}
-                                    />
-                                    <div>
-                                        <span style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                                            {t('settings.enableSMSNotifications') || 'SMS Notifications'}
-                                        </span>
-                                        <p className={styles.hint}>Receive urgent messages by SMS.</p>
-                                    </div>
-                                </label>
-                            </div>
-                            <div className={styles.actions}>
-                                <Button variant="primary" type="submit" icon={Bell}>
-                                    {t('settings.savePreferences') || 'Save Preferences'}
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                );
+            <label className={styles.checkboxItem}>
+                <input
+                    type="checkbox"
+                    checked={securityForm.enable2FA}
+                    onChange={(event) => {
+                        setSecurityForm((prev) => ({ ...prev, enable2FA: event.target.checked }));
+                    }}
+                />
+                <div>
+                    <p className={styles.checkboxTitle}>{translate('settings.enable2FA', 'Enable Two-Factor Authentication')}</p>
+                    <p className={styles.checkboxHint}>Store preference for two-factor authentication.</p>
+                </div>
+            </label>
 
-            default:
-                return null;
+            <div className={styles.actions}>
+                <Button variant="primary" type="submit" icon={Shield} disabled={savingState.security}>
+                    {savingState.security ? 'Saving...' : translate('settings.updateSecurity', 'Update Security')}
+                </Button>
+            </div>
+        </form>
+    );
+
+    const renderNotificationsTab = () => (
+        <form className={styles.form} onSubmit={handleSaveNotifications}>
+            <label className={styles.checkboxItem}>
+                <input
+                    type="checkbox"
+                    checked={notificationsForm.emailNotifications}
+                    onChange={(event) => {
+                        setNotificationsForm((prev) => ({ ...prev, emailNotifications: event.target.checked }));
+                    }}
+                />
+                <div>
+                    <p className={styles.checkboxTitle}>{translate('settings.enableEmailNotifications', 'Email Notifications')}</p>
+                    <p className={styles.checkboxHint}>Receive updates by email.</p>
+                </div>
+            </label>
+
+            <label className={styles.checkboxItem}>
+                <input
+                    type="checkbox"
+                    checked={notificationsForm.inAppAlerts}
+                    onChange={(event) => {
+                        setNotificationsForm((prev) => ({ ...prev, inAppAlerts: event.target.checked }));
+                    }}
+                />
+                <div>
+                    <p className={styles.checkboxTitle}>{translate('settings.enableInAppAlerts', 'In-App Alerts')}</p>
+                    <p className={styles.checkboxHint}>Show badges and alert popups inside the app.</p>
+                </div>
+            </label>
+
+            <label className={styles.checkboxItem}>
+                <input
+                    type="checkbox"
+                    checked={notificationsForm.smsNotifications}
+                    onChange={(event) => {
+                        setNotificationsForm((prev) => ({ ...prev, smsNotifications: event.target.checked }));
+                    }}
+                />
+                <div>
+                    <p className={styles.checkboxTitle}>{translate('settings.enableSMSNotifications', 'SMS Notifications')}</p>
+                    <p className={styles.checkboxHint}>Receive urgent alerts through SMS.</p>
+                </div>
+            </label>
+
+            <div className={styles.actions}>
+                <Button variant="primary" type="submit" icon={Bell} disabled={savingState.notifications}>
+                    {savingState.notifications ? 'Saving...' : translate('settings.savePreferences', 'Save Preferences')}
+                </Button>
+            </div>
+        </form>
+    );
+
+    const activeTabContent = (() => {
+        if (activeTab === 'general') {
+            return {
+                title: translate('settings.generalSettings', 'General Settings'),
+                subtitle: 'Language, theme, and timezone preferences.',
+                content: renderGeneralTab(),
+            };
         }
-    };
+
+        if (activeTab === 'profile') {
+            return {
+                title: translate('settings.profileInformation', 'Profile Information'),
+                subtitle: 'Update your personal profile information.',
+                content: renderProfileTab(),
+            };
+        }
+
+        if (activeTab === 'security') {
+            return {
+                title: translate('settings.securitySettings', 'Security Settings'),
+                subtitle: 'Manage your password and security preference.',
+                content: renderSecurityTab(),
+            };
+        }
+
+        return {
+            title: translate('settings.notificationPreferences', 'Notification Preferences'),
+            subtitle: 'Control how alerts are delivered to you.',
+            content: renderNotificationsTab(),
+        };
+    })();
 
     return (
-        <div className={styles.container}>
-            <div className={styles.header}>
+        <section className={styles.page}>
+            <header className={styles.header}>
                 <h1 className={styles.title}>{title}</h1>
                 <p className={styles.subtitle}>{subtitle}</p>
-            </div>
+            </header>
 
-            <div className={styles.tabsContainer}>
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.id}
-                        className={`${styles.tabButton} ${activeTab === tab.id ? styles.activeTab : ''}`}
-                        onClick={() => setActiveTab(tab.id)}
-                        type="button"
-                    >
-                        <tab.icon size={16} />
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            <nav className={styles.tabs} aria-label="Settings sections">
+                {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
 
-            <div className={styles.content}>{renderContent()}</div>
-        </div>
+                    return (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            className={`${styles.tabButton} ${isActive ? styles.tabButtonActive : ''}`}
+                            onClick={() => setActiveTab(tab.id)}
+                            aria-pressed={isActive}
+                        >
+                            <Icon size={16} aria-hidden="true" />
+                            <span>{tab.label}</span>
+                        </button>
+                    );
+                })}
+            </nav>
+
+            <article className={styles.panel}>
+                <div className={styles.panelHeader}>
+                    <h2 className={styles.panelTitle}>{activeTabContent.title}</h2>
+                    <p className={styles.panelSubtitle}>{activeTabContent.subtitle}</p>
+                </div>
+
+                {loadingSettings ? (
+                    <div className={styles.loadingState}>Loading settings...</div>
+                ) : (
+                    activeTabContent.content
+                )}
+            </article>
+        </section>
     );
 };
 

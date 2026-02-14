@@ -689,29 +689,27 @@
     animation: fadeIn 0.5s ease-out;
 }
 
+.workstream-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: calc(var(--z-fixed) - 1);
+}
+
 /* ========================================================================
    RESPONSIVE
    ======================================================================== */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .workstream-sidebar {
-        transform: translateX(-100%);
-    }
-
-    .workstream-sidebar.active {
-        transform: translateX(0);
-    }
-
-    [dir="rtl"] .workstream-sidebar {
-        transform: translateX(100%);
-    }
-
-    [dir="rtl"] .workstream-sidebar.active {
-        transform: translateX(0);
+        width: min(82vw, 280px);
+        max-width: 280px;
     }
 
     .workstream-main {
-        margin-left: 0;
-        margin-right: 0;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: var(--spacing-4);
     }
 
     .stats-grid {
@@ -775,4 +773,302 @@
 .workstream-logo-icon:hover {
     transform: scale(1.05);
     box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+}
+
+/* ========================================================================
+   SCHOOL MANAGEMENT RESPONSIVE
+   ======================================================================== */
+.school-management-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.school-management-header-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.school-management-filters {
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.school-management-search {
+    position: relative;
+    width: 280px;
+    max-width: 100%;
+}
+
+.school-management-filter-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.school-management-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.school-management-row-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+@media (max-width: 1024px) {
+    .school-management-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .school-management-header-actions {
+        width: 100%;
+    }
+
+    .school-management-search {
+        width: min(100%, 420px);
+    }
+}
+
+@media (max-width: 768px) {
+    .school-management-header-actions {
+        flex-direction: column;
+    }
+
+    .school-management-header-actions .btn-primary,
+    .school-management-header-actions .workstream-activate-all-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .school-management-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .school-management-search {
+        width: 100%;
+    }
+
+    .school-management-filter-group {
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .school-management-table-wrap {
+        overflow: visible;
+    }
+
+    .school-management-table thead {
+        display: none;
+    }
+
+    .school-management-table,
+    .school-management-table tbody,
+    .school-management-table tr,
+    .school-management-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .school-management-table tbody tr {
+        background: var(--color-bg-surface);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 12px;
+        margin: 0.75rem;
+        padding: 0.25rem 0.25rem 0.5rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .school-management-table td {
+        border-bottom: 1px solid var(--color-border-subtle);
+        padding: 0.7rem 0.85rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .school-management-table td:last-child {
+        border-bottom: none;
+    }
+
+    .school-management-table td::before {
+        content: attr(data-label);
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        line-height: 1.4;
+        min-width: 92px;
+        flex-shrink: 0;
+    }
+
+    .school-management-table td.school-management-actions-cell {
+        display: block;
+    }
+
+    .school-management-table td.school-management-actions-cell::before {
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .school-management-row-actions {
+        justify-content: flex-end;
+    }
+
+    .school-management-empty-row td {
+        display: block;
+    }
+
+    .school-management-empty-cell::before {
+        content: none;
+    }
+}
+
+/* ========================================================================
+   MANAGER ASSIGNMENT RESPONSIVE
+   ======================================================================== */
+.assignment-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.assignment-header-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.assignment-filters {
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.assignment-search {
+    position: relative;
+    width: 300px;
+    max-width: 100%;
+}
+
+.assignment-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1024px) {
+    .assignment-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .assignment-header-actions {
+        width: 100%;
+    }
+
+    .assignment-search {
+        width: min(100%, 420px);
+    }
+}
+
+@media (max-width: 768px) {
+    .assignment-header-actions .btn-primary {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .assignment-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .assignment-search {
+        width: 100%;
+    }
+
+    .assignment-table-wrap {
+        overflow: visible;
+    }
+
+    .assignment-table thead {
+        display: none;
+    }
+
+    .assignment-table,
+    .assignment-table tbody,
+    .assignment-table tr,
+    .assignment-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .assignment-table tbody tr {
+        background: var(--color-bg-surface);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 12px;
+        margin: 0.75rem;
+        padding: 0.25rem 0.25rem 0.5rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .assignment-table td {
+        border-bottom: 1px solid var(--color-border-subtle);
+        padding: 0.7rem 0.85rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .assignment-table td:last-child {
+        border-bottom: none;
+    }
+
+    .assignment-table td::before {
+        content: attr(data-label);
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        line-height: 1.4;
+        min-width: 92px;
+        flex-shrink: 0;
+    }
+
+    .assignment-table td.assignment-manager-cell {
+        display: block;
+    }
+
+    .assignment-table td.assignment-manager-cell::before {
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .assignment-table td.assignment-actions-cell {
+        display: block;
+    }
+
+    .assignment-table td.assignment-actions-cell::before {
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .assignment-row-actions {
+        justify-content: flex-end;
+    }
+
+    .assignment-empty-row td {
+        display: block;
+    }
+
+    .assignment-empty-cell::before {
+        content: none;
+    }
 }

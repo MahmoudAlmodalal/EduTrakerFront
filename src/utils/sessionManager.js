@@ -55,7 +55,6 @@ export class SessionManager {
 
         const now = Date.now();
         const timeSinceLastExtension = now - sessionInfo.lastExtension;
-        const totalSessionTime = now - sessionInfo.startTime;
 
         // Check if session has expired
         if (timeSinceLastExtension > SESSION_DURATION) {
@@ -113,8 +112,6 @@ export class SessionManager {
         };
 
         sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(newSessionInfo));
-
-        console.log(`Session extended (${newSessionInfo.extensionCount}/${MAX_EXTENSIONS})`);
 
         return {
             success: true,

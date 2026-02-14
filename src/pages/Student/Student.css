@@ -1442,6 +1442,12 @@
 
 /* --- src/pages/Student/Attendance/StudentAttendance.jsx --- */
 
+                .student-attendance {
+                    width: 100%;
+                    max-width: 100%;
+                    overflow-x: hidden;
+                }
+
                 .attendance-warning-banner {
                     display: flex;
                     align-items: flex-start;
@@ -1483,6 +1489,7 @@
                     grid-template-columns: 1.5fr repeat(3, 1fr);
                     gap: 1.25rem;
                     margin-bottom: 1.5rem;
+                    min-width: 0;
                 }
                 
                 @media (max-width: 1024px) {
@@ -1569,6 +1576,18 @@
                     justify-content: center;
                     color: white;
                 }
+
+                .attendance-stat-card.present .stat-icon-wrapper {
+                    background: linear-gradient(135deg, #10b981, #34d399);
+                }
+
+                .attendance-stat-card.absent .stat-icon-wrapper {
+                    background: linear-gradient(135deg, #ef4444, #f87171);
+                }
+
+                .attendance-stat-card.late .stat-icon-wrapper {
+                    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+                }
                 
                 .stat-info {
                     text-align: center;
@@ -1592,6 +1611,7 @@
                     display: grid;
                     grid-template-columns: 1fr 2fr;
                     gap: 1.5rem;
+                    min-width: 0;
                 }
                 
                 @media (max-width: 1024px) {
@@ -1605,6 +1625,11 @@
                     border-radius: 16px;
                     padding: 1.5rem;
                     box-shadow: 0 4px 20px rgba(8, 145, 178, 0.06);
+                    min-width: 0;
+                }
+
+                .history-table.full-width {
+                    grid-column: 1 / -1;
                 }
                 
                 .card-header-premium {
@@ -1614,6 +1639,7 @@
                     margin-bottom: 1.5rem;
                     flex-wrap: wrap;
                     gap: 1rem;
+                    min-width: 0;
                 }
                 
                 .card-header-premium h3 {
@@ -1700,9 +1726,11 @@
                 
                 .filter-tabs {
                     display: flex;
+                    flex-wrap: wrap;
                     background: #f1f5f9;
                     padding: 0.25rem;
                     border-radius: 10px;
+                    max-width: 100%;
                 }
                 
                 .filter-tab {
@@ -1715,6 +1743,8 @@
                     border-radius: 8px;
                     cursor: pointer;
                     transition: all 0.2s ease;
+                    white-space: nowrap;
+                    flex: 0 1 auto;
                 }
                 
                 .filter-tab:hover {
@@ -1731,6 +1761,7 @@
                     display: flex;
                     flex-direction: column;
                     gap: 0.75rem;
+                    min-width: 0;
                 }
                 
                 .history-item {
@@ -1819,6 +1850,69 @@
                 .empty-history p {
                     margin: 0;
                     font-size: 0.875rem;
+                }
+
+                @media (max-width: 768px) {
+                    .attendance-warning-banner {
+                        padding: 1rem;
+                        gap: 0.75rem;
+                    }
+
+                    .warning-icon {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 10px;
+                    }
+
+                    .card-header-premium {
+                        align-items: flex-start;
+                    }
+
+                    .filter-tabs {
+                        width: 100%;
+                    }
+
+                    .history-list {
+                        overflow-x: auto;
+                        overflow-y: hidden;
+                        -webkit-overflow-scrolling: touch;
+                        padding-bottom: 0.25rem;
+                    }
+
+                    .history-item {
+                        min-width: 640px;
+                        align-items: center;
+                    }
+
+                    .history-details {
+                        min-width: 180px;
+                        width: auto;
+                    }
+
+                    .attendance-status-badge {
+                        margin-inline-start: auto;
+                        flex-shrink: 0;
+                    }
+                }
+
+                @media (max-width: 640px) {
+                    .attendance-card {
+                        padding: 1rem;
+                    }
+
+                    .history-item {
+                        min-width: 560px;
+                    }
+
+                    .history-date {
+                        width: 44px;
+                        height: 44px;
+                    }
+
+                    .attendance-status-badge {
+                        width: auto;
+                        margin-inline-start: auto;
+                    }
                 }
                 
                 [data-theme="dark"] .attendance-stat-card,

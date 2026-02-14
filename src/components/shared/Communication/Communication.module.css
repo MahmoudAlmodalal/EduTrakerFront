@@ -3,13 +3,16 @@
     flex-direction: column;
     gap: var(--spacing-8);
     height: calc(100vh - 120px);
+    min-height: calc(100vh - 120px);
+    min-width: 0;
     animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
     gap: var(--spacing-4);
     margin-bottom: var(--spacing-6);
 }
@@ -35,7 +38,7 @@
 
 .layout {
     display: grid;
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
     gap: var(--spacing-6);
     flex: 1;
     min-height: 0;
@@ -45,6 +48,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-4);
+    min-width: 0;
 }
 
 .sidebar {
@@ -58,6 +62,7 @@
     overflow: hidden;
     box-shadow: var(--glass-shadow);
     flex: 1;
+    min-width: 0;
 }
 
 .sidebarHeader {
@@ -179,6 +184,7 @@
     flex-direction: column;
     box-shadow: var(--glass-shadow);
     overflow: hidden;
+    min-width: 0;
 }
 
 .contentHeader {
@@ -206,6 +212,7 @@
     color: var(--color-text-main);
     margin: 0;
     letter-spacing: -0.03em;
+    overflow-wrap: anywhere;
 }
 
 .senderProfile {
@@ -233,6 +240,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-4);
+    min-height: 0;
 }
 
 .messageBubble {
@@ -262,19 +270,20 @@
 .messageMeta {
     display: flex;
     justify-content: space-between;
-
-    .loadMoreIndicator {
-        text-align: center;
-        padding: 10px;
-        color: var(--text-secondary);
-        font-size: 0.9rem;
-        border-bottom: 1px solid var(--border-color);
-        margin-bottom: 15px;
-    }
-
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
     font-size: 0.75rem;
     margin-top: 4px;
     opacity: 0.7;
+}
+
+.loadMoreIndicator {
+    text-align: center;
+    padding: 10px;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--color-border-light);
+    margin-bottom: 15px;
 }
 
 .footer {
@@ -386,16 +395,72 @@
     border-top: 1px solid var(--color-border-light);
     display: flex;
     justify-content: flex-end;
+    gap: var(--spacing-3);
     background: var(--color-bg-hover);
 }
 
+@media (max-width: 1024px) {
+    .container {
+        gap: var(--spacing-6);
+    }
+
+    .title {
+        font-size: 2rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .layout {
+        gap: var(--spacing-4);
+        grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    }
+
+    .contentHeader {
+        padding: var(--spacing-5);
+    }
+
+    .subjectLine {
+        font-size: 1.4rem;
+    }
+
+    .body {
+        padding: var(--spacing-5);
+    }
+}
+
 @media (max-width: 768px) {
+    .container {
+        height: auto;
+        min-height: calc(100vh - 140px);
+        gap: var(--spacing-4);
+    }
+
+    .header {
+        margin-bottom: 0;
+    }
+
+    .header > button {
+        width: 100%;
+    }
+
+    .title {
+        font-size: 1.5rem;
+    }
+
+    .subtitle {
+        font-size: 0.9rem;
+    }
+
     .layout {
         grid-template-columns: 1fr;
+        gap: var(--spacing-3);
     }
 
     .sidebarWrapper {
         display: block;
+        min-height: 0;
     }
 
     .contentArea {
@@ -408,10 +473,113 @@
         inset: 0;
         z-index: 100;
         border-radius: 0;
+        height: 100dvh;
+        max-height: 100dvh;
     }
 
     .backBtn {
         display: flex;
+    }
+
+    .sidebarHeader {
+        padding: var(--spacing-4);
+    }
+
+    .listItem {
+        padding: var(--spacing-4);
+    }
+
+    .itemHeader {
+        gap: 0.5rem;
+    }
+
+    .itemSender {
+        font-size: 0.875rem;
+    }
+
+    .itemDate {
+        font-size: 0.6875rem;
+    }
+
+    .itemSubject {
+        font-size: 0.875rem;
+    }
+
+    .contentHeader {
+        padding: var(--spacing-4);
+        gap: var(--spacing-3);
+    }
+
+    .subjectLine {
+        font-size: 1.125rem;
+    }
+
+    .senderProfile {
+        gap: var(--spacing-3);
+    }
+
+    .senderAvatar {
+        width: 34px;
+        height: 34px;
+    }
+
+    .body {
+        padding: var(--spacing-4);
+    }
+
+    .messageBubble {
+        max-width: 92%;
+        padding: var(--spacing-3) var(--spacing-4);
+        font-size: 0.875rem;
+    }
+
+    .footer {
+        padding: var(--spacing-3);
+    }
+
+    .modalOverlay {
+        padding: 0.75rem;
+    }
+
+    .modalContent {
+        width: 100%;
+        max-width: 100%;
+        max-height: 92dvh;
+        overflow-y: auto;
+    }
+
+    .modalHeader {
+        padding: var(--spacing-4);
+    }
+
+    .modalHeader h2 {
+        font-size: 1.1rem;
+    }
+
+    .modalBody {
+        padding: var(--spacing-4);
+        gap: var(--spacing-4);
+    }
+
+    .modalFooter {
+        padding: var(--spacing-4);
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .modalFooter > button,
+    .replyActions > button {
+        width: 100%;
+    }
+
+    .replyActions {
+        padding: var(--spacing-3);
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .searchResults {
+        max-height: 40vh;
     }
 }
 

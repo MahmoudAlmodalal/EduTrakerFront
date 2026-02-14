@@ -1,5 +1,40 @@
 import { api } from '../utils/api';
 
+const CACHE_TTL = 5 * 60 * 1000;
+const inMemoryCache = new Map();
+
+const getCacheKey = (key, params = {}) => {
+    const sortedParams = Object.keys(params)
+        .sort()
+        .reduce((acc, currentKey) => {
+            acc[currentKey] = params[currentKey];
+            return acc;
+        }, {});
+
+    return `${key}:${JSON.stringify(sortedParams)}`;
+};
+
+const getCachedValue = (cacheKey) => {
+    const cached = inMemoryCache.get(cacheKey);
+    if (!cached) {
+        return null;
+    }
+
+    if (Date.now() > cached.expiresAt) {
+        inMemoryCache.delete(cacheKey);
+        return null;
+    }
+
+    return cached.value;
+};
+
+const setCachedValue = (cacheKey, value) => {
+    inMemoryCache.set(cacheKey, {
+        value,
+        expiresAt: Date.now() + CACHE_TTL,
+    });
+};
+
 const secretaryService = {
     // Dashboard Stats
     getDashboardStats: async () => {
@@ -51,19 +86,35 @@ const secretaryService = {
         // Create an enrollment: { student_id, class_room_id, academic_year_id }
         return api.post('/manager/enrollments/create/', data);
     },
+    getStudentEnrollments: async (studentId, params = {}) => {
+        const queryParams = new URLSearchParams(params).toString();
+        return api.get(`/manager/students/${studentId}/enrollments/${queryParams ? `?${queryParams}` : ''}`);
+    },
 
     // Grades & Classrooms
     getGrades: async (params = {}) => {
+        const cacheKey = getCacheKey('grades', params);
+        const cached = getCachedValue(cacheKey);
+        if (cached) return cached;
+
         const queryParams = new URLSearchParams(params).toString();
-        return api.get(`/grades/${queryParams ? `?${queryParams}` : ''}`);
+        const data = await api.get(`/grades/${queryParams ? `?${queryParams}` : ''}`);
+        setCachedValue(cacheKey, data);
+        return data;
     },
     getClassrooms: async (schoolId, academicYearId, params = {}) => {
         const queryParams = new URLSearchParams(params).toString();
         return api.get(`/school/${schoolId}/academic-year/${academicYearId}/classrooms/${queryParams ? `?${queryParams}` : ''}`);
     },
     getAcademicYears: async (params = {}) => {
+        const cacheKey = getCacheKey('academic_years', params);
+        const cached = getCachedValue(cacheKey);
+        if (cached) return cached;
+
         const queryParams = new URLSearchParams(params).toString();
-        return api.get(`/academic-years/${queryParams ? `?${queryParams}` : ''}`);
+        const data = await api.get(`/academic-years/${queryParams ? `?${queryParams}` : ''}`);
+        setCachedValue(cacheKey, data);
+        return data;
     },
 
     // Guardians
@@ -71,14 +122,21 @@ const secretaryService = {
         return api.post('/guardian/guardians/create/', data);
     },
     getGuardians: async (search = '') => {
-        return api.get(`/guardian/guardians/?search=${search}`);
+        const queryParams = new URLSearchParams();
+
+        if (typeof search === 'string' && search.trim()) {
+            queryParams.set('search', search.trim());
+        }
+
+        const queryString = queryParams.toString();
+        return api.get(`/guardian/guardians/${queryString ? `?${queryString}` : ''}`);
     },
     getGuardianLinks: async (guardianId) => {
         return api.get(`/guardian/guardians/${guardianId}/students/`);
     },
     linkGuardianToStudent: async (guardianId, studentId, data) => {
         return api.post(`/guardian/guardians/${guardianId}/students/`, {
-            student_id: parseInt(studentId),
+            student_id: parseInt(studentId, 10),
             relationship_type: data.relationship_type,
             is_primary: data.is_primary || false,
             can_pickup: data.can_pickup !== undefined ? data.can_pickup : true,

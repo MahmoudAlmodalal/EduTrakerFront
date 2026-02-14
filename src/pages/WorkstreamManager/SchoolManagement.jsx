@@ -53,10 +53,14 @@ const SchoolManagement = () => {
     const handleCreateSchool = async (e) => {
         e.preventDefault();
         try {
+            const normalizedLocation = newSchool.location?.trim() || null;
+            const normalizedCapacity = newSchool.capacity === '' ? null : parseInt(newSchool.capacity, 10);
+
             if (newSchool.isEditing) {
-                // Backend update endpoint currently only accepts "school_name"
                 await api.patch(`/school/${newSchool.id}/update/`, {
                     school_name: newSchool.school_name,
+                    location: normalizedLocation,
+                    capacity: Number.isNaN(normalizedCapacity) ? null : normalizedCapacity,
                 });
             } else {
                 // SchoolCreateInputSerializer requires: school_name, work_stream (as PK int)
@@ -67,16 +71,17 @@ const SchoolManagement = () => {
                     user?.work_stream_id ??
                     user?.workstream_id;
                 const wsId = rawWsId != null ? parseInt(rawWsId, 10) : null;
+                const payload = {
+                    school_name: newSchool.school_name,
+                    location: normalizedLocation,
+                    capacity: Number.isNaN(normalizedCapacity) ? null : normalizedCapacity,
+                };
 
                 if (!wsId || Number.isNaN(wsId)) {
-                    // Fall back to letting the backend raise a validation error
-                    // so the user does not see a hard-blocking frontend exception.
-                    await api.post('/school/create/', {
-                        school_name: newSchool.school_name,
-                    });
+                    await api.post('/school/create/', payload);
                 } else {
                     await api.post('/school/create/', {
-                        school_name: newSchool.school_name,
+                        ...payload,
                         work_stream: wsId,
                     });
                 }
@@ -152,8 +157,8 @@ const SchoolManagement = () => {
         if (schoolToEdit) {
             setNewSchool({
                 school_name: schoolToEdit.school_name,
-                location: schoolToEdit.location,
-                capacity: schoolToEdit.capacity,
+                location: schoolToEdit.location ?? '',
+                capacity: schoolToEdit.capacity ?? '',
                 isEditing: true,
                 id: schoolToEdit.id
             });
@@ -185,12 +190,12 @@ const SchoolManagement = () => {
     return (
         <div className="workstream-dashboard">
             <div className="workstream-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="school-management-header-row">
                     <div>
                         <h1 className="workstream-title">{t('workstream.schools.title')}</h1>
                         <p className="workstream-subtitle">{t('workstream.schools.subtitle')}</p>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div className="school-management-header-actions">
                         <button
                             className="btn-secondary workstream-activate-all-btn"
                             onClick={() => setShowActivateAllModal(true)}
@@ -402,8 +407,8 @@ const SchoolManagement = () => {
             </Modal>
 
             <div className="management-card">
-                <div className="table-header-actions" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                    <div style={{ position: 'relative', width: '280px' }}>
+                <div className="table-header-actions school-management-filters">
+                    <div className="school-management-search">
                         <Search
                             size={18}
                             style={{
@@ -428,7 +433,7 @@ const SchoolManagement = () => {
                         />
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <div className="school-management-filter-group">
                         <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
                             Filter by status
                         </span>
@@ -450,82 +455,91 @@ const SchoolManagement = () => {
                     </div>
                 </div>
 
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t('workstream.schools.table.name')}</th>
-                            <th>{t('workstream.schools.table.location')}</th>
-                            <th>{t('workstream.schools.table.capacity')}</th>
-                            <th>{t('workstream.schools.table.status')}</th>
-                            <th>{t('workstream.schools.table.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredSchools.map((school) => (
-                            <tr key={school.id}>
-                                <td>
-                                    <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{school.school_name}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>ID: #{school.id}</div>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-text-muted)' }}>
-                                        <MapPin size={14} />
-                                        {school.location}
-                                    </div>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <Users size={14} color="var(--color-text-muted)" />
-                                        <span>{school.student_count || 0} / {school.capacity}</span>
-                                    </div>
-                                    <div style={{ width: '100px', height: '4px', background: '#e2e8f0', borderRadius: '2px', marginTop: '4px' }}>
-                                        <div style={{
-                                            width: `${(school.student_count / school.capacity) * 100 || 0}%`,
-                                            height: '100%',
-                                            background: 'var(--color-primary)',
-                                            borderRadius: '2px'
-                                        }}></div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span
-                                        onClick={() => handleToggleStatus(school)}
-                                        className={`status-badge ${school.is_active ? 'status-active' : 'status-inactive'}`}
-                                        style={{ cursor: 'pointer' }}
-                                        title="Click to toggle status"
-                                    >
-                                        {school.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button
-                                            onClick={() => setViewSchool(school)}
-                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-text-main)' }}
-                                            title="View Details"
-                                        >
-                                            <Eye size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleEditSchool(school.id)}
-                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-primary)' }}
-                                            title="Edit School"
-                                        >
-                                            <Edit size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleRequestDeleteSchool(school)}
-                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
-                                            title="Deactivate School"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                </td>
+                <div className="school-management-table-wrap">
+                    <table className="data-table school-management-table">
+                        <thead>
+                            <tr>
+                                <th>{t('workstream.schools.table.name')}</th>
+                                <th>{t('workstream.schools.table.location')}</th>
+                                <th>{t('workstream.schools.table.capacity')}</th>
+                                <th>{t('workstream.schools.table.status')}</th>
+                                <th>{t('workstream.schools.table.actions')}</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {filteredSchools.length === 0 && (
+                                <tr className="school-management-empty-row">
+                                    <td className="school-management-empty-cell" colSpan={5} style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                                        No schools found.
+                                    </td>
+                                </tr>
+                            )}
+                            {filteredSchools.map((school) => (
+                                <tr key={school.id}>
+                                    <td data-label={t('workstream.schools.table.name')}>
+                                        <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{school.school_name}</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>ID: #{school.id}</div>
+                                    </td>
+                                    <td data-label={t('workstream.schools.table.location')}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-text-muted)' }}>
+                                            <MapPin size={14} />
+                                            {school.location}
+                                        </div>
+                                    </td>
+                                    <td data-label={t('workstream.schools.table.capacity')}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                            <Users size={14} color="var(--color-text-muted)" />
+                                            <span>{school.student_count || 0} / {school.capacity}</span>
+                                        </div>
+                                        <div style={{ width: '100px', height: '4px', background: '#e2e8f0', borderRadius: '2px', marginTop: '4px' }}>
+                                            <div style={{
+                                                width: `${(school.student_count / school.capacity) * 100 || 0}%`,
+                                                height: '100%',
+                                                background: 'var(--color-primary)',
+                                                borderRadius: '2px'
+                                            }}></div>
+                                        </div>
+                                    </td>
+                                    <td data-label={t('workstream.schools.table.status')}>
+                                        <span
+                                            onClick={() => handleToggleStatus(school)}
+                                            className={`status-badge ${school.is_active ? 'status-active' : 'status-inactive'}`}
+                                            style={{ cursor: 'pointer' }}
+                                            title="Click to toggle status"
+                                        >
+                                            {school.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </td>
+                                    <td className="school-management-actions-cell" data-label={t('workstream.schools.table.actions')}>
+                                        <div className="school-management-row-actions">
+                                            <button
+                                                onClick={() => setViewSchool(school)}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-text-main)' }}
+                                                title="View Details"
+                                            >
+                                                <Eye size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleEditSchool(school.id)}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-primary)' }}
+                                                title="Edit School"
+                                            >
+                                                <Edit size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleRequestDeleteSchool(school)}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
+                                                title="Deactivate School"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

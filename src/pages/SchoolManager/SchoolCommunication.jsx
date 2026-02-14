@@ -221,9 +221,9 @@ const SchoolCommunication = () => {
     const threadList = messages.filter(m => m.type === activeTab);
 
     const renderMessages = () => (
-        <div className="messages-layout" style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '1.5rem', height: 'calc(100vh - 250px)' }}>
+        <div className="messages-layout">
             {/* Sidebar Threads */}
-            <div className="management-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="management-card messages-thread-panel">
                 <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)' }}>
                     <div style={{ position: 'relative' }}>
                         <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
@@ -276,10 +276,10 @@ const SchoolCommunication = () => {
             </div>
 
             {/* Chat Content */}
-            <div className="management-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="management-card messages-chat-panel">
                 {selectedThread ? (
                     <>
-                        <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div className="messages-chat-header">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <User size={20} style={{ color: 'var(--color-primary)' }} />
@@ -300,16 +300,16 @@ const SchoolCommunication = () => {
                             </div>
                         </div>
 
-                        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div className="messages-chat-body">
                             {loadingThread ? (
                                 <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Loading conversation...</div>
                             ) : (
                                 threadMessages.map(m => (
                                     <div
                                         key={m.id}
+                                        className="messages-chat-bubble"
                                         style={{
                                             alignSelf: m.sender?.id === user?.id ? 'flex-end' : 'flex-start',
-                                            maxWidth: '80%',
                                             display: 'flex',
                                             flexDirection: 'column',
                                             alignItems: m.sender?.id === user?.id ? 'flex-end' : 'flex-start'
@@ -336,7 +336,7 @@ const SchoolCommunication = () => {
                             )}
                         </div>
 
-                        <form onSubmit={handleSendMessage} style={{ padding: '1.25rem', borderTop: '1px solid var(--color-border)', display: 'flex', gap: '1rem' }}>
+                        <form onSubmit={handleSendMessage} className="messages-chat-form">
                             <input
                                 type="text"
                                 value={newMessage}
@@ -421,12 +421,12 @@ const SchoolCommunication = () => {
 
     return (
         <div className="school-communication-page">
-            <div className="school-manager-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div className="school-manager-header">
                 <div>
                     <h1 className="school-manager-title">{t('school.communication.title')}</h1>
                     <p className="school-manager-subtitle">{t('communication.subtitle')}</p>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div className="school-communication-tabs">
                     <button
                         className="btn-primary"
                         onClick={openCompose}

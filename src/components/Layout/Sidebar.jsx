@@ -23,6 +23,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     const { user, logout } = useAuth();
     const { t } = useTheme();
     const role = user?.role;
+    const isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 1024;
 
     const links = {
         SUPER_ADMIN: [
@@ -48,6 +49,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     };
 
     const currentLinks = links[role] || links.SUPER_ADMIN;
+
+    const handleNavItemClick = () => {
+        if (isMobileViewport && isOpen) {
+            toggleSidebar();
+        }
+    };
 
     return (
         <aside id="app-sidebar" className={`${styles.sidebar} ${!isOpen ? styles.closed : ''}`}>
@@ -76,6 +83,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         <li key={link.path}>
                             <NavLink
                                 to={link.path}
+                                onClick={handleNavItemClick}
                                 className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
                                 end={link.path === '/super-admin' || link.path === '/school-manager/dashboard'}
                             >

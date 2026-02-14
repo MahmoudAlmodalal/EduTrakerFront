@@ -37,9 +37,15 @@ const studentService = {
     },
 
     // Get attendance history
-    getAttendance: async (studentId) => {
-        // This endpoint supports IsStudent and filters by actor
-        return api.get(`/teacher/attendance/?student_id=${studentId}`);
+    getAttendance: async (studentId = null, config = {}) => {
+        const params = new URLSearchParams();
+        if (studentId !== null && studentId !== undefined && studentId !== '') {
+            params.set('student_id', studentId);
+        }
+
+        const query = params.toString();
+        const endpoint = query ? `/teacher/attendance/?${query}` : '/teacher/attendance/';
+        return api.get(endpoint, config);
     },
 
     // Get student schedule

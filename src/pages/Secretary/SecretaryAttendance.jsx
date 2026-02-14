@@ -1,45 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Search, CheckCircle, XCircle, Clock, AlertCircle, TrendingUp, Users } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    Calendar,
+    CheckCircle,
+    Clock,
+    Search,
+    TrendingUp,
+    Users,
+    XCircle,
+} from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import secretaryService from '../../services/secretaryService';
-import { getSecretaryIconStyle, getAttendanceStatusStyle, getAttendanceStatusIcon } from '../../utils/secretaryHelpers';
+import { getAttendanceStatusIcon } from '../../utils/secretaryHelpers';
+import {
+    AlertBanner,
+    AvatarInitial,
+    EmptyState,
+    LoadingSpinner,
+    PageHeader,
+    StatCard,
+    StatusBadge,
+} from './components';
 import './Secretary.css';
 
 const SecretaryAttendance = () => {
     const { t } = useTheme();
-    const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
-    const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
+
+    const initialDate = new Date().toISOString().split('T')[0];
+
+    const [dateFrom, setDateFrom] = useState(initialDate);
+    const [dateTo, setDateTo] = useState(initialDate);
     const [statusFilter, setStatusFilter] = useState('');
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState('');
     const [debouncedFilters, setDebouncedFilters] = useState({
-        dateFrom: new Date().toISOString().split('T')[0],
-        dateTo: new Date().toISOString().split('T')[0],
+        dateFrom: initialDate,
+        dateTo: initialDate,
         statusFilter: '',
     });
 
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedFilters({ dateFrom, dateTo, statusFilter });
-        }, 400);
+        }, 350);
 
         return () => clearTimeout(timer);
     }, [dateFrom, dateTo, statusFilter]);
 
-    useEffect(() => {
-        fetchAttendance(debouncedFilters);
-    }, [debouncedFilters]);
-
-    const fetchAttendance = async (filters) => {
+    const fetchAttendance = useCallback(async (filters) => {
         try {
             setLoading(true);
             setError('');
+
             const params = {};
             if (filters.dateFrom) params.date_from = filters.dateFrom;
             if (filters.dateTo) params.date_to = filters.dateTo;
             if (filters.statusFilter) params.status = filters.statusFilter;
+
             const data = await secretaryService.getAttendance(params);
             setRecords(data.results || data || []);
         } catch (err) {
@@ -48,130 +66,102 @@ const SecretaryAttendance = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const getStatusLabel = (status) => {
-        const map = {
-            present: t('secretary.attendance.present') || 'Present',
-            absent: t('secretary.attendance.absent') || 'Absent',
-            late: t('secretary.attendance.late') || 'Late',
-            excused: t('secretary.attendance.excused') || 'Excused',
-        };
-        return map[status] || status;
-    };
+    useEffect(() => {
+        fetchAttendance(debouncedFilters);
+    }, [debouncedFilters, fetchAttendance]);
 
-    const filteredRecords = records.filter(r =>
-        (r.student_name || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const getStatusLabel = useCallback(
+        (status) => {
+            const map = {
+                present: t('secretary.attendance.present') || 'Present',
+                absent: t('secretary.attendance.absent') || 'Absent',
+                late: t('secretary.attendance.late') || 'Late',
+                excused: t('secretary.attendance.excused') || 'Excused',
+            };
+
+            return map[status] || status;
+        },
+        [t]
     );
 
-    // Summary stats
-    const totalPresent = records.filter(r => r.status === 'present').length;
-    const totalAbsent = records.filter(r => r.status === 'absent').length;
-    const totalLate = records.filter(r => r.status === 'late').length;
-    const attendanceRate = records.length > 0 ? Math.round((totalPresent / records.length) * 100) : 0;
+    const filteredRecords = useMemo(() => {
+        const search = searchTerm.trim().toLowerCase();
 
-    const statCards = [
-        { label: 'Present', value: totalPresent, icon: CheckCircle, color: 'green' },
-        { label: 'Absent', value: totalAbsent, icon: XCircle, color: 'rose' },
-        { label: 'Late', value: totalLate, icon: Clock, color: 'amber' },
-        { label: 'Attendance Rate', value: `${attendanceRate}%`, icon: TrendingUp, color: 'indigo' },
-    ];
+        if (!search) {
+            return records;
+        }
+
+        return records.filter((record) => (record.student_name || '').toLowerCase().includes(search));
+    }, [records, searchTerm]);
+
+    const statCards = useMemo(() => {
+        const totalPresent = records.filter((record) => record.status === 'present').length;
+        const totalAbsent = records.filter((record) => record.status === 'absent').length;
+        const totalLate = records.filter((record) => record.status === 'late').length;
+        const attendanceRate = records.length > 0 ? Math.round((totalPresent / records.length) * 100) : 0;
+
+        return [
+            { title: 'Present', value: totalPresent, icon: CheckCircle, color: 'green' },
+            { title: 'Absent', value: totalAbsent, icon: XCircle, color: 'rose' },
+            { title: 'Late', value: totalLate, icon: Clock, color: 'amber' },
+            { title: 'Attendance Rate', value: `${attendanceRate}%`, icon: TrendingUp, color: 'indigo' },
+        ];
+    }, [records]);
 
     return (
         <div className="secretary-dashboard">
-            {/* Header */}
-            <div className="secretary-header">
-                <div>
-                    <h1>{t('secretary.attendance.title') || 'Attendance Management'}</h1>
-                    <p>{t('secretary.attendance.subtitle') || 'View and manage student attendance records'}</p>
-                </div>
-            </div>
+            <PageHeader
+                title={t('secretary.attendance.title') || 'Attendance Management'}
+                subtitle={t('secretary.attendance.subtitle') || 'View and manage student attendance records'}
+            />
 
-            {error && (
-                <div style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    color: '#dc2626',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                }}>
-                    <AlertCircle size={18} /> {error}
-                </div>
-            )}
+            <AlertBanner type="error" message={error} onDismiss={() => setError('')} />
 
-            {/* Summary Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '28px' }}>
-                {statCards.map((stat, index) => (
-                    <div key={index} className="stat-card" style={{ padding: '20px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <p style={{ fontSize: '13px', color: 'var(--sec-text-muted)', fontWeight: '500', marginBottom: '4px' }}>{stat.label}</p>
-                                <p style={{ fontSize: '28px', fontWeight: '700', color: 'var(--sec-text-main)', margin: 0 }}>{stat.value}</p>
-                            </div>
-                            <div style={{
-                                ...getSecretaryIconStyle(stat.color),
-                                width: '48px',
-                                height: '48px',
-                                borderRadius: '12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}>
-                                <stat.icon size={24} />
-                            </div>
-                        </div>
-                    </div>
+            <section className="sec-stats-grid">
+                {statCards.map((card) => (
+                    <StatCard
+                        key={card.title}
+                        title={card.title}
+                        value={card.value}
+                        icon={card.icon}
+                        color={card.color}
+                    />
                 ))}
-            </div>
+            </section>
 
-            {/* Filters & Table */}
-            <div className="management-card">
-                {/* Filters Row */}
-                <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '16px',
-                    padding: '20px',
-                    borderBottom: '1px solid var(--sec-border)',
-                    alignItems: 'flex-end'
-                }}>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>
-                            From Date
-                        </label>
+            <section className="management-card">
+                <div className="sec-filter-bar">
+                    <div className="sec-field">
+                        <label htmlFor="attendance-date-from" className="form-label">From Date</label>
                         <input
+                            id="attendance-date-from"
                             type="date"
                             className="form-input"
                             value={dateFrom}
-                            onChange={(e) => setDateFrom(e.target.value)}
-                            style={{ minWidth: '150px' }}
+                            onChange={(event) => setDateFrom(event.target.value)}
                         />
                     </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>
-                            To Date
-                        </label>
+
+                    <div className="sec-field">
+                        <label htmlFor="attendance-date-to" className="form-label">To Date</label>
                         <input
+                            id="attendance-date-to"
                             type="date"
                             className="form-input"
                             value={dateTo}
-                            onChange={(e) => setDateTo(e.target.value)}
-                            style={{ minWidth: '150px' }}
+                            onChange={(event) => setDateTo(event.target.value)}
                         />
                     </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>
-                            Status
-                        </label>
+
+                    <div className="sec-field">
+                        <label htmlFor="attendance-status" className="form-label">Status</label>
                         <select
+                            id="attendance-status"
                             className="form-select"
                             value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            style={{ minWidth: '140px' }}
+                            onChange={(event) => setStatusFilter(event.target.value)}
                         >
                             <option value="">All Statuses</option>
                             <option value="present">Present</option>
@@ -180,119 +170,85 @@ const SecretaryAttendance = () => {
                             <option value="excused">Excused</option>
                         </select>
                     </div>
-                    <div style={{ flex: 1, minWidth: '200px' }}>
-                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--sec-text-muted)', marginBottom: '6px', fontWeight: '500' }}>
-                            Search Student
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--sec-text-muted)' }} />
+
+                    <div className="sec-field sec-field--grow">
+                        <label htmlFor="attendance-search" className="form-label">Search Student</label>
+                        <div className="search-wrapper sec-search-wrapper">
+                            <Search size={16} className="search-icon" />
                             <input
+                                id="attendance-search"
                                 type="text"
+                                className="search-input"
                                 placeholder="Search by student name..."
-                                className="form-input"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{ paddingLeft: '36px', width: '100%' }}
+                                onChange={(event) => setSearchTerm(event.target.value)}
                             />
                         </div>
                     </div>
                 </div>
 
-                {/* Table */}
-                <div style={{ overflowX: 'auto' }}>
+                <div className="sec-table-wrap">
                     {loading ? (
-                        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--sec-text-muted)' }}>
-                            <div style={{
-                                width: '36px',
-                                height: '36px',
-                                border: '3px solid var(--sec-primary)',
-                                borderTop: '3px solid transparent',
-                                borderRadius: '50%',
-                                animation: 'spin 1s linear infinite',
-                                margin: '0 auto 12px'
-                            }}></div>
-                            Loading attendance records...
-                        </div>
+                        <LoadingSpinner message="Loading attendance records..." />
                     ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: '60px' }}>ID</th>
-                                    <th>{t('secretary.attendance.studentName') || 'Student'}</th>
-                                    <th>Course</th>
-                                    <th>Date</th>
-                                    <th>{t('secretary.attendance.status') || 'Status'}</th>
-                                    <th>Note</th>
-                                    <th>Recorded By</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredRecords.map((record) => {
-                                    const StatusIcon = getAttendanceStatusIcon(record.status);
+                        <div className="sec-table-scroll">
+                            <table className="data-table sec-data-table">
+                                <thead>
+                                    <tr>
+                                        <th className="cell-id">ID</th>
+                                        <th>{t('secretary.attendance.studentName') || 'Student'}</th>
+                                        <th>Course</th>
+                                        <th>Date</th>
+                                        <th>{t('secretary.attendance.status') || 'Status'}</th>
+                                        <th>Note</th>
+                                        <th>Recorded By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredRecords.map((record) => {
+                                        const StatusIcon = getAttendanceStatusIcon(record.status);
 
-                                    return (
-                                        <tr key={record.id}>
-                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>#{record.id}</td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <div style={{
-                                                        width: '32px',
-                                                        height: '32px',
-                                                        borderRadius: '8px',
-                                                        background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
-                                                        color: '#4f46e5',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        fontWeight: '600',
-                                                        fontSize: '13px'
-                                                    }}>
-                                                        {(record.student_name || 'S').charAt(0).toUpperCase()}
+                                        return (
+                                            <tr key={record.id}>
+                                                <td className="cell-id">#{record.id}</td>
+                                                <td>
+                                                    <div className="sec-row-user">
+                                                        <AvatarInitial name={record.student_name || 'Student'} size="sm" color="indigo" />
+                                                        <span>{record.student_name || '-'}</span>
                                                     </div>
-                                                    <span style={{ fontWeight: '500', color: 'var(--sec-text-main)' }}>
-                                                        {record.student_name || '-'}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td style={{ color: 'var(--sec-text-main)' }}>{record.course_name || '-'}</td>
-                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>{record.date || '-'}</td>
-                                            <td>
-                                                <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    padding: '6px 12px',
-                                                    borderRadius: '20px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '600',
-                                                    ...getAttendanceStatusStyle(record.status)
-                                                }}>
-                                                    {StatusIcon ? <StatusIcon size={14} /> : null}
-                                                    {getStatusLabel(record.status)}
-                                                </span>
-                                            </td>
-                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px', maxWidth: '180px' }}>
-                                                {record.note || '-'}
-                                            </td>
-                                            <td style={{ color: 'var(--sec-text-muted)', fontSize: '13px' }}>
-                                                {record.recorded_by_name || '-'}
+                                                </td>
+                                                <td>{record.course_name || '-'}</td>
+                                                <td className="cell-muted">{record.date || '-'}</td>
+                                                <td>
+                                                    <StatusBadge status={getStatusLabel(record.status)} icon={StatusIcon} />
+                                                </td>
+                                                <td className="cell-muted cell-ellipsis">{record.note || '-'}</td>
+                                                <td className="cell-muted">{record.recorded_by_name || '-'}</td>
+                                            </tr>
+                                        );
+                                    })}
+
+                                    {filteredRecords.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="7">
+                                                <EmptyState
+                                                    icon={Users}
+                                                    message="No attendance records found for this date range."
+                                                />
                                             </td>
                                         </tr>
-                                    );
-                                })}
-                                {filteredRecords.length === 0 && (
-                                    <tr>
-                                        <td colSpan="7" style={{ textAlign: 'center', padding: '48px', color: 'var(--sec-text-muted)' }}>
-                                            <Users size={40} style={{ marginBottom: '12px', opacity: 0.3 }} />
-                                            <p style={{ margin: 0 }}>No attendance records found for this date range.</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                    ) : null}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
-            </div>
+            </section>
+
+            <section className="sec-mobile-note">
+                <Calendar size={14} />
+                <span>Tip: Scroll the table horizontally on mobile to see all columns.</span>
+            </section>
         </div>
     );
 };

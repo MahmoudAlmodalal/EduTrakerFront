@@ -166,7 +166,7 @@ const AcademicReports = () => {
                     </div>
                 </div>
 
-                <div className="reports-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                <div className="reports-grid">
                     {reportTypes.map((report) => (
                         <div
                             key={report.id}
@@ -242,12 +242,13 @@ const AcademicReports = () => {
             <div className="management-card" style={{ marginTop: '2rem' }}>
                 <div className="table-header-actions">
                     <h3 className="chart-title">Subject Performance Distribution</h3>
-                    <div style={{ position: 'relative' }}>
-                        <Search size={16} {...iconSvgProps} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                    <div className="sm-search-control">
+                        <Search size={16} {...iconSvgProps} className="sm-search-control-icon" />
                         <input
                             type="text"
                             placeholder="Filter subjects..."
-                            style={{ padding: '0.4rem 0.4rem 0.4rem 2rem', border: '1px solid var(--color-border)', borderRadius: '0.375rem', fontSize: '0.875rem' }}
+                            className="sm-search-control-input"
+                            style={{ fontSize: '0.875rem' }}
                         />
                     </div>
                 </div>

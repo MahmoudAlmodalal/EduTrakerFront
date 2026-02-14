@@ -9,8 +9,6 @@ import { api } from '../../utils/api';
 import styles from './Login.module.css';
 
 const Login = ({ role }) => {
-    console.log('Login component rendered with role:', role);
-
     const { t } = useTheme();
     const { login } = useAuth();
     const { workstreamSlug } = useParams();
@@ -49,27 +47,15 @@ const Login = ({ role }) => {
         setError('');
         setIsLoading(true);
 
-        console.log('Login attempt started', { email, role, workstreamSlug });
-
         try {
             const data = await authService.login(
-                { email, password },
+                { email: email.trim(), password },
                 role,
                 workstreamSlug
             );
 
-            console.log('Login response received:', data);
-            console.log('Login response structure:', {
-                hasUser: !!data.user,
-                hasTokens: !!data.tokens,
-                dataKeys: Object.keys(data),
-                fullData: JSON.stringify(data, null, 2)
-            });
-
             // Pass user data and tokens to the AuthContext
             login(data, role, workstreamSlug);
-
-            console.log('Login context updated');
         } catch (err) {
             console.error('Login error:', err);
             setError(err.message || "Unable to connect to the server. Please try again later.");

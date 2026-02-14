@@ -53,7 +53,6 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     // If we get 401 errors, logout the user
     useEffect(() => {
         if (notificationsError?.includes('401') || unreadError?.includes('401')) {
-            console.warn('Token expired, logging out...');
             logout();
         }
     }, [notificationsError, unreadError, logout]);
@@ -96,7 +95,6 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
     const handleSearch = (e) => {
         if (e.key === 'Enter') {
-            console.log('Searching for:', searchQuery);
             // Implement search navigation or filtering logic here
         }
     };
@@ -136,12 +134,8 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                         className={styles.searchInput}
                         placeholder="Search anything..."
                         value={searchQuery}
-                        onChange={(e) => {
-                            console.log('SEARCH_INPUT_CHANGE:', e.target.value);
-                            setSearchQuery(e.target.value);
-                        }}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearch}
-                        onFocus={() => console.log('SEARCH_INPUT_FOCUS')}
                         autoComplete="off"
                         style={{
                             flex: 1,

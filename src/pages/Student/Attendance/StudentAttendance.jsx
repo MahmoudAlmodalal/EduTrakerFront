@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Calendar,
     AlertCircle,
@@ -18,6 +18,23 @@ import { useStudentData } from '../../../context/StudentDataContext';
 import studentService from '../../../services/studentService';
 import '../Student.css';
 
+const ATTENDANCE_STATUS_CONFIGS = {
+    present: { icon: CheckCircle, bg: '#dcfce7', color: '#16a34a', label: 'Present' },
+    absent: { icon: XCircle, bg: '#fef2f2', color: '#dc2626', label: 'Absent' },
+    late: { icon: Clock, bg: '#fef3c7', color: '#d97706', label: 'Late' },
+    excused: { icon: AlertCircle, bg: '#e0f2fe', color: '#0891b2', label: 'Excused' }
+};
+
+const ATTENDANCE_FILTER_OPTIONS = [
+    { key: 'all', translationKey: 'student.attendance.all', fallbackLabel: 'All' },
+    { key: 'present', translationKey: 'student.attendance.present', fallbackLabel: 'Present' },
+    { key: 'absent', translationKey: 'student.attendance.absent', fallbackLabel: 'Absent' },
+    { key: 'late', translationKey: 'student.attendance.late', fallbackLabel: 'Late' },
+    { key: 'excused', translationKey: 'student.attendance.excused', fallbackLabel: 'Excused' }
+];
+
+const ATTENDANCE_RING_CIRCUMFERENCE = 251;
+
 const resolveText = (value, fallbackKey, fallbackText) => {
     if (!value || value === fallbackKey) {
         return fallbackText;
@@ -25,8 +42,56 @@ const resolveText = (value, fallbackKey, fallbackText) => {
     return value;
 };
 
+const toSafeNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const parseDateValue = (value) => {
+    if (!value) {
+        return null;
+    }
+    const parsedDate = new Date(value);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+const normalizeStatus = (status) => {
+    if (typeof status !== 'string') {
+        return 'present';
+    }
+    const normalizedStatus = status.toLowerCase();
+    return ATTENDANCE_STATUS_CONFIGS[normalizedStatus] ? normalizedStatus : 'present';
+};
+
+const normalizeAttendanceRecords = (records) => {
+    if (!Array.isArray(records)) {
+        return [];
+    }
+
+    return records
+        .map((record, index) => {
+            const attendanceDate = parseDateValue(record?.date) || parseDateValue(record?.created_at);
+            const createdAt = parseDateValue(record?.created_at);
+            const sortTimestamp = (attendanceDate || createdAt)?.getTime() || 0;
+
+            return {
+                id: record?.id ?? `${record?.date || record?.created_at || 'attendance'}-${index}`,
+                subject: record?.course_name || 'Subject',
+                statusKey: normalizeStatus(record?.status),
+                attendanceDate,
+                createdAt,
+                sortTimestamp
+            };
+        })
+        .sort((left, right) => right.sortTimestamp - left.sortTimestamp);
+};
+
+const getMonthBucketKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
 const StudentAttendance = () => {
-    const { t } = useTheme();
+    const { t, language } = useTheme();
     const { user } = useAuth();
     const {
         dashboardData,
@@ -38,8 +103,17 @@ const StudentAttendance = () => {
     const [historyLoading, setHistoryLoading] = useState(true);
     const [historyError, setHistoryError] = useState(null);
     const [attendanceHistory, setAttendanceHistory] = useState([]);
+    const latestFetchId = useRef(0);
+
+    const locale = language === 'ar' ? 'ar' : 'en-US';
+
+    const text = useCallback((translationKey, fallback) => (
+        resolveText(t(translationKey), translationKey, fallback)
+    ), [t]);
 
     const fetchAttendanceHistory = useCallback(async () => {
+        const fetchId = ++latestFetchId.current;
+
         if (!user?.id) {
             setAttendanceHistory([]);
             setHistoryLoading(false);
@@ -50,69 +124,132 @@ const StudentAttendance = () => {
         setHistoryLoading(true);
         setHistoryError(null);
         try {
-            const attendanceRes = await studentService.getAttendance(user.id);
-            const records = attendanceRes?.results || attendanceRes || [];
-            setAttendanceHistory(records.map((record) => ({
-                id: record.id,
-                date: record.date,
-                subject: record.course_name || 'Subject',
-                statusKey: record.status,
-                time: record.created_at
-                    ? new Date(record.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : 'N/A'
-            })));
+            const attendanceRes = await studentService.getAttendance();
+            if (fetchId !== latestFetchId.current) {
+                return;
+            }
+            const records = Array.isArray(attendanceRes?.results)
+                ? attendanceRes.results
+                : Array.isArray(attendanceRes)
+                    ? attendanceRes
+                    : [];
+            setAttendanceHistory(normalizeAttendanceRecords(records));
         } catch (err) {
+            if (fetchId !== latestFetchId.current) {
+                return;
+            }
             console.error('Error fetching attendance history:', err);
-            setHistoryError('Failed to load attendance records. Please try again.');
+            setAttendanceHistory([]);
+            setHistoryError(text(
+                'student.attendance.historyError',
+                'Failed to load attendance records. Please try again.'
+            ));
         } finally {
-            setHistoryLoading(false);
+            if (fetchId === latestFetchId.current) {
+                setHistoryLoading(false);
+            }
         }
-    }, [user?.id]);
+    }, [text, user?.id]);
 
     useEffect(() => {
         void fetchAttendanceHistory();
+        return () => {
+            latestFetchId.current += 1;
+        };
     }, [fetchAttendanceHistory]);
 
-    const attendanceSummary = dashboardData?.attendance || {};
-    const stats = {
-        present: attendanceSummary.by_status?.present || 0,
-        absent: attendanceSummary.by_status?.absent || 0,
-        late: attendanceSummary.by_status?.late || 0,
-        excused: attendanceSummary.by_status?.excused || 0,
-        totalDays: attendanceSummary.total_records || 0,
-        attendanceRate: attendanceSummary.attendance_rate || 0
-    };
+    const stats = useMemo(() => {
+        const attendanceSummary = dashboardData?.attendance || {};
+        const byStatus = attendanceSummary.by_status || {};
+        const rawRate = toSafeNumber(attendanceSummary.attendance_rate);
+
+        return {
+            present: toSafeNumber(byStatus.present),
+            absent: toSafeNumber(byStatus.absent),
+            late: toSafeNumber(byStatus.late),
+            excused: toSafeNumber(byStatus.excused),
+            totalDays: toSafeNumber(attendanceSummary.total_records),
+            attendanceRate: clamp(rawRate, 0, 100)
+        };
+    }, [dashboardData]);
 
     const monthlyData = useMemo(() => {
-        if (!attendanceHistory.length) return [];
+        if (!attendanceHistory.length) {
+            return [];
+        }
 
-        const months = {};
-        attendanceHistory.forEach(record => {
-            const date = new Date(record.date);
-            const monthName = date.toLocaleDateString('en', { month: 'short' });
-            if (!months[monthName]) {
-                months[monthName] = { month: monthName, present: 0, total: 0 };
+        const monthlyBuckets = new Map();
+
+        attendanceHistory.forEach((record) => {
+            if (!record.attendanceDate) {
+                return;
             }
-            months[monthName].total++;
+
+            const monthKey = getMonthBucketKey(record.attendanceDate);
+            const existingBucket = monthlyBuckets.get(monthKey) || {
+                key: monthKey,
+                month: record.attendanceDate.toLocaleDateString(locale, { month: 'short' }),
+                present: 0,
+                total: 0
+            };
+
+            existingBucket.total += 1;
             if (record.statusKey === 'present' || record.statusKey === 'late') {
-                months[monthName].present++;
+                existingBucket.present += 1;
             }
+
+            monthlyBuckets.set(monthKey, existingBucket);
         });
 
-        return Object.values(months).reverse().slice(0, 6); // Last 6 months
-    }, [attendanceHistory]);
+        return Array.from(monthlyBuckets.values())
+            .sort((left, right) => left.key.localeCompare(right.key))
+            .slice(-6)
+            .map((bucket) => ({
+                ...bucket,
+                rate: bucket.total > 0 ? Math.round((bucket.present / bucket.total) * 100) : 0
+            }));
+    }, [attendanceHistory, locale]);
 
-    const dashboardErrorText = resolveText(
-        t('student.dashboard.error'),
+    const filteredHistory = useMemo(() => {
+        if (filterStatus === 'all') {
+            return attendanceHistory;
+        }
+        return attendanceHistory.filter((record) => record.statusKey === filterStatus);
+    }, [attendanceHistory, filterStatus]);
+
+    const dashboardErrorText = text(
         'student.dashboard.error',
         'Failed to load dashboard data. Please try again.'
     );
+
+    const attendanceRingColor = stats.attendanceRate >= 90
+        ? '#10b981'
+        : stats.attendanceRate >= 75
+            ? '#f59e0b'
+            : '#ef4444';
+    const attendanceRingDasharray = `${(stats.attendanceRate / 100) * ATTENDANCE_RING_CIRCUMFERENCE} ${ATTENDANCE_RING_CIRCUMFERENCE}`;
+    const historyCardClassName = `attendance-card history-table${monthlyData.length === 0 ? ' full-width' : ''}`;
+    const getStatusBadge = (statusKey) => {
+        const config = ATTENDANCE_STATUS_CONFIGS[statusKey] || ATTENDANCE_STATUS_CONFIGS.present;
+        const Icon = config.icon;
+        const statusTranslationKey = ATTENDANCE_STATUS_CONFIGS[statusKey] ? statusKey : 'present';
+
+        return (
+            <span
+                className="attendance-status-badge"
+                style={{ background: config.bg, color: config.color }}
+            >
+                <Icon size={14} />
+                <span>{text(`student.attendance.${statusTranslationKey}`, config.label)}</span>
+            </span>
+        );
+    };
 
     if (dashboardLoading && !dashboardData) {
         return (
             <div className="dashboard-loading">
                 <RefreshCw className="animate-spin" size={40} />
-                <p>Loading attendance records...</p>
+                <p>{text('student.attendance.loading', 'Loading attendance records...')}</p>
             </div>
         );
     }
@@ -122,59 +259,26 @@ const StudentAttendance = () => {
             <div className="dashboard-error">
                 <AlertCircle size={48} color="#ef4444" />
                 <p>{dashboardErrorText}</p>
-                <button onClick={refreshData} className="retry-btn">
+                <button type="button" onClick={refreshData} className="retry-btn">
                     <RefreshCw size={18} />
-                    Try Again
+                    {text('student.actions.tryAgain', 'Try Again')}
                 </button>
             </div>
         );
     }
-
-    const getStatusBadge = (statusKey) => {
-        const configs = {
-            present: { icon: CheckCircle, bg: '#dcfce7', color: '#16a34a', label: 'Present' },
-            absent: { icon: XCircle, bg: '#fef2f2', color: '#dc2626', label: 'Absent' },
-            late: { icon: Clock, bg: '#fef3c7', color: '#d97706', label: 'Late' },
-            excused: { icon: AlertCircle, bg: '#e0f2fe', color: '#0891b2', label: 'Excused' }
-        };
-        const config = configs[statusKey] || configs.present;
-        const Icon = config.icon;
-
-        return (
-            <span
-                className="attendance-status-badge"
-                style={{ background: config.bg, color: config.color }}
-            >
-                <Icon size={14} />
-                <span>{t(`student.attendance.${statusKey}`) || config.label}</span>
-            </span>
-        );
-    };
-
-    const filterOptions = [
-        { key: 'all', label: 'All' },
-        { key: 'present', label: 'Present' },
-        { key: 'absent', label: 'Absent' },
-        { key: 'late', label: 'Late' },
-        { key: 'excused', label: 'Excused' }
-    ];
-
-    const filteredHistory = filterStatus === 'all'
-        ? attendanceHistory
-        : attendanceHistory.filter(record => record.statusKey === filterStatus);
 
     return (
         <div className="student-attendance">
             {/* Header */}
             <header className="page-header">
                 <div>
-                    <h1 className="page-title">{t('student.attendance.title') || 'Attendance Record'}</h1>
-                    <p className="page-subtitle">{t('student.attendance.subtitle') || 'Track your class attendance and punctuality'}</p>
+                    <h1 className="page-title">{text('student.attendance.title', 'Attendance Record')}</h1>
+                    <p className="page-subtitle">{text('student.attendance.subtitle', 'Track your class attendance and punctuality')}</p>
                 </div>
                 <div className="header-stats">
                     <div className="header-stat">
                         <CalendarDays size={18} />
-                        <span>{stats.totalDays} Total Records</span>
+                        <span>{stats.totalDays} {text('student.attendance.totalRecords', 'Total Records')}</span>
                     </div>
                 </div>
             </header>
@@ -186,10 +290,10 @@ const StudentAttendance = () => {
                         <AlertTriangle size={24} />
                     </div>
                     <div className="warning-content">
-                        <h4>{t('student.attendance.attendanceAlert') || 'Attendance Alert'}</h4>
+                        <h4>{text('student.attendance.attendanceAlert', 'Attendance Alert')}</h4>
                         <p>
-                            {t('student.attendance.lowAttendanceWarning') || 'Your attendance rate is'} <strong>{stats.attendanceRate}%</strong>.
-                            {' '}{t('student.attendance.lowAttendanceAction') || 'Please improve your attendance to meet the requirement.'}
+                            {text('student.attendance.lowAttendanceWarning', 'Your attendance rate is')} <strong>{stats.attendanceRate}%</strong>.
+                            {' '}{text('student.attendance.lowAttendanceAction', 'Please improve your attendance to meet the requirement.')}
                         </p>
                     </div>
                 </div>
@@ -204,51 +308,51 @@ const StudentAttendance = () => {
                             <circle
                                 cx="50" cy="50" r="40"
                                 fill="none"
-                                stroke={stats.attendanceRate >= 90 ? '#10b981' : stats.attendanceRate >= 75 ? '#f59e0b' : '#ef4444'}
+                                stroke={attendanceRingColor}
                                 strokeWidth="8"
                                 strokeLinecap="round"
-                                strokeDasharray={`${stats.attendanceRate * 2.51} 251`}
+                                strokeDasharray={attendanceRingDasharray}
                                 transform="rotate(-90 50 50)"
                             />
                         </svg>
                         <div className="ring-value">
                             <span className="ring-percentage">{stats.attendanceRate}%</span>
-                            <span className="ring-label">Rate</span>
+                            <span className="ring-label">{text('student.attendance.attendanceRate', 'Rate')}</span>
                         </div>
                     </div>
                     <div className="stat-card-meta">
                         <TrendingUp size={16} />
-                        <span>Overview of your presence</span>
+                        <span>{text('student.attendance.overall', 'Overview')}</span>
                     </div>
                 </div>
 
                 <div className="attendance-stat-card present">
-                    <div className="stat-icon-wrapper" style={{ background: 'linear-gradient(135deg, #10b981, #34d399)' }}>
+                    <div className="stat-icon-wrapper">
                         <CheckCircle size={24} />
                     </div>
                     <div className="stat-info">
                         <span className="stat-value">{stats.present}</span>
-                        <span className="stat-label">{t('student.attendance.totalPresent') || 'Days Present'}</span>
+                        <span className="stat-label">{text('student.attendance.totalPresent', 'Days Present')}</span>
                     </div>
                 </div>
 
                 <div className="attendance-stat-card absent">
-                    <div className="stat-icon-wrapper" style={{ background: 'linear-gradient(135deg, #ef4444, #f87171)' }}>
+                    <div className="stat-icon-wrapper">
                         <XCircle size={24} />
                     </div>
                     <div className="stat-info">
                         <span className="stat-value">{stats.absent}</span>
-                        <span className="stat-label">{t('student.attendance.totalAbsent') || 'Days Absent'}</span>
+                        <span className="stat-label">{text('student.attendance.totalAbsent', 'Days Absent')}</span>
                     </div>
                 </div>
 
                 <div className="attendance-stat-card late">
-                    <div className="stat-icon-wrapper" style={{ background: 'linear-gradient(135deg, #f59e0b, #fbbf24)' }}>
+                    <div className="stat-icon-wrapper">
                         <Clock size={24} />
                     </div>
                     <div className="stat-info">
                         <span className="stat-value">{stats.late}</span>
-                        <span className="stat-label">{t('student.attendance.late') || 'Late Arrivals'}</span>
+                        <span className="stat-label">{text('student.attendance.late', 'Late Arrivals')}</span>
                     </div>
                 </div>
             </div>
@@ -261,32 +365,29 @@ const StudentAttendance = () => {
                         <div className="card-header-premium">
                             <h3>
                                 <Calendar size={20} />
-                                {t('student.attendance.monthlyBreakdown') || 'Monthly Overview'}
+                                {text('student.attendance.monthlyBreakdown', 'Monthly Overview')}
                             </h3>
                         </div>
                         <div className="monthly-bars">
-                            {monthlyData.map((data, index) => {
-                                const rate = Math.round((data.present / data.total) * 100);
-                                return (
-                                    <div key={index} className="month-bar-item">
-                                        <div className="month-bar-container">
-                                            <div
-                                                className="month-bar-fill"
-                                                style={{
-                                                    height: `${rate}%`,
-                                                    background: rate >= 90
-                                                        ? 'linear-gradient(180deg, #10b981, #34d399)'
-                                                        : rate >= 80
-                                                            ? 'linear-gradient(180deg, #f59e0b, #fbbf24)'
-                                                            : 'linear-gradient(180deg, #ef4444, #f87171)'
-                                                }}
-                                            ></div>
-                                        </div>
-                                        <span className="month-label">{data.month}</span>
-                                        <span className="month-rate">{rate}%</span>
+                            {monthlyData.map((data) => (
+                                <div key={data.key} className="month-bar-item">
+                                    <div className="month-bar-container">
+                                        <div
+                                            className="month-bar-fill"
+                                            style={{
+                                                height: `${data.rate}%`,
+                                                background: data.rate >= 90
+                                                    ? 'linear-gradient(180deg, #10b981, #34d399)'
+                                                    : data.rate >= 80
+                                                        ? 'linear-gradient(180deg, #f59e0b, #fbbf24)'
+                                                        : 'linear-gradient(180deg, #ef4444, #f87171)'
+                                            }}
+                                        ></div>
                                     </div>
-                                );
-                            })}
+                                    <span className="month-label">{data.month}</span>
+                                    <span className="month-rate">{data.rate}%</span>
+                                </div>
+                            ))}
                         </div>
                         <div className="chart-legend">
                             <div className="legend-item">
@@ -306,20 +407,21 @@ const StudentAttendance = () => {
                 )}
 
                 {/* Attendance History */}
-                <div className="attendance-card history-table" style={{ gridColumn: monthlyData.length === 0 ? 'span 2' : 'auto' }}>
+                <div className={historyCardClassName}>
                     <div className="card-header-premium">
                         <h3>
                             <Search size={20} />
-                            {t('student.attendance.recentHistory') || 'Attendance History'}
+                            {text('student.attendance.recentHistory', 'Attendance History')}
                         </h3>
                         <div className="filter-tabs">
-                            {filterOptions.map((option) => (
+                            {ATTENDANCE_FILTER_OPTIONS.map((option) => (
                                 <button
                                     key={option.key}
+                                    type="button"
                                     onClick={() => setFilterStatus(option.key)}
                                     className={`filter-tab ${filterStatus === option.key ? 'active' : ''}`}
                                 >
-                                    {t(`student.attendance.${option.key}`) || option.label}
+                                    {text(option.translationKey, option.fallbackLabel)}
                                 </button>
                             ))}
                         </div>
@@ -329,7 +431,7 @@ const StudentAttendance = () => {
                         {historyLoading && (
                             <div className="empty-history">
                                 <RefreshCw className="animate-spin" size={32} />
-                                <p>Loading attendance history...</p>
+                                <p>{text('student.attendance.loadingHistory', 'Loading attendance history...')}</p>
                             </div>
                         )}
                         {!historyLoading && historyError && (
@@ -338,37 +440,49 @@ const StudentAttendance = () => {
                                 <p>{historyError}</p>
                                 <button onClick={fetchAttendanceHistory} className="retry-btn" type="button">
                                     <RefreshCw size={14} />
-                                    Retry History
+                                    {text('student.attendance.retryHistory', 'Retry History')}
                                 </button>
                             </div>
                         )}
-                        {!historyLoading && !historyError && filteredHistory.length > 0 ? filteredHistory.map((record) => (
-                            <div key={record.id} className="history-item">
-                                <div className="history-date">
-                                    <span className="date-day">{record.date.split('-')[2]}</span>
-                                    <span className="date-month">{new Date(record.date).toLocaleDateString('en', { month: 'short' })}</span>
+                        {!historyLoading && !historyError && filteredHistory.length > 0 ? filteredHistory.map((record) => {
+                            const dayLabel = record.attendanceDate
+                                ? record.attendanceDate.toLocaleDateString(locale, { day: '2-digit' })
+                                : '--';
+                            const monthLabel = record.attendanceDate
+                                ? record.attendanceDate.toLocaleDateString(locale, { month: 'short' })
+                                : '--';
+                            const timeLabel = record.createdAt
+                                ? record.createdAt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+                                : 'N/A';
+
+                            return (
+                                <div key={record.id} className="history-item">
+                                    <div className="history-date">
+                                        <span className="date-day">{dayLabel}</span>
+                                        <span className="date-month">{monthLabel}</span>
+                                    </div>
+                                    <div className="history-details">
+                                        <span className="history-subject">{record.subject}</span>
+                                        <span className="history-time">
+                                            <Clock size={12} />
+                                            {timeLabel}
+                                        </span>
+                                    </div>
+                                    {getStatusBadge(record.statusKey)}
                                 </div>
-                                <div className="history-details">
-                                    <span className="history-subject">{record.subject}</span>
-                                    <span className="history-time">
-                                        <Clock size={12} />
-                                        {record.time}
-                                    </span>
-                                </div>
-                                {getStatusBadge(record.statusKey)}
-                            </div>
-                        )) : (
+                            );
+                        }) : (
                             !historyLoading && !historyError && (
                                 <div className="empty-history">
                                     <Filter size={32} />
-                                    <p>{t('student.attendance.noRecords') || 'No records found for this filter'}</p>
+                                    <p>{text('student.attendance.noRecords', 'No records found for this filter')}</p>
                                 </div>
                             )
                         )}
                     </div>
                 </div>
             </div>
-</div>
+        </div>
     );
 };
 

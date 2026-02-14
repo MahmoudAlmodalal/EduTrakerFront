@@ -14,7 +14,7 @@ import './Workstream.css';
 const WorkstreamCommunication = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const { showSuccess, showError, showWarning, showInfo } = useToast();
+    const { showSuccess, showError } = useToast();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState('received');
 
@@ -26,7 +26,6 @@ const WorkstreamCommunication = () => {
 
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(true);
     const [replyBody, setReplyBody] = useState('');
 
     const [messages, setMessages] = useState([]);
@@ -34,22 +33,16 @@ const WorkstreamCommunication = () => {
 
     const fetchData = async () => {
         if (!user) return;
-        setLoading(true);
         try {
             const [msgsRes, notifsRes] = await Promise.all([
                 workstreamService.getMessages(),
                 workstreamService.getNotifications()
             ]);
 
-            console.log('=== WORKSTREAM: Fetched Messages ===');
-            console.log('Raw messages from API:', msgsRes.results || msgsRes);
-
             // Map backend messages to frontend format
             const mappedMsgs = (msgsRes.results || msgsRes).map(m => {
                 const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
                 const isSentByMe = m.sender?.id === user?.id;
-
-                console.log(`Message ${m.id}: sender object =`, m.sender);
 
                 return {
                     ...m,
@@ -67,13 +60,10 @@ const WorkstreamCommunication = () => {
                 };
             });
 
-            console.log('Mapped messages:', mappedMsgs);
             setMessages(mappedMsgs);
             setNotifications(notifsRes.results || notifsRes || []);
         } catch (error) {
             console.error('Failed to fetch communications:', error);
-        } finally {
-            setLoading(false);
         }
     };
 

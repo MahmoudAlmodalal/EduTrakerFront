@@ -27,6 +27,16 @@ export const getSecretaryIconStyle = (color) => {
     return SECRETARY_ICON_STYLES[color] || SECRETARY_ICON_STYLES.indigo;
 };
 
+export const getSecretaryIconColorKey = (color) => {
+    const resolved = getSecretaryIconStyle(color);
+
+    const match = Object.entries(SECRETARY_ICON_STYLES).find(([, style]) => {
+        return style.background === resolved.background && style.color === resolved.color;
+    });
+
+    return match ? match[0] : 'indigo';
+};
+
 export const getAttendanceStatusStyle = (status) => {
     return ATTENDANCE_STATUS_STYLES[status] || { background: 'var(--sec-border)', color: 'var(--sec-text-muted)' };
 };

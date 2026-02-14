@@ -178,19 +178,14 @@ const SecretaryMonitoring = () => {
             {/* Main Card with Search and Table */}
             <div className="management-card">
                 <div className="table-header-actions">
-                    <div style={{ position: 'relative', width: '300px' }}>
-                        <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                    <div className="sm-search-control">
+                        <Search size={18} className="sm-search-control-icon" />
                         <input
                             type="text"
                             placeholder={t('common.search') || 'Search secretaries...'}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '0.5rem 0.5rem 0.5rem 2.25rem',
-                                borderRadius: '0.375rem',
-                                border: '1px solid var(--color-border)'
-                            }}
+                            className="sm-search-control-input"
                         />
                     </div>
                     <button className="btn-primary" onClick={handleOpenCreate}>
@@ -205,88 +200,90 @@ const SecretaryMonitoring = () => {
                         {t('common.loading') || 'Loading...'}
                     </div>
                 ) : (
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Secretary</th>
-                                <th>School</th>
-                                <th>Department</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredSecretaries.length === 0 ? (
+                    <div className="sm-table-scroll">
+                        <table className="data-table">
+                            <thead>
                                 <tr>
-                                    <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                        No secretaries found.
-                                    </td>
+                                    <th>Secretary</th>
+                                    <th>School</th>
+                                    <th>Department</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
-                            ) : (
-                                filteredSecretaries.map((sec) => {
-                                    const id = sec.user_id || sec.id;
-                                    const isActive = sec.is_active !== false;
-                                    return (
-                                        <tr key={id}>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <div style={{
-                                                        width: '36px', height: '36px', borderRadius: '50%',
-                                                        background: '#f3e8ff', color: '#9333ea',
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        fontWeight: 'bold', fontSize: '0.875rem'
-                                                    }}>
-                                                        {(sec.full_name || sec.name)?.charAt(0)?.toUpperCase() || 'S'}
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
-                                                            {sec.full_name || sec.name || '-'}
+                            </thead>
+                            <tbody>
+                                {filteredSecretaries.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                            No secretaries found.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredSecretaries.map((sec) => {
+                                        const id = sec.user_id || sec.id;
+                                        const isActive = sec.is_active !== false;
+                                        return (
+                                            <tr key={id}>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <div style={{
+                                                            width: '36px', height: '36px', borderRadius: '50%',
+                                                            background: '#f3e8ff', color: '#9333ea',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            fontWeight: 'bold', fontSize: '0.875rem'
+                                                        }}>
+                                                            {(sec.full_name || sec.name)?.charAt(0)?.toUpperCase() || 'S'}
                                                         </div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            <Mail size={12} /> {sec.email || '-'}
+                                                        <div>
+                                                            <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
+                                                                {sec.full_name || sec.name || '-'}
+                                                            </div>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                <Mail size={12} /> {sec.email || '-'}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td style={{ color: sec.school_name ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
-                                                {sec.school_name || 'Not assigned'}
-                                            </td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <Briefcase size={14} color="var(--color-text-muted)" />
-                                                    <span style={{ color: sec.department ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
-                                                        {sec.department || 'Not assigned'}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <button
-                                                    type="button"
-                                                    className={`status-badge ${isActive ? 'status-active active' : 'status-inactive inactive'} status-toggle-btn`}
-                                                    onClick={() => handleToggleStatus(sec)}
-                                                    disabled={togglingId === id}
-                                                    title={isActive ? 'Click to deactivate' : 'Click to activate'}
-                                                >
-                                                    {isActive ? 'Active' : 'Inactive'}
-                                                </button>
-                                            </td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                </td>
+                                                <td style={{ color: sec.school_name ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                                    {sec.school_name || 'Not assigned'}
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <Briefcase size={14} color="var(--color-text-muted)" />
+                                                        <span style={{ color: sec.department ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                                            {sec.department || 'Not assigned'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td>
                                                     <button
-                                                        onClick={() => handleOpenEdit(sec)}
-                                                        title="Edit"
-                                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-primary)' }}
+                                                        type="button"
+                                                        className={`status-badge ${isActive ? 'status-active active' : 'status-inactive inactive'} status-toggle-btn`}
+                                                        onClick={() => handleToggleStatus(sec)}
+                                                        disabled={togglingId === id}
+                                                        title={isActive ? 'Click to deactivate' : 'Click to activate'}
                                                     >
-                                                        <Edit size={18} />
+                                                        {isActive ? 'Active' : 'Inactive'}
                                                     </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                        <button
+                                                            onClick={() => handleOpenEdit(sec)}
+                                                            title="Edit"
+                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-primary)' }}
+                                                        >
+                                                            <Edit size={18} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 

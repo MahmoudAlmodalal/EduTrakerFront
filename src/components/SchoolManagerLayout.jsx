@@ -22,19 +22,24 @@ import managerService from '../services/managerService';
 import { useCachedApi } from '../hooks/useCachedApi';
 import NotificationDropdown from './shared/NotificationDropdown';
 
+const SIDEBAR_BREAKPOINT = 1024;
+
 const SchoolManagerLayout = () => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
+    const [isMobile, setIsMobile] = useState(
+        typeof window !== 'undefined' ? window.innerWidth <= SIDEBAR_BREAKPOINT : false
+    );
+    const [isSidebarOpen, setSidebarOpen] = useState(
+        typeof window !== 'undefined' ? window.innerWidth > SIDEBAR_BREAKPOINT : true
+    );
 
     useEffect(() => {
         const handleResize = () => {
-            if (window.innerWidth <= 768) {
-                setSidebarOpen(false);
-            } else {
-                setSidebarOpen(true);
-            }
+            const mobile = window.innerWidth <= SIDEBAR_BREAKPOINT;
+            setIsMobile(mobile);
+            setSidebarOpen(!mobile);
         };
 
         window.addEventListener('resize', handleResize);
@@ -42,7 +47,7 @@ const SchoolManagerLayout = () => {
     }, []);
 
     const toggleSidebar = () => {
-        setSidebarOpen(!isSidebarOpen);
+        setSidebarOpen((prev) => !prev);
     };
 
     const navItems = [
@@ -93,6 +98,13 @@ const SchoolManagerLayout = () => {
 
     return (
         <div className={`school-manager-layout ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
+            {isMobile && isSidebarOpen && (
+                <div
+                    className="school-manager-sidebar-overlay"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
             {/* Mobile/Collapsed Menu Toggle */}
             {!isSidebarOpen && (
                 <button
@@ -164,6 +176,11 @@ const SchoolManagerLayout = () => {
                         <NavLink
                             key={item.path}
                             to={item.path}
+                            onClick={() => {
+                                if (isMobile) {
+                                    setSidebarOpen(false);
+                                }
+                            }}
                             className={({ isActive }) =>
                                 `school-manager-nav-item ${isActive ? 'active' : ''}`
                             }

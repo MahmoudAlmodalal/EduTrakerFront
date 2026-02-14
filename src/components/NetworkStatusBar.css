@@ -1,0 +1,84 @@
+.network-status-bar {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translate(-50%, -24px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: calc(var(--z-modal, 11000) + 1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    max-width: min(640px, calc(100vw - 32px));
+    padding: 10px 14px;
+    border-radius: 999px;
+    color: white;
+    box-shadow: var(--shadow-lg);
+    transition:
+        transform 220ms ease,
+        opacity 220ms ease;
+}
+
+.network-status-bar.is-visible {
+    transform: translate(-50%, 0);
+    opacity: 1;
+}
+
+.network-status-bar.is-offline {
+    background: linear-gradient(90deg, #475569 0%, #1e293b 100%);
+}
+
+.network-status-bar.is-syncing {
+    background: linear-gradient(90deg, #0ea5e9 0%, #0369a1 100%);
+}
+
+.network-status-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.network-status-spinner {
+    animation: network-status-spin 0.9s linear infinite;
+}
+
+.network-status-count {
+    min-width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 7px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+@keyframes network-status-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 768px) {
+    .network-status-bar {
+        top: 12px;
+        width: calc(100vw - 20px);
+        max-width: none;
+        border-radius: 16px;
+    }
+
+    .network-status-message {
+        font-size: 0.82rem;
+    }
+}
+

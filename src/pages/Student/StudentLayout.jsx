@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import {
     LayoutDashboard,
     BookOpen,
@@ -20,40 +20,31 @@ import { useAuth } from '../../context/AuthContext';
 import { StudentDataProvider, useStudentData } from '../../context/StudentDataContext';
 import './Student.css';
 
+const SIDEBAR_BREAKPOINT = 992;
+
 const StudentLayoutContent = () => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
     const { dashboardData, loading } = useStudentData();
-    const location = useLocation();
 
     // Initialize sidebar state based on screen width
-    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 992);
-    const [isMobile, setIsMobile] = useState(window.innerWidth <= 992);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(
+        typeof window !== 'undefined' ? window.innerWidth > SIDEBAR_BREAKPOINT : true
+    );
+    const [isMobile, setIsMobile] = useState(
+        typeof window !== 'undefined' ? window.innerWidth <= SIDEBAR_BREAKPOINT : false
+    );
 
-    // Handle window resize
     useEffect(() => {
         const handleResize = () => {
-            const mobile = window.innerWidth <= 992;
+            const mobile = window.innerWidth <= SIDEBAR_BREAKPOINT;
             setIsMobile(mobile);
-            if (mobile && isSidebarOpen) {
-                setIsSidebarOpen(false);
-            } else if (!mobile && !isSidebarOpen) {
-                // Optional: Auto-open on desktop resize? 
-                // Let's keep user preference or default to open if coming from mobile
-                setIsSidebarOpen(true);
-            }
+            setIsSidebarOpen(!mobile);
         };
 
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
-
-    // Close sidebar on route change on mobile
-    useEffect(() => {
-        if (isMobile) {
-            setIsSidebarOpen(false);
-        }
-    }, [location, isMobile]);
 
     const stats = {
         attendance: `${dashboardData?.attendance?.attendance_rate || 0}%`,
@@ -111,6 +102,11 @@ const StudentLayoutContent = () => {
                         <NavLink
                             key={item.path}
                             to={item.path}
+                            onClick={() => {
+                                if (isMobile) {
+                                    setIsSidebarOpen(false);
+                                }
+                            }}
                             className={({ isActive }) => `student-nav-item ${isActive ? 'active' : ''}`}
                         >
                             <div className="student-nav-icon">

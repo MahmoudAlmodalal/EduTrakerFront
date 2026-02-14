@@ -303,15 +303,6 @@ docker run -p 80:80 edutraker-front
 
 ---
 
-## 📚 Additional Documentation
-
-### Available Documentation Files
-- `CACHING_MIGRATION_GUIDE.md` - Caching implementation guide
-- `CACHING_QUICK_REFERENCE.md` - Quick reference for caching
-- `RECENT_ACTIVITY_ENHANCEMENT.md` - Recent activity features
-
----
-
 ## 📞 Support & Contributing
 
 ### Getting Help

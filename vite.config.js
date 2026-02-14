@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import process from 'node:process'
 
 const usePolling = process.env.CHOKIDAR_USEPOLLING === 'true' || process.env.CHOKIDAR_USEPOLLING === '1'
 const proxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://localhost:8000'
@@ -54,15 +55,18 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            urlPattern: /^https?:\/\/.*\/api\/(statistics|teacher\/schedule|notifications)/,
-            handler: 'StaleWhileRevalidate',
+            urlPattern: /^https?:\/\/.*\/api\//,
+            handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
+              networkTimeoutSeconds: 5,
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 5 * 60,
+                maxEntries: 200,
+                maxAgeSeconds: 24 * 60 * 60,
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -112,5 +116,21 @@ export default defineConfig({
     fs: {
       strict: false
     }
-  }
+  },
+  build: {
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          query: ['@tanstack/react-query'],
+          ui: ['framer-motion', 'lucide-react'],
+        },
+      },
+    },
+  },
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
 })

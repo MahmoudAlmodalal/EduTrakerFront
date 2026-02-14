@@ -420,19 +420,14 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
     return (
         <TableCard
             left={(
-                <div style={{ position: 'relative', width: '300px' }}>
-                    <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                <div className="sm-search-control">
+                    <Search size={18} className="sm-search-control-icon" />
                     <input
                         type="text"
                         placeholder={t('common.search') || 'Search teachers...'}
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
-                        style={{
-                            width: '100%',
-                            padding: '0.5rem 0.5rem 0.5rem 2.25rem',
-                            borderRadius: '0.375rem',
-                            border: '1px solid var(--color-border)'
-                        }}
+                        className="sm-search-control-input"
                     />
                 </div>
             )}
@@ -444,100 +439,102 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
             )}
         >
 
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Teacher</th>
-                        <th>School</th>
-                        <th>Specialization</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filteredTeachers.length === 0 ? (
+            <div className="sm-table-scroll">
+                <table className="data-table">
+                    <thead>
                         <tr>
-                            <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                No teachers found.
-                            </td>
+                            <th>Teacher</th>
+                            <th>School</th>
+                            <th>Specialization</th>
+                            <th>Status</th>
+                            <th>Actions</th>
                         </tr>
-                    ) : filteredTeachers.map((teacher) => {
-                        const id = getTeacherId(teacher);
-                        const isActive = teacher.is_active !== false;
-                        const isUpdatingThisTeacher = updateTeacherStatusMutation.isPending
-                            && updateTeacherStatusMutation.variables?.teacherId === id;
-
-                        return (
-                            <tr key={id}>
-                                <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{
-                                            width: '36px', height: '36px', borderRadius: '50%',
-                                            background: '#f3e8ff', color: '#9333ea',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontWeight: 'bold', fontSize: '0.875rem'
-                                        }}>
-                                            {teacher.full_name?.charAt(0)?.toUpperCase() || 'T'}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
-                                                {teacher.full_name}
-                                            </div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Mail size={12} />
-                                                {teacher.email}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td style={{ color: teacher.school_name ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
-                                    {teacher.school_name || 'Not assigned'}
-                                </td>
-                                <td style={{ color: teacher.specialization ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
-                                    {teacher.specialization || 'Not specified'}
-                                </td>
-                                <td>
-                                    <button
-                                        type="button"
-                                        className={`status-badge ${isActive ? 'status-active active' : 'status-inactive inactive'} status-toggle-btn`}
-                                        onClick={() => handleStatusBadgeToggle(teacher)}
-                                        style={{
-                                            opacity: toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id ? 0.75 : 1
-                                        }}
-                                        disabled={toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id}
-                                        title="Click to toggle status"
-                                    >
-                                        {isActive ? 'Active' : 'Inactive'}
-                                    </button>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        {isActive ? (
-                                            <button
-                                                onClick={() => requestStatusChange(teacher, false)}
-                                                title="Deactivate Teacher"
-                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
-                                                disabled={isUpdatingThisTeacher}
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => requestStatusChange(teacher, true)}
-                                                title="Activate Teacher"
-                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-success)' }}
-                                                disabled={isUpdatingThisTeacher}
-                                            >
-                                                <UserCheck size={18} />
-                                            </button>
-                                        )}
-                                    </div>
+                    </thead>
+                    <tbody>
+                        {filteredTeachers.length === 0 ? (
+                            <tr>
+                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                    No teachers found.
                                 </td>
                             </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                        ) : filteredTeachers.map((teacher) => {
+                            const id = getTeacherId(teacher);
+                            const isActive = teacher.is_active !== false;
+                            const isUpdatingThisTeacher = updateTeacherStatusMutation.isPending
+                                && updateTeacherStatusMutation.variables?.teacherId === id;
+
+                            return (
+                                <tr key={id}>
+                                    <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div style={{
+                                                width: '36px', height: '36px', borderRadius: '50%',
+                                                background: '#f3e8ff', color: '#9333ea',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontWeight: 'bold', fontSize: '0.875rem'
+                                            }}>
+                                                {teacher.full_name?.charAt(0)?.toUpperCase() || 'T'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
+                                                    {teacher.full_name}
+                                                </div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Mail size={12} />
+                                                    {teacher.email}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style={{ color: teacher.school_name ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                        {teacher.school_name || 'Not assigned'}
+                                    </td>
+                                    <td style={{ color: teacher.specialization ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                        {teacher.specialization || 'Not specified'}
+                                    </td>
+                                    <td>
+                                        <button
+                                            type="button"
+                                            className={`status-badge ${isActive ? 'status-active active' : 'status-inactive inactive'} status-toggle-btn`}
+                                            onClick={() => handleStatusBadgeToggle(teacher)}
+                                            style={{
+                                                opacity: toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id ? 0.75 : 1
+                                            }}
+                                            disabled={toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id}
+                                            title="Click to toggle status"
+                                        >
+                                            {isActive ? 'Active' : 'Inactive'}
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            {isActive ? (
+                                                <button
+                                                    onClick={() => requestStatusChange(teacher, false)}
+                                                    title="Deactivate Teacher"
+                                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
+                                                    disabled={isUpdatingThisTeacher}
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => requestStatusChange(teacher, true)}
+                                                    title="Activate Teacher"
+                                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-success)' }}
+                                                    disabled={isUpdatingThisTeacher}
+                                                >
+                                                    <UserCheck size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
 
             <Modal
                 isOpen={isModalOpen}
@@ -816,17 +813,19 @@ const PerformanceEvaluation = memo(function PerformanceEvaluation({
             )}
         >
 
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Teacher</th>
-                        <th>Rating</th>
-                        <th>Comments</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>{evaluationRows}</tbody>
-            </table>
+            <div className="sm-table-scroll">
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>Teacher</th>
+                            <th>Rating</th>
+                            <th>Comments</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>{evaluationRows}</tbody>
+                </table>
+            </div>
 
             <Modal
                 isOpen={isModalOpen}

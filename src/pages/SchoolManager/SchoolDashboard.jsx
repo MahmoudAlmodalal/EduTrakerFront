@@ -123,7 +123,7 @@ const SchoolDashboard = () => {
                 ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '2rem', marginTop: '2rem' }}>
+            <div className="sm-dashboard-main-grid">
                 {/* Performance Chart */}
                 <SchoolPerformanceChart />
 
@@ -132,7 +132,7 @@ const SchoolDashboard = () => {
             </div>
 
             {/* Grade Breakdown + Recent Activity */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem' }}>
+            <div className="sm-dashboard-secondary-grid">
                 <GradeBreakdown grades={stats?.by_grade || []} />
             </div>
         </div>
@@ -168,7 +168,7 @@ const SchoolPerformanceChart = () => {
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">{t('performanceTrend') || 'Academic Performance Trend'}</h3>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div className="sm-chart-toolbar">
                     {['weekly', 'monthly'].map(p => (
                         <button
                             key={p}
@@ -346,8 +346,8 @@ const GradeBreakdown = ({ grades = [] }) => {
                             const count = grade.student_count || grade.total_students || 0;
                             const barWidth = maxStudents > 0 ? (count / maxStudents) * 100 : 0;
                             return (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                    <span style={{ minWidth: '100px', fontSize: '0.85rem', color: 'var(--color-text-main)', fontWeight: '500' }}>
+                                <div key={idx} className="sm-grade-breakdown-row">
+                                    <span className="sm-grade-breakdown-label">
                                         {grade.grade_name || grade.name || `Grade ${idx + 1}`}
                                     </span>
                                     <div style={{ flex: 1, height: '24px', backgroundColor: 'var(--color-bg-body)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -360,7 +360,7 @@ const GradeBreakdown = ({ grades = [] }) => {
                                             opacity: 0.8
                                         }} />
                                     </div>
-                                    <span style={{ minWidth: '40px', textAlign: 'right', fontSize: '0.85rem', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                                    <span className="sm-grade-breakdown-value">
                                         {count}
                                     </span>
                                 </div>

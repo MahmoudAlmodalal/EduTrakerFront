@@ -165,15 +165,17 @@ const SchoolManagerAssignment = () => {
     return (
         <div className="workstream-dashboard">
             <div className="workstream-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="assignment-header-row">
                     <div>
                         <h1 className="workstream-title">{t('workstream.assignments.title')}</h1>
                         <p className="workstream-subtitle">{t('workstream.assignments.subtitle')}</p>
                     </div>
-                    <button className="btn-primary" onClick={() => setShowAssignForm(true)}>
-                        <UserPlus size={20} />
-                        {t('users.create')}
-                    </button>
+                    <div className="assignment-header-actions">
+                        <button className="btn-primary" onClick={() => setShowAssignForm(true)}>
+                            <UserPlus size={20} />
+                            {t('users.create')}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -303,8 +305,8 @@ const SchoolManagerAssignment = () => {
             </Modal>
 
             <div className="management-card">
-                <div className="table-header-actions">
-                    <div style={{ position: 'relative', width: '300px' }}>
+                <div className="table-header-actions assignment-filters">
+                    <div className="assignment-search">
                         <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                         <input
                             type="text"
@@ -321,66 +323,75 @@ const SchoolManagerAssignment = () => {
                     </div>
                 </div>
 
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t('workstream.assignments.table.manager')}</th>
-                            <th>{t('workstream.assignments.table.assignedSchool')}</th>
-                            <th>{t('workstream.assignments.table.status')}</th>
-                            <th>{t('workstream.assignments.table.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredManagers.map((manager) => (
-                            <tr key={manager.id}>
-                                <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                                            {manager.full_name?.charAt(0) || 'U'}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{manager.full_name}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Mail size={12} /> {manager.email}
+                <div className="assignment-table-wrap">
+                    <table className="data-table assignment-table">
+                        <thead>
+                            <tr>
+                                <th>{t('workstream.assignments.table.manager')}</th>
+                                <th>{t('workstream.assignments.table.assignedSchool')}</th>
+                                <th>{t('workstream.assignments.table.status')}</th>
+                                <th>{t('workstream.assignments.table.actions')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredManagers.length === 0 && (
+                                <tr className="assignment-empty-row">
+                                    <td className="assignment-empty-cell" colSpan={4} style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                                        No managers found.
+                                    </td>
+                                </tr>
+                            )}
+                            {filteredManagers.map((manager) => (
+                                <tr key={manager.id}>
+                                    <td className="assignment-manager-cell" data-label={t('workstream.assignments.table.manager')}>
+                                        <div className="assignment-manager-cell-content" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                                {manager.full_name?.charAt(0) || 'U'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{manager.full_name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Mail size={12} /> {manager.email}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <School size={16} color="var(--color-text-muted)" />
-                                        <span style={{ color: !manager.school ? 'var(--color-text-muted)' : 'var(--color-text-main)' }}>
-                                            {manager.school_name || 'Unassigned'}
+                                    </td>
+                                    <td data-label={t('workstream.assignments.table.assignedSchool')}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                            <School size={16} color="var(--color-text-muted)" />
+                                            <span style={{ color: !manager.school ? 'var(--color-text-muted)' : 'var(--color-text-main)' }}>
+                                                {manager.school_name || 'Unassigned'}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td data-label={t('workstream.assignments.table.status')}>
+                                        <span className={`status-badge ${manager.is_active ? 'status-active' : 'status-inactive'}`}>
+                                            {manager.is_active ? 'Active' : 'Inactive'}
                                         </span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span className={`status-badge ${manager.is_active ? 'status-active' : 'status-inactive'}`}>
-                                        {manager.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button
-                                            onClick={() => handleEditManager(manager.id)}
-                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-primary)' }}
-                                            title="Edit Manager"
-                                        >
-                                            <Edit size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleRequestDeleteManager(manager)}
-                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
-                                            title="Deactivate Manager"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                    </td>
+                                    <td className="assignment-actions-cell" data-label={t('workstream.assignments.table.actions')}>
+                                        <div className="assignment-row-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button
+                                                onClick={() => handleEditManager(manager.id)}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-primary)' }}
+                                                title="Edit Manager"
+                                            >
+                                                <Edit size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleRequestDeleteManager(manager)}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
+                                                title="Deactivate Manager"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

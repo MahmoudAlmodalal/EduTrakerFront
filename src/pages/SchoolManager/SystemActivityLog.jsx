@@ -116,7 +116,7 @@ const SystemActivityLog = () => {
 
             <div className="management-card">
                 <div className="table-header-actions" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <div className="sm-search-wrap" style={{ minWidth: '260px', flex: '1 1 320px' }}>
+                    <div className="sm-search-wrap sm-search-control">
                         <Search size={18} className="sm-search-icon" />
                         <input
                             type="text"
@@ -128,10 +128,9 @@ const SystemActivityLog = () => {
                     </div>
 
                     <select
-                        className="sm-form-select"
+                        className="sm-form-select sm-select-control"
                         value={userType}
                         onChange={handleUserTypeChange}
-                        style={{ width: '180px' }}
                     >
                         <option value="all">All User Types</option>
                         <option value="manager_school">School Managers</option>
@@ -141,10 +140,9 @@ const SystemActivityLog = () => {
                     </select>
 
                     <select
-                        className="sm-form-select"
+                        className="sm-form-select sm-select-control"
                         value={actionType}
                         onChange={handleActionTypeChange}
-                        style={{ width: '180px' }}
                     >
                         <option value="all">All Actions</option>
                         <option value="LOGIN">Login</option>
@@ -162,93 +160,95 @@ const SystemActivityLog = () => {
                     </button>
                 </div>
 
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>User Type</th>
-                            <th>Action</th>
-                            <th>Details</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {!hasSchoolId ? (
+                <div className="sm-table-scroll">
+                    <table className="data-table">
+                        <thead>
                             <tr>
-                                <td colSpan="5" className="sm-empty-state">
-                                    School information is missing for this account.
-                                </td>
+                                <th>Name</th>
+                                <th>User Type</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>Time</th>
                             </tr>
-                        ) : isLoading ? (
-                            <tr>
-                                <td colSpan="5" className="sm-loading-state">
-                                    Loading activity logs...
-                                </td>
-                            </tr>
-                        ) : error ? (
-                            <tr>
-                                <td colSpan="5" className="sm-empty-state">
-                                    {error?.message || 'Failed to load activity logs.'}
-                                </td>
-                            </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" className="sm-empty-state">
-                                    No activity logs match the current filters.
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((row) => {
-                                const actionLabel = row.action_label || row.action_type || 'N/A';
-                                const badgeClass = toActionBadgeClass(actionLabel);
-                                const target = row.entity_id
-                                    ? `${row.entity_type || 'N/A'} #${row.entity_id}`
-                                    : (row.entity_type || 'N/A');
-                                const timeParts = formatTimeParts(row.created_at);
+                        </thead>
+                        <tbody>
+                            {!hasSchoolId ? (
+                                <tr>
+                                    <td colSpan="5" className="sm-empty-state">
+                                        School information is missing for this account.
+                                    </td>
+                                </tr>
+                            ) : isLoading ? (
+                                <tr>
+                                    <td colSpan="5" className="sm-loading-state">
+                                        Loading activity logs...
+                                    </td>
+                                </tr>
+                            ) : error ? (
+                                <tr>
+                                    <td colSpan="5" className="sm-empty-state">
+                                        {error?.message || 'Failed to load activity logs.'}
+                                    </td>
+                                </tr>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="sm-empty-state">
+                                        No activity logs match the current filters.
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((row) => {
+                                    const actionLabel = row.action_label || row.action_type || 'N/A';
+                                    const badgeClass = toActionBadgeClass(actionLabel);
+                                    const target = row.entity_id
+                                        ? `${row.entity_type || 'N/A'} #${row.entity_id}`
+                                        : (row.entity_type || 'N/A');
+                                    const timeParts = formatTimeParts(row.created_at);
 
-                                return (
-                                    <tr key={row.id}>
-                                        <td>
-                                            <div className="teacher-row-identity">
-                                                <div className="teacher-avatar">
-                                                    {row.actor_name?.charAt(0)?.toUpperCase() || 'S'}
+                                    return (
+                                        <tr key={row.id}>
+                                            <td>
+                                                <div className="teacher-row-identity">
+                                                    <div className="teacher-avatar">
+                                                        {row.actor_name?.charAt(0)?.toUpperCase() || 'S'}
+                                                    </div>
+                                                    <div>
+                                                        <div className="teacher-name">{row.actor_name || 'System'}</div>
+                                                        <div className="teacher-email">{row.actor_email || 'system@edutraker.com'}</div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <div className="teacher-name">{row.actor_name || 'System'}</div>
-                                                    <div className="teacher-email">{row.actor_email || 'system@edutraker.com'}</div>
+                                            </td>
+                                            <td>
+                                                <span className="activity-user-type-badge">{toRoleLabel(row.actor_role)}</span>
+                                            </td>
+                                            <td>
+                                                <span className={`status-badge ${badgeClass}`}>{actionLabel}</span>
+                                            </td>
+                                            <td>
+                                                <div className="activity-details-wrap">
+                                                    <p className="activity-details-main">{row.description || 'No details available'}</p>
+                                                    <span className="activity-details-target">{target}</span>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span className="activity-user-type-badge">{toRoleLabel(row.actor_role)}</span>
-                                        </td>
-                                        <td>
-                                            <span className={`status-badge ${badgeClass}`}>{actionLabel}</span>
-                                        </td>
-                                        <td>
-                                            <div className="activity-details-wrap">
-                                                <p className="activity-details-main">{row.description || 'No details available'}</p>
-                                                <span className="activity-details-target">{target}</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="activity-time-wrap">
-                                                <span className="activity-time-main">{timeParts.time}</span>
-                                                <span className="activity-time-sub">{timeParts.date}</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
+                                            </td>
+                                            <td>
+                                                <div className="activity-time-wrap">
+                                                    <span className="activity-time-main">{timeParts.time}</span>
+                                                    <span className="activity-time-sub">{timeParts.date}</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
                 <div className="table-header-actions" style={{ marginTop: '1rem' }}>
                     <div className="sm-muted-cell">
                         Showing page {page} of {totalPages} ({totalCount} logs)
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div className="sm-inline-controls">
                         <button
                             type="button"
                             className="sm-btn-secondary"
