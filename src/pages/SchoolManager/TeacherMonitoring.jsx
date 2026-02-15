@@ -11,6 +11,7 @@ import './SchoolManager.css';
 
 const DEFAULT_PASSWORD = 'Teacher@123';
 const STAR_INDICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const TABLE_ROWS_PER_PAGE = 10;
 
 const normalizeList = (response) => {
     if (Array.isArray(response?.results)) return response.results;
@@ -255,6 +256,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const deferredSearchTerm = useDeferredValue(searchTerm);
+    const [page, setPage] = useState(1);
     const [formData, setFormData] = useState(createInitialTeacherForm);
     const [pendingStatusAction, setPendingStatusAction] = useState(null);
 
@@ -268,6 +270,13 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
             || (teacher.specialization?.toLowerCase() || '').includes(query)
         ));
     }, [teachers, deferredSearchTerm]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredTeachers.length / TABLE_ROWS_PER_PAGE));
+    const currentPage = Math.min(page, totalPages);
+    const paginatedTeachers = useMemo(() => {
+        const startIndex = (currentPage - 1) * TABLE_ROWS_PER_PAGE;
+        return filteredTeachers.slice(startIndex, startIndex + TABLE_ROWS_PER_PAGE);
+    }, [currentPage, filteredTeachers]);
 
     const createTeacherMutation = useMutation({
         mutationFn: (payload) => managerService.createTeacher(payload),
@@ -426,7 +435,10 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                         type="text"
                         placeholder={t('common.search') || 'Search teachers...'}
                         value={searchTerm}
-                        onChange={(event) => setSearchTerm(event.target.value)}
+                        onChange={(event) => {
+                            setSearchTerm(event.target.value);
+                            setPage(1);
+                        }}
                         className="sm-search-control-input"
                     />
                 </div>
@@ -457,7 +469,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                                     No teachers found.
                                 </td>
                             </tr>
-                        ) : filteredTeachers.map((teacher) => {
+                        ) : paginatedTeachers.map((teacher) => {
                             const id = getTeacherId(teacher);
                             const isActive = teacher.is_active !== false;
                             const isUpdatingThisTeacher = updateTeacherStatusMutation.isPending
@@ -535,6 +547,37 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                     </tbody>
                 </table>
             </div>
+
+            {filteredTeachers.length > 0 ? (
+                <div className="sm-table-pagination">
+                    <span className="sm-table-pagination-summary">
+                        Showing {(currentPage - 1) * TABLE_ROWS_PER_PAGE + 1}
+                        -
+                        {Math.min(currentPage * TABLE_ROWS_PER_PAGE, filteredTeachers.length)} of {filteredTeachers.length}
+                    </span>
+                    <div className="sm-table-pagination-controls">
+                        <button
+                            type="button"
+                            className="sm-btn-secondary"
+                            onClick={() => setPage(Math.max(1, currentPage - 1))}
+                            disabled={currentPage <= 1}
+                        >
+                            Previous
+                        </button>
+                        <span className="sm-table-pagination-page">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            type="button"
+                            className="sm-btn-secondary"
+                            onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                            disabled={currentPage >= totalPages}
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             <Modal
                 isOpen={isModalOpen}

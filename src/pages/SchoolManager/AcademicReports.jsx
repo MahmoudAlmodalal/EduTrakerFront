@@ -18,6 +18,8 @@ import './SchoolManager.css';
 const AcademicReports = () => {
     const { t, theme } = useTheme();
     const [stats, setStats] = useState(null);
+    const [performanceData, setPerformanceData] = useState(null);
+    const [subjectFilter, setSubjectFilter] = useState('');
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(null);
     const isDarkTheme = theme === 'dark';
@@ -38,8 +40,12 @@ const AcademicReports = () => {
         const fetchStats = async () => {
             setLoading(true);
             try {
-                const data = await managerService.getDashboardStats();
-                setStats(data);
+                const [dashboardData, schoolPerformanceData] = await Promise.all([
+                    managerService.getDashboardStats(),
+                    managerService.getSchoolPerformance('monthly')
+                ]);
+                setStats(dashboardData);
+                setPerformanceData(schoolPerformanceData);
             } catch (error) {
                 console.error('Failed to fetch stats:', error);
             } finally {
@@ -248,42 +254,62 @@ const AcademicReports = () => {
                             type="text"
                             placeholder="Filter subjects..."
                             className="sm-search-control-input"
+                            value={subjectFilter}
+                            onChange={(event) => setSubjectFilter(event.target.value)}
                             style={{ fontSize: '0.875rem' }}
                         />
                     </div>
                 </div>
                 <div style={{ padding: '1.5rem' }}>
-                    {/* Placeholder for a real chart component */}
-                    <div style={{ height: '300px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 1rem' }}>
-                        {stats?.statistics?.by_grade?.length > 0 ? stats.statistics.by_grade.map((item, i) => (
-                            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: `${Math.floor(80 / (stats.statistics.by_grade?.length || 1))}%` }}>
-                                <div style={{
-                                    width: '100%',
-                                    height: `${Math.min(item.student_count || item.count || 0, 100)}%`,
-                                    backgroundColor: 'var(--color-primary)',
-                                    opacity: 0.8,
-                                    borderRadius: '4px 4px 0 0',
-                                    position: 'relative'
-                                }}>
-                                    <div className="chart-tooltip" style={{
-                                        position: 'absolute',
-                                        top: '-30px',
-                                        left: '50%',
-                                        transform: 'translateX(-50%)',
-                                        backgroundColor: '#000',
-                                        color: '#fff',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        fontSize: '10px',
-                                        whiteSpace: 'nowrap'
-                                    }}>{item.student_count || item.count || 0}</div>
+                    {(() => {
+                        const normalizedFilter = subjectFilter.trim().toLowerCase();
+                        const subjects = (performanceData?.subject_performance || []).filter((item) => {
+                            const name = item?.subject || '';
+                            return name.toLowerCase().includes(normalizedFilter);
+                        });
+                        const maxScore = Math.max(...subjects.map((item) => Number(item?.avg_score) || 0), 1);
+
+                        if (subjects.length === 0) {
+                            return (
+                                <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', flexDirection: 'column', gap: '0.5rem' }}>
+                                    <TrendingUp size={40} style={{ opacity: 0.3 }} {...iconSvgProps} />
+                                    <p style={{ margin: 0 }}>No subject performance data yet</p>
+                                    <p style={{ margin: 0, fontSize: '0.75rem' }}>Data appears once students receive grades</p>
                                 </div>
-                                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{item.grade__name || item.grade_name || 'N/A'}</span>
+                            );
+                        }
+
+                        return (
+                            <div style={{ height: '300px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', gap: '8px' }}>
+                                {subjects.map((item, index) => {
+                                    const avgScore = Number(item?.avg_score) || 0;
+                                    const barHeight = maxScore > 0 ? (avgScore / maxScore) * 100 : 0;
+                                    return (
+                                        <div key={`${item?.subject || 'subject'}-${index}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: '80px' }}>
+                                            <span style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginBottom: '4px' }}>
+                                                {avgScore.toFixed(1)}%
+                                            </span>
+                                            <div
+                                                style={{
+                                                    width: '100%',
+                                                    height: `${Math.max(barHeight, 2)}%`,
+                                                    backgroundColor: 'var(--color-primary)',
+                                                    borderRadius: '4px 4px 0 0',
+                                                    opacity: 0.8,
+                                                    transition: 'height 0.3s ease',
+                                                    minHeight: '4px'
+                                                }}
+                                                title={`${item?.subject || 'Subject'}: ${avgScore.toFixed(1)}%`}
+                                            />
+                                            <span style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginTop: '8px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                                                {item?.subject || 'N/A'}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        )) : (
-                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>No performance data available</div>
-                        )}
-                    </div>
+                        );
+                    })()}
                 </div>
             </div>
         </div>

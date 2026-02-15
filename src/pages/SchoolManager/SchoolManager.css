@@ -513,6 +513,52 @@
     min-width: max(100%, 680px);
 }
 
+.sm-table-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: var(--spacing-4) var(--spacing-6);
+    border-top: 1px solid var(--color-border-subtle);
+    background: linear-gradient(180deg, transparent, rgba(248, 250, 252, 0.75));
+}
+
+[data-theme='dark'] .sm-table-pagination {
+    background: linear-gradient(180deg, transparent, rgba(30, 41, 59, 0.5));
+}
+
+.sm-table-pagination-summary {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
+.sm-table-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.sm-table-pagination-page {
+    font-size: 0.8125rem;
+    color: var(--color-text-main);
+    font-weight: 600;
+    min-width: 95px;
+    text-align: center;
+}
+
+.sm-table-pagination .sm-btn-secondary {
+    padding: 0.5rem 0.875rem;
+}
+
+.sm-table-pagination .sm-btn-secondary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    border-color: var(--color-border);
+    background: var(--color-bg-surface);
+}
+
 .data-table th {
     background: linear-gradient(180deg, #f8fafc, #f1f5f9);
     padding: var(--spacing-4) var(--spacing-6);
@@ -636,6 +682,72 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 0.75rem;
+}
+
+.sm-allocation-filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    width: auto;
+    min-width: 0;
+    margin-left: auto;
+    gap: 0.75rem;
+}
+
+.sm-allocation-filters > * {
+    flex: 0 0 auto;
+}
+
+.sm-allocation-filters .sm-select-control {
+    width: 180px;
+    min-width: 180px;
+    flex: 0 0 180px;
+}
+
+.sm-subject-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    width: auto;
+    min-width: 0;
+    margin-left: auto;
+    gap: 0.75rem;
+}
+
+.sm-subject-actions > * {
+    flex: 0 0 auto;
+}
+
+.sm-subject-actions .sm-select-control {
+    width: 180px;
+    min-width: 180px;
+    flex: 0 0 180px;
+}
+
+.sm-classroom-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    width: auto;
+    min-width: 0;
+    margin-left: auto;
+    gap: 0.75rem;
+}
+
+.sm-classroom-actions > * {
+    flex: 0 0 auto;
+}
+
+.sm-classroom-actions .sm-select-control {
+    width: 180px;
+    min-width: 180px;
+    flex: 0 0 180px;
+}
+
+.sm-classroom-actions .sm-classroom-year-select {
+    width: 240px;
+    min-width: 240px;
+    flex: 0 0 240px;
 }
 
 .sm-dashboard-main-grid {
@@ -1612,6 +1724,39 @@
         flex: 1 1 100%;
     }
 
+    .sm-allocation-filters,
+    .sm-subject-actions,
+    .sm-classroom-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .sm-allocation-filters > *,
+    .sm-subject-actions > *,
+    .sm-classroom-actions > * {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .sm-allocation-filters .sm-select-control,
+    .sm-subject-actions .sm-select-control,
+    .sm-classroom-actions .sm-select-control,
+    .sm-classroom-actions .sm-classroom-year-select {
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 100%;
+    }
+
+    .sm-allocation-filters .sm-btn-secondary,
+    .sm-subject-actions .btn-primary,
+    .sm-subject-actions .sm-btn-secondary,
+    .sm-classroom-actions .btn-primary,
+    .sm-classroom-actions .sm-btn-secondary {
+        width: 100%;
+        justify-content: center;
+    }
+
     .btn-primary,
     .btn-secondary {
         width: 100%;
@@ -1632,6 +1777,19 @@
     .table-header-actions > .sm-btn-secondary {
         width: 100%;
         justify-content: center;
+    }
+
+    .sm-table-pagination {
+        padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .sm-table-pagination-summary {
+        width: 100%;
+    }
+
+    .sm-table-pagination-controls {
+        width: 100%;
+        justify-content: space-between;
     }
 
     .school-communication-tabs > .tab-btn {
@@ -1707,6 +1865,19 @@
         width: max-content;
     }
 
+    .sm-config-responsive-scroll .sm-config-responsive-table {
+        width: max-content;
+    }
+
+    .sm-config-responsive-scroll .sm-subject-allocation-table,
+    .sm-config-responsive-scroll .sm-classroom-management-table {
+        min-width: 620px;
+    }
+
+    .sm-config-responsive-scroll .sm-teacher-allocation-table {
+        min-width: 720px;
+    }
+
     .sm-timetable-table {
         min-width: 700px;
     }
@@ -1751,6 +1922,10 @@
         justify-content: center;
     }
 
+    .sm-table-pagination .sm-btn-secondary {
+        width: auto;
+    }
+
     .btn-secondary {
         width: 100%;
     }
@@ -1772,6 +1947,11 @@
 
     .sm-action-select {
         width: 100%;
+    }
+
+    .sm-config-responsive-table .sm-action-select {
+        width: auto;
+        max-width: 130px;
     }
 }
 
@@ -1809,5 +1989,18 @@
     .sm-table-scroll .data-table {
         min-width: 680px;
         width: max-content;
+    }
+
+    .sm-config-responsive-scroll .sm-subject-allocation-table,
+    .sm-config-responsive-scroll .sm-classroom-management-table {
+        min-width: 540px;
+    }
+
+    .sm-config-responsive-scroll .sm-teacher-allocation-table {
+        min-width: 620px;
+    }
+
+    .sm-config-responsive-table .sm-action-select {
+        max-width: 115px;
     }
 }

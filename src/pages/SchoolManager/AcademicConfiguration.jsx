@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     BookOpen,
     Users,
@@ -56,6 +56,51 @@ const runMobileAction = (event, actions) => {
     event.target.value = '';
     if (!action || !actions[action]) return;
     actions[action]();
+};
+
+const TABLE_ROWS_PER_PAGE = 10;
+
+const TablePagination = ({
+    currentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    onPrevious,
+    onNext
+}) => {
+    if (totalItems === 0) return null;
+
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(currentPage * pageSize, totalItems);
+
+    return (
+        <div className="sm-table-pagination">
+            <span className="sm-table-pagination-summary">
+                Showing {startItem}-{endItem} of {totalItems}
+            </span>
+            <div className="sm-table-pagination-controls">
+                <button
+                    type="button"
+                    className="sm-btn-secondary"
+                    onClick={onPrevious}
+                    disabled={currentPage <= 1}
+                >
+                    Previous
+                </button>
+                <span className="sm-table-pagination-page">
+                    Page {currentPage} of {totalPages}
+                </span>
+                <button
+                    type="button"
+                    className="sm-btn-secondary"
+                    onClick={onNext}
+                    disabled={currentPage >= totalPages}
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    );
 };
 
 const RowActions = ({
@@ -450,8 +495,14 @@ export const GradeManagement = () => {
     const [editingGrade, setEditingGrade] = useState(null);
     const [pendingStatusAction, setPendingStatusAction] = useState(null);
     const [togglingGradeId, setTogglingGradeId] = useState(null);
+    const [gradePage, setGradePage] = useState(1);
     const [formData, setFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
     const [editFormData, setEditFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
+
+    const gradeTotalPages = Math.max(1, Math.ceil(grades.length / TABLE_ROWS_PER_PAGE));
+    const activeGradePage = Math.min(gradePage, gradeTotalPages);
+    const gradePageStart = (activeGradePage - 1) * TABLE_ROWS_PER_PAGE;
+    const paginatedGrades = grades.slice(gradePageStart, gradePageStart + TABLE_ROWS_PER_PAGE);
 
     const fetchGrades = async () => {
         try {
@@ -621,52 +672,62 @@ export const GradeManagement = () => {
                     No grades found. Create your first grade.
                 </div>
             ) : (
-                <div className="sm-table-scroll">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Grade</th>
-                                <th>Level</th>
-                                <th>Age Range</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {grades.map((grade) => (
-                                <tr key={grade.id} className={grade.is_active ? '' : 'inactive-row'}>
-                                    <td style={{ fontWeight: 600 }}>{grade.name}</td>
-                                    <td>{grade.numeric_level}</td>
-                                    <td>{grade.min_age} - {grade.max_age}</td>
-                                    <td>
-                                        <span
-                                            className={`status-badge ${grade.is_active ? 'status-active' : 'status-inactive'}`}
-                                            onClick={() => handleStatusBadgeToggle(grade)}
-                                            style={{
-                                                cursor: togglingGradeId === grade.id ? 'wait' : 'pointer',
-                                                opacity: togglingGradeId === grade.id ? 0.75 : 1
-                                            }}
-                                            title={togglingGradeId === grade.id ? 'Updating status...' : 'Click to toggle status'}
-                                        >
-                                            {togglingGradeId === grade.id ? 'Updating...' : (grade.is_active ? 'Active' : 'Inactive')}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <RowActions
-                                            isActive={grade.is_active}
-                                            onUpdate={() => handleOpenEdit(grade)}
-                                            onActivate={() => setPendingStatusAction({ grade, nextIsActive: true })}
-                                            onDeactivate={() => setPendingStatusAction({ grade, nextIsActive: false })}
-                                            updateTitle="Update Grade"
-                                            activateTitle="Activate Grade"
-                                            deactivateTitle="Deactivate Grade"
-                                        />
-                                    </td>
+                <>
+                    <div className="sm-table-scroll">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Grade</th>
+                                    <th>Level</th>
+                                    <th>Age Range</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {paginatedGrades.map((grade) => (
+                                    <tr key={grade.id} className={grade.is_active ? '' : 'inactive-row'}>
+                                        <td style={{ fontWeight: 600 }}>{grade.name}</td>
+                                        <td>{grade.numeric_level}</td>
+                                        <td>{grade.min_age} - {grade.max_age}</td>
+                                        <td>
+                                            <span
+                                                className={`status-badge ${grade.is_active ? 'status-active' : 'status-inactive'}`}
+                                                onClick={() => handleStatusBadgeToggle(grade)}
+                                                style={{
+                                                    cursor: togglingGradeId === grade.id ? 'wait' : 'pointer',
+                                                    opacity: togglingGradeId === grade.id ? 0.75 : 1
+                                                }}
+                                                title={togglingGradeId === grade.id ? 'Updating status...' : 'Click to toggle status'}
+                                            >
+                                                {togglingGradeId === grade.id ? 'Updating...' : (grade.is_active ? 'Active' : 'Inactive')}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <RowActions
+                                                isActive={grade.is_active}
+                                                onUpdate={() => handleOpenEdit(grade)}
+                                                onActivate={() => setPendingStatusAction({ grade, nextIsActive: true })}
+                                                onDeactivate={() => setPendingStatusAction({ grade, nextIsActive: false })}
+                                                updateTitle="Update Grade"
+                                                activateTitle="Activate Grade"
+                                                deactivateTitle="Deactivate Grade"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <TablePagination
+                        currentPage={activeGradePage}
+                        totalPages={gradeTotalPages}
+                        totalItems={grades.length}
+                        pageSize={TABLE_ROWS_PER_PAGE}
+                        onPrevious={() => setGradePage((prev) => Math.max(1, prev - 1))}
+                        onNext={() => setGradePage((prev) => Math.min(gradeTotalPages, prev + 1))}
+                    />
+                </>
             )}
 
             <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Add Grade">
@@ -818,6 +879,8 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
     const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [grades, setGrades] = useState([]);
+    const [gradeFilter, setGradeFilter] = useState('');
+    const [subjectPage, setSubjectPage] = useState(1);
     const [editingSubject, setEditingSubject] = useState(null);
     const [pendingStatusAction, setPendingStatusAction] = useState(null);
     const [formData, setFormData] = useState({ grade_id: '', course_code: '', name: '' });
@@ -841,6 +904,40 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
     useEffect(() => {
         fetchGrades();
     }, []);
+
+    const gradeFilterOptions = useMemo(() => {
+        return Array.from(
+            new Set(
+                courses
+                    .map((course) => course.grade_name || course.grade)
+                    .filter(Boolean)
+                    .map((gradeName) => String(gradeName))
+            )
+        ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    }, [courses]);
+
+    const filteredCourses = useMemo(() => {
+        if (!gradeFilter) return courses;
+        return courses.filter((course) => String(course.grade_name || course.grade || '') === gradeFilter);
+    }, [courses, gradeFilter]);
+
+    const subjectTotalPages = Math.max(1, Math.ceil(filteredCourses.length / TABLE_ROWS_PER_PAGE));
+    const activeSubjectPage = Math.min(subjectPage, subjectTotalPages);
+    const subjectPageStart = (activeSubjectPage - 1) * TABLE_ROWS_PER_PAGE;
+    const paginatedCourses = useMemo(
+        () => filteredCourses.slice(subjectPageStart, subjectPageStart + TABLE_ROWS_PER_PAGE),
+        [filteredCourses, subjectPageStart]
+    );
+
+    useEffect(() => {
+        setSubjectPage(1);
+    }, [gradeFilter]);
+
+    useEffect(() => {
+        if (subjectPage > subjectTotalPages) {
+            setSubjectPage(subjectTotalPages);
+        }
+    }, [subjectPage, subjectTotalPages]);
 
     const handleSave = async (event) => {
         event.preventDefault();
@@ -975,13 +1072,27 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">Subject Allocations</h3>
-                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
-                    <Plus size={18} />
-                    Add Subject
-                </button>
+                <div className="sm-inline-controls sm-subject-actions">
+                    <select
+                        className="sm-form-select sm-select-control"
+                        value={gradeFilter}
+                        onChange={(event) => setGradeFilter(event.target.value)}
+                    >
+                        <option value="">All Grades</option>
+                        {gradeFilterOptions.map((gradeName) => (
+                            <option key={gradeName} value={gradeName}>
+                                {gradeName}
+                            </option>
+                        ))}
+                    </select>
+                    <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                        <Plus size={18} />
+                        Add Subject
+                    </button>
+                </div>
             </div>
-            <div className="sm-table-scroll">
-                <table className="data-table">
+            <div className="sm-table-scroll sm-config-responsive-scroll">
+                <table className="data-table sm-config-responsive-table sm-subject-allocation-table">
                     <thead>
                         <tr>
                             <th>Grade</th>
@@ -996,7 +1107,11 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                             <tr>
                                 <td colSpan="5" className="sm-empty-state">No subjects found.</td>
                             </tr>
-                        ) : courses.map((item) => {
+                        ) : filteredCourses.length === 0 ? (
+                            <tr>
+                                <td colSpan="5" className="sm-empty-state">No subjects match the selected grade.</td>
+                            </tr>
+                        ) : paginatedCourses.map((item) => {
                             const isCourseActive = courseStatusOverrides[item.id] ?? item.is_active;
                             return (
                             <tr key={item.id} className={isCourseActive ? '' : 'inactive-row'}>
@@ -1032,6 +1147,14 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                     </tbody>
                 </table>
             </div>
+            <TablePagination
+                currentPage={activeSubjectPage}
+                totalPages={subjectTotalPages}
+                totalItems={filteredCourses.length}
+                pageSize={TABLE_ROWS_PER_PAGE}
+                onPrevious={() => setSubjectPage((prev) => Math.max(1, prev - 1))}
+                onNext={() => setSubjectPage((prev) => Math.min(subjectTotalPages, prev + 1))}
+            />
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Subject to School">
                 <form onSubmit={handleSave} className="sm-modal-form">
@@ -1218,9 +1341,59 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [selectedTeacher, setSelectedTeacher] = useState('');
+    const [classroomFilter, setClassroomFilter] = useState('');
+    const [teacherFilter, setTeacherFilter] = useState('');
+    const [allocationPage, setAllocationPage] = useState(1);
     const [pendingStatusAction, setPendingStatusAction] = useState(null);
     const [togglingAllocationId, setTogglingAllocationId] = useState(null);
     const [allocationStatusOverrides, setAllocationStatusOverrides] = useState({});
+
+    const classroomOptions = useMemo(() => {
+        return Array.from(
+            new Set(
+                courses
+                    .map((course) => course.classroom_name)
+                    .filter(Boolean)
+            )
+        ).sort((a, b) => a.localeCompare(b));
+    }, [courses]);
+
+    const teacherOptions = useMemo(() => {
+        return Array.from(
+            new Set(
+                [
+                    ...courses.map((course) => course.teacher_name).filter(Boolean),
+                    ...teachers.map((teacher) => teacher.full_name).filter(Boolean),
+                ]
+            )
+        ).sort((a, b) => a.localeCompare(b));
+    }, [courses, teachers]);
+
+    const filteredCourses = useMemo(() => {
+        return courses.filter((course) => {
+            const matchesClassroom = !classroomFilter || (course.classroom_name || '') === classroomFilter;
+            const matchesTeacher = !teacherFilter || (course.teacher_name || '') === teacherFilter;
+            return matchesClassroom && matchesTeacher;
+        });
+    }, [courses, classroomFilter, teacherFilter]);
+
+    const allocationTotalPages = Math.max(1, Math.ceil(filteredCourses.length / TABLE_ROWS_PER_PAGE));
+    const activeAllocationPage = Math.min(allocationPage, allocationTotalPages);
+    const allocationPageStart = (activeAllocationPage - 1) * TABLE_ROWS_PER_PAGE;
+    const paginatedAllocations = useMemo(
+        () => filteredCourses.slice(allocationPageStart, allocationPageStart + TABLE_ROWS_PER_PAGE),
+        [filteredCourses, allocationPageStart]
+    );
+
+    useEffect(() => {
+        setAllocationPage(1);
+    }, [classroomFilter, teacherFilter]);
+
+    useEffect(() => {
+        if (allocationPage > allocationTotalPages) {
+            setAllocationPage(allocationTotalPages);
+        }
+    }, [allocationPage, allocationTotalPages]);
 
     const handleOpenAssign = (course) => {
         if (!hasActiveAcademicYear) {
@@ -1299,9 +1472,47 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">Teacher Allocations</h3>
+                <div className="sm-inline-controls sm-allocation-filters">
+                    <select
+                        className="sm-form-select sm-select-control"
+                        value={classroomFilter}
+                        onChange={(event) => setClassroomFilter(event.target.value)}
+                    >
+                        <option value="">All Classrooms</option>
+                        {classroomOptions.map((classroomName) => (
+                            <option key={classroomName} value={classroomName}>
+                                {classroomName}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        className="sm-form-select sm-select-control"
+                        value={teacherFilter}
+                        onChange={(event) => setTeacherFilter(event.target.value)}
+                    >
+                        <option value="">All Teachers</option>
+                        {teacherOptions.map((teacherName) => (
+                            <option key={teacherName} value={teacherName}>
+                                {teacherName}
+                            </option>
+                        ))}
+                    </select>
+                    {(classroomFilter || teacherFilter) && (
+                        <button
+                            type="button"
+                            className="sm-btn-secondary"
+                            onClick={() => {
+                                setClassroomFilter('');
+                                setTeacherFilter('');
+                            }}
+                        >
+                            Clear Filters
+                        </button>
+                    )}
+                </div>
             </div>
-            <div className="sm-table-scroll">
-                <table className="data-table">
+            <div className="sm-table-scroll sm-config-responsive-scroll">
+                <table className="data-table sm-config-responsive-table sm-teacher-allocation-table">
                     <thead>
                         <tr>
                             <th>Subject</th>
@@ -1319,7 +1530,13 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                                     No subjects found. Configure subjects first.
                                 </td>
                             </tr>
-                        ) : courses.map((item) => {
+                        ) : filteredCourses.length === 0 ? (
+                            <tr>
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                    No allocations match the selected filters.
+                                </td>
+                            </tr>
+                        ) : paginatedAllocations.map((item) => {
                             const hasAllocation = Boolean(item.allocation_id);
                             const isAllocationActive = hasAllocation
                                 ? (allocationStatusOverrides[item.allocation_id] ?? (item.allocation_is_active !== false))
@@ -1365,6 +1582,14 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                     </tbody>
                 </table>
             </div>
+            <TablePagination
+                currentPage={activeAllocationPage}
+                totalPages={allocationTotalPages}
+                totalItems={filteredCourses.length}
+                pageSize={TABLE_ROWS_PER_PAGE}
+                onPrevious={() => setAllocationPage((prev) => Math.max(1, prev - 1))}
+                onNext={() => setAllocationPage((prev) => Math.min(allocationTotalPages, prev + 1))}
+            />
 
             <Modal
                 isOpen={Boolean(pendingStatusAction)}
@@ -1429,6 +1654,8 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
     const [courses, setCourses] = useState([]);
     const [grades, setGrades] = useState([]);
     const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
+    const [gradeFilter, setGradeFilter] = useState('');
+    const [classroomPage, setClassroomPage] = useState(1);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingClassroom, setEditingClassroom] = useState(null);
@@ -1466,6 +1693,10 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
         }
     }, [schoolId, selectedAcademicYear]);
 
+    useEffect(() => {
+        setGradeFilter('');
+    }, [selectedAcademicYear]);
+
     const fetchCoursesForYear = async () => {
         if (!schoolId) return;
         try {
@@ -1490,6 +1721,42 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
             setLoadingClassrooms(false);
         }
     };
+
+    const gradeFilterOptions = useMemo(() => {
+        return Array.from(
+            new Set(
+                classrooms
+                    .map((classroom) => classroom.grade_name || classroom.grade)
+                    .filter(Boolean)
+                    .map((gradeName) => String(gradeName))
+            )
+        ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    }, [classrooms]);
+
+    const filteredClassrooms = useMemo(() => {
+        if (!gradeFilter) return classrooms;
+        return classrooms.filter(
+            (classroom) => String(classroom.grade_name || classroom.grade || '') === gradeFilter
+        );
+    }, [classrooms, gradeFilter]);
+
+    const classroomTotalPages = Math.max(1, Math.ceil(filteredClassrooms.length / TABLE_ROWS_PER_PAGE));
+    const activeClassroomPage = Math.min(classroomPage, classroomTotalPages);
+    const classroomPageStart = (activeClassroomPage - 1) * TABLE_ROWS_PER_PAGE;
+    const paginatedClassrooms = useMemo(
+        () => filteredClassrooms.slice(classroomPageStart, classroomPageStart + TABLE_ROWS_PER_PAGE),
+        [filteredClassrooms, classroomPageStart]
+    );
+
+    useEffect(() => {
+        setClassroomPage(1);
+    }, [selectedAcademicYear, gradeFilter]);
+
+    useEffect(() => {
+        if (classroomPage > classroomTotalPages) {
+            setClassroomPage(classroomTotalPages);
+        }
+    }, [classroomPage, classroomTotalPages]);
 
     const handleCreate = async (event) => {
         event.preventDefault();
@@ -1620,16 +1887,29 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">Classroom Management</h3>
-                <div className="sm-inline-controls">
+                <div className="sm-inline-controls sm-classroom-actions">
                     <select
+                        className="sm-form-select sm-select-control sm-classroom-year-select"
                         value={selectedAcademicYear}
                         onChange={(event) => setSelectedAcademicYear(event.target.value)}
-                        style={{ padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '0.25rem', fontSize: '0.875rem', color: 'var(--color-text-main)', background: 'var(--color-bg-surface)' }}
                     >
                         <option value="">Select Academic Year</option>
                         {academicYears.map((year) => (
                             <option key={year.id} value={year.id}>
                                 {year.academic_year_code} {year.is_active ? '(Active)' : '(Inactive)'}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        className="sm-form-select sm-select-control"
+                        value={gradeFilter}
+                        onChange={(event) => setGradeFilter(event.target.value)}
+                        disabled={!selectedAcademicYear || classrooms.length === 0}
+                    >
+                        <option value="">All Grades</option>
+                        {gradeFilterOptions.map((gradeName) => (
+                            <option key={gradeName} value={gradeName}>
+                                {gradeName}
                             </option>
                         ))}
                     </select>
@@ -1665,52 +1945,66 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
                     </button>
                 </div>
             ) : (
-                <div className="sm-table-scroll">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Classroom Name</th>
-                                <th>Grade</th>
-                                <th>Homeroom Teacher</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {classrooms.map((classroom) => (
-                                <tr key={classroom.id} className={classroom.is_active ? '' : 'inactive-row'}>
-                                    <td style={{ fontWeight: 600 }}>{classroom.classroom_name}</td>
-                                    <td>{classroom.grade_name || classroom.grade}</td>
-                                    <td>{getAssignedTeacherName(classroom)}</td>
-                                    <td>
-                                        <span
-                                            className={`status-badge ${classroom.is_active ? 'status-active' : 'status-inactive'}`}
-                                            onClick={() => handleStatusBadgeToggle(classroom)}
-                                            style={{
-                                                cursor: togglingClassroomId === classroom.id ? 'wait' : 'pointer',
-                                                opacity: togglingClassroomId === classroom.id ? 0.75 : 1
-                                            }}
-                                            title={togglingClassroomId === classroom.id ? 'Updating status...' : 'Click to toggle status'}
-                                        >
-                                            {togglingClassroomId === classroom.id ? 'Updating...' : (classroom.is_active ? 'Active' : 'Inactive')}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <RowActions
-                                            isActive={classroom.is_active}
-                                            onUpdate={() => handleOpenEdit(classroom)}
-                                            onActivate={() => setPendingStatusAction({ classroom, nextIsActive: true })}
-                                            onDeactivate={() => setPendingStatusAction({ classroom, nextIsActive: false })}
-                                            updateTitle="Update Classroom"
-                                            activateTitle="Activate Classroom"
-                                            deactivateTitle="Deactivate Classroom"
-                                        />
-                                    </td>
+                <>
+                    <div className="sm-table-scroll sm-config-responsive-scroll">
+                        <table className="data-table sm-config-responsive-table sm-classroom-management-table">
+                            <thead>
+                                <tr>
+                                    <th>Classroom Name</th>
+                                    <th>Grade</th>
+                                    <th>Homeroom Teacher</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {filteredClassrooms.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" className="sm-empty-state">No classrooms match the selected grade.</td>
+                                    </tr>
+                                ) : paginatedClassrooms.map((classroom) => (
+                                    <tr key={classroom.id} className={classroom.is_active ? '' : 'inactive-row'}>
+                                        <td style={{ fontWeight: 600 }}>{classroom.classroom_name}</td>
+                                        <td>{classroom.grade_name || classroom.grade}</td>
+                                        <td>{getAssignedTeacherName(classroom)}</td>
+                                        <td>
+                                            <span
+                                                className={`status-badge ${classroom.is_active ? 'status-active' : 'status-inactive'}`}
+                                                onClick={() => handleStatusBadgeToggle(classroom)}
+                                                style={{
+                                                    cursor: togglingClassroomId === classroom.id ? 'wait' : 'pointer',
+                                                    opacity: togglingClassroomId === classroom.id ? 0.75 : 1
+                                                }}
+                                                title={togglingClassroomId === classroom.id ? 'Updating status...' : 'Click to toggle status'}
+                                            >
+                                                {togglingClassroomId === classroom.id ? 'Updating...' : (classroom.is_active ? 'Active' : 'Inactive')}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <RowActions
+                                                isActive={classroom.is_active}
+                                                onUpdate={() => handleOpenEdit(classroom)}
+                                                onActivate={() => setPendingStatusAction({ classroom, nextIsActive: true })}
+                                                onDeactivate={() => setPendingStatusAction({ classroom, nextIsActive: false })}
+                                                updateTitle="Update Classroom"
+                                                activateTitle="Activate Classroom"
+                                                deactivateTitle="Deactivate Classroom"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <TablePagination
+                        currentPage={activeClassroomPage}
+                        totalPages={classroomTotalPages}
+                        totalItems={filteredClassrooms.length}
+                        pageSize={TABLE_ROWS_PER_PAGE}
+                        onPrevious={() => setClassroomPage((prev) => Math.max(1, prev - 1))}
+                        onNext={() => setClassroomPage((prev) => Math.min(classroomTotalPages, prev + 1))}
+                    />
+                </>
             )}
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Classroom">

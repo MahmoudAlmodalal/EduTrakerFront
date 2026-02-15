@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Edit, Mail, Briefcase } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +6,8 @@ import managerService from '../../services/managerService';
 import Modal from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/Toast';
 import './SchoolManager.css';
+
+const TABLE_ROWS_PER_PAGE = 10;
 
 const SecretaryMonitoring = () => {
     const { t } = useTheme();
@@ -18,6 +20,7 @@ const SecretaryMonitoring = () => {
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [page, setPage] = useState(1);
     const [error, setError] = useState('');
     const [formData, setFormData] = useState({
         full_name: '',
@@ -27,7 +30,7 @@ const SecretaryMonitoring = () => {
         hire_date: ''
     });
 
-    const fetchSecretaries = async () => {
+    const fetchSecretaries = useCallback(async () => {
         try {
             setLoading(true);
             const data = await managerService.getSecretaries({ include_inactive: true });
@@ -39,11 +42,11 @@ const SecretaryMonitoring = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [showError]);
 
     useEffect(() => {
         fetchSecretaries();
-    }, []);
+    }, [fetchSecretaries]);
 
     const filteredSecretaries = secretaries.filter(sec => {
         const name = sec.full_name || sec.name || '';
@@ -51,6 +54,13 @@ const SecretaryMonitoring = () => {
         const term = searchTerm.toLowerCase();
         return name.toLowerCase().includes(term) || email.toLowerCase().includes(term);
     });
+
+    const totalPages = Math.max(1, Math.ceil(filteredSecretaries.length / TABLE_ROWS_PER_PAGE));
+    const currentPage = Math.min(page, totalPages);
+    const paginatedSecretaries = filteredSecretaries.slice(
+        (currentPage - 1) * TABLE_ROWS_PER_PAGE,
+        currentPage * TABLE_ROWS_PER_PAGE
+    );
 
     const resetForm = () => {
         setFormData({ full_name: '', email: '', password: '', department: '', hire_date: '' });
@@ -184,7 +194,10 @@ const SecretaryMonitoring = () => {
                             type="text"
                             placeholder={t('common.search') || 'Search secretaries...'}
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setPage(1);
+                            }}
                             className="sm-search-control-input"
                         />
                     </div>
@@ -219,7 +232,7 @@ const SecretaryMonitoring = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredSecretaries.map((sec) => {
+                                    paginatedSecretaries.map((sec) => {
                                         const id = sec.user_id || sec.id;
                                         const isActive = sec.is_active !== false;
                                         return (
@@ -285,6 +298,37 @@ const SecretaryMonitoring = () => {
                         </table>
                     </div>
                 )}
+
+                {!loading && filteredSecretaries.length > 0 ? (
+                    <div className="sm-table-pagination">
+                        <span className="sm-table-pagination-summary">
+                            Showing {(currentPage - 1) * TABLE_ROWS_PER_PAGE + 1}
+                            -
+                            {Math.min(currentPage * TABLE_ROWS_PER_PAGE, filteredSecretaries.length)} of {filteredSecretaries.length}
+                        </span>
+                        <div className="sm-table-pagination-controls">
+                            <button
+                                type="button"
+                                className="sm-btn-secondary"
+                                onClick={() => setPage(Math.max(1, currentPage - 1))}
+                                disabled={currentPage <= 1}
+                            >
+                                Previous
+                            </button>
+                            <span className="sm-table-pagination-page">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button
+                                type="button"
+                                className="sm-btn-secondary"
+                                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                                disabled={currentPage >= totalPages}
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             {/* Create/Edit Modal */}

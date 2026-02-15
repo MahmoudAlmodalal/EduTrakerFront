@@ -2,13 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
     Users,
     GraduationCap,
-    Clock,
     AlertCircle,
-    ChevronRight,
     UserCheck,
     Briefcase,
     BookOpen,
-    Activity
+    TrendingUp
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import managerService from '../../services/managerService';
@@ -26,7 +24,7 @@ const SchoolDashboard = () => {
             setError(null);
             try {
                 // Backend: GET /api/statistics/dashboard/
-                // Response: { role, statistics: { school_name, total_students, total_teachers, total_secretaries, classroom_count, course_count, by_grade }, recent_activity, activity_chart }
+                // Response: { role, statistics: { school_name, total_students, total_teachers, total_secretaries, classroom_count, course_count, by_grade, by_classroom }, recent_activity, activity_chart }
                 const data = await managerService.getDashboardStats();
                 setStats(data?.statistics || {
                     total_students: 0,
@@ -123,18 +121,11 @@ const SchoolDashboard = () => {
                 ))}
             </div>
 
-            <div className="sm-dashboard-main-grid">
-                {/* Performance Chart */}
-                <SchoolPerformanceChart />
+            {/* Performance Chart */}
+            <SchoolPerformanceChart />
 
-                {/* Notifications/Alerts Sidebar */}
-                <SchoolAlertsWidget />
-            </div>
-
-            {/* Grade Breakdown + Recent Activity */}
-            <div className="sm-dashboard-secondary-grid">
-                <GradeBreakdown grades={stats?.by_grade || []} />
-            </div>
+            {/* Grade Breakdown */}
+            <GradeBreakdown classrooms={stats?.by_classroom || []} />
         </div>
     );
 };
@@ -144,13 +135,12 @@ const SchoolPerformanceChart = () => {
     const { t } = useTheme();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [period, setPeriod] = useState('monthly');
 
     useEffect(() => {
         const loadData = async () => {
             try {
                 setLoading(true);
-                const res = await managerService.getSchoolPerformance(period);
+                const res = await managerService.getSchoolPerformance('monthly');
                 setData(res?.performance_trend || []);
             } catch (e) {
                 console.error("Performance fetch error", e);
@@ -160,7 +150,7 @@ const SchoolPerformanceChart = () => {
             }
         };
         loadData();
-    }, [period]);
+    }, []);
 
     const maxScore = Math.max(...data.map(d => d.score || 0), 1);
 
@@ -168,25 +158,6 @@ const SchoolPerformanceChart = () => {
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">{t('performanceTrend') || 'Academic Performance Trend'}</h3>
-                <div className="sm-chart-toolbar">
-                    {['weekly', 'monthly'].map(p => (
-                        <button
-                            key={p}
-                            onClick={() => setPeriod(p)}
-                            style={{
-                                padding: '0.4rem 0.8rem',
-                                fontSize: '0.75rem',
-                                borderRadius: '6px',
-                                border: period === p ? 'none' : '1px solid var(--color-border)',
-                                background: period === p ? 'var(--color-primary)' : 'var(--color-bg-body)',
-                                color: period === p ? '#fff' : 'inherit',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            {p === 'weekly' ? (t('common.weekly') || 'Weekly') : (t('common.monthly') || 'Monthly')}
-                        </button>
-                    ))}
-                </div>
             </div>
             <div style={{ padding: '1.5rem', height: '350px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', gap: '4px' }}>
                 {loading ? (
@@ -194,8 +165,14 @@ const SchoolPerformanceChart = () => {
                         {t('common.loading') || 'Loading...'}
                     </div>
                 ) : data.length === 0 ? (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
-                        {t('noData') || 'No data available'}
+                    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                        <TrendingUp size={40} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
+                        <p style={{ margin: 0, fontWeight: 600, color: 'var(--color-text-main)' }}>
+                            No performance data yet
+                        </p>
+                        <p style={{ marginTop: '4px', fontSize: '0.75rem' }}>
+                            Performance trend will appear once students receive grades.
+                        </p>
                     </div>
                 ) : (
                     data.map((val, i) => {
@@ -227,145 +204,90 @@ const SchoolPerformanceChart = () => {
     );
 };
 
-// Sub-component: Alerts Widget
-const SchoolAlertsWidget = () => {
-    const { t } = useTheme();
-    const [alerts, setAlerts] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const loadAlerts = async () => {
-            try {
-                setLoading(true);
-                const res = await managerService.getAlerts();
-                const alertsData = Array.isArray(res) ? res : (res?.results || []);
-                setAlerts(alertsData);
-            } catch (e) {
-                console.error("Alerts fetch error", e);
-                setAlerts([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadAlerts();
-    }, []);
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="management-card">
-                <div className="table-header-actions">
-                    <h3 className="chart-title">{t('attentionNeeded') || 'Attention Needed'}</h3>
-                </div>
-                <div style={{ padding: '0' }}>
-                    {loading ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                            {t('common.loading') || 'Loading alerts...'}
-                        </div>
-                    ) : alerts.length > 0 ? (
-                        alerts.slice(0, 5).map((alert, idx) => (
-                            <div key={alert.id || idx} style={{
-                                padding: '1.25rem',
-                                borderBottom: idx < alerts.length - 1 ? '1px solid var(--color-border)' : 'none',
-                                display: 'flex',
-                                gap: '1rem'
-                            }}>
-                                <div style={{
-                                    minWidth: '40px',
-                                    height: '40px',
-                                    borderRadius: '10px',
-                                    background: alert.is_read ? 'var(--color-bg-body)' : 'rgba(239,68,68,0.1)',
-                                    color: alert.is_read ? 'var(--color-text-muted)' : 'var(--color-error, #ef4444)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    {alert.notification_type === 'system' ? <AlertCircle size={20} /> : <Clock size={20} />}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', margin: 0, color: 'var(--color-text-main)' }}>
-                                        {alert.title || alert.message || 'Notification'}
-                                    </h4>
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {alert.message || ''}
-                                    </p>
-                                    <span style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)' }}>
-                                        {alert.created_at ? new Date(alert.created_at).toLocaleString() : ''}
-                                    </span>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                            {t('noAlerts') || 'No active alerts'}
-                        </div>
-                    )}
-                </div>
-                {alerts.length > 5 && (
-                    <div style={{ padding: '1rem', textAlign: 'center', borderTop: '1px solid var(--color-border)' }}>
-                        <button style={{
-                            color: 'var(--color-primary)',
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '0.875rem',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            width: '100%'
-                        }}>
-                            {t('school.dashboard.viewAllAlerts') || 'View All Alerts'}
-                            <ChevronRight size={16} />
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-// Sub-component: Grade Breakdown (from dashboard stats by_grade)
-const GradeBreakdown = ({ grades = [] }) => {
+// Sub-component: Grade Breakdown (classrooms and students per grade)
+const GradeBreakdown = ({ classrooms = [] }) => {
     const { t } = useTheme();
 
+    // Group classrooms by grade name, preserving each classroom's student_count
+    const gradeMap = classrooms.reduce((acc, room) => {
+        const gradeName = (typeof room.grade === 'object' ? room.grade?.name : room.grade)
+            || room.grade_name
+            || 'Unassigned';
+        if (!acc[gradeName]) acc[gradeName] = [];
+        acc[gradeName].push(room);
+        return acc;
+    }, {});
+
+    const grades = Object.entries(gradeMap)
+        .map(([grade_name, rooms]) => ({
+            grade_name,
+            classrooms: rooms,
+            classroom_count: rooms.length,
+            total_students: rooms.reduce((s, r) => s + (r.student_count || 0), 0)
+        }))
+        .sort((a, b) => a.grade_name.localeCompare(b.grade_name, undefined, { numeric: true }));
+
     return (
-        <div className="management-card">
+        <div className="management-card" style={{ marginTop: '1.5rem' }}>
             <div className="table-header-actions">
-                <h3 className="chart-title">{t('gradeBreakdown') || 'Students by Grade'}</h3>
+                <h3 className="chart-title">{t('gradeBreakdown') || 'Grade & Classroom Overview'}</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                    {classrooms.length} classroom{classrooms.length !== 1 ? 's' : ''} total
+                </span>
             </div>
             <div style={{ padding: '1rem' }}>
                 {grades.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                        {t('noData') || 'No grade data available'}
+                        <GraduationCap size={36} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+                        <p style={{ margin: 0 }}>{t('noData') || 'No classroom data available'}</p>
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        {grades.map((grade, idx) => {
-                            const maxStudents = Math.max(...grades.map(g => g.student_count || g.total_students || 0), 1);
-                            const count = grade.student_count || grade.total_students || 0;
-                            const barWidth = maxStudents > 0 ? (count / maxStudents) * 100 : 0;
-                            return (
-                                <div key={idx} className="sm-grade-breakdown-row">
-                                    <span className="sm-grade-breakdown-label">
-                                        {grade.grade_name || grade.name || `Grade ${idx + 1}`}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {grades.map((grade, idx) => (
+                            <div key={idx} style={{
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '10px',
+                                overflow: 'hidden'
+                            }}>
+                                {/* Grade header row */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '0.625rem 1rem',
+                                    background: 'var(--color-bg-body)',
+                                    borderBottom: '1px solid var(--color-border)'
+                                }}>
+                                    <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-text-main)' }}>
+                                        {grade.grade_name}
                                     </span>
-                                    <div style={{ flex: 1, height: '24px', backgroundColor: 'var(--color-bg-body)', borderRadius: '6px', overflow: 'hidden' }}>
-                                        <div style={{
-                                            width: `${Math.max(barWidth, 2)}%`,
-                                            height: '100%',
-                                            backgroundColor: 'var(--color-primary)',
-                                            borderRadius: '6px',
-                                            transition: 'width 0.4s ease',
-                                            opacity: 0.8
-                                        }} />
+                                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                        <span>{grade.classroom_count} classroom{grade.classroom_count !== 1 ? 's' : ''}</span>
+                                        <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
+                                            {grade.total_students} student{grade.total_students !== 1 ? 's' : ''}
+                                        </span>
                                     </div>
-                                    <span className="sm-grade-breakdown-value">
-                                        {count}
-                                    </span>
                                 </div>
-                            );
-                        })}
+                                {/* Classroom rows */}
+                                {grade.classrooms.map((room, rIdx) => (
+                                    <div key={rIdx} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '0.5rem 1rem 0.5rem 1.5rem',
+                                        borderBottom: rIdx < grade.classrooms.length - 1 ? '1px solid var(--color-border)' : 'none',
+                                        background: 'var(--color-bg-surface)'
+                                    }}>
+                                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-main)' }}>
+                                            {room.classroom_name}
+                                        </span>
+                                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
+                                            {room.student_count ?? 0} student{(room.student_count ?? 0) !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>

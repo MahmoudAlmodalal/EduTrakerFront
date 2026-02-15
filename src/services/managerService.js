@@ -32,7 +32,7 @@ const managerService = {
     // Backend: /api/secretary/
     // ============================================
     getSecretaries: async (params = {}) => {
-        const res = await api.get('/secretary/', { params });
+        const res = await api.get('/secretary/', { params: { page_size: 1000, ...params } });
         return res.data !== undefined ? res.data : res;
     },
 
@@ -66,7 +66,7 @@ const managerService = {
     // Backend: /api/teacher/teachers/
     // ============================================
     getTeachers: async (params = {}) => {
-        const res = await api.get('/teacher/teachers/', { params });
+        const res = await api.get('/teacher/teachers/', { params: { page_size: 1000, ...params } });
         return res.data !== undefined ? res.data : res;
     },
 
@@ -110,7 +110,7 @@ const managerService = {
     // Backend: /api/grades/
     // ============================================
     getGrades: async (params = {}) => {
-        const res = await api.get('/grades/', { params });
+        const res = await api.get('/grades/', { params: { page_size: 1000, ...params } });
         return res.data !== undefined ? res.data : res;
     },
 
@@ -144,7 +144,7 @@ const managerService = {
     // Backend: /api/school/<schoolId>/courses/
     // ============================================
     getCourses: async (schoolId, params = {}) => {
-        const res = await api.get(`/school/${schoolId}/courses/`, { params });
+        const res = await api.get(`/school/${schoolId}/courses/`, { params: { page_size: 1000, ...params } });
         return res.data !== undefined ? res.data : res;
     },
 
@@ -187,7 +187,10 @@ const managerService = {
     // Backend: /api/school/<schoolId>/academic-year/<academicYearId>/classrooms/
     // ============================================
     getClassrooms: async (schoolId, academicYearId, params = {}) => {
-        const res = await api.get(`/school/${schoolId}/academic-year/${academicYearId}/classrooms/`, { params });
+        const res = await api.get(
+            `/school/${schoolId}/academic-year/${academicYearId}/classrooms/`,
+            { params: { page_size: 1000, ...params } }
+        );
         return res.data !== undefined ? res.data : res;
     },
 
@@ -239,7 +242,7 @@ const managerService = {
     // Academic Year Management
     // ============================================
     getAcademicYears: async (params = {}) => {
-        const res = await api.get('/academic-years/', { params });
+        const res = await api.get('/academic-years/', { params: { page_size: 1000, ...params } });
         return res.data !== undefined ? res.data : res;
     },
 

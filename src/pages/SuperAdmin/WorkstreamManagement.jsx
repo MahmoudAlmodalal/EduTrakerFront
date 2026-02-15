@@ -279,7 +279,7 @@ const WorkstreamManagement = () => {
                                                 <Users size={14} style={{ color: '#8b5cf6' }} />
                                                 <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
                                             </div>
-                                            <span className={styles.statValue}>{ws.total_users || 0} Clients</span>
+                                            <span className={styles.statValue}>{ws.total_users || 0} Users</span>
                                         </div>
                                     </div>
 
