@@ -18,7 +18,8 @@ import './SchoolManager.css';
 const AcademicReports = () => {
     const { t, theme } = useTheme();
     const [stats, setStats] = useState(null);
-    const [performanceData, setPerformanceData] = useState(null);
+    const [subjectPerformance, setSubjectPerformance] = useState([]);
+    const [subjectPerformanceError, setSubjectPerformanceError] = useState('');
     const [subjectFilter, setSubjectFilter] = useState('');
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(null);
@@ -39,15 +40,22 @@ const AcademicReports = () => {
     useEffect(() => {
         const fetchStats = async () => {
             setLoading(true);
+            setSubjectPerformanceError('');
             try {
                 const [dashboardData, schoolPerformanceData] = await Promise.all([
                     managerService.getDashboardStats(),
-                    managerService.getSchoolPerformance('monthly')
+                    reportService.getSchoolPerformance()
                 ]);
                 setStats(dashboardData);
-                setPerformanceData(schoolPerformanceData);
+                setSubjectPerformance(
+                    Array.isArray(schoolPerformanceData?.subject_performance)
+                        ? schoolPerformanceData.subject_performance
+                        : []
+                );
             } catch (error) {
                 console.error('Failed to fetch stats:', error);
+                setSubjectPerformance([]);
+                setSubjectPerformanceError(error?.message || 'Failed to load subject performance data.');
             } finally {
                 setLoading(false);
             }
@@ -263,18 +271,41 @@ const AcademicReports = () => {
                 <div style={{ padding: '1.5rem' }}>
                     {(() => {
                         const normalizedFilter = subjectFilter.trim().toLowerCase();
-                        const subjects = (performanceData?.subject_performance || []).filter((item) => {
-                            const name = item?.subject || '';
-                            return name.toLowerCase().includes(normalizedFilter);
-                        });
-                        const maxScore = Math.max(...subjects.map((item) => Number(item?.avg_score) || 0), 1);
+                        const subjects = subjectPerformance
+                            .map((item) => {
+                                const subjectName = typeof item?.subject === 'string'
+                                    ? item.subject.trim()
+                                    : '';
+                                const rawScore = Number(item?.score ?? item?.avg_score ?? 0);
+
+                                return {
+                                    subject: subjectName || 'N/A',
+                                    score: Number.isFinite(rawScore) ? rawScore : 0
+                                };
+                            })
+                            .filter((item) => item.subject.toLowerCase().includes(normalizedFilter));
+                        const maxScore = Math.max(...subjects.map((item) => item.score), 1);
+
+                        if (subjectPerformanceError && subjectPerformance.length === 0) {
+                            return (
+                                <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', flexDirection: 'column', gap: '0.5rem' }}>
+                                    <TrendingUp size={40} style={{ opacity: 0.3 }} {...iconSvgProps} />
+                                    <p style={{ margin: 0 }}>Failed to load subject performance</p>
+                                    <p style={{ margin: 0, fontSize: '0.75rem' }}>{subjectPerformanceError}</p>
+                                </div>
+                            );
+                        }
 
                         if (subjects.length === 0) {
                             return (
                                 <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', flexDirection: 'column', gap: '0.5rem' }}>
                                     <TrendingUp size={40} style={{ opacity: 0.3 }} {...iconSvgProps} />
-                                    <p style={{ margin: 0 }}>No subject performance data yet</p>
-                                    <p style={{ margin: 0, fontSize: '0.75rem' }}>Data appears once students receive grades</p>
+                                    <p style={{ margin: 0 }}>
+                                        {normalizedFilter ? 'No subjects match this filter' : 'No subject performance data yet'}
+                                    </p>
+                                    <p style={{ margin: 0, fontSize: '0.75rem' }}>
+                                        {normalizedFilter ? 'Try a different subject name' : 'Data appears once students receive grades'}
+                                    </p>
                                 </div>
                             );
                         }
@@ -282,12 +313,12 @@ const AcademicReports = () => {
                         return (
                             <div style={{ height: '300px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', gap: '8px' }}>
                                 {subjects.map((item, index) => {
-                                    const avgScore = Number(item?.avg_score) || 0;
-                                    const barHeight = maxScore > 0 ? (avgScore / maxScore) * 100 : 0;
+                                    const score = Number(item?.score) || 0;
+                                    const barHeight = maxScore > 0 ? (score / maxScore) * 100 : 0;
                                     return (
                                         <div key={`${item?.subject || 'subject'}-${index}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: '80px' }}>
                                             <span style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginBottom: '4px' }}>
-                                                {avgScore.toFixed(1)}%
+                                                {score.toFixed(1)}%
                                             </span>
                                             <div
                                                 style={{
@@ -299,7 +330,7 @@ const AcademicReports = () => {
                                                     transition: 'height 0.3s ease',
                                                     minHeight: '4px'
                                                 }}
-                                                title={`${item?.subject || 'Subject'}: ${avgScore.toFixed(1)}%`}
+                                                title={`${item?.subject || 'Subject'}: ${score.toFixed(1)}%`}
                                             />
                                             <span style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginTop: '8px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
                                                 {item?.subject || 'N/A'}

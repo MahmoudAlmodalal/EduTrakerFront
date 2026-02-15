@@ -5,8 +5,7 @@ import {
     AlertCircle,
     UserCheck,
     Briefcase,
-    BookOpen,
-    TrendingUp
+    BookOpen
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import managerService from '../../services/managerService';
@@ -121,85 +120,8 @@ const SchoolDashboard = () => {
                 ))}
             </div>
 
-            {/* Performance Chart */}
-            <SchoolPerformanceChart />
-
             {/* Grade Breakdown */}
             <GradeBreakdown classrooms={stats?.by_classroom || []} />
-        </div>
-    );
-};
-
-// Sub-component: Performance Chart
-const SchoolPerformanceChart = () => {
-    const { t } = useTheme();
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                setLoading(true);
-                const res = await managerService.getSchoolPerformance('monthly');
-                setData(res?.performance_trend || []);
-            } catch (e) {
-                console.error("Performance fetch error", e);
-                setData([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadData();
-    }, []);
-
-    const maxScore = Math.max(...data.map(d => d.score || 0), 1);
-
-    return (
-        <div className="management-card">
-            <div className="table-header-actions">
-                <h3 className="chart-title">{t('performanceTrend') || 'Academic Performance Trend'}</h3>
-            </div>
-            <div style={{ padding: '1.5rem', height: '350px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', gap: '4px' }}>
-                {loading ? (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
-                        {t('common.loading') || 'Loading...'}
-                    </div>
-                ) : data.length === 0 ? (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', textAlign: 'center' }}>
-                        <TrendingUp size={40} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
-                        <p style={{ margin: 0, fontWeight: 600, color: 'var(--color-text-main)' }}>
-                            No performance data yet
-                        </p>
-                        <p style={{ marginTop: '4px', fontSize: '0.75rem' }}>
-                            Performance trend will appear once students receive grades.
-                        </p>
-                    </div>
-                ) : (
-                    data.map((val, i) => {
-                        const score = val.score || 0;
-                        const barHeight = maxScore > 0 ? (score / maxScore) * 100 : 0;
-                        const label = val.month || val.week || val.label || '';
-                        return (
-                            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: '60px' }}>
-                                <span style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginBottom: '4px' }}>{score}%</span>
-                                <div
-                                    style={{
-                                        width: '100%',
-                                        height: `${Math.max(barHeight, 2)}%`,
-                                        backgroundColor: 'var(--color-primary)',
-                                        borderRadius: '4px 4px 0 0',
-                                        opacity: 0.85,
-                                        transition: 'height 0.3s ease',
-                                        minHeight: '4px'
-                                    }}
-                                    title={`${label}: ${score}%`}
-                                />
-                                <span style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginTop: '8px', whiteSpace: 'nowrap' }}>{label}</span>
-                            </div>
-                        );
-                    })
-                )}
-            </div>
         </div>
     );
 };

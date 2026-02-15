@@ -19,6 +19,19 @@ const reportService = {
     },
 
     /**
+     * Get school performance trend + subject distribution
+     * @param {Object} params - Optional query/path params (e.g. { schoolId: 1 })
+     */
+    getSchoolPerformance: async (params = {}) => {
+        const { schoolId, ...queryParams } = params || {};
+        const endpoint = schoolId
+            ? `/school/${schoolId}/performance/`
+            : '/school-performance/';
+
+        return api.get(endpoint, { params: queryParams });
+    },
+
+    /**
      * Export reports (PDF/CSV)
      * @param {string} format - 'pdf' or 'csv'
      * @param {string} reportType - Type of report to export (e.g., 'student_performance', 'attendance', 'generic')
