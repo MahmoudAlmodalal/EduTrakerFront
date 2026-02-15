@@ -22,6 +22,10 @@ const SchoolManagerAssignment = () => {
     const [newManager, setNewManager] = useState({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
     const [searchTerm, setSearchTerm] = useState('');
 
+    const notifyWorkstreamStatsUpdated = () => {
+        window.dispatchEvent(new CustomEvent('workstream_stats_updated'));
+    };
+
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -99,7 +103,8 @@ const SchoolManagerAssignment = () => {
                     school: newManager.schoolId || null,
                 });
             }
-            fetchData();
+            await fetchData();
+            notifyWorkstreamStatsUpdated();
             setNewManager({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
             setShowAssignForm(false);
             showSuccess(newManager.isEditing ? 'Manager updated successfully.' : 'Manager assigned successfully.');
@@ -126,7 +131,8 @@ const SchoolManagerAssignment = () => {
             showSuccess(`"${managerToDelete.full_name}" deactivated successfully.`);
             setShowDeleteModal(false);
             setManagerToDelete(null);
-            fetchData();
+            await fetchData();
+            notifyWorkstreamStatsUpdated();
         } catch (error) {
             console.error('Failed to deactivate manager:', error);
             showError(`Error: ${error.message}`);

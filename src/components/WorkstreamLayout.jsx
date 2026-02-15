@@ -66,7 +66,7 @@ const WorkstreamLayout = () => {
     const hasValidToken = !!user && !!localStorage.getItem('accessToken');
 
     // Fetch dashboard statistics for quick stats (5 minute TTL)
-    const { data: statsData } = useCachedApi(
+    const { data: statsData, refetch: refetchSidebarStats } = useCachedApi(
         () => workstreamService.getDashboardStatistics(),
         {
             enabled: hasValidToken,
@@ -75,6 +75,15 @@ const WorkstreamLayout = () => {
             dependencies: [user?.id]
         }
     );
+
+    useEffect(() => {
+        const handleStatsUpdated = () => {
+            refetchSidebarStats();
+        };
+
+        window.addEventListener('workstream_stats_updated', handleStatsUpdated);
+        return () => window.removeEventListener('workstream_stats_updated', handleStatsUpdated);
+    }, [refetchSidebarStats]);
 
     const getInitials = () => {
         if (user?.name) {

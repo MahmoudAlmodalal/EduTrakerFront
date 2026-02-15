@@ -147,9 +147,10 @@ const WorkstreamReports = () => {
                         <h3 className="chart-title">{t('workstream.reports.monthlyAttendance')}</h3>
                         <button
                             onClick={() => handleExport('pdf', 'attendance', 'Monthly Attendance')}
-                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
-                            <Download size={18} />
+                            <Download size={16} />
+                            <span style={{ fontSize: '0.75rem' }}>PDF</span>
                         </button>
                     </div>
                     <div className="table-responsive">
@@ -193,10 +194,11 @@ const WorkstreamReports = () => {
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <h3 className="chart-title">{t('workstream.reports.resourceUtilization')}</h3>
                         <button
-                            onClick={() => handleExport('csv', 'utilization', 'Resource Utilization')}
-                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}
+                            onClick={() => handleExport('pdf', 'utilization', 'Resource Utilization')}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
-                            <Download size={18} />
+                            <Download size={16} />
+                            <span style={{ fontSize: '0.75rem' }}>PDF</span>
                         </button>
                     </div>
                     <div className="table-responsive">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { School, Users, GraduationCap, TrendingUp, TrendingDown, Activity, Award } from 'lucide-react';
+import { School, Users, GraduationCap, TrendingUp, TrendingDown, Activity, Award, Calendar } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import workstreamService from '../../services/workstreamService';
@@ -133,6 +133,9 @@ const WorkstreamDashboard = () => {
                 <div className="chart-card">
                     <div className="chart-header">
                         <h3 className="chart-title">{t('workstream.dashboard.academicPerformance')}</h3>
+                        <p style={{ marginTop: '0.5rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+                            Score represents attendance %. N/A means no attendance records yet.
+                        </p>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {schoolPerformance.length > 0 ? schoolPerformance.map((school, index) => {
@@ -217,7 +220,7 @@ const EnrollmentTrendsChart = () => {
         const fetchData = async () => {
             try {
                 const res = await workstreamService.getEnrollmentTrends();
-                setData(res.results || res || []);
+                setData(Array.isArray(res) ? res : []);
             } catch (e) {
                 console.error("Trends error", e);
             } finally {
@@ -227,14 +230,7 @@ const EnrollmentTrendsChart = () => {
         fetchData();
     }, []);
 
-    const chartData = data.length > 0 ? data : [
-        { month: 'Jan', enrollment: 85, graduates: 45 },
-        { month: 'Feb', enrollment: 92, graduates: 52 },
-        { month: 'Mar', enrollment: 78, graduates: 48 },
-        { month: 'Apr', enrollment: 95, graduates: 55 },
-        { month: 'May', enrollment: 88, graduates: 62 },
-        { month: 'Jun', enrollment: 102, graduates: 58 },
-    ];
+    const maxEnrollment = Math.max(...data.map((item) => item.enrollment || 0), 1);
 
     return (
         <div className="chart-card" style={{ marginTop: '24px' }}>
@@ -243,20 +239,27 @@ const EnrollmentTrendsChart = () => {
             </div>
             {loading ? <div style={{ padding: '20px' }}>Loading trends...</div> : (
                 <>
+                    {data.length === 0 ? (
+                        <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <Calendar size={32} style={{ opacity: 0.6, marginBottom: '8px' }} />
+                            <div style={{ fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '4px' }}>
+                                No enrollment data yet
+                            </div>
+                            <div style={{ fontSize: '0.875rem' }}>
+                                Students will appear here once enrolled.
+                            </div>
+                        </div>
+                    ) : (
                     <div className="css-chart-container" style={{ height: '180px' }}>
-                        {chartData.map((item, index) => {
+                        {data.map((item, index) => {
+                            const enrollment = item.enrollment || 0;
                             return (
                                 <div key={item.month || index} className="css-bar-group">
                                     <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
                                         <div
                                             className="css-bar"
-                                            style={{ height: `${(item.enrollment || 0) * 1.2}px`, width: '24px' }}
-                                            data-value={item.enrollment}
-                                        ></div>
-                                        <div
-                                            className="css-bar secondary"
-                                            style={{ height: `${(item.graduates || 0) * 1.2}px`, width: '24px' }}
-                                            data-value={item.graduates}
+                                            style={{ height: `${(enrollment / maxEnrollment) * 160}px`, width: '28px' }}
+                                            data-value={enrollment}
                                         ></div>
                                     </div>
                                     <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', marginTop: '8px' }}>{item.month}</span>
@@ -264,14 +267,11 @@ const EnrollmentTrendsChart = () => {
                             );
                         })}
                     </div>
+                    )}
                     <div className="chart-legend">
                         <div className="legend-item">
                             <div className="legend-color" style={{ background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)' }}></div>
                             <span>New Enrollments</span>
-                        </div>
-                        <div className="legend-item">
-                            <div className="legend-color" style={{ background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)' }}></div>
-                            <span>Graduates</span>
                         </div>
                     </div>
                 </>

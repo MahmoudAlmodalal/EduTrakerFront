@@ -363,6 +363,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
     border: 1px solid var(--color-border-subtle);
     min-height: 300px;
+    overflow: visible;
 }
 
 .chart-header {
@@ -470,6 +471,12 @@
     overflow: hidden;
 }
 
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 .table-header-actions {
     padding: var(--spacing-5) var(--spacing-6);
     display: flex;
@@ -541,6 +548,10 @@
     border-spacing: 0;
 }
 
+.chart-card .data-table {
+    min-width: 520px;
+}
+
 .data-table th {
     background: linear-gradient(180deg, #f8fafc, #f1f5f9);
     padding: var(--spacing-4) var(--spacing-6);
@@ -568,6 +579,18 @@
     border-bottom: 1px solid var(--color-border-subtle);
     font-size: 0.9375rem;
     transition: all 0.2s ease;
+}
+
+.data-table td:first-child,
+.data-table th:first-child {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.data-table td:last-child {
+    min-width: 160px;
 }
 
 .data-table tbody tr {

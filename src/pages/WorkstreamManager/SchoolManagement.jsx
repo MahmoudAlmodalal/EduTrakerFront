@@ -24,6 +24,10 @@ const SchoolManagement = () => {
     const [viewSchool, setViewSchool] = useState(null);
     const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'inactive'
 
+    const notifyWorkstreamStatsUpdated = () => {
+        window.dispatchEvent(new CustomEvent('workstream_stats_updated'));
+    };
+
     const fetchSchools = async () => {
         setLoading(true);
         try {
@@ -86,7 +90,8 @@ const SchoolManagement = () => {
                     });
                 }
             }
-            fetchSchools();
+            await fetchSchools();
+            notifyWorkstreamStatsUpdated();
             setNewSchool({ school_name: '', location: '', capacity: '', isEditing: false, id: null });
             setShowCreateForm(false);
         } catch (error) {
@@ -111,7 +116,8 @@ const SchoolManagement = () => {
                 showSuccess('Schools activated successfully.');
             }
             setShowActivateAllModal(false);
-            fetchSchools();
+            await fetchSchools();
+            notifyWorkstreamStatsUpdated();
         } catch (error) {
             console.error('Failed to activate schools:', error);
             showError(`Error: ${error.message}`);
@@ -133,7 +139,8 @@ const SchoolManagement = () => {
             showSuccess(`"${schoolToDelete.school_name}" deactivated successfully.`);
             setShowDeleteModal(false);
             setSchoolToDelete(null);
-            fetchSchools();
+            await fetchSchools();
+            notifyWorkstreamStatsUpdated();
         } catch (error) {
             console.error('Failed to delete school:', error);
             showError(`Error: ${error.message}`);
@@ -146,7 +153,8 @@ const SchoolManagement = () => {
         const endpoint = school.is_active ? 'deactivate' : 'activate';
         try {
             await api.post(`/school/${school.id}/${endpoint}/`);
-            fetchSchools();
+            await fetchSchools();
+            notifyWorkstreamStatsUpdated();
         } catch (error) {
             console.error(`Failed to ${endpoint} school:`, error);
         }

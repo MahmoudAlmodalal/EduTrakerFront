@@ -82,6 +82,9 @@ export const AuthProvider = ({ children }) => {
 
                             // Update tokens
                             localStorage.setItem('accessToken', response.access);
+                            if (response.refresh) {
+                                localStorage.setItem('refreshToken', response.refresh);
+                            }
 
                             // Extend session
                             const extensionResult = SessionManager.extendSession();
