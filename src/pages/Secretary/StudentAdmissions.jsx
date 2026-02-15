@@ -143,6 +143,22 @@ const getEnrollmentClassroomId = (enrollment) => {
     return Number(enrollment?.class_room_id ?? enrollment?.class_room?.id ?? enrollment?.class_room);
 };
 
+const getStudentGradeId = (student) => {
+    const candidateGrade = (
+        student?.current_grade?.id
+        ?? student?.grade_id
+        ?? student?.grade?.id
+        ?? student?.grade
+    );
+
+    const gradeId = Number(candidateGrade);
+    if (!Number.isInteger(gradeId) || gradeId <= 0) {
+        return null;
+    }
+
+    return gradeId;
+};
+
 const EditStudentStatusModal = memo(function EditStudentStatusModal({
     student,
     loading,
@@ -297,10 +313,17 @@ const StudentAdmissions = () => {
     }, [academicYears]);
 
     const assignmentStudents = useMemo(() => {
-        return [...students].sort((leftStudent, rightStudent) => {
+        const selectedGradeId = Number(selectedGradeFilter);
+        const hasGradeFilter = Number.isInteger(selectedGradeId) && selectedGradeId > 0;
+
+        const filteredStudents = hasGradeFilter
+            ? students.filter((student) => getStudentGradeId(student) === selectedGradeId)
+            : students;
+
+        return [...filteredStudents].sort((leftStudent, rightStudent) => {
             return getStudentName(leftStudent).localeCompare(getStudentName(rightStudent));
         });
-    }, [students]);
+    }, [selectedGradeFilter, students]);
 
     const getAcademicYearLabel = useCallback((year, includeStatus = true) => {
         const rawName = year?.name || year?.academic_year_code || `Year #${year?.id || ''}`;
@@ -387,7 +410,7 @@ const StudentAdmissions = () => {
         }
     }, [schoolId, setFeedback]);
 
-    const fetchStudents = useCallback(async (yearId = '') => {
+    const fetchAssignmentStudents = useCallback(async () => {
         if (!schoolId) {
             studentsRequestRef.current += 1;
             setStudents([]);
@@ -399,12 +422,7 @@ const StudentAdmissions = () => {
 
         try {
             setIsStudentsLoading(true);
-            const params = { school_id: schoolId };
-            if (yearId) {
-                params.academic_year_id = yearId;
-            }
-
-            const data = await secretaryService.getStudents(params);
+            const data = await secretaryService.getAllStudents({ school_id: schoolId });
             if (studentsRequestRef.current !== requestId) {
                 return;
             }
@@ -562,13 +580,8 @@ const StudentAdmissions = () => {
             return;
         }
 
-        if (!assignmentAcademicYear) {
-            setStudents([]);
-            return;
-        }
-
-        fetchStudents(assignmentAcademicYear);
-    }, [activeTab, assignmentAcademicYear, fetchStudents]);
+        fetchAssignmentStudents();
+    }, [activeTab, fetchAssignmentStudents]);
 
     useEffect(() => {
         if (!selectedClassroom) {
@@ -701,14 +714,14 @@ const StudentAdmissions = () => {
 
             setFeedback('success', 'Student assigned to class successfully!');
             setSelectedStudent('');
-            fetchStudents(assignmentAcademicYear);
+            fetchAssignmentStudents();
         } catch (error) {
             console.error('Error assigning student:', error);
             setFeedback('error', getApiErrorMessage(error, 'Failed to assign student to class.'));
         } finally {
             setIsAssigningStudent(false);
         }
-    }, [assignmentAcademicYear, fetchStudents, selectedClassroom, selectedStudent, setFeedback]);
+    }, [assignmentAcademicYear, fetchAssignmentStudents, selectedClassroom, selectedStudent, setFeedback]);
 
     const handleUpdateStudent = useCallback(async (event) => {
         event.preventDefault();

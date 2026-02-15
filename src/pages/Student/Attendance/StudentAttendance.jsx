@@ -88,6 +88,22 @@ const normalizeAttendanceRecords = (records) => {
         .sort((left, right) => right.sortTimestamp - left.sortTimestamp);
 };
 
+const extractAttendanceRecords = (payload) => {
+    if (Array.isArray(payload?.results)) {
+        return payload.results;
+    }
+    if (Array.isArray(payload?.data?.results)) {
+        return payload.data.results;
+    }
+    if (Array.isArray(payload?.data)) {
+        return payload.data;
+    }
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+    return [];
+};
+
 const getMonthBucketKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
 const StudentAttendance = () => {
@@ -106,6 +122,7 @@ const StudentAttendance = () => {
     const latestFetchId = useRef(0);
 
     const locale = language === 'ar' ? 'ar' : 'en-US';
+    const currentStudentId = user?.id ?? user?.user_id ?? null;
 
     const text = useCallback((translationKey, fallback) => (
         resolveText(t(translationKey), translationKey, fallback)
@@ -114,7 +131,7 @@ const StudentAttendance = () => {
     const fetchAttendanceHistory = useCallback(async () => {
         const fetchId = ++latestFetchId.current;
 
-        if (!user?.id) {
+        if (!currentStudentId) {
             setAttendanceHistory([]);
             setHistoryLoading(false);
             setHistoryError(null);
@@ -124,15 +141,11 @@ const StudentAttendance = () => {
         setHistoryLoading(true);
         setHistoryError(null);
         try {
-            const attendanceRes = await studentService.getAttendance();
+            const attendanceRes = await studentService.getAttendance(currentStudentId);
             if (fetchId !== latestFetchId.current) {
                 return;
             }
-            const records = Array.isArray(attendanceRes?.results)
-                ? attendanceRes.results
-                : Array.isArray(attendanceRes)
-                    ? attendanceRes
-                    : [];
+            const records = extractAttendanceRecords(attendanceRes);
             setAttendanceHistory(normalizeAttendanceRecords(records));
         } catch (err) {
             if (fetchId !== latestFetchId.current) {
@@ -140,16 +153,17 @@ const StudentAttendance = () => {
             }
             console.error('Error fetching attendance history:', err);
             setAttendanceHistory([]);
-            setHistoryError(text(
+            const fallbackErrorMessage = text(
                 'student.attendance.historyError',
                 'Failed to load attendance records. Please try again.'
-            ));
+            );
+            setHistoryError(err?.message || fallbackErrorMessage);
         } finally {
             if (fetchId === latestFetchId.current) {
                 setHistoryLoading(false);
             }
         }
-    }, [text, user?.id]);
+    }, [currentStudentId, text]);
 
     useEffect(() => {
         void fetchAttendanceHistory();

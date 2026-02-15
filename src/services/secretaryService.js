@@ -35,6 +35,24 @@ const setCachedValue = (cacheKey, value) => {
     });
 };
 
+const resolveNextPage = (nextUrl) => {
+    if (!nextUrl || typeof nextUrl !== 'string') {
+        return null;
+    }
+
+    try {
+        const parsedUrl = new URL(nextUrl, 'http://localhost');
+        const pageValue = Number.parseInt(parsedUrl.searchParams.get('page') || '', 10);
+        if (Number.isInteger(pageValue) && pageValue > 0) {
+            return pageValue;
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+};
+
 const secretaryService = {
     // Dashboard Stats
     getDashboardStats: async () => {
@@ -74,6 +92,33 @@ const secretaryService = {
     getStudents: async (params = {}) => {
         const queryParams = new URLSearchParams(params).toString();
         return api.get(`/manager/students/${queryParams ? `?${queryParams}` : ''}`);
+    },
+    getAllStudents: async (params = {}) => {
+        const allStudents = [];
+        let page = 1;
+
+        while (page !== null) {
+            const queryParams = new URLSearchParams({
+                ...params,
+                page_size: '100',
+                page: String(page),
+            }).toString();
+            const payload = await api.get(`/manager/students/${queryParams ? `?${queryParams}` : ''}`);
+
+            if (Array.isArray(payload?.results)) {
+                allStudents.push(...payload.results);
+                page = resolveNextPage(payload.next);
+                continue;
+            }
+
+            if (Array.isArray(payload)) {
+                allStudents.push(...payload);
+            }
+
+            break;
+        }
+
+        return allStudents;
     },
     updateStudent: async (id, data) => {
         return api.patch(`/manager/students/${id}/`, data);
