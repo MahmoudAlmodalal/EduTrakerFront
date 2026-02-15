@@ -11,6 +11,26 @@ import { useTheme } from '../../context/ThemeContext';
 import managerService from '../../services/managerService';
 import './SchoolManager.css';
 
+const toNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeClassroom = (room = {}, index = 0) => {
+    const rawGrade = typeof room?.grade === 'object' ? room?.grade?.name : room?.grade;
+
+    return {
+        ...room,
+        classroom_id: room?.classroom_id ?? room?.id ?? null,
+        classroom_name: room?.classroom_name || room?.name || room?.class_name || `Classroom ${index + 1}`,
+        grade: rawGrade || room?.grade_name || room?.['grade__name'] || 'Unassigned',
+        student_count: toNumber(
+            room?.student_count ?? room?.count ?? room?.total_students ?? room?.students_count,
+            0
+        )
+    };
+};
+
 const SchoolDashboard = () => {
     const { t } = useTheme();
     const [stats, setStats] = useState(null);
@@ -49,6 +69,14 @@ const SchoolDashboard = () => {
         { title: t('classrooms') || 'Classrooms', value: stats?.classroom_count ?? 0, icon: GraduationCap, color: 'orange', bgColor: '#ffedd5', iconColor: '#ea580c' },
         { title: t('courses') || 'Courses', value: stats?.course_count ?? 0, icon: BookOpen, color: 'teal', bgColor: '#ccfbf1', iconColor: '#0d9488' }
     ];
+
+    const gradeBreakdownClassrooms = (
+        Array.isArray(stats?.by_classroom)
+            ? stats.by_classroom
+            : Array.isArray(stats?.summary?.by_classroom)
+                ? stats.summary.by_classroom
+                : []
+    ).map(normalizeClassroom);
 
     if (loading) {
         return (
@@ -121,7 +149,7 @@ const SchoolDashboard = () => {
             </div>
 
             {/* Grade Breakdown */}
-            <GradeBreakdown classrooms={stats?.by_classroom || []} />
+            <GradeBreakdown classrooms={gradeBreakdownClassrooms} />
         </div>
     );
 };
