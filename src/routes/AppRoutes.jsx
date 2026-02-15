@@ -72,6 +72,7 @@ import TeacherDashboard from '../pages/Teacher/TeacherDashboard';
 import ClassManagement from '../pages/Teacher/ClassManagement';
 import Assessments from '../pages/Teacher/Assessments';
 import LessonPlans from '../pages/Teacher/LessonPlans';
+import TeacherCommunication from '../pages/Teacher/TeacherCommunication';
 import TeacherSettings from '../pages/Teacher/TeacherSettings';
 
 const AppRoutes = () => {
@@ -109,7 +110,7 @@ const AppRoutes = () => {
                     <Route path="workstreams" element={<WorkstreamManagement />} />
                     <Route path="reports" element={<AnalyticsReports />} />
                     <Route path="settings" element={<SystemSettings />} />
-                    <Route path="communication" element={<GeneralCommunication />} />
+                    <Route path="communication" element={<TeacherCommunication />} />
                     <Route path="support" element={<SupportHelpdesk />} />
                     <Route path="activity" element={<ActivityLog />} />
                 </Route>

@@ -17,8 +17,12 @@ const GeneralCommunication = () => {
     };
 
     const role = roleMap[user?.role] || user?.role?.toLowerCase() || 'staff';
+    const allowedRolesMap = {
+        student: ['secretary', 'teacher', 'school_manager']
+    };
+    const allowedRoles = allowedRolesMap[role] || null;
 
-    return <CommunicationView role={role} />;
+    return <CommunicationView role={role} allowedRoles={allowedRoles} />;
 };
 
 export default GeneralCommunication;

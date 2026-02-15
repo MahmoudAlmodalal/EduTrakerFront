@@ -761,8 +761,34 @@
     font-size: 0.625rem;
     text-transform: uppercase;
     font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 2px 8px;
+    border-radius: 999px;
     color: var(--color-primary);
-    margin-top: 2px;
+    background: var(--color-primary-light);
+    margin-top: 4px;
+}
+
+.resultRole[data-role="secretary"] {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+.resultRole[data-role="teacher"] {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.resultRole[data-role="school_manager"] {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.resultRole[data-role="student"] {
+    background: #fef3c7;
+    color: #d97706;
 }
 
 .formActions {

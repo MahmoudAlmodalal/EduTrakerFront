@@ -1,49 +1,99 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Users, UserCheck, AlertTriangle, Check, Search, Filter, Loader2, Save, ChevronDown } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Check, Clock, Search, TriangleAlert, Users } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
-import { motion as Motion } from 'framer-motion';
 import {
     useRecordBulkAttendanceMutation,
     useTeacherAllocations,
     useTeacherAttendance,
     useTeacherStudents
 } from '../../hooks/useTeacherQueries';
-import { teacherContainerVariants, teacherItemVariants } from '../../utils/animations';
+import teacherService from '../../services/teacherService';
 import { toList, todayIsoDate } from '../../utils/helpers';
+import './Teacher.css';
 
-// Skeleton Component
-const Skeleton = ({ className }) => (
-    <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
-);
+const attendanceStatusOptions = [
+    { value: 'present', label: 'Present', color: '#16a34a', bg: '#dcfce7', icon: Check },
+    { value: 'absent', label: 'Absent', color: '#dc2626', bg: '#fee2e2', icon: TriangleAlert },
+    { value: 'late', label: 'Late', color: '#b45309', bg: '#fef3c7', icon: Clock }
+];
 
 const ClassManagement = () => {
     const { t } = useTheme();
-    const { user } = useAuth();
-    const schoolId = useMemo(
-        () => user?.school_id ?? (typeof user?.school === 'number' ? user.school : null),
-        [user?.school, user?.school_id]
-    );
-    const [attendanceOverrides, setAttendanceOverrides] = useState({});
-    const [behaviorOverrides, setBehaviorOverrides] = useState({});
 
-    // Selection States
     const [selectedAllocationId, setSelectedAllocationId] = useState('');
     const [attendanceDate, setAttendanceDate] = useState(todayIsoDate());
-    const [searchQuery, setSearchQuery] = useState('');
-    const [attendanceFilter, setAttendanceFilter] = useState('all');
+    const [searchText, setSearchText] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [attendanceOverrides, setAttendanceOverrides] = useState({});
+    const [studentCounts, setStudentCounts] = useState({});
+    const [loadingCounts, setLoadingCounts] = useState(false);
 
     const {
         data: allocationsData,
         isLoading: loadingAllocations
-    } = useTeacherAllocations(todayIsoDate());
+    } = useTeacherAllocations();
 
     const allocations = useMemo(() => toList(allocationsData), [allocationsData]);
-    const effectiveAllocationId = selectedAllocationId || allocations[0]?.id?.toString() || '';
+
+    useEffect(() => {
+        if (!selectedAllocationId && allocations.length > 0) {
+            setSelectedAllocationId(String(allocations[0].id));
+        }
+    }, [allocations, selectedAllocationId]);
+
+    useEffect(() => {
+        let ignore = false;
+
+        const fetchStudentCounts = async () => {
+            const classroomIds = [...new Set(
+                allocations
+                    .map((allocation) => allocation.class_room_id)
+                    .filter(Boolean)
+            )];
+
+            if (classroomIds.length === 0) {
+                setStudentCounts({});
+                return;
+            }
+
+            setLoadingCounts(true);
+            try {
+                const countPairs = await Promise.all(
+                    classroomIds.map(async (classroomId) => {
+                        try {
+                            const response = await teacherService.getStudents({
+                                classroom_id: classroomId,
+                                current_status: 'active',
+                                page_size: 200
+                            });
+                            return [classroomId, toList(response).length];
+                        } catch {
+                            return [classroomId, 0];
+                        }
+                    })
+                );
+
+                if (!ignore) {
+                    setStudentCounts(Object.fromEntries(countPairs));
+                }
+            } finally {
+                if (!ignore) {
+                    setLoadingCounts(false);
+                }
+            }
+        };
+
+        fetchStudentCounts();
+
+        return () => {
+            ignore = true;
+        };
+    }, [allocations]);
 
     const selectedAllocation = useMemo(
-        () => allocations.find((item) => item.id.toString() === effectiveAllocationId),
-        [allocations, effectiveAllocationId]
+        () => allocations.find((allocation) => String(allocation.id) === String(selectedAllocationId)),
+        [allocations, selectedAllocationId]
     );
 
     const studentFilters = useMemo(() => {
@@ -51,22 +101,16 @@ const ClassManagement = () => {
             return null;
         }
 
-        const filters = {
+        return {
             classroom_id: selectedAllocation.class_room_id,
             current_status: 'active',
-            page_size: 100
+            page_size: 200
         };
-
-        if (schoolId) {
-            filters.school_id = schoolId;
-        }
-
-        return filters;
-    }, [schoolId, selectedAllocation]);
+    }, [selectedAllocation?.class_room_id]);
 
     const {
         data: studentsData,
-        isLoading: loadingStudentsList
+        isLoading: loadingStudents
     } = useTeacherStudents(studentFilters || {}, {
         enabled: Boolean(studentFilters)
     });
@@ -74,383 +118,330 @@ const ClassManagement = () => {
     const {
         data: attendanceData,
         isLoading: loadingAttendance
-    } = useTeacherAttendance(effectiveAllocationId, attendanceDate, {
-        enabled: Boolean(effectiveAllocationId && attendanceDate)
+    } = useTeacherAttendance(selectedAllocationId, attendanceDate, {
+        enabled: Boolean(selectedAllocationId && attendanceDate)
     });
 
-    const saveAttendanceMutation = useRecordBulkAttendanceMutation();
+    const recordAttendanceMutation = useRecordBulkAttendanceMutation();
 
-    const loadingStudents = loadingStudentsList || loadingAttendance;
-    const saving = saveAttendanceMutation.isPending;
+    const students = useMemo(() => toList(studentsData), [studentsData]);
 
-    const baseStudents = useMemo(() => toList(studentsData), [studentsData]);
-    const attendanceMap = useMemo(() => {
+    const attendanceByStudentId = useMemo(() => {
         const map = {};
         toList(attendanceData).forEach((record) => {
-            const normalizedStatus = record.status
-                ? `${record.status.charAt(0).toUpperCase()}${record.status.slice(1)}`
-                : 'Present';
-
-            map[record.student_id] = {
-                status: normalizedStatus,
-                id: record.id
-            };
+            map[record.student_id] = (record.status || '').toLowerCase();
         });
         return map;
     }, [attendanceData]);
 
     const overrideKey = useMemo(
-        () => `${effectiveAllocationId || 'none'}:${attendanceDate}`,
-        [effectiveAllocationId, attendanceDate]
+        () => `${selectedAllocationId || 'none'}:${attendanceDate}`,
+        [attendanceDate, selectedAllocationId]
     );
-    const currentAttendanceOverrides = useMemo(
+
+    const currentOverrides = useMemo(
         () => attendanceOverrides[overrideKey] || {},
         [attendanceOverrides, overrideKey]
     );
-    const currentBehaviorOverrides = useMemo(
-        () => behaviorOverrides[overrideKey] || {},
-        [behaviorOverrides, overrideKey]
-    );
 
-    const students = useMemo(() => baseStudents.map((student) => {
+    const mergedStudentRows = useMemo(
+        () => students.map((student) => {
             const studentId = student.user_id || student.id;
             return {
                 ...student,
-                user_id: studentId,
-                attendance_status: currentAttendanceOverrides[studentId] ?? attendanceMap[studentId]?.status ?? null,
-                attendance_record_id: attendanceMap[studentId]?.id || null,
-                behavior: currentBehaviorOverrides[studentId] || null
+                studentId,
+                attendanceStatus: currentOverrides[studentId]
+                    || attendanceByStudentId[studentId]
+                    || ''
             };
-    }), [attendanceMap, baseStudents, currentAttendanceOverrides, currentBehaviorOverrides]);
+        }),
+        [attendanceByStudentId, currentOverrides, students]
+    );
 
-    const handleAttendanceStatus = useCallback((studentId, status) => {
-        setAttendanceOverrides((prev) => ({
-            ...prev,
+    const filteredStudents = useMemo(() => {
+        const query = searchText.trim().toLowerCase();
+
+        return mergedStudentRows.filter((row) => {
+            const matchesSearch = !query || (row.full_name || '').toLowerCase().includes(query);
+            const matchesStatus = statusFilter === 'all'
+                || (statusFilter === 'unmarked' && !row.attendanceStatus)
+                || row.attendanceStatus === statusFilter;
+
+            return matchesSearch && matchesStatus;
+        });
+    }, [mergedStudentRows, searchText, statusFilter]);
+
+    const handleSetStatus = useCallback((studentId, status) => {
+        setAttendanceOverrides((previous) => ({
+            ...previous,
             [overrideKey]: {
-                ...(prev[overrideKey] || {}),
+                ...(previous[overrideKey] || {}),
                 [studentId]: status
             }
         }));
     }, [overrideKey]);
 
     const handleSaveAttendance = useCallback(async () => {
-        if (!effectiveAllocationId) return;
+        if (!selectedAllocationId) {
+            return;
+        }
+
+        const records = mergedStudentRows
+            .filter((row) => row.attendanceStatus)
+            .map((row) => ({
+                student_id: row.studentId,
+                course_allocation_id: Number(selectedAllocationId),
+                date: attendanceDate,
+                status: row.attendanceStatus
+            }));
+
+        if (records.length === 0) {
+            toast.error('No attendance statuses selected.');
+            return;
+        }
 
         try {
-            const attendanceRecords = students
-                .filter(s => s.attendance_status)
-                .map(s => ({
-                    student_id: s.user_id,
-                    status: s.attendance_status.toLowerCase(),
-                    date: attendanceDate,
-                    course_allocation_id: parseInt(effectiveAllocationId, 10)
-                }));
-
-            if (attendanceRecords.length === 0) {
-                alert('No attendance marked yet.');
-                return;
-            }
-
-            await saveAttendanceMutation.mutateAsync(attendanceRecords);
-            setAttendanceOverrides((prev) => ({
-                ...prev,
+            await recordAttendanceMutation.mutateAsync(records);
+            setAttendanceOverrides((previous) => ({
+                ...previous,
                 [overrideKey]: {}
             }));
-            setTimeout(() => alert('Attendance saved successfully!'), 100);
+            toast.success('Attendance saved successfully.');
         } catch (error) {
-            console.error("Error saving attendance:", error);
-            alert("Failed to save attendance.");
+            toast.error(error?.message || 'Failed to save attendance.');
         }
-    }, [effectiveAllocationId, saveAttendanceMutation, students, attendanceDate, overrideKey]);
-
-    const handleBehavior = useCallback((studentId, type) => {
-        setBehaviorOverrides((prev) => ({
-            ...prev,
-            [overrideKey]: {
-                ...(prev[overrideKey] || {}),
-                [studentId]: type
-            }
-        }));
-    }, [overrideKey]);
-
-    const filteredStudents = useMemo(() => students.filter(s => {
-        const matchesSearch = s.full_name?.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesFilter = attendanceFilter === 'all' ||
-            (attendanceFilter === 'marked' && s.attendance_status) ||
-            (attendanceFilter === 'unmarked' && !s.attendance_status) ||
-            s.attendance_status === attendanceFilter;
-        return matchesSearch && matchesFilter;
-    }), [students, searchQuery, attendanceFilter]);
+    }, [attendanceDate, mergedStudentRows, overrideKey, recordAttendanceMutation, selectedAllocationId]);
 
     return (
-        <Motion.div
-            initial="hidden"
-            animate="visible"
-            variants={teacherContainerVariants}
-            className="max-w-7xl mx-auto space-y-6 pb-12 px-4 sm:px-6"
-        >
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-gray-100">
+        <div className="teacher-page">
+            <div className="teacher-header">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-                        {t('teacher.classes.title')}
-                    </h1>
-                    <p className="text-gray-500 mt-2">
-                        Manage your classes, track attendance, and log student behavior.
+                    <h1 className="teacher-title">{t('teacher.classes.title') || 'Class Management'}</h1>
+                    <p className="teacher-subtitle">
+                        View class allocations and record student attendance by class and date.
                     </p>
                 </div>
+            </div>
 
-                {/* Global Controls */}
-                <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl border border-gray-200 shadow-sm">
-                    <div className="relative">
-                        <input
-                            type="date"
-                            value={attendanceDate}
-                            onChange={(e) => setAttendanceDate(e.target.value)}
-                            className="pl-3 pr-2 py-2 text-sm font-medium text-gray-700 bg-transparent border-none focus:ring-0 cursor-pointer"
-                        />
+            <div className="management-card" style={{ padding: '1rem 1.25rem' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '0.85rem', fontSize: '1rem' }}>My Allocated Classes</h3>
+
+                {loadingAllocations ? (
+                    <div style={{ color: 'var(--color-text-muted)' }}>Loading classes...</div>
+                ) : allocations.length === 0 ? (
+                    <div style={{ color: 'var(--color-text-muted)' }}>No active class allocations found.</div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.75rem' }}>
+                        {allocations.map((allocation) => {
+                            const selected = String(allocation.id) === String(selectedAllocationId);
+                            const count = studentCounts[allocation.class_room_id];
+
+                            return (
+                                <button
+                                    key={allocation.id}
+                                    type="button"
+                                    onClick={() => setSelectedAllocationId(String(allocation.id))}
+                                    style={{
+                                        border: selected ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                        borderRadius: '0.85rem',
+                                        background: selected ? 'rgba(var(--color-primary-rgb), 0.06)' : '#fff',
+                                        padding: '0.85rem 0.95rem',
+                                        textAlign: 'left',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'flex-start' }}>
+                                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
+                                            {allocation.course_name || allocation.subject || 'Subject'}
+                                        </h4>
+                                        <span
+                                            style={{
+                                                fontSize: '0.72rem',
+                                                borderRadius: '999px',
+                                                padding: '0.2rem 0.5rem',
+                                                background: '#e0f2fe',
+                                                color: '#075985',
+                                                fontWeight: 700,
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
+                                            {loadingCounts ? '...' : `${count ?? 0} students`}
+                                        </span>
+                                    </div>
+                                    <p style={{ margin: '0.35rem 0 0', fontSize: '0.83rem', color: 'var(--color-text-muted)' }}>
+                                        {allocation.classroom_name || allocation.class || 'Classroom'}
+                                    </p>
+                                    <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                                        Slot: {allocation.time || allocation.time_slot || 'TBD'}
+                                    </p>
+                                </button>
+                            );
+                        })}
                     </div>
-                    <div className="w-px h-6 bg-gray-200"></div>
-                    <div className="relative min-w-[200px]">
-                        {loadingAllocations ? (
-                            <div className="px-3 py-2 text-sm text-gray-400">Loading classes...</div>
-                        ) : (
-                            <select
-                                value={effectiveAllocationId}
-                                onChange={(e) => setSelectedAllocationId(e.target.value)}
-                                className="w-full pl-3 pr-8 py-2 text-sm font-bold text-gray-900 bg-transparent border-none focus:ring-0 cursor-pointer appearance-none"
+                )}
+            </div>
+
+            {selectedAllocation && (
+                <div className="management-card" style={{ overflow: 'hidden' }}>
+                    <div
+                        style={{
+                            padding: '1rem 1.25rem',
+                            borderBottom: '1px solid var(--color-border)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            flexWrap: 'wrap'
+                        }}
+                    >
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '1rem' }}>
+                                Attendance Recording
+                            </h3>
+                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                {selectedAllocation.course_name || selectedAllocation.subject} • {selectedAllocation.classroom_name || selectedAllocation.class}
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                            <label style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>Date</label>
+                            <input
+                                type="date"
+                                value={attendanceDate}
+                                onChange={(event) => setAttendanceDate(event.target.value)}
+                                style={{
+                                    border: '1px solid var(--color-border)',
+                                    borderRadius: '0.55rem',
+                                    padding: '0.45rem 0.6rem',
+                                    fontSize: '0.85rem'
+                                }}
+                            />
+
+                            <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={handleSaveAttendance}
+                                disabled={recordAttendanceMutation.isPending}
+                                style={{ opacity: recordAttendanceMutation.isPending ? 0.7 : 1 }}
                             >
-                                {allocations.map(alloc => (
-                                    <option key={alloc.id} value={alloc.id}>
-                                        {alloc.course_name || alloc.subject} - {alloc.classroom_name || alloc.class}
-                                    </option>
-                                ))}
-                                {allocations.length === 0 && <option value="">No active classes found</option>}
-                            </select>
-                        )}
-                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                {recordAttendanceMutation.isPending ? 'Saving...' : 'Save Attendance'}
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            {/* Stats Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Motion.div variants={teacherItemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Total Students</p>
-                        <p className="text-2xl font-black text-gray-900 mt-1">{loadingStudents ? "-" : students.length}</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                        <Users size={20} />
-                    </div>
-                </Motion.div>
-
-                <Motion.div variants={teacherItemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Present</p>
-                        <p className="text-2xl font-black text-emerald-600 mt-1">
-                            {loadingStudents ? "-" : students.filter(s => s.attendance_status === 'Present').length}
-                        </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <UserCheck size={20} />
-                    </div>
-                </Motion.div>
-
-                <Motion.div variants={teacherItemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Absent</p>
-                        <p className="text-2xl font-black text-rose-600 mt-1">
-                            {loadingStudents ? "-" : students.filter(s => s.attendance_status === 'Absent').length}
-                        </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                        <AlertTriangle size={20} />
-                    </div>
-                </Motion.div>
-
-                <Motion.div variants={teacherItemVariants} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Late</p>
-                        <p className="text-2xl font-black text-amber-600 mt-1">
-                            {loadingStudents ? "-" : students.filter(s => s.attendance_status === 'Late').length}
-                        </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                        <AlertTriangle size={20} />
-                    </div>
-                </Motion.div>
-            </div>
-
-            {/* Main Content Area */}
-            <Motion.div variants={teacherItemVariants} className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden min-h-[500px] flex flex-col hover:shadow-xl transition-shadow">
-                {/* Toolbar */}
-                <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50/30">
-                    <div className="flex items-center gap-3 flex-1">
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <div style={{ padding: '0.9rem 1.25rem', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <div style={{ position: 'relative', flex: '1 1 220px', maxWidth: '340px' }}>
+                            <Search
+                                size={16}
+                                style={{
+                                    position: 'absolute',
+                                    left: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    color: 'var(--color-text-muted)'
+                                }}
+                            />
                             <input
                                 type="text"
-                                placeholder={t('teacher.classes.searchStudent')}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                value={searchText}
+                                onChange={(event) => setSearchText(event.target.value)}
+                                placeholder="Search students"
+                                style={{
+                                    width: '100%',
+                                    border: '1px solid var(--color-border)',
+                                    borderRadius: '0.55rem',
+                                    padding: '0.5rem 0.65rem 0.5rem 2rem',
+                                    fontSize: '0.85rem'
+                                }}
                             />
                         </div>
-                        <div className="relative">
-                            <select
-                                value={attendanceFilter}
-                                onChange={(e) => setAttendanceFilter(e.target.value)}
-                                className="pl-3 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
-                            >
-                                <option value="all">All Students</option>
-                                <option value="marked">Marked</option>
-                                <option value="unmarked">Unmarked</option>
-                                <option value="Present">Present Only</option>
-                                <option value="Absent">Absent Only</option>
-                            </select>
-                            <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        </div>
+
+                        <select
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value)}
+                            style={{
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '0.55rem',
+                                padding: '0.5rem 0.65rem',
+                                fontSize: '0.85rem'
+                            }}
+                        >
+                            <option value="all">All statuses</option>
+                            <option value="unmarked">Unmarked</option>
+                            <option value="present">Present</option>
+                            <option value="absent">Absent</option>
+                            <option value="late">Late</option>
+                        </select>
                     </div>
 
-                    <button
-                        onClick={handleSaveAttendance}
-                        disabled={saving || loadingStudents || students.length === 0}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-all ${saving
-                            ? 'bg-gray-100 text-gray-400 cursor-wait'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md active:scale-95'
-                            }`}
-                    >
-                        {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                        {saving ? 'Saving...' : t('teacher.classes.saveChanges')}
-                    </button>
-                </div>
-
-                {/* Table Header */}
-                <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50/50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    <div className="col-span-4 sm:col-span-3">Student Name</div>
-                    <div className="col-span-2 hidden sm:block">Status</div>
-                    <div className="col-span-4 sm:col-span-4 text-center">Mark Attendance</div>
-                    <div className="col-span-4 sm:col-span-3 text-right">Behavior</div>
-                </div>
-
-                {/* List Content */}
-                <div className="flex-1 overflow-y-auto max-h-[600px] divide-y divide-gray-50">
-                    {loadingStudents ? (
-                        Array(5).fill(0).map((_, i) => (
-                            <div key={i} className="px-6 py-4 grid grid-cols-12 gap-4 items-center">
-                                <div className="col-span-3 flex items-center gap-3">
-                                    <Skeleton className="w-8 h-8 rounded-full" />
-                                    <Skeleton className="h-4 w-32" />
-                                </div>
-                                <div className="col-span-2 hidden sm:block">
-                                    <Skeleton className="h-6 w-20 rounded-full" />
-                                </div>
-                                <div className="col-span-4 flex justify-center gap-2">
-                                    <Skeleton className="h-8 w-8 rounded-lg" />
-                                    <Skeleton className="h-8 w-8 rounded-lg" />
-                                    <Skeleton className="h-8 w-8 rounded-lg" />
-                                </div>
-                                <div className="col-span-3 flex justify-end gap-2">
-                                    <Skeleton className="h-8 w-8 rounded-lg" />
-                                </div>
+                    <div style={{ maxHeight: '540px', overflowY: 'auto' }}>
+                        {loadingStudents || loadingAttendance ? (
+                            <div style={{ padding: '1.5rem', color: 'var(--color-text-muted)' }}>
+                                Loading students...
                             </div>
-                        ))
-                    ) : filteredStudents.length > 0 ? (
-                        filteredStudents.map((student) => (
-                            <Motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                key={student.user_id}
-                                className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50/50 transition-colors group"
-                            >
-                                {/* Name */}
-                                <div className="col-span-4 sm:col-span-3 flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
-                                        {student.full_name?.charAt(0)}
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-gray-900 line-clamp-1">{student.full_name}</p>
-                                        <p className="text-[10px] text-gray-400 hidden sm:block">ID: {student.user_id}</p>
-                                    </div>
-                                </div>
-
-                                {/* Status Badge */}
-                                <div className="col-span-2 hidden sm:block">
-                                    {student.attendance_status ? (
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${student.attendance_status === 'Present' ? 'bg-emerald-100 text-emerald-700' :
-                                            student.attendance_status === 'Absent' ? 'bg-rose-100 text-rose-700' :
-                                                'bg-amber-100 text-amber-700'
-                                            }`}>
-                                            {student.attendance_status}
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs text-gray-400 italic">Not marked</span>
-                                    )}
-                                </div>
-
-                                {/* Attendance Buttons */}
-                                <div className="col-span-4 sm:col-span-4 flex justify-center items-center gap-2">
-                                    {['Present', 'Absent', 'Late'].map((status) => {
-                                        const isActive = student.attendance_status === status;
-                                        let activeClass = '';
-                                        let icon = null;
-
-                                        if (status === 'Present') { activeClass = 'bg-emerald-500 text-white shadow-emerald-200'; icon = <Check size={14} />; }
-                                        if (status === 'Absent') { activeClass = 'bg-rose-500 text-white shadow-rose-200'; icon = <AlertTriangle size={14} />; }
-                                        if (status === 'Late') { activeClass = 'bg-amber-500 text-white shadow-amber-200'; icon = <AlertTriangle size={14} />; }
-
-                                        return (
-                                            <button
-                                                key={status}
-                                                onClick={() => handleAttendanceStatus(student.user_id, status)}
-                                                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isActive
-                                                    ? `${activeClass} shadow-md scale-105`
-                                                    : 'bg-white border border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'
-                                                    }`}
-                                                title={`Mark ${status}`}
-                                            >
-                                                {isActive ? icon : status.charAt(0)}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Behavior */}
-                                <div className="col-span-4 sm:col-span-3 flex justify-end items-center gap-2">
-                                    <button
-                                        onClick={() => handleBehavior(student.user_id, 'Positive')}
-                                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${student.behavior === 'Positive'
-                                            ? 'bg-emerald-100 text-emerald-600'
-                                            : 'text-gray-300 hover:bg-emerald-50 hover:text-emerald-500'
-                                            }`}
-                                    >
-                                        <UserCheck size={16} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleBehavior(student.user_id, 'Negative')}
-                                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${student.behavior === 'Negative'
-                                            ? 'bg-rose-100 text-rose-600'
-                                            : 'text-gray-300 hover:bg-rose-50 hover:text-rose-500'
-                                            }`}
-                                    >
-                                        <AlertTriangle size={16} />
-                                    </button>
-                                </div>
-                            </Motion.div>
-                        ))
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-20 text-center">
-                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                                <Users size={24} className="text-gray-300" />
+                        ) : filteredStudents.length === 0 ? (
+                            <div style={{ padding: '2rem', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                                <Users size={28} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+                                <p style={{ margin: 0 }}>No students found for this class/date.</p>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900">No students found</h3>
-                            <p className="text-gray-500 text-sm max-w-xs mt-1">Try adjusting your filters or select a different class.</p>
-                        </div>
-                    )}
+                        ) : (
+                            filteredStudents.map((student) => (
+                                <div
+                                    key={student.studentId}
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'minmax(180px, 1fr) minmax(220px, 340px)',
+                                        alignItems: 'center',
+                                        gap: '0.85rem',
+                                        padding: '0.75rem 1.25rem',
+                                        borderBottom: '1px solid var(--color-border)'
+                                    }}
+                                >
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-main)' }}>
+                                            {student.full_name || 'Student'}
+                                        </div>
+                                        <div style={{ marginTop: '2px', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                                            ID: {student.studentId}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                        {attendanceStatusOptions.map((option) => {
+                                            const active = student.attendanceStatus === option.value;
+                                            const Icon = option.icon;
+                                            return (
+                                                <button
+                                                    key={option.value}
+                                                    type="button"
+                                                    onClick={() => handleSetStatus(student.studentId, option.value)}
+                                                    style={{
+                                                        border: active ? `1px solid ${option.color}` : '1px solid var(--color-border)',
+                                                        background: active ? option.bg : '#fff',
+                                                        color: active ? option.color : 'var(--color-text-muted)',
+                                                        borderRadius: '999px',
+                                                        padding: '0.3rem 0.65rem',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.3rem',
+                                                        fontSize: '0.78rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <Icon size={13} />
+                                                    {option.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
-            </Motion.div>
-        </Motion.div>
+            )}
+        </div>
     );
 };
 

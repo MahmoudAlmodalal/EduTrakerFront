@@ -1,7 +1,18 @@
-import React, { useMemo, useState } from 'react';
-import { BookOpen, Plus, Calendar, Paperclip, Trash2, Edit2, Save, X, Loader2 } from 'lucide-react';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+    Calendar,
+    FileImage,
+    FileText,
+    FileUp,
+    Link as LinkIcon,
+    Pencil,
+    Plus,
+    Trash2,
+    X
+} from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+import { toast } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
 import {
     useCreateLearningMaterialMutation,
     useCreateLessonPlanMutation,
@@ -12,453 +23,647 @@ import {
     useTeacherLessonPlans,
     useUpdateLessonPlanMutation
 } from '../../hooks/useTeacherQueries';
-import { toList, todayIsoDate } from '../../utils/helpers';
+import { toList } from '../../utils/helpers';
+import './Teacher.css';
+
+const emptyLessonForm = {
+    title: '',
+    allocationId: '',
+    weekStartDate: '',
+    objectives: '',
+    activities: '',
+    resources: '',
+    notes: ''
+};
+
+const emptyMaterialForm = {
+    title: '',
+    allocationId: '',
+    description: ''
+};
+
+const startOfWeek = (date) => {
+    const normalized = new Date(date);
+    if (Number.isNaN(normalized.getTime())) {
+        return null;
+    }
+    const day = normalized.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    normalized.setDate(normalized.getDate() + diff);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+};
+
+const isSameWeek = (dateA, dateB) => {
+    const weekA = startOfWeek(dateA);
+    const weekB = startOfWeek(dateB);
+    return weekA && weekB && weekA.getTime() === weekB.getTime();
+};
+
+const parseLessonContent = (content = '') => {
+    if (!content) {
+        return { activities: '', notes: '' };
+    }
+
+    const notesMarker = '\n\nNotes:\n';
+    if (content.includes(notesMarker)) {
+        const [activitiesPart, notesPart] = content.split(notesMarker);
+        return {
+            activities: activitiesPart.replace(/^Activities:\n/, ''),
+            notes: notesPart || ''
+        };
+    }
+
+    return { activities: content, notes: '' };
+};
+
+const buildLessonContent = ({ activities, notes }) => {
+    const trimmedActivities = (activities || '').trim();
+    const trimmedNotes = (notes || '').trim();
+
+    if (!trimmedActivities && !trimmedNotes) {
+        return '';
+    }
+
+    if (!trimmedNotes) {
+        return `Activities:\n${trimmedActivities}`;
+    }
+
+    return `Activities:\n${trimmedActivities}\n\nNotes:\n${trimmedNotes}`;
+};
+
+const getFileTypeIcon = (fileType = '') => {
+    const normalized = fileType.toLowerCase();
+    if (normalized.includes('jpg') || normalized.includes('jpeg') || normalized.includes('png') || normalized.includes('gif')) {
+        return FileImage;
+    }
+    return FileText;
+};
 
 const LessonPlans = () => {
     const { t } = useTheme();
-    const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('plans');
-    const [isCreating, setIsCreating] = useState(false);
-    const [editingId, setEditingId] = useState(null);
 
-    const [formData, setFormData] = useState({
-        title: '',
-        classroom_id: '',
-        course_id: '',
-        academic_year_id: 1, // Fallback
-        date_planned: '',
-        objectives: '',
-        content: '',
-        is_published: true,
-        // Resource specific
-        description: '',
-        file_url: '',
-        file_type: 'PDF',
-        file_size: 0
-    });
+    const [timeFilter, setTimeFilter] = useState('all');
+    const [showLessonModal, setShowLessonModal] = useState(false);
+    const [editingLesson, setEditingLesson] = useState(null);
+    const [lessonForm, setLessonForm] = useState(emptyLessonForm);
 
-    const {
-        data: plansData,
-        isLoading: loadingPlans
-    } = useTeacherLessonPlans();
-
-    const {
-        data: resourcesData,
-        isLoading: loadingResources
-    } = useTeacherLearningMaterials();
+    const [showMaterialUpload, setShowMaterialUpload] = useState(false);
+    const [materialForm, setMaterialForm] = useState(emptyMaterialForm);
+    const [selectedFile, setSelectedFile] = useState(null);
 
     const {
         data: allocationsData,
         isLoading: loadingAllocations
-    } = useTeacherAllocations(todayIsoDate());
+    } = useTeacherAllocations();
 
-    const createPlanMutation = useCreateLessonPlanMutation();
-    const updatePlanMutation = useUpdateLessonPlanMutation();
-    const deletePlanMutation = useDeleteLessonPlanMutation();
-    const createResourceMutation = useCreateLearningMaterialMutation();
-    const deleteResourceMutation = useDeleteLearningMaterialMutation();
+    const {
+        data: lessonPlansData,
+        isLoading: loadingLessonPlans
+    } = useTeacherLessonPlans();
 
-    const plans = useMemo(() => toList(plansData), [plansData]);
-    const resources = useMemo(() => toList(resourcesData), [resourcesData]);
+    const {
+        data: materialsData,
+        isLoading: loadingMaterials
+    } = useTeacherLearningMaterials();
+
+    const createLessonPlanMutation = useCreateLessonPlanMutation();
+    const updateLessonPlanMutation = useUpdateLessonPlanMutation();
+    const deleteLessonPlanMutation = useDeleteLessonPlanMutation();
+
+    const createMaterialMutation = useCreateLearningMaterialMutation();
+    const deleteMaterialMutation = useDeleteLearningMaterialMutation();
+
     const allocations = useMemo(() => toList(allocationsData), [allocationsData]);
-    const loading = loadingPlans || loadingResources || loadingAllocations;
+    const lessonPlans = useMemo(() => toList(lessonPlansData), [lessonPlansData]);
+    const materials = useMemo(() => toList(materialsData), [materialsData]);
 
-    const handleStartCreate = () => {
-        setFormData({
-            title: '',
-            classroom_id: allocations.length > 0 ? allocations[0].class_room_id : '',
-            course_id: allocations.length > 0 ? allocations[0].course_id : '',
-            academic_year_id: allocations.length > 0 ? allocations[0].academic_year_id : 1,
-            date_planned: new Date().toISOString().split('T')[0],
-            objectives: '',
-            content: '',
-            is_published: true,
-            description: '',
-            file_url: 'https://example.com/placeholder.pdf', // Mock URL for now as requested
-            file_type: 'PDF',
-            file_size: 1024 * 1024
-        });
-        setIsCreating(true);
-        setEditingId(null);
-    };
-
-    const handleStartEdit = (plan) => {
-        setFormData({
-            ...plan,
-            classroom_id: plan.classroom,
-            course_id: plan.course,
-            academic_year_id: plan.academic_year
-        });
-        setIsCreating(true);
-        setEditingId(plan.id);
-    };
-
-    const handleSave = async (e) => {
-        e.preventDefault();
-        try {
-            if (activeTab === 'plans') {
-                const payload = {
-                    title: formData.title,
-                    content: formData.content,
-                    objectives: formData.objectives,
-                    date_planned: formData.date_planned,
-                    is_published: formData.is_published,
-                    teacher: user.user_id,
-                    classroom: parseInt(formData.classroom_id),
-                    course: parseInt(formData.course_id),
-                    academic_year: parseInt(formData.academic_year_id) || 1
-                };
-
-                if (editingId) {
-                    await updatePlanMutation.mutateAsync({ id: editingId, payload });
-                    alert(`Lesson Plan "${formData.title}" updated successfully!`);
-                } else {
-                    await createPlanMutation.mutateAsync(payload);
-                    alert(`Lesson Plan "${formData.title}" created successfully!`);
-                }
-            } else {
-                const payload = {
-                    title: formData.title,
-                    description: formData.description,
-                    file_url: formData.file_url,
-                    file_type: formData.file_type,
-                    file_size: formData.file_size,
-                    classroom: parseInt(formData.classroom_id),
-                    course: parseInt(formData.course_id),
-                    academic_year: parseInt(formData.academic_year_id) || 1
-                };
-                await createResourceMutation.mutateAsync(payload);
-                alert(`Resource "${formData.title}" uploaded successfully!`);
-            }
-            setIsCreating(false);
-            setEditingId(null);
-        } catch (error) {
-            console.error("Error saving lesson plan/resource:", error);
-            alert("Failed to save. Please check all fields.");
+    const filteredLessonPlans = useMemo(() => {
+        if (timeFilter === 'all') {
+            return lessonPlans;
         }
-    };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this?')) {
-            try {
-                if (activeTab === 'plans') {
-                    await deletePlanMutation.mutateAsync(id);
-                } else {
-                    await deleteResourceMutation.mutateAsync(id);
-                }
-            } catch (error) {
-                console.error("Error deleting item:", error);
+        const now = new Date();
+
+        return lessonPlans.filter((plan) => {
+            const plannedDate = plan.date_planned ? new Date(plan.date_planned) : null;
+            if (!plannedDate || Number.isNaN(plannedDate.getTime())) {
+                return false;
             }
-        }
-    };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="animate-spin text-teacher-primary" size={48} />
-            </div>
+            if (timeFilter === 'week') {
+                return isSameWeek(plannedDate, now);
+            }
+
+            if (timeFilter === 'month') {
+                return plannedDate.getFullYear() === now.getFullYear()
+                    && plannedDate.getMonth() === now.getMonth();
+            }
+
+            return true;
+        });
+    }, [lessonPlans, timeFilter]);
+
+    const openCreateLessonModal = useCallback(() => {
+        setEditingLesson(null);
+        setLessonForm({
+            ...emptyLessonForm,
+            allocationId: allocations[0] ? String(allocations[0].id) : '',
+            weekStartDate: new Date().toISOString().split('T')[0]
+        });
+        setShowLessonModal(true);
+    }, [allocations]);
+
+    const openEditLessonModal = useCallback((plan) => {
+        const allocation = allocations.find(
+            (item) => Number(item.course_id) === Number(plan.course) && Number(item.class_room_id) === Number(plan.classroom)
         );
-    }
+
+        const parsedContent = parseLessonContent(plan.content || '');
+
+        setEditingLesson(plan);
+        setLessonForm({
+            title: plan.title || '',
+            allocationId: allocation ? String(allocation.id) : '',
+            weekStartDate: plan.date_planned || '',
+            objectives: plan.objectives || '',
+            activities: parsedContent.activities || '',
+            resources: plan.resources_needed || '',
+            notes: parsedContent.notes || ''
+        });
+        setShowLessonModal(true);
+    }, [allocations]);
+
+    const closeLessonModal = useCallback(() => {
+        setShowLessonModal(false);
+        setEditingLesson(null);
+        setLessonForm(emptyLessonForm);
+    }, []);
+
+    const handleSaveLessonPlan = useCallback(async (event) => {
+        event.preventDefault();
+
+        const allocation = allocations.find((item) => String(item.id) === String(lessonForm.allocationId));
+        if (!allocation) {
+            toast.error('Select a class allocation.');
+            return;
+        }
+
+        const payload = {
+            title: lessonForm.title.trim(),
+            course: Number(allocation.course_id),
+            classroom: Number(allocation.class_room_id),
+            academic_year: Number(allocation.academic_year_id),
+            date_planned: lessonForm.weekStartDate,
+            objectives: lessonForm.objectives.trim(),
+            resources_needed: lessonForm.resources.trim(),
+            content: buildLessonContent({
+                activities: lessonForm.activities,
+                notes: lessonForm.notes
+            }),
+            is_published: true
+        };
+
+        if (!payload.title || !payload.date_planned) {
+            toast.error('Title and week start date are required.');
+            return;
+        }
+
+        try {
+            if (editingLesson) {
+                await updateLessonPlanMutation.mutateAsync({ id: editingLesson.id, payload });
+                toast.success('Lesson plan updated.');
+            } else {
+                await createLessonPlanMutation.mutateAsync(payload);
+                toast.success('Lesson plan created.');
+            }
+            closeLessonModal();
+        } catch (error) {
+            toast.error(error?.message || 'Failed to save lesson plan.');
+        }
+    }, [allocations, closeLessonModal, createLessonPlanMutation, editingLesson, lessonForm, updateLessonPlanMutation]);
+
+    const handleDeleteLessonPlan = useCallback(async (lessonId) => {
+        if (!window.confirm('Delete this lesson plan?')) {
+            return;
+        }
+
+        try {
+            await deleteLessonPlanMutation.mutateAsync(lessonId);
+            toast.success('Lesson plan deleted.');
+        } catch (error) {
+            toast.error(error?.message || 'Failed to delete lesson plan.');
+        }
+    }, [deleteLessonPlanMutation]);
+
+    const onDropFile = useCallback((acceptedFiles) => {
+        if (acceptedFiles.length === 0) {
+            return;
+        }
+        setSelectedFile(acceptedFiles[0]);
+    }, []);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop: onDropFile,
+        multiple: false,
+        accept: {
+            'application/pdf': ['.pdf'],
+            'application/msword': ['.doc'],
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+            'image/*': ['.png', '.jpg', '.jpeg']
+        }
+    });
+
+    const handleSaveMaterial = useCallback(async (event) => {
+        event.preventDefault();
+
+        const allocation = allocations.find((item) => String(item.id) === String(materialForm.allocationId));
+        if (!allocation) {
+            toast.error('Select a class allocation for this material.');
+            return;
+        }
+
+        if (!selectedFile) {
+            toast.error('Attach a file before uploading.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('title', materialForm.title.trim());
+        formData.append('description', materialForm.description.trim());
+        formData.append('course', String(allocation.course_id));
+        formData.append('classroom', String(allocation.class_room_id));
+        formData.append('academic_year', String(allocation.academic_year_id));
+        formData.append('file_url', selectedFile.name);
+        formData.append('file_type', selectedFile.type || selectedFile.name.split('.').pop() || 'file');
+        formData.append('file_size', String(selectedFile.size || 0));
+        formData.append('file', selectedFile);
+
+        try {
+            await createMaterialMutation.mutateAsync(formData);
+            toast.success('Learning material uploaded.');
+            setShowMaterialUpload(false);
+            setMaterialForm(emptyMaterialForm);
+            setSelectedFile(null);
+        } catch (error) {
+            toast.error(error?.message || 'Failed to upload learning material.');
+        }
+    }, [allocations, createMaterialMutation, materialForm, selectedFile]);
+
+    const handleDeleteMaterial = useCallback(async (materialId) => {
+        if (!window.confirm('Delete this learning material?')) {
+            return;
+        }
+
+        try {
+            await deleteMaterialMutation.mutateAsync(materialId);
+            toast.success('Learning material deleted.');
+        } catch (error) {
+            toast.error(error?.message || 'Failed to delete material.');
+        }
+    }, [deleteMaterialMutation]);
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            {/* Header */}
-            <header className="page-header">
+        <div className="teacher-page">
+            <div className="teacher-header">
                 <div>
-                    <h1 className="page-title">{t('teacher.lessonPlans.title')}</h1>
-                    <p className="page-subtitle">{t('teacher.lessonPlans.subtitle')}</p>
+                    <h1 className="teacher-title">{t('teacher.lessonPlans.title') || 'Lesson Plans'}</h1>
+                    <p className="teacher-subtitle">
+                        Plan weekly lessons and manage learning materials tied to your allocated classes.
+                    </p>
                 </div>
-                <div className="action-group">
-                    <button
-                        onClick={handleStartCreate}
-                        className="btn-primary"
-                    >
-                        <Plus size={20} />
-                        {activeTab === 'plans' ? t('teacher.lessonPlans.newPlan') : t('teacher.lessonPlans.uploadResource')}
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                    <button type="button" className="btn-primary" onClick={openCreateLessonModal}>
+                        <Plus size={16} />
+                        New Lesson Plan
+                    </button>
+                    <button type="button" className="icon-btn" style={{ width: 'auto', padding: '0.5rem 0.85rem' }} onClick={() => setShowMaterialUpload((previous) => !previous)}>
+                        <FileUp size={15} />
+                        {showMaterialUpload ? 'Close Upload' : 'Upload Material'}
                     </button>
                 </div>
-            </header>
-
-            {/* Tabs */}
-            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--teacher-border)', marginBottom: '1.5rem' }}>
-                <button
-                    onClick={() => setActiveTab('plans')}
-                    style={{
-                        padding: '0.75rem 1rem',
-                        fontWeight: '500',
-                        color: activeTab === 'plans' ? 'var(--teacher-primary)' : 'var(--teacher-text-muted)',
-                        borderBottom: activeTab === 'plans' ? '2px solid var(--teacher-primary)' : '2px solid transparent',
-                        background: 'none',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    {t('teacher.lessonPlans.plans')}
-                </button>
-                <button
-                    onClick={() => setActiveTab('resources')}
-                    style={{
-                        padding: '0.75rem 1rem',
-                        fontWeight: '500',
-                        color: activeTab === 'resources' ? 'var(--teacher-primary)' : 'var(--teacher-text-muted)',
-                        borderBottom: activeTab === 'resources' ? '2px solid var(--teacher-primary)' : '2px solid transparent',
-                        background: 'none',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    {t('teacher.lessonPlans.resources')}
-                </button>
             </div>
 
-            {isCreating && (
-                <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                        <h2 className="text-lg font-bold text-slate-800">
-                            {activeTab === 'plans'
-                                ? (editingId ? t('teacher.lessonPlans.editPlan') : t('teacher.lessonPlans.createPlan'))
-                                : t('teacher.lessonPlans.uploadRes')
-                            }
-                        </h2>
-                        <button onClick={() => setIsCreating(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teacher-text-muted)' }}><X size={20} /></button>
-                    </div>
+            <div className="management-card" style={{ padding: '1rem 1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1rem' }}>Lesson Plan List</h3>
+                    <select
+                        value={timeFilter}
+                        onChange={(event) => setTimeFilter(event.target.value)}
+                        style={{ border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.5rem 0.65rem', fontSize: '0.85rem' }}
+                    >
+                        <option value="all">All plans</option>
+                        <option value="week">This week</option>
+                        <option value="month">This month</option>
+                    </select>
+                </div>
 
-                    <form className="space-y-6" onSubmit={handleSave}>
-                        <div>
-                            <label className="text-sm font-medium text-slate-700 mb-1 block">
-                                {activeTab === 'plans' ? t('teacher.lessonPlans.topic') : t('teacher.lessonPlans.resourceName')}
-                            </label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.title}
-                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                placeholder={activeTab === 'plans' ? 'e.g. Photosynthesis' : 'e.g. Syllabus 2025'}
-                                className="teacher-input w-full"
-                            />
-                        </div>
+                <div style={{ marginTop: '0.9rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+                    {loadingLessonPlans ? (
+                        <div style={{ color: 'var(--color-text-muted)' }}>Loading lesson plans...</div>
+                    ) : filteredLessonPlans.length === 0 ? (
+                        <div style={{ color: 'var(--color-text-muted)' }}>No lesson plans found for this filter.</div>
+                    ) : filteredLessonPlans.map((plan) => {
+                        const start = plan.date_planned ? new Date(plan.date_planned) : null;
+                        const end = start ? new Date(start) : null;
+                        if (end) {
+                            end.setDate(end.getDate() + 6);
+                        }
 
-                        {activeTab === 'plans' ? (
-                            <>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.forClass')}</label>
-                                        <select
-                                            required
-                                            value={formData.classroom_id}
-                                            onChange={(e) => {
-                                                const alloc = allocations.find(a => a.class_room_id === parseInt(e.target.value));
-                                                setFormData({
-                                                    ...formData,
-                                                    classroom_id: e.target.value,
-                                                    course_id: alloc ? alloc.course_id : formData.course_id,
-                                                    academic_year_id: alloc ? alloc.academic_year_id : formData.academic_year_id
-                                                });
-                                            }}
-                                            className="teacher-select w-full"
-                                        >
-                                            <option value="">Select Class</option>
-                                            {allocations.map(a => (
-                                                <option key={a.id} value={a.class_room_id}>
-                                                    {a.classroom_name} - {a.course_name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.date')}</label>
-                                        <input
-                                            type="date"
-                                            required
-                                            value={formData.date_planned}
-                                            onChange={(e) => setFormData({ ...formData, date_planned: e.target.value })}
-                                            className="teacher-input w-full"
-                                        />
-                                    </div>
+                        return (
+                            <div key={plan.id} style={{ border: '1px solid var(--color-border)', borderRadius: '0.85rem', background: '#fff', padding: '0.85rem 0.95rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{plan.title}</h4>
+                                    <span
+                                        style={{
+                                            borderRadius: '999px',
+                                            padding: '0.2rem 0.5rem',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 700,
+                                            background: plan.is_published ? '#dcfce7' : '#e2e8f0',
+                                            color: plan.is_published ? '#166534' : '#334155'
+                                        }}
+                                    >
+                                        {plan.is_published ? 'Published' : 'Draft'}
+                                    </span>
                                 </div>
-                                <div>
-                                    <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.objectives')}</label>
-                                    <textarea
-                                        rows="3"
-                                        value={formData.objectives}
-                                        onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
-                                        className="teacher-input w-full"
-                                        placeholder="What should students learn?"
-                                    ></textarea>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.content')}</label>
-                                    <textarea
-                                        rows="5"
-                                        value={formData.content}
-                                        onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                                        className="teacher-input w-full"
-                                        placeholder="Detailed steps and content..."
-                                    ></textarea>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">Class & Course</label>
-                                        <select
-                                            required
-                                            value={formData.classroom_id}
-                                            onChange={(e) => {
-                                                const alloc = allocations.find(a => a.class_room_id === parseInt(e.target.value));
-                                                setFormData({
-                                                    ...formData,
-                                                    classroom_id: e.target.value,
-                                                    course_id: alloc ? alloc.course_id : formData.course_id,
-                                                    academic_year_id: alloc ? alloc.academic_year_id : formData.academic_year_id
-                                                });
-                                            }}
-                                            className="teacher-select w-full"
-                                        >
-                                            <option value="">Select Class & Course</option>
-                                            {allocations.map(a => (
-                                                <option key={a.id} value={a.class_room_id}>
-                                                    {a.classroom_name} - {a.course_name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700 mb-1 block">File URL</label>
-                                        <input
-                                            type="url"
-                                            required
-                                            value={formData.file_url}
-                                            onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
-                                            placeholder="https://..."
-                                            className="teacher-input w-full"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-slate-700 mb-1 block">{t('teacher.lessonPlans.description') || 'Description'}</label>
-                                    <textarea
-                                        rows="3"
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        className="teacher-input w-full"
-                                        placeholder="Enter resource description..."
-                                    ></textarea>
-                                </div>
-                            </>
-                        )}
 
-                        <div className="flex justify-end gap-3 pt-2">
-                            <button type="button" onClick={() => setIsCreating(false)} className="icon-btn" style={{ width: 'auto', padding: '0.5rem 1rem' }}>{t('teacher.assessments.cancel')}</button>
-                            <button type="submit" className="btn-primary">
-                                <Save size={18} /> {activeTab === 'plans' ? t('teacher.lessonPlans.savePlan') : t('teacher.lessonPlans.upload')}
+                                <p style={{ margin: '0.35rem 0 0', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                    {(plan.course_name || 'Course')} • {(plan.classroom_name || 'Classroom')}
+                                </p>
+
+                                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <Calendar size={14} />
+                                    {start ? start.toLocaleDateString() : 'N/A'} {end ? `- ${end.toLocaleDateString()}` : ''}
+                                </div>
+
+                                <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                                    <button type="button" className="icon-btn" onClick={() => openEditLessonModal(plan)} title="Edit">
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button type="button" className="icon-btn danger" onClick={() => handleDeleteLessonPlan(plan.id)} title="Delete">
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {showLessonModal && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.45)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '1rem'
+                    }}
+                    onClick={closeLessonModal}
+                >
+                    <div
+                        className="management-card"
+                        style={{ width: '720px', maxWidth: '100%', padding: '1rem 1.25rem' }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>{editingLesson ? 'Edit Lesson Plan' : 'Create Lesson Plan'}</h3>
+                            <button type="button" className="icon-btn" onClick={closeLessonModal}>
+                                <X size={14} />
                             </button>
                         </div>
-                    </form>
+
+                        <form onSubmit={handleSaveLessonPlan} style={{ display: 'grid', gap: '0.75rem', marginTop: '0.85rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.6rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Title</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={lessonForm.title}
+                                        onChange={(event) => setLessonForm((prev) => ({ ...prev, title: event.target.value }))}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Week Start Date</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={lessonForm.weekStartDate}
+                                        onChange={(event) => setLessonForm((prev) => ({ ...prev, weekStartDate: event.target.value }))}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Allocation</label>
+                                <select
+                                    value={lessonForm.allocationId}
+                                    onChange={(event) => setLessonForm((prev) => ({ ...prev, allocationId: event.target.value }))}
+                                    required
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                >
+                                    <option value="">Select allocation</option>
+                                    {allocations.map((allocation) => (
+                                        <option key={allocation.id} value={String(allocation.id)}>
+                                            {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Objectives</label>
+                                <textarea
+                                    rows={3}
+                                    value={lessonForm.objectives}
+                                    onChange={(event) => setLessonForm((prev) => ({ ...prev, objectives: event.target.value }))}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                />
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Activities</label>
+                                <textarea
+                                    rows={4}
+                                    value={lessonForm.activities}
+                                    onChange={(event) => setLessonForm((prev) => ({ ...prev, activities: event.target.value }))}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Resources</label>
+                                    <textarea
+                                        rows={3}
+                                        value={lessonForm.resources}
+                                        onChange={(event) => setLessonForm((prev) => ({ ...prev, resources: event.target.value }))}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Notes</label>
+                                    <textarea
+                                        rows={3}
+                                        value={lessonForm.notes}
+                                        onChange={(event) => setLessonForm((prev) => ({ ...prev, notes: event.target.value }))}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem' }}>
+                                <button type="button" onClick={closeLessonModal} className="icon-btn" style={{ width: 'auto', padding: '0.45rem 0.8rem' }}>
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    disabled={createLessonPlanMutation.isPending || updateLessonPlanMutation.isPending}
+                                >
+                                    <Plus size={15} />
+                                    {editingLesson ? 'Update Plan' : 'Create Plan'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
 
-            {activeTab === 'plans' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                    {plans.map((plan) => (
-                        <div key={plan.id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <h3 className="font-bold text-slate-800 text-lg leading-tight">{plan.title}</h3>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button
-                                        onClick={() => handleStartEdit(plan)}
-                                        className="icon-btn"
-                                        title="Edit"
-                                        style={{ border: 'none', padding: '4px' }}
-                                    >
-                                        <Edit2 size={16} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(plan.id)}
-                                        className="icon-btn danger"
-                                        title="Delete"
-                                        style={{ border: 'none', padding: '4px' }}
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            </div>
+            <div className="management-card" style={{ padding: '1rem 1.25rem' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '0.85rem', fontSize: '1rem' }}>Learning Materials</h3>
 
-                            <div className="space-y-2">
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>
-                                    <Calendar size={16} style={{ color: 'var(--teacher-primary)' }} />
-                                    <span>{plan.date_planned}</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--teacher-text-muted)' }}>
-                                    <BookOpen size={16} style={{ color: 'var(--teacher-accent)' }} />
-                                    <span>{plan.classroom_name} - {plan.course_name}</span>
-                                </div>
+                {showMaterialUpload && (
+                    <form onSubmit={handleSaveMaterial} style={{ border: '1px solid var(--color-border)', borderRadius: '0.8rem', padding: '0.85rem', marginBottom: '0.85rem', display: 'grid', gap: '0.65rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Title</label>
+                                <input
+                                    type="text"
+                                    value={materialForm.title}
+                                    onChange={(event) => setMaterialForm((prev) => ({ ...prev, title: event.target.value }))}
+                                    required
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                />
                             </div>
-
-                            {plan.objectives && (
-                                <p className="text-sm text-slate-600 line-clamp-2" style={{ borderTop: '1px solid var(--teacher-border)', paddingTop: '0.5rem' }}>
-                                    <strong>Obj:</strong> {plan.objectives}
-                                </p>
-                            )}
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Allocation</label>
+                                <select
+                                    value={materialForm.allocationId}
+                                    onChange={(event) => setMaterialForm((prev) => ({ ...prev, allocationId: event.target.value }))}
+                                    required
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                >
+                                    <option value="">Select allocation</option>
+                                    {allocations.map((allocation) => (
+                                        <option key={allocation.id} value={String(allocation.id)}>
+                                            {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="glass-panel">
-                    <div className="table-container">
-                        <table className="teacher-table">
-                            <thead>
-                                <tr>
-                                    <th>{t('teacher.lessonPlans.resourceTable.name')}</th>
-                                    <th>Course / Class</th>
-                                    <th>{t('teacher.lessonPlans.resourceTable.type')}</th>
-                                    <th>{t('teacher.lessonPlans.resourceTable.date')}</th>
-                                    <th>{t('teacher.lessonPlans.resourceTable.actions')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {resources.map((res) => (
-                                    <tr key={res.id}>
-                                        <td className="font-bold text-slate-800">
-                                            <div>{res.title}</div>
-                                            <div className="text-xs font-normal text-slate-500">{res.description}</div>
-                                        </td>
-                                        <td>
-                                            <div className="text-sm font-medium">{res.course_name}</div>
-                                            <div className="text-xs text-slate-500">{res.classroom_name}</div>
-                                        </td>
-                                        <td>
-                                            <span className="status-badge info">
-                                                {res.file_type || 'PDF'}
-                                            </span>
-                                        </td>
-                                        <td className="text-slate-500">{new Date(res.created_at).toLocaleDateString()}</td>
-                                        <td>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    className="icon-btn"
-                                                    style={{ border: 'none', cursor: 'pointer', color: 'var(--teacher-primary)' }}
-                                                    onClick={() => window.open(res.file_url, '_blank')}
-                                                    title="View"
-                                                >
-                                                    <Paperclip size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(res.id)}
-                                                    className="icon-btn danger"
-                                                    style={{ border: 'none' }}
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
+
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.82rem' }}>Description</label>
+                            <textarea
+                                rows={3}
+                                value={materialForm.description}
+                                onChange={(event) => setMaterialForm((prev) => ({ ...prev, description: event.target.value }))}
+                                style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                            />
+                        </div>
+
+                        <div
+                            {...getRootProps()}
+                            style={{
+                                border: '2px dashed var(--color-border)',
+                                borderRadius: '0.7rem',
+                                padding: '0.9rem',
+                                textAlign: 'center',
+                                background: isDragActive ? 'rgba(var(--color-primary-rgb), 0.07)' : 'transparent',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <input {...getInputProps()} />
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                                {selectedFile
+                                    ? `Selected file: ${selectedFile.name}`
+                                    : 'Drag and drop a file here, or click to choose.'}
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button type="submit" className="btn-primary" disabled={createMaterialMutation.isPending}>
+                                <FileUp size={15} />
+                                {createMaterialMutation.isPending ? 'Uploading...' : 'Upload Material'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {loadingMaterials ? (
+                    <div style={{ color: 'var(--color-text-muted)' }}>Loading learning materials...</div>
+                ) : materials.length === 0 ? (
+                    <div style={{ color: 'var(--color-text-muted)' }}>No materials uploaded yet.</div>
+                ) : (
+                    <div style={{ display: 'grid', gap: '0.55rem' }}>
+                        {materials.map((material) => {
+                            const MaterialIcon = getFileTypeIcon(material.file_type || '');
+
+                            return (
+                                <div key={material.id} style={{ border: '1px solid var(--color-border)', borderRadius: '0.75rem', background: '#fff', padding: '0.75rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--color-bg-body)', display: 'grid', placeItems: 'center', color: 'var(--color-primary)', flexShrink: 0 }}>
+                                            <MaterialIcon size={16} />
+                                        </div>
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--color-text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {material.title}
                                             </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                            <div style={{ marginTop: '2px', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                                                {(material.course_name || 'Course')} • {(material.classroom_name || 'Class')} • {material.created_at ? new Date(material.created_at).toLocaleDateString() : 'N/A'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                                        <a
+                                            href={material.file_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="icon-btn"
+                                            style={{ textDecoration: 'none' }}
+                                            title="Open material"
+                                        >
+                                            <LinkIcon size={14} />
+                                        </a>
+                                        <button
+                                            type="button"
+                                            className="icon-btn danger"
+                                            onClick={() => handleDeleteMaterial(material.id)}
+                                            title="Delete material"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
+                )}
+            </div>
+
+            {(loadingAllocations || loadingLessonPlans || loadingMaterials) && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                    {loadingAllocations ? 'Loading allocations...' : ''}
                 </div>
             )}
         </div>

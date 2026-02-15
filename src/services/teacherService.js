@@ -1,11 +1,10 @@
 import { api } from '../utils/api';
 
-const buildQueryString = (filters = {}) => {
-    const sanitized = Object.fromEntries(
-        Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
-    );
-    return new URLSearchParams(sanitized).toString();
-};
+const sanitizeParams = (filters = {}) => Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
+);
+
+const todayDate = () => new Date().toISOString().split('T')[0];
 
 const teacherService = {
     // Teacher Profile/Settings
@@ -22,28 +21,21 @@ const teacherService = {
     },
 
     // Course Allocations / Classes
-    getSchedule: async (date = new Date().toISOString().split('T')[0]) => {
-        return api.get(`/teacher/schedule/?date=${date}`);
+    getSchedule: async (date = todayDate()) => {
+        return api.get('/teacher/schedule/', { params: { date } });
     },
 
-    getCourseAllocations: async () => {
-        // Use schedule endpoint to get active allocations
-        const date = new Date().toISOString().split('T')[0];
-        return api.get(`/teacher/schedule/?date=${date}`);
+    getCourseAllocations: async (date = todayDate()) => {
+        return teacherService.getSchedule(date);
     },
 
     getStudents: async (filters = {}) => {
-        // Teacher specific student list logic if needed,
-        // otherwise rely on class-filtered lists
-        const queryParams = buildQueryString(filters);
-        // Teachers are StaffUsers, so they can access /manager/students/
-        return api.get(`/manager/students/?${queryParams}`);
+        return api.get('/manager/students/', { params: sanitizeParams(filters) });
     },
 
     // Assignments
     getAssignments: async (filters = {}) => {
-        const queryParams = buildQueryString(filters);
-        return api.get(`/teacher/assignments/?${queryParams}`);
+        return api.get('/teacher/assignments/', { params: sanitizeParams(filters) });
     },
     createAssignment: async (data) => {
         return api.post('/teacher/assignments/', data);
@@ -57,11 +49,13 @@ const teacherService = {
     deleteAssignment: async (id) => {
         return api.post(`/teacher/assignments/${id}/deactivate/`);
     },
+    activateAssignment: async (id) => {
+        return api.post(`/teacher/assignments/${id}/activate/`);
+    },
 
     // Attendance
     getAttendance: async (filters = {}) => {
-        const queryParams = buildQueryString(filters);
-        return api.get(`/teacher/attendance/?${queryParams}`);
+        return api.get('/teacher/attendance/', { params: sanitizeParams(filters) });
     },
     recordBulkAttendance: async (records = []) => {
         if (!Array.isArray(records) || records.length === 0) {
@@ -84,40 +78,25 @@ const teacherService = {
 
     // Marks / Grading
     getMarks: async (filters = {}) => {
-        const queryParams = buildQueryString(filters);
-        return api.get(`/teacher/marks/?${queryParams}`);
+        return api.get('/teacher/marks/', { params: sanitizeParams(filters) });
     },
     recordMark: async (data) => {
         return api.post('/teacher/marks/record/', data);
     },
-    bulkImportMarks: async (data) => {
-        // Since api.post uses JSON.stringify, we might need a custom approach for multipart/form-data
-        // But for now, let's assume the API utility can handle or we'll adjust it if needed.
-        // However, standard fetch with FormData shouldn't have Content-Type set manually.
+    bulkImportMarks: async ({ assignment_id, file }) => {
         const formData = new FormData();
-        formData.append('assignment_id', data.assignment_id);
-        formData.append('file', data.file);
-
-        const token = localStorage.getItem('accessToken');
-        const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-        const response = await fetch(`${BASE_URL}/teacher/marks/bulk-import/`, {
-            method: 'POST',
+        formData.append('assignment_id', assignment_id);
+        formData.append('file', file);
+        return api.post('/teacher/marks/bulk-import/', formData, {
             headers: {
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-            },
-            body: data, // FormData passed in
+                'Content-Type': 'multipart/form-data'
+            }
         });
-
-        if (response.status === 204) return null;
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.detail || result.message || 'Something went wrong');
-        return result;
     },
 
     // Lesson Plans
     getLessonPlans: async (filters = {}) => {
-        const queryParams = buildQueryString(filters);
-        return api.get(`/teacher/lesson-plans/?${queryParams}`);
+        return api.get('/teacher/lesson-plans/', { params: sanitizeParams(filters) });
     },
     createLessonPlan: async (data) => {
         return api.post('/teacher/lesson-plans/', data);
@@ -134,19 +113,53 @@ const teacherService = {
 
     // Learning Materials
     getLearningMaterials: async (filters = {}) => {
-        const queryParams = buildQueryString(filters);
-        return api.get(`/teacher/learning-materials/?${queryParams}`);
+        return api.get('/teacher/learning-materials/', { params: sanitizeParams(filters) });
     },
     createLearningMaterial: async (data) => {
-        return api.post('/teacher/learning-materials/', data);
+        return api.post('/teacher/learning-materials/', data, {
+            headers: data instanceof FormData
+                ? { 'Content-Type': 'multipart/form-data' }
+                : undefined
+        });
     },
     deleteLearningMaterial: async (id) => {
         return api.delete(`/teacher/learning-materials/${id}/`);
     },
 
+    // Communication
+    sendMessage: async (data) => {
+        return api.post('/user-messages/', data);
+    },
+    getMessages: async (params = {}) => {
+        return api.get('/user-messages/', { params: sanitizeParams(params) });
+    },
+    getThread: async (threadId) => {
+        return api.get(`/user-messages/threads/${threadId}/`);
+    },
+    markMessageRead: async (messageId) => {
+        try {
+            return await api.post(`/user-messages/${messageId}/read/`);
+        } catch (error) {
+            if ([404, 405].includes(error?.status)) {
+                return api.get(`/user-messages/${messageId}/read/`);
+            }
+            throw error;
+        }
+    },
+    searchUsers: async (search) => {
+        return api.get('/user-messages/search/', {
+            params: sanitizeParams({ search, q: search })
+        });
+    },
+
     // Analytics
     getKnowledgeGaps: async (allocationId, threshold = 50.0) => {
-        return api.get(`/teacher/analytics/knowledge-gaps/?course_allocation_id=${allocationId}&threshold=${threshold}`);
+        return api.get('/teacher/analytics/knowledge-gaps/', {
+            params: sanitizeParams({
+                course_allocation_id: allocationId,
+                threshold
+            })
+        });
     }
 };
 

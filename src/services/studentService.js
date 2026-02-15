@@ -85,6 +85,27 @@ const studentService = {
 
     markMessageRead: async (messageId) => {
         return api.post(`/user-messages/${messageId}/read/`);
+    },
+
+    // Notifications
+    getNotifications: async (params = {}) => {
+        return api.get('/notifications/', { params });
+    },
+
+    getUnreadCount: async () => {
+        return api.get('/notifications/unread-count/');
+    },
+
+    getUnreadNotificationCount: async () => {
+        return api.get('/notifications/unread-count/');
+    },
+
+    markNotificationRead: async (id) => {
+        return api.post(`/notifications/${id}/mark-read/`);
+    },
+
+    markAllNotificationsRead: async () => {
+        return api.post('/notifications/mark-all-read/');
     }
 };
 

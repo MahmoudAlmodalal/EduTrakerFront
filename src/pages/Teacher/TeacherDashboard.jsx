@@ -1,23 +1,17 @@
 import React, { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Clock,
-    Calendar,
     Bell,
-    Plus,
-    FileText,
-    UserCheck,
-    Search,
-    ChevronRight,
-    TrendingUp,
-    Users,
+    BookOpen,
+    Calendar,
+    CheckCircle2,
+    Clock,
+    ClipboardCheck,
     GraduationCap,
-    ArrowUpRight,
-    AlertCircle
+    Plus,
+    Users
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
-import { motion as Motion } from 'framer-motion';
 import {
     useMarkAllTeacherNotificationsRead,
     useMarkTeacherNotificationRead,
@@ -25,78 +19,113 @@ import {
     useTeacherNotifications,
     useTeacherSchedule
 } from '../../hooks/useTeacherQueries';
-import { teacherContainerVariants, teacherItemVariants } from '../../utils/animations';
 import { toList, todayIsoDate } from '../../utils/helpers';
+import './Teacher.css';
 
-// Skeleton Component for Loading States
-const Skeleton = ({ className }) => (
-    <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
+const cardPalette = [
+    { bgColor: '#dbeafe', iconColor: '#2563eb' },
+    { bgColor: '#dcfce7', iconColor: '#16a34a' },
+    { bgColor: '#ffedd5', iconColor: '#ea580c' },
+    { bgColor: '#ede9fe', iconColor: '#7c3aed' },
+    { bgColor: '#ccfbf1', iconColor: '#0f766e' }
+];
+
+const SkeletonBlock = ({ height = '80px' }) => (
+    <div
+        style={{
+            width: '100%',
+            height,
+            borderRadius: '0.75rem',
+            background: 'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%)',
+            backgroundSize: '400% 100%',
+            animation: 'shimmer 1.2s ease infinite'
+        }}
+    />
 );
 
-const QuickAction = ({ label, sub, icon, onClick, colorClass, iconColor }) => (
-    <Motion.button
-        variants={teacherItemVariants}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
+const QuickAction = ({ icon, title, subtitle, onClick }) => (
+    <button
+        type="button"
         onClick={onClick}
-        className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all text-left w-full group"
+        className="teacher-quick-action"
     >
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass} ${iconColor} group-hover:scale-110 transition-transform`}>
-            {React.createElement(icon, { size: 20 })}
+        <div className="teacher-quick-action-icon">
+            {React.createElement(icon, { size: 18 })}
         </div>
-        <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">{label}</p>
-            <p className="text-xs text-gray-500 truncate">{sub}</p>
+        <div className="teacher-quick-action-copy">
+            <div className="teacher-quick-action-title">{title}</div>
+            <div className="teacher-quick-action-subtitle">{subtitle}</div>
         </div>
-        <ArrowUpRight size={16} className="text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-    </Motion.button>
+    </button>
 );
 
 const TeacherDashboard = () => {
-    const navigate = useNavigate();
     const { t } = useTheme();
-    const { user } = useAuth();
+    const navigate = useNavigate();
     const date = todayIsoDate();
 
     const {
         data: statsData,
-        isLoading: statsLoading,
-        error: statsError,
+        isLoading: loadingStats,
+        isError: hasStatsError,
         refetch: refetchStats
     } = useTeacherDashboardStats();
 
     const {
         data: scheduleData,
-        isLoading: scheduleLoading,
-        error: scheduleError,
+        isLoading: loadingSchedule,
+        isError: hasScheduleError,
         refetch: refetchSchedule
     } = useTeacherSchedule(date);
 
     const {
         data: notificationsData,
-        isLoading: notificationsLoading,
-        error: notificationsError,
+        isLoading: loadingNotifications,
+        isError: hasNotificationsError,
         refetch: refetchNotifications
     } = useTeacherNotifications({ page_size: 5 });
 
-    const markAllAsReadMutation = useMarkAllTeacherNotificationsRead();
-    const markAsReadMutation = useMarkTeacherNotificationRead();
+    const markAllReadMutation = useMarkAllTeacherNotificationsRead();
+    const markNotificationReadMutation = useMarkTeacherNotificationRead();
 
+    const stats = useMemo(() => statsData?.statistics || {}, [statsData]);
     const schedule = useMemo(() => toList(scheduleData), [scheduleData]);
     const notifications = useMemo(() => toList(notificationsData), [notificationsData]);
 
-    const stats = useMemo(() => {
-        const source = statsData?.statistics || {};
-        return {
-            avgAttendance: Math.round(Number(source.average_attendance || 0)),
-            pendingAssignments: source.pending_assignments_count || 0,
-            totalToGrade: source.total_submissions_to_grade || 0,
-            activeStudents: source.total_students || 0
-        };
-    }, [statsData]);
+    const dashboardCards = useMemo(() => ([
+        {
+            label: 'Total Students',
+            value: stats.total_students ?? 0,
+            icon: Users
+        },
+        {
+            label: 'Active Classes Today',
+            value: schedule.length,
+            icon: GraduationCap
+        },
+        {
+            label: 'Pending Assignments',
+            value: stats.pending_assignments_count ?? 0,
+            icon: ClipboardCheck
+        },
+        {
+            label: 'Average Attendance %',
+            value: `${Math.round(Number(stats.average_attendance || 0))}%`,
+            icon: CheckCircle2
+        },
+        {
+            label: 'Lesson Plans (This Week)',
+            value: stats.lesson_plans_this_week
+                ?? stats.weekly_lesson_plans
+                ?? stats.lesson_plan_count
+                ?? 0,
+            icon: BookOpen
+        }
+    ]), [schedule.length, stats]);
 
-    const loading = statsLoading || scheduleLoading || notificationsLoading;
-    const error = statsError || scheduleError || notificationsError;
+    const hasAnyError = hasStatsError || hasScheduleError || hasNotificationsError;
+
+    const unreadCount = notifications.filter((notification) => !notification.is_read).length;
 
     const handleRetry = useCallback(() => {
         refetchStats();
@@ -104,386 +133,387 @@ const TeacherDashboard = () => {
         refetchNotifications();
     }, [refetchNotifications, refetchSchedule, refetchStats]);
 
-    const handleMarkAllRead = useCallback(() => {
-        markAllAsReadMutation.mutate();
-    }, [markAllAsReadMutation]);
+    const handleMarkAllNotificationsRead = useCallback(() => {
+        markAllReadMutation.mutate();
+    }, [markAllReadMutation]);
 
-    const handleNotificationClick = useCallback(async (notif) => {
-        if (!notif.is_read) {
-            await markAsReadMutation.mutateAsync(notif.id);
+    const handleNotificationClick = useCallback(async (notification) => {
+        if (!notification.is_read) {
+            await markNotificationReadMutation.mutateAsync(notification.id);
         }
-        if (notif.action_url) {
-            navigate(notif.action_url);
-        }
-    }, [markAsReadMutation, navigate]);
 
-    if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-center px-4">
-                <div className="bg-red-50 p-4 rounded-full">
-                    <AlertCircle className="text-red-500" size={32} />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">Something went wrong</h3>
-                <p className="text-gray-500 max-w-md">{error?.message || 'Failed to load dashboard data. Please try again later.'}</p>
-                <button
-                    onClick={handleRetry}
-                    className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                    Retry
-                </button>
-            </div>
-        );
-    }
+        if (notification.action_url) {
+            navigate(notification.action_url);
+        }
+    }, [markNotificationReadMutation, navigate]);
 
     return (
-        <Motion.div
-            initial="hidden"
-            animate="visible"
-            variants={teacherContainerVariants}
-            className="max-w-7xl mx-auto space-y-8 pb-12 overflow-hidden px-4 sm:px-6"
-        >
-            {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-100 pb-8">
+        <div className="teacher-page">
+            <style>
+                {`@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }`}
+            </style>
+
+            <div className="teacher-header">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-                        {t('teacher.dashboard.title')}
-                    </h1>
-                    <p className="text-gray-500 mt-1 flex items-center gap-2">
-                        <Users size={16} className="text-indigo-500" />
-                        {t('teacher.dashboard.welcome')}, <span className="font-semibold text-gray-700">{user?.full_name || user?.username}</span>
+                    <h1 className="teacher-title">{t('teacher.dashboard.title') || 'Teacher Dashboard'}</h1>
+                    <p className="teacher-subtitle">
+                        {t('teacher.dashboard.subtitle') || 'Daily overview of classes, assignments, attendance, and notifications.'}
                     </p>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <button
-                        onClick={() => navigate('/teacher/assignments/new')}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => navigate('/teacher/assessments?tab=create')}
+                        style={{ borderRadius: '0.75rem' }}
                     >
                         <Plus size={16} />
-                        <span>{t('teacher.assessments.createAssessment') || 'Create Assessment'}</span>
+                        Create Assignment
                     </button>
-                    <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                        <div className="pr-4 border-r border-gray-100">
-                            <p className="text-sm font-bold text-gray-900 leading-none">
-                                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                            </p>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">{new Date().getFullYear()}</p>
-                        </div>
-                        <div className="relative cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors"
-                            onClick={() => navigate('/teacher/communication', { state: { activeTab: 'notifications' } })}>
-                            <Bell size={22} className="text-gray-500" />
-                            {notifications.some(n => !n.is_read) && (
-                                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm animate-pulse"></span>
-                            )}
-                        </div>
-                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => navigate('/teacher/communication', { state: { activeTab: 'notifications' } })}
+                        style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '12px',
+                            border: '1px solid var(--color-border)',
+                            background: 'var(--color-bg-surface)',
+                            display: 'grid',
+                            placeItems: 'center',
+                            color: 'var(--color-text-muted)',
+                            cursor: 'pointer',
+                            position: 'relative'
+                        }}
+                        aria-label="Open notifications"
+                    >
+                        <Bell size={20} />
+                        {unreadCount > 0 && (
+                            <span
+                                style={{
+                                    position: 'absolute',
+                                    top: '6px',
+                                    right: '6px',
+                                    minWidth: '16px',
+                                    height: '16px',
+                                    borderRadius: '999px',
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '0 4px'
+                                }}
+                            >
+                                {unreadCount}
+                            </span>
+                        )}
+                    </button>
                 </div>
             </div>
 
-            {/* Top Stats Row - Enhanced with Gradients */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Motion.div variants={teacherItemVariants} className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                    <div className="relative bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
-                        {loading ? (
-                            <div className="space-y-3">
-                                <Skeleton className="h-4 w-24 bg-white/20" />
-                                <Skeleton className="h-8 w-16 bg-white/20" />
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                                        <UserCheck size={24} className="text-white" />
-                                    </div>
-                                    <TrendingUp size={16} className="text-white/60" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-white/80 text-xs font-bold uppercase tracking-wide">{t('teacher.dashboard.avgAttendance')}</p>
-                                    <p className="text-4xl font-black text-white">{stats.avgAttendance}%</p>
-                                    <p className="text-white/70 text-xs font-medium">Overall</p>
-                                </div>
-                            </>
-                        )}
+            {hasAnyError && (
+                <div className="management-card" style={{ padding: '1rem', border: '1px solid #fecaca', background: '#fef2f2' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                        <p style={{ margin: 0, color: '#991b1b', fontWeight: 600 }}>
+                            Failed to load some dashboard data.
+                        </p>
+                        <button type="button" className="btn-primary" onClick={handleRetry}>
+                            Retry
+                        </button>
                     </div>
-                </Motion.div>
+                </div>
+            )}
 
-                <Motion.div variants={teacherItemVariants} className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                    <div className="relative bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
-                        {loading ? (
-                            <div className="space-y-3">
-                                <Skeleton className="h-4 w-24 bg-white/20" />
-                                <Skeleton className="h-8 w-16 bg-white/20" />
+            <div className="teacher-stats-grid">
+                {(loadingStats ? Array.from({ length: 5 }) : dashboardCards).map((card, index) => {
+                    if (loadingStats) {
+                        return (
+                            <div key={`skeleton-${index}`} className="management-card" style={{ padding: '1rem' }}>
+                                <SkeletonBlock height="120px" />
                             </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                                        <FileText size={24} className="text-white" />
-                                    </div>
-                                    <div className="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full">
-                                        <span className="text-xs font-bold text-white">{stats.pendingAssignments}</span>
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-white/80 text-xs font-bold uppercase tracking-wide">{t('teacher.dashboard.assignmentsToGrade')}</p>
-                                    <p className="text-4xl font-black text-white">{stats.totalToGrade}</p>
-                                    <p className="text-white/70 text-xs font-medium">{stats.pendingAssignments} Active</p>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </Motion.div>
+                        );
+                    }
 
-                <Motion.div variants={teacherItemVariants} className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                    <div className="relative bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
-                        {loading ? (
-                            <div className="space-y-3">
-                                <Skeleton className="h-4 w-24 bg-white/20" />
-                                <Skeleton className="h-8 w-16 bg-white/20" />
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                                        <GraduationCap size={24} className="text-white" />
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-white/80 text-xs font-bold uppercase tracking-wide">Current Classes</p>
-                                    <p className="text-4xl font-black text-white">{schedule.length}</p>
-                                    <p className="text-white/70 text-xs font-medium">Active Today</p>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </Motion.div>
+                    const Icon = card.icon;
+                    const palette = cardPalette[index % cardPalette.length];
 
-                <Motion.div variants={teacherItemVariants} className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-sky-400 to-blue-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                    <div className="relative bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all">
-                        {loading ? (
-                            <div className="space-y-3">
-                                <Skeleton className="h-4 w-24 bg-white/20" />
-                                <Skeleton className="h-8 w-16 bg-white/20" />
+                    return (
+                        <div key={card.label} className="management-card" style={{ padding: '1.2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div
+                                    style={{
+                                        width: '46px',
+                                        height: '46px',
+                                        borderRadius: '12px',
+                                        background: palette.bgColor,
+                                        color: palette.iconColor,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    <Icon size={22} />
+                                </div>
                             </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                                        <Users size={24} className="text-white" />
-                                    </div>
+
+                            <div style={{ marginTop: '1rem' }}>
+                                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--color-text-main)' }}>
+                                    {card.value}
                                 </div>
-                                <div className="space-y-1">
-                                    <p className="text-white/80 text-xs font-bold uppercase tracking-wide">Active Students</p>
-                                    <p className="text-4xl font-black text-white">{stats.activeStudents}</p>
-                                    <p className="text-white/70 text-xs font-medium">Enrolled</p>
+                                <div style={{ marginTop: '0.25rem', color: 'var(--color-text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                    {card.label}
                                 </div>
-                            </>
-                        )}
-                    </div>
-                </Motion.div>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
-            {/* Main Content & Sidebar */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Schedule Column */}
-                <Motion.div variants={teacherItemVariants} className="lg:col-span-2 space-y-6">
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden min-h-[400px] hover:shadow-xl transition-shadow">
-                        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
-                            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-3">
-                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                                    <Clock size={18} />
-                                </div>
-                                {t('teacher.dashboard.mySchedule')}
-                            </h2>
+            <div className="teacher-split-grid">
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                    <div className="management-card">
+                        <div
+                            style={{
+                                padding: '1rem 1.25rem',
+                                borderBottom: '1px solid var(--color-border)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: '0.75rem',
+                                flexWrap: 'wrap'
+                            }}
+                        >
+                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem' }}>
+                                <Clock size={18} style={{ color: 'var(--color-primary)' }} />
+                                Today's Schedule
+                            </h3>
                             <button
+                                type="button"
                                 onClick={() => navigate('/teacher/classes')}
-                                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group"
+                                style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    color: 'var(--color-primary)',
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
                             >
-                                {t('teacher.dashboard.viewTimetable')}
-                                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                                View classes
                             </button>
                         </div>
 
-                        <div className="p-6">
-                            {loading ? (
-                                <div className="space-y-4">
-                                    <Skeleton className="h-24 w-full rounded-2xl" />
-                                    <Skeleton className="h-24 w-full rounded-2xl" />
-                                    <Skeleton className="h-24 w-full rounded-2xl" />
+                        <div style={{ padding: '1rem 1.25rem' }}>
+                            {loadingSchedule ? (
+                                <div style={{ display: 'grid', gap: '0.7rem' }}>
+                                    <SkeletonBlock height="76px" />
+                                    <SkeletonBlock height="76px" />
+                                    <SkeletonBlock height="76px" />
                                 </div>
-                            ) : schedule.length > 0 ? (
-                                <div className="space-y-4">
+                            ) : schedule.length === 0 ? (
+                                <div
+                                    style={{
+                                        minHeight: '180px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexDirection: 'column',
+                                        color: 'var(--color-text-muted)',
+                                        textAlign: 'center'
+                                    }}
+                                >
+                                    <Calendar size={38} style={{ opacity: 0.25, marginBottom: '0.5rem' }} />
+                                    <p style={{ margin: 0 }}>No classes scheduled for today.</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gap: '0.7rem' }}>
                                     {schedule.map((slot) => (
-                                        <div key={slot.id} className={`flex items-center gap-5 p-5 rounded-2xl border transition-all group ${slot.status === 'current'
-                                            ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 shadow-md ring-2 ring-indigo-100'
-                                            : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-md'
-                                            }`}>
-                                            <div className="w-16 h-16 rounded-xl bg-white border border-gray-100 shadow-xs flex flex-col items-center justify-center shrink-0">
-                                                <span className="text-xs font-bold text-indigo-600">{slot.time?.split(' ')[0] || 'TBD'}</span>
-                                                <Clock size={14} className="text-gray-300 mt-1" />
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h3 className="font-bold text-gray-900 truncate">{slot.subject || slot.course_name}</h3>
-                                                    {slot.status === 'current' && (
-                                                        <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
-                                                            {t('teacher.dashboard.now')}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-3 text-xs text-gray-500">
-                                                    <span className="flex items-center gap-1">
-                                                        <Users size={12} className="text-gray-400" />
-                                                        {slot.class || slot.classroom_name}
-                                                    </span>
-                                                    <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                                                    <span className="flex items-center gap-1 uppercase tracking-tight">
-                                                        {slot.room || 'Room TBD'}
-                                                    </span>
+                                        <div
+                                            key={slot.id}
+                                            style={{
+                                                border: '1px solid var(--color-border)',
+                                                borderRadius: '0.85rem',
+                                                padding: '0.85rem 0.95rem',
+                                                display: 'grid',
+                                                gridTemplateColumns: '110px 1fr',
+                                                gap: '0.85rem',
+                                                alignItems: 'center'
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    borderRadius: '0.65rem',
+                                                    background: 'var(--color-bg-body)',
+                                                    border: '1px solid var(--color-border)',
+                                                    padding: '0.45rem 0.55rem',
+                                                    textAlign: 'center'
+                                                }}
+                                            >
+                                                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-primary)' }}>
+                                                    {slot.time || slot.time_slot || 'TBD'}
                                                 </div>
                                             </div>
 
-                                            {slot.status === 'current' && (
-                                                <button
-                                                    onClick={() => navigate('/teacher/attendance')}
-                                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
-                                                >
-                                                    {t('teacher.dashboard.start')}
-                                                </button>
-                                            )}
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ fontWeight: 700, color: 'var(--color-text-main)' }}>
+                                                    {slot.course_name || slot.subject || 'Class'}
+                                                </div>
+                                                <div style={{ marginTop: '2px', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                                    Room: {slot.room || slot.classroom_name || slot.class || 'TBD'}
+                                                </div>
+                                                <div style={{ marginTop: '2px', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                                    Grade: {slot.grade_level || slot.grade || 'N/A'}
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-20 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                                    <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm mb-4">
-                                        <Calendar className="text-gray-300" size={32} />
-                                    </div>
-                                    <p className="text-gray-500 font-medium">{t('teacher.dashboard.noSchedule') || 'No classes scheduled for today'}</p>
-                                </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Quick Access Desktop Grid */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                        <h2 className="text-md font-bold text-gray-900 mb-6 flex items-center gap-2">
-                            <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                            Quick Actions
-                        </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="management-card" style={{ padding: '1rem 1.25rem' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '0.85rem', fontSize: '1rem' }}>Quick Actions</h3>
+                        <div style={{ display: 'grid', gap: '0.65rem' }}>
                             <QuickAction
-                                label={t('teacher.dashboard.createAssessment') || 'Create Assessment'}
-                                sub="New Assignment"
                                 icon={Plus}
-                                onClick={() => navigate('/teacher/assignments/new')}
-                                colorClass="bg-indigo-50"
-                                iconColor="text-indigo-600"
+                                title={t('teacher.dashboard.createAssessment') || 'Create Assessment'}
+                                subtitle="Add a new assignment or quiz"
+                                onClick={() => navigate('/teacher/assessments?tab=create')}
                             />
                             <QuickAction
-                                label={t('teacher.dashboard.recordAttendance')}
-                                sub="Today's Classes"
-                                icon={UserCheck}
+                                icon={ClipboardCheck}
+                                title={t('teacher.dashboard.recordAttendance') || 'Record Attendance'}
+                                subtitle="Open class attendance panel"
                                 onClick={() => navigate('/teacher/classes')}
-                                colorClass="bg-emerald-50"
-                                iconColor="text-emerald-600"
                             />
                             <QuickAction
-                                label={t('teacher.dashboard.findStudent')}
-                                sub="Student Profiles"
-                                icon={Search}
-                                onClick={() => navigate('/teacher/classes')}
-                                colorClass="bg-amber-50"
-                                iconColor="text-amber-600"
+                                icon={Bell}
+                                title={t('teacher.dashboard.notifications') || 'Message Center'}
+                                subtitle="Open communication and notifications"
+                                onClick={() => navigate('/teacher/communication')}
                             />
                         </div>
                     </div>
-                </Motion.div>
+                </div>
 
-                {/* Sidebar Notification Column */}
-                <Motion.div variants={teacherItemVariants} className="space-y-6">
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
-                            <h2 className="text-md font-bold text-gray-900 flex items-center gap-2">
-                                <Bell size={18} className="text-amber-500" />
-                                {t('teacher.dashboard.notifications')}
-                            </h2>
+                <div className="management-card">
+                    <div
+                        style={{
+                            padding: '1rem 1.25rem',
+                            borderBottom: '1px solid var(--color-border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.75rem'
+                        }}
+                    >
+                        <h3 style={{ margin: 0, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <Bell size={18} style={{ color: 'var(--color-primary)' }} />
+                            Notifications
+                        </h3>
+                        {unreadCount > 0 && (
                             <button
-                                onClick={handleMarkAllRead}
-                                className="text-[10px] font-bold text-gray-400 hover:text-indigo-600 uppercase tracking-widest transition-colors"
-                                disabled={markAllAsReadMutation.isPending}
+                                type="button"
+                                onClick={handleMarkAllNotificationsRead}
+                                style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    color: 'var(--color-primary)',
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
                             >
-                                {t('teacher.dashboard.markAllRead')}
+                                {markAllReadMutation.isPending ? 'Marking...' : 'Mark all read'}
                             </button>
-                        </div>
+                        )}
+                    </div>
 
-                        <div className="p-4 space-y-2">
-                            {loading ? (
-                                <>
-                                    <Skeleton className="h-16 w-full rounded-xl" />
-                                    <Skeleton className="h-16 w-full rounded-xl" />
-                                </>
-                            ) : notifications.length > 0 ? (
-                                notifications.map((notif) => (
-                                    <Motion.div
-                                        key={notif.id}
-                                        whileHover={{ scale: 1.02 }}
-                                        onClick={() => handleNotificationClick(notif)}
-                                        className={`p-4 rounded-xl flex gap-4 cursor-pointer transition-all ${!notif.is_read ? 'bg-amber-50/50 border border-amber-100 shadow-xs' : 'hover:bg-gray-50 border border-transparent'
-                                            }`}
+                    <div>
+                        {loadingNotifications ? (
+                            <div style={{ padding: '1rem', display: 'grid', gap: '0.7rem' }}>
+                                <SkeletonBlock height="72px" />
+                                <SkeletonBlock height="72px" />
+                                <SkeletonBlock height="72px" />
+                            </div>
+                        ) : notifications.length === 0 ? (
+                            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                                No new notifications.
+                            </div>
+                        ) : (
+                            notifications.map((notification) => (
+                                <button
+                                    key={notification.id}
+                                    type="button"
+                                    onClick={() => handleNotificationClick(notification)}
+                                    style={{
+                                        width: '100%',
+                                        textAlign: 'left',
+                                        border: 'none',
+                                        borderBottom: '1px solid var(--color-border)',
+                                        background: notification.is_read
+                                            ? 'transparent'
+                                            : 'rgba(var(--color-primary-rgb), 0.03)',
+                                        padding: '1rem 1.1rem',
+                                        display: 'flex',
+                                        gap: '0.8rem',
+                                        position: 'relative',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {!notification.is_read && (
+                                        <span
+                                            style={{
+                                                position: 'absolute',
+                                                left: 0,
+                                                top: 0,
+                                                bottom: 0,
+                                                width: '4px',
+                                                background: 'var(--color-primary)'
+                                            }}
+                                        />
+                                    )}
+
+                                    <div
+                                        style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            borderRadius: '10px',
+                                            background: 'var(--color-bg-body)',
+                                            display: 'grid',
+                                            placeItems: 'center',
+                                            color: 'var(--color-primary)',
+                                            flexShrink: 0
+                                        }}
                                     >
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${notif.notification_type === 'grade_posted' ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'
-                                            }`}>
-                                            <Bell size={14} />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className={`text-sm leading-tight mb-1 ${!notif.is_read ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
-                                                {notif.title}
-                                            </p>
-                                            <p className="text-[10px] text-gray-400 font-medium">
-                                                {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </p>
-                                        </div>
-                                    </Motion.div>
-                                ))
-                            ) : (
-                                <div className="text-center py-10">
-                                    <p className="text-xs text-gray-400 italic">No new notifications</p>
-                                </div>
-                            )}
-                        </div>
+                                        <Bell size={19} />
+                                    </div>
 
-                        <div className="p-4 border-t border-gray-50 bg-gray-50/20">
-                            <button
-                                onClick={() => navigate('/teacher/communication', { state: { activeTab: 'notifications' } })}
-                                className="w-full py-2 text-xs font-bold text-gray-500 hover:text-indigo-600 transition-colors uppercase tracking-widest"
-                            >
-                                {t('teacher.dashboard.viewAllNotifications')}
-                            </button>
-                        </div>
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                                            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: notification.is_read ? 600 : 700 }}>
+                                                {notification.title || 'System Notification'}
+                                            </h4>
+                                        </div>
+                                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                            {notification.message || notification.content}
+                                        </p>
+                                        <span style={{ marginTop: '4px', fontSize: '0.74rem', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                            <Clock size={12} />
+                                            {new Date(notification.created_at).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </button>
+                            ))
+                        )}
                     </div>
-
-                    {/* Small Support Widget */}
-                    <Motion.div variants={teacherItemVariants} className="bg-indigo-900 rounded-2xl p-6 text-white text-center relative overflow-hidden shadow-lg">
-                        <div className="relative z-10">
-                            <h3 className="font-bold text-sm mb-2">Technical Support</h3>
-                            <p className="text-indigo-200 text-[11px] mb-4">Facing issues with the dashboard? Our team is here to help.</p>
-                            <button className="w-full py-2 bg-indigo-500 hover:bg-indigo-400 text-white rounded-lg text-xs font-bold transition-colors">
-                                Contact IT Desk
-                            </button>
-                        </div>
-                        <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <TrendingUp size={80} />
-                        </div>
-                    </Motion.div>
-                </Motion.div>
+                </div>
             </div>
-        </Motion.div>
+        </div>
     );
 };
 

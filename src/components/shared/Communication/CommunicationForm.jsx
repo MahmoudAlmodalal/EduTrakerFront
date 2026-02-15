@@ -13,7 +13,8 @@ const CommunicationForm = ({
     initialRecipient = null,
     isReply = false,
     parentMessage = null,
-    role = 'user'
+    role = 'user',
+    allowedRoles = null
 }) => {
     const { t } = useTheme();
     const { showSuccess, showError, showWarning } = useToast();
@@ -28,6 +29,15 @@ const CommunicationForm = ({
         subject: isReply ? `Re: ${parentMessage?.subject}` : '',
         body: ''
     });
+    const requiresScopedRecipient = role === 'school_manager' || role === 'student';
+    const filteredRecipientResults = allowedRoles
+        ? recipientSearchResults.filter((user) =>
+            allowedRoles.some((allowedRole) => user.role?.toUpperCase() === allowedRole.toUpperCase())
+        )
+        : recipientSearchResults;
+    const recipientSearchPlaceholder = allowedRoles
+        ? 'Search secretaries, teachers, school manager...'
+        : t('communication.searchPlaceholder');
 
     const handleUserSearch = async (term) => {
         setRecipientSearchTerm(term);
@@ -95,8 +105,8 @@ const CommunicationForm = ({
             return;
         }
 
-        // For School Manager compose flow, force recipient selection from scoped search.
-        if (!formData.recipient_id && role === 'school_manager') {
+        // For School Manager and Student compose flow, force recipient selection from scoped search.
+        if (!formData.recipient_id && requiresScopedRecipient) {
             showError(t('communication.noRecipient') || 'Please select a recipient from the list.');
             return;
         }
@@ -168,25 +178,25 @@ const CommunicationForm = ({
                                     <input
                                         type="text"
                                         className={styles.searchInput}
-                                        placeholder={t('communication.searchPlaceholder')}
+                                        placeholder={recipientSearchPlaceholder}
                                         value={recipientSearchTerm}
                                         onChange={(e) => handleUserSearch(e.target.value)}
                                     />
                                     {recipientSearchTerm.trim().length >= MIN_RECIPIENT_SEARCH_CHARS && (
                                         <div className={styles.searchResults}>
-                                            {recipientSearchResults.length > 0 ? (
-                                                recipientSearchResults.map(user => (
+                                            {filteredRecipientResults.length > 0 ? (
+                                                filteredRecipientResults.map(user => (
                                                     <div key={user.id} onClick={() => handleSelectRecipient(user)} className={styles.searchResultItem}>
                                                         <div className={styles.resultName}>{user.full_name}</div>
                                                         <div className={styles.resultEmail}>{user.email}</div>
-                                                        <div className={styles.resultRole}>{user.role}</div>
+                                                        <div className={styles.resultRole} data-role={user.role?.toLowerCase()}>{user.role}</div>
                                                     </div>
                                                 ))
                                             ) : (
                                                 <div className={styles.searchResultItem} style={{ opacity: 0.7, cursor: 'default' }}>
                                                     <div className={styles.resultName}>{t('communication.noResults') || 'No users found'}</div>
                                                     <div className={styles.resultEmail}>
-                                                        {role === 'school_manager'
+                                                        {requiresScopedRecipient
                                                             ? (t('communication.recipientRequired') || 'Choose a recipient from available users.')
                                                             : (t('communication.typeEmailHint') || 'Type a full email and click Send')}
                                                     </div>
@@ -238,7 +248,7 @@ const CommunicationForm = ({
                     variant="primary"
                     onClick={handleSend}
                     icon={Send}
-                    disabled={isSending || !formData.body.trim() || (!isReply && !formData.recipient_id && role === 'school_manager')}
+                    disabled={isSending || !formData.body.trim() || (!isReply && !formData.recipient_id && requiresScopedRecipient)}
                 >
                     {t('communication.send')}
                 </Button>

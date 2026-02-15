@@ -1,665 +1,896 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, Plus, Save, Send, Users, Loader2, Check, ChevronDown } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
-import { motion as Motion, AnimatePresence } from 'framer-motion';
 import {
+    Check,
+    FileUp,
+    Pencil,
+    Plus,
+    Save,
+    Search,
+    Trash2,
+    X
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { useTheme } from '../../context/ThemeContext';
+import {
+    useBulkImportTeacherMarksMutation,
     useCreateTeacherAssignmentMutation,
+    useDeactivateTeacherAssignmentMutation,
     useRecordTeacherMarkMutation,
     useTeacherAllocations,
     useTeacherAssignments,
     useTeacherMarks,
-    useTeacherStudents
+    useTeacherStudents,
+    useUpdateTeacherAssignmentMutation
 } from '../../hooks/useTeacherQueries';
-import { teacherContainerVariants } from '../../utils/animations';
-import { toList, todayIsoDate } from '../../utils/helpers';
+import teacherService from '../../services/teacherService';
+import { toList } from '../../utils/helpers';
+import './Teacher.css';
 
-// Skeleton Component
-const Skeleton = ({ className }) => (
-    <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
-);
+const emptyForm = {
+    title: '',
+    description: '',
+    allocationId: '',
+    dueDate: '',
+    maxMarks: '',
+    type: 'assignment'
+};
+
+const assessmentTypes = [
+    'homework',
+    'quiz',
+    'midterm',
+    'final',
+    'project',
+    'participation',
+    'assignment'
+];
+
+const toDateTimeLocal = (value) => {
+    if (!value) {
+        return '';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const toIsoFromLocal = (value) => {
+    if (!value) {
+        return null;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return date.toISOString();
+};
+
+const getAssignmentStatus = (assignment) => {
+    if (assignment?.is_active === false) {
+        return 'inactive';
+    }
+
+    if (assignment?.due_date) {
+        const dueDate = new Date(assignment.due_date);
+        if (!Number.isNaN(dueDate.getTime()) && dueDate < new Date()) {
+            return 'overdue';
+        }
+    }
+
+    return 'active';
+};
+
+const statusBadgeStyles = {
+    active: { background: '#dcfce7', color: '#166534', label: 'Active' },
+    overdue: { background: '#fee2e2', color: '#991b1b', label: 'Overdue' },
+    inactive: { background: '#e2e8f0', color: '#334155', label: 'Inactive' }
+};
 
 const Assessments = () => {
     const { t } = useTheme();
-    const { user } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
-    const schoolId = useMemo(
-        () => user?.school_id ?? (typeof user?.school === 'number' ? user.school : null),
-        [user?.school, user?.school_id]
-    );
-    const [activeTab, setActiveTab] = useState('gradebook');
-    const [grades, setGrades] = useState([]);
 
-    // Selection States
-    const [selectedClass, setSelectedClass] = useState('');
-    const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
+    const [allocationFilter, setAllocationFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [searchText, setSearchText] = useState('');
 
-    // UI States
-    const [savingStudentId, setSavingStudentId] = useState(null);
+    const [assignmentDetails, setAssignmentDetails] = useState({});
+    const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+    const [editingAssignment, setEditingAssignment] = useState(null);
+    const [assignmentForm, setAssignmentForm] = useState(emptyForm);
+    const [allocationSearch, setAllocationSearch] = useState('');
 
-    const assessmentTypes = ['homework', 'quiz', 'midterm', 'final', 'project', 'participation', 'assignment'];
-
-    // Form State for New Assessment
-    const [newAssessment, setNewAssessment] = useState({
-        title: '',
-        assignment_type: 'homework',
-        due_date: '',
-        full_mark: '',
-        description: '',
-        course_allocation: '',
-        assignment_code: `ASN-${Date.now().toString().slice(-6)}`
-    });
+    const [markingAssignment, setMarkingAssignment] = useState(null);
+    const [markDrafts, setMarkDrafts] = useState({});
+    const [bulkFile, setBulkFile] = useState(null);
+    const [savingMarkStudentId, setSavingMarkStudentId] = useState(null);
 
     const {
-        data: classesData,
-        isLoading: loadingClasses
-    } = useTeacherAllocations(todayIsoDate());
+        data: allocationsData,
+        isLoading: loadingAllocations
+    } = useTeacherAllocations();
 
     const {
-        data: assessmentsData,
-        isLoading: loadingAssessments
-    } = useTeacherAssignments();
+        data: assignmentsData,
+        isLoading: loadingAssignments
+    } = useTeacherAssignments({ include_inactive: true });
 
-    const classes = useMemo(() => toList(classesData), [classesData]);
-    const assessments = useMemo(() => toList(assessmentsData), [assessmentsData]);
+    const allocations = useMemo(() => toList(allocationsData), [allocationsData]);
+    const assignments = useMemo(() => toList(assignmentsData), [assignmentsData]);
 
-    const loading = loadingClasses || loadingAssessments;
+    const createAssignmentMutation = useCreateTeacherAssignmentMutation();
+    const updateAssignmentMutation = useUpdateTeacherAssignmentMutation();
+    const deactivateAssignmentMutation = useDeactivateTeacherAssignmentMutation();
+
+    const recordMarkMutation = useRecordTeacherMarkMutation();
+    const bulkImportMarksMutation = useBulkImportTeacherMarksMutation();
 
     useEffect(() => {
-        if (!selectedClass && classes.length > 0) {
-            setSelectedClass(classes[0].id.toString());
+        const requestedTab = searchParams.get('tab');
+        if (requestedTab === 'create') {
+            setShowAssignmentModal(true);
+            setEditingAssignment(null);
+            setAssignmentForm(emptyForm);
         }
-    }, [classes, selectedClass]);
-
-    const filteredAssessments = useMemo(
-        () => (selectedClass
-            ? assessments.filter((assessment) => assessment.course_allocation?.toString() === selectedClass)
-            : assessments),
-        [assessments, selectedClass]
-    );
+    }, [searchParams]);
 
     useEffect(() => {
-        if (!selectedAssessmentId && filteredAssessments.length > 0) {
-            setSelectedAssessmentId(filteredAssessments[0].id.toString());
+        let ignore = false;
+
+        const hydrateMissingAssignmentDetails = async () => {
+            const missingIds = assignments
+                .filter((assignment) => {
+                    const hasAllocation = assignment?.course_allocation || assignment?.course_allocation_id;
+                    return !hasAllocation && !assignmentDetails[assignment.id];
+                })
+                .map((assignment) => assignment.id);
+
+            if (missingIds.length === 0) {
+                return;
+            }
+
+            const detailPairs = await Promise.all(
+                missingIds.map(async (assignmentId) => {
+                    try {
+                        const detail = await teacherService.getAssignmentDetail(assignmentId);
+                        return [assignmentId, detail];
+                    } catch {
+                        return [assignmentId, null];
+                    }
+                })
+            );
+
+            if (!ignore) {
+                setAssignmentDetails((previous) => ({
+                    ...previous,
+                    ...Object.fromEntries(detailPairs)
+                }));
+            }
+        };
+
+        hydrateMissingAssignmentDetails();
+
+        return () => {
+            ignore = true;
+        };
+    }, [assignmentDetails, assignments]);
+
+    const getAllocationId = useCallback((assignment) => (
+        assignment?.course_allocation
+        || assignment?.course_allocation_id
+        || assignmentDetails[assignment?.id]?.course_allocation
+        || assignmentDetails[assignment?.id]?.course_allocation_id
+        || ''
+    ), [assignmentDetails]);
+
+    const getAllocationLabel = useCallback((assignment) => {
+        const allocationId = Number(getAllocationId(assignment));
+        const allocation = allocations.find((item) => item.id === allocationId);
+
+        if (allocation) {
+            return `${allocation.classroom_name || allocation.class || 'Class'} • ${allocation.course_name || allocation.subject || 'Subject'}`;
+        }
+
+        return 'Unassigned class';
+    }, [allocations, getAllocationId]);
+
+    const filteredAllocations = useMemo(() => {
+        const query = allocationSearch.trim().toLowerCase();
+        if (!query) {
+            return allocations;
+        }
+
+        return allocations.filter((allocation) => {
+            const label = `${allocation.classroom_name || allocation.class || ''} ${allocation.course_name || allocation.subject || ''}`.toLowerCase();
+            return label.includes(query);
+        });
+    }, [allocationSearch, allocations]);
+
+    const filteredAssignments = useMemo(() => {
+        const query = searchText.trim().toLowerCase();
+
+        return assignments.filter((assignment) => {
+            const status = getAssignmentStatus(assignment);
+            const allocationId = String(getAllocationId(assignment) || '');
+
+            const matchesStatus = statusFilter === 'all' || status === statusFilter;
+            const matchesAllocation = allocationFilter === 'all' || allocationId === allocationFilter;
+            const matchesQuery = !query || [
+                assignment.title,
+                assignment.description,
+                assignment.assignment_code,
+                assignment.exam_type,
+                assignment.assignment_type
+            ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+
+            return matchesStatus && matchesAllocation && matchesQuery;
+        });
+    }, [allocationFilter, assignments, getAllocationId, searchText, statusFilter]);
+
+    const openCreateModal = useCallback(() => {
+        setEditingAssignment(null);
+        setAssignmentForm(emptyForm);
+        setShowAssignmentModal(true);
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('tab');
+        setSearchParams(nextParams, { replace: true });
+    }, [searchParams, setSearchParams]);
+
+    const openEditModal = useCallback((assignment) => {
+        setEditingAssignment(assignment);
+        setAssignmentForm({
+            title: assignment.title || '',
+            description: assignment.description || '',
+            allocationId: String(getAllocationId(assignment) || ''),
+            dueDate: toDateTimeLocal(assignment.due_date),
+            maxMarks: String(assignment.full_mark || ''),
+            type: assignment.assignment_type || assignment.exam_type || 'assignment'
+        });
+        setShowAssignmentModal(true);
+    }, [getAllocationId]);
+
+    const closeAssignmentModal = useCallback(() => {
+        setShowAssignmentModal(false);
+        setEditingAssignment(null);
+        setAssignmentForm(emptyForm);
+    }, []);
+
+    const handleSubmitAssignment = useCallback(async (event) => {
+        event.preventDefault();
+
+        const payload = {
+            title: assignmentForm.title.trim(),
+            description: assignmentForm.description.trim(),
+            full_mark: Number(assignmentForm.maxMarks),
+            exam_type: assignmentForm.type
+        };
+
+        const createPayload = {
+            ...payload,
+            assignment_type: assignmentForm.type,
+            due_date: toIsoFromLocal(assignmentForm.dueDate),
+            course_allocation: assignmentForm.allocationId ? Number(assignmentForm.allocationId) : null
+        };
+
+        const updatePayload = {
+            ...payload,
+            due_date: assignmentForm.dueDate ? assignmentForm.dueDate.split('T')[0] : null
+        };
+
+        if (!payload.title || !payload.full_mark) {
+            toast.error('Title and max marks are required.');
             return;
         }
 
-        if (
-            selectedAssessmentId
-            && !filteredAssessments.some((assessment) => assessment.id.toString() === selectedAssessmentId)
-        ) {
-            setSelectedAssessmentId(filteredAssessments[0]?.id?.toString() || '');
+        try {
+            if (editingAssignment) {
+                await updateAssignmentMutation.mutateAsync({ id: editingAssignment.id, payload: updatePayload });
+                toast.success('Assignment updated.');
+            } else {
+                await createAssignmentMutation.mutateAsync(createPayload);
+                toast.success('Assignment created.');
+            }
+            closeAssignmentModal();
+        } catch (error) {
+            toast.error(error?.message || 'Failed to save assignment.');
         }
-    }, [filteredAssessments, selectedAssessmentId]);
+    }, [assignmentForm, closeAssignmentModal, createAssignmentMutation, editingAssignment, updateAssignmentMutation]);
 
-    const selectedAllocation = useMemo(
-        () => classes.find((item) => item.id.toString() === selectedClass),
-        [classes, selectedClass]
-    );
+    const handleDeactivateAssignment = useCallback(async (assignmentId) => {
+        if (!window.confirm('Deactivate this assignment?')) {
+            return;
+        }
 
-    const studentFilters = useMemo(() => {
-        if (!selectedClass) {
+        try {
+            await deactivateAssignmentMutation.mutateAsync(assignmentId);
+            toast.success('Assignment deactivated.');
+        } catch (error) {
+            toast.error(error?.message || 'Failed to deactivate assignment.');
+        }
+    }, [deactivateAssignmentMutation]);
+
+    const selectedMarkAllocation = useMemo(() => {
+        if (!markingAssignment) {
             return null;
         }
 
-        const filters = {
+        const allocationId = Number(getAllocationId(markingAssignment));
+        return allocations.find((allocation) => allocation.id === allocationId) || null;
+    }, [allocations, getAllocationId, markingAssignment]);
+
+    const studentFiltersForMarking = useMemo(() => {
+        if (!selectedMarkAllocation?.class_room_id) {
+            return null;
+        }
+
+        return {
+            classroom_id: selectedMarkAllocation.class_room_id,
             current_status: 'active',
-            page_size: 100
+            page_size: 200
         };
+    }, [selectedMarkAllocation?.class_room_id]);
 
-        if (schoolId) {
-            filters.school_id = schoolId;
-        }
-
-        if (selectedAllocation?.class_room_id) {
-            filters.classroom_id = selectedAllocation.class_room_id;
-        }
-
-        return filters;
-    }, [schoolId, selectedAllocation, selectedClass]);
+    const {
+        data: markingStudentsData,
+        isLoading: loadingMarkingStudents
+    } = useTeacherStudents(studentFiltersForMarking || {}, {
+        enabled: Boolean(studentFiltersForMarking && markingAssignment)
+    });
 
     const {
         data: marksData,
         isLoading: loadingMarks
-    } = useTeacherMarks(selectedAssessmentId, {
-        enabled: Boolean(selectedAssessmentId)
+    } = useTeacherMarks(markingAssignment?.id, {
+        enabled: Boolean(markingAssignment?.id)
     });
 
-    const {
-        data: studentsData,
-        isLoading: loadingStudents
-    } = useTeacherStudents(studentFilters || {}, {
-        enabled: Boolean(studentFilters)
-    });
-
-    const loadingGrades = loadingMarks || loadingStudents;
-    const createAssessmentMutation = useCreateTeacherAssignmentMutation();
-    const saveMarkMutation = useRecordTeacherMarkMutation();
-    const saving = createAssessmentMutation.isPending;
+    const markingStudents = useMemo(() => toList(markingStudentsData), [markingStudentsData]);
+    const existingMarks = useMemo(() => toList(marksData), [marksData]);
 
     useEffect(() => {
-        if (!selectedAssessmentId || !selectedClass) {
-            setGrades([]);
+        if (!markingAssignment) {
+            setMarkDrafts({});
+            setBulkFile(null);
             return;
         }
 
-        const existingMarks = toList(marksData);
-        const students = toList(studentsData);
-
-        const gradebookData = students.map((student) => {
+        const initialDrafts = {};
+        markingStudents.forEach((student) => {
             const studentId = student.user_id || student.id;
-            const mark = existingMarks.find((item) => item.student_id === studentId);
-            return {
-                id: studentId,
-                student_name: student.full_name || 'N/A',
-                score: mark ? mark.score : '',
-                feedback: mark ? mark.feedback : '',
-                is_active: mark ? mark.is_active : false,
-                mark_id: mark ? mark.id : null
+            const existing = existingMarks.find((mark) => Number(mark.student_id) === Number(studentId));
+            initialDrafts[studentId] = {
+                score: existing?.score ?? '',
+                feedback: existing?.feedback ?? '',
+                saved: Boolean(existing)
             };
         });
+        setMarkDrafts(initialDrafts);
+    }, [existingMarks, markingAssignment, markingStudents]);
 
-        setGrades(gradebookData);
-    }, [marksData, selectedAssessmentId, selectedClass, studentsData]);
-
-    const handleCreateAssessment = useCallback(async (e) => {
-        e.preventDefault();
-        try {
-            const payload = {
-                ...newAssessment,
-                exam_type: newAssessment.assignment_type,
-                created_by: user.user_id,
-                assigned_date: new Date().toISOString().split('T')[0]
-            };
-
-            const created = await createAssessmentMutation.mutateAsync(payload);
-            setSelectedAssessmentId(created.id.toString());
-
-            if (created.course_allocation) {
-                setSelectedClass(created.course_allocation.toString());
+    const handleChangeMarkDraft = useCallback((studentId, field, value) => {
+        setMarkDrafts((previous) => ({
+            ...previous,
+            [studentId]: {
+                ...(previous[studentId] || { score: '', feedback: '', saved: false }),
+                [field]: value,
+                saved: false
             }
+        }));
+    }, []);
 
-            setActiveTab('gradebook');
-            setNewAssessment({
-                title: '',
-                assignment_type: 'homework',
-                due_date: '',
-                full_mark: '',
-                description: '',
-                course_allocation: '',
-                assignment_code: `ASN-${Date.now().toString().slice(-6)}`
+    const handleSaveStudentMark = useCallback(async (studentId) => {
+        const draft = markDrafts[studentId];
+        if (!draft || draft.score === '' || draft.score === null) {
+            toast.error('Enter a valid score first.');
+            return;
+        }
+
+        try {
+            setSavingMarkStudentId(studentId);
+            await recordMarkMutation.mutateAsync({
+                assignment_id: markingAssignment.id,
+                student_id: Number(studentId),
+                score: Number(draft.score),
+                feedback: draft.feedback || ''
+            });
+            setMarkDrafts((previous) => ({
+                ...previous,
+                [studentId]: {
+                    ...previous[studentId],
+                    saved: true
+                }
+            }));
+            toast.success('Mark saved.');
+        } catch (error) {
+            toast.error(error?.message || 'Failed to save mark.');
+        } finally {
+            setSavingMarkStudentId(null);
+        }
+    }, [markDrafts, markingAssignment?.id, recordMarkMutation]);
+
+    const handleBulkUpload = useCallback(async () => {
+        if (!markingAssignment?.id || !bulkFile) {
+            toast.error('Select a CSV file first.');
+            return;
+        }
+
+        try {
+            const result = await bulkImportMarksMutation.mutateAsync({
+                assignment_id: markingAssignment.id,
+                file: bulkFile
             });
 
-            setTimeout(() => alert(`Assessment "${created.title}" created successfully!`), 100);
-        } catch (error) {
-            console.error("Error creating assessment:", error);
-            alert("Failed to create assessment");
-        }
-    }, [createAssessmentMutation, newAssessment, user.user_id]);
-
-    const handleSaveGrade = useCallback(async (studentId) => {
-        const gradeData = grades.find(g => g.id === studentId);
-        if (!gradeData || gradeData.score === '' || gradeData.score === null) return;
-
-        try {
-            setSavingStudentId(studentId);
-            const payload = {
-                assignment_id: parseInt(selectedAssessmentId),
-                student_id: studentId,
-                score: parseFloat(gradeData.score),
-                feedback: gradeData.feedback || '',
-                date_recorded: new Date().toISOString().split('T')[0]
-            };
-
-            await saveMarkMutation.mutateAsync(payload);
-            setGrades(grades.map(g => g.id === studentId ? { ...g, is_active: true } : g));
-        } catch (error) {
-            console.error("Error saving grade:", error);
-            alert("Failed to save grade");
-        } finally {
-            setSavingStudentId(null);
-        }
-    }, [grades, saveMarkMutation, selectedAssessmentId]);
-
-    const handleGradeChange = useCallback((id, value) => {
-        setGrades(grades.map(student =>
-            student.id === id ? { ...student, score: value } : student
-        ));
-    }, [grades]);
-
-    const handleFeedbackChange = useCallback((id, value) => {
-        setGrades(grades.map(student =>
-            student.id === id ? { ...student, feedback: value } : student
-        ));
-    }, [grades]);
-
-    const handlePublishResults = useCallback(async () => {
-        const ungradedCount = grades.filter(g => !g.is_active && g.score).length;
-        if (ungradedCount > 0) {
-            if (window.confirm(`You have ${ungradedCount} unsaved grades. Save them all before publishing?`)) {
-                try {
-                    const unsaved = grades.filter(g => !g.is_active && g.score);
-                    await Promise.all(unsaved.map(g => handleSaveGrade(g.id)));
-                } catch {
-                    return;
-                }
+            if (result?.success_count !== undefined || result?.failed_count !== undefined) {
+                toast.success(`Import completed: ${result.success_count || 0} success, ${result.failed_count || 0} failed.`);
+            } else {
+                toast.success('Bulk marks import completed.');
             }
+
+            setBulkFile(null);
+        } catch (error) {
+            toast.error(error?.message || 'Bulk import failed.');
         }
-        alert('Results published successfully! Notifications sent to students and parents.');
-    }, [grades, handleSaveGrade]);
-
-    const selectedAssessment = assessments.find(a => a.id.toString() === selectedAssessmentId);
-    const hasClasses = classes.length > 0;
-
-    const setActiveTabAndSyncUrl = useCallback((nextTab) => {
-        setActiveTab(nextTab);
-        const nextParams = new URLSearchParams(searchParams);
-        nextParams.set('tab', nextTab);
-        setSearchParams(nextParams, { replace: true });
-    }, [searchParams, setSearchParams]);
-
-    useEffect(() => {
-        const requestedTab = searchParams.get('tab');
-        if (requestedTab === 'create' || requestedTab === 'gradebook') {
-            setActiveTab(requestedTab);
-        }
-    }, [searchParams]);
+    }, [bulkFile, bulkImportMarksMutation, markingAssignment?.id]);
 
     return (
-        <Motion.div
-            initial="hidden"
-            animate="visible"
-            variants={teacherContainerVariants}
-            className="max-w-7xl mx-auto space-y-6 pb-12 px-4 sm:px-6"
-        >
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-gray-100">
+        <div className="teacher-page">
+            <div className="teacher-header">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-                        {t('teacher.assessments.title')}
-                    </h1>
-                    <p className="text-gray-500 mt-2">
-                        Create assessments, manage grades, and track student performance.
+                    <h1 className="teacher-title">{t('teacher.assessments.title') || 'Assessments'}</h1>
+                    <p className="teacher-subtitle">
+                        Create and manage assignments, then record marks per student or via CSV bulk import.
                     </p>
                 </div>
+                <button type="button" className="btn-primary" onClick={openCreateModal}>
+                    <Plus size={16} />
+                    New Assignment
+                </button>
+            </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                    <button
-                        onClick={() => setActiveTabAndSyncUrl('gradebook')}
-                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'gradebook'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
-                            }`}
+            <div className="management-card" style={{ padding: '1rem 1.25rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) auto auto', gap: '0.6rem', alignItems: 'center' }}>
+                    <div style={{ position: 'relative' }}>
+                        <Search
+                            size={16}
+                            style={{
+                                position: 'absolute',
+                                left: '10px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: 'var(--color-text-muted)'
+                            }}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Search assignments"
+                            value={searchText}
+                            onChange={(event) => setSearchText(event.target.value)}
+                            style={{
+                                width: '100%',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '0.55rem',
+                                padding: '0.55rem 0.65rem 0.55rem 2rem',
+                                fontSize: '0.85rem'
+                            }}
+                        />
+                    </div>
+
+                    <select
+                        value={allocationFilter}
+                        onChange={(event) => setAllocationFilter(event.target.value)}
+                        style={{
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '0.55rem',
+                            padding: '0.55rem 0.65rem',
+                            fontSize: '0.85rem',
+                            minWidth: '220px'
+                        }}
                     >
-                        <FileText size={16} className="inline mr-2" />
-                        {t('teacher.assessments.gradebook') || 'Gradebook'}
-                    </button>
-                    <button
-                        onClick={() => setActiveTabAndSyncUrl('create')}
-                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'create'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
-                            }`}
+                        <option value="all">All allocations</option>
+                        {allocations.map((allocation) => (
+                            <option key={allocation.id} value={String(allocation.id)}>
+                                {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
+                            </option>
+                        ))}
+                    </select>
+
+                    <select
+                        value={statusFilter}
+                        onChange={(event) => setStatusFilter(event.target.value)}
+                        style={{
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '0.55rem',
+                            padding: '0.55rem 0.65rem',
+                            fontSize: '0.85rem',
+                            minWidth: '150px'
+                        }}
                     >
-                        <Plus size={16} className="inline mr-2" />
-                        {t('teacher.assessments.createAssessment') || 'Create Assessment'}
-                    </button>
+                        <option value="all">All status</option>
+                        <option value="active">Active</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
                 </div>
             </div>
 
-            {/* Create Assessment Tab */}
-            <AnimatePresence mode="wait">
-                {activeTab === 'create' && (
-                    <Motion.div
-                        key="create"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-4xl mx-auto"
-                    >
-                        <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                            <Plus size={22} className="text-indigo-600" />
-                            {t('teacher.assessments.createNew')}
-                        </h2>
+            <div className="management-card" style={{ overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                    <table className="teacher-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Class</th>
+                                <th>Due Date</th>
+                                <th>Max Marks</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(loadingAssignments || loadingAllocations) ? (
+                                <tr>
+                                    <td colSpan="6" style={{ padding: '1.25rem', color: 'var(--color-text-muted)' }}>
+                                        Loading assignments...
+                                    </td>
+                                </tr>
+                            ) : filteredAssignments.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" style={{ padding: '1.25rem', color: 'var(--color-text-muted)' }}>
+                                        No assignments match your filters.
+                                    </td>
+                                </tr>
+                            ) : filteredAssignments.map((assignment) => {
+                                const status = getAssignmentStatus(assignment);
+                                const badge = statusBadgeStyles[status];
 
-                        <form onSubmit={handleCreateAssessment} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('teacher.assessments.assessmentTitle')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={newAssessment.title}
-                                        onChange={(e) => setNewAssessment({ ...newAssessment, title: e.target.value })}
-                                        placeholder="e.g. Algebra Quiz 1"
-                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('teacher.assessments.type')}
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            value={newAssessment.assignment_type}
-                                            onChange={(e) => setNewAssessment({ ...newAssessment, assignment_type: e.target.value })}
-                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none"
-                                        >
-                                            {assessmentTypes.map(type => (
-                                                <option key={type} value={type}>
-                                                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('teacher.assessments.dueDate')}
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        required
-                                        value={newAssessment.due_date}
-                                        onChange={(e) => setNewAssessment({ ...newAssessment, due_date: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('teacher.assessments.totalPoints')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        required
-                                        value={newAssessment.full_mark}
-                                        onChange={(e) => setNewAssessment({ ...newAssessment, full_mark: e.target.value })}
-                                        placeholder="100"
-                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Class / Subject</label>
-                                    <div className="relative">
-                                        <select
-                                            required
-                                            value={newAssessment.course_allocation}
-                                            onChange={(e) => setNewAssessment({ ...newAssessment, course_allocation: e.target.value })}
-                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none"
-                                        >
-                                            <option value="" disabled>Select Class</option>
-                                            {classes.map(cls => (
-                                                <option key={cls.id} value={cls.id}>
-                                                    {cls.classroom_name || cls.class} - {cls.course_name || cls.subject}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    {t('teacher.assessments.description')}
-                                </label>
-                                <textarea
-                                    rows="4"
-                                    value={newAssessment.description}
-                                    onChange={(e) => setNewAssessment({ ...newAssessment, description: e.target.value })}
-                                    placeholder="Add instructions or details about this assessment..."
-                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                ></textarea>
-                            </div>
-
-                            <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-gray-100">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTabAndSyncUrl('gradebook')}
-                                    className="px-6 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                    {t('teacher.assessments.cancel')}
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving || !hasClasses}
-                                    className="inline-flex items-center justify-center gap-2 min-w-[190px] px-6 py-2.5 rounded-xl text-sm font-bold transition-colors border disabled:cursor-not-allowed"
-                                    style={{
-                                        backgroundColor: saving || !hasClasses ? '#A5B4FC' : '#4F46E5',
-                                        borderColor: saving || !hasClasses ? '#A5B4FC' : '#4F46E5',
-                                        color: '#FFFFFF'
-                                    }}
-                                >
-                                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                    {saving ? 'Creating...' : (t('teacher.assessments.createAssessment') || 'Create Assessment')}
-                                </button>
-                            </div>
-                            {!hasClasses && (
-                                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-                                    No classes available yet. Assign a class to this teacher before creating assessments.
-                                </p>
-                            )}
-                        </form>
-                    </Motion.div>
-                )}
-
-                {/* Gradebook Tab */}
-                {activeTab === 'gradebook' && (
-                    <Motion.div
-                        key="gradebook"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-                    >
-                        {/* Toolbar */}
-                        <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50/30">
-                            <div className="flex items-center gap-3 flex-1">
-                                <div className="relative min-w-[200px]">
-                                    {loading ? (
-                                        <Skeleton className="h-10 w-full rounded-xl" />
-                                    ) : (
-                                        <>
-                                            <select
-                                                value={selectedClass}
-                                                onChange={(e) => setSelectedClass(e.target.value)}
-                                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none"
+                                return (
+                                    <tr key={assignment.id}>
+                                        <td>
+                                            <div style={{ fontWeight: 700 }}>{assignment.title}</div>
+                                            {assignment.description && (
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '3px' }}>
+                                                    {assignment.description}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td>{getAllocationLabel(assignment)}</td>
+                                        <td>{assignment.due_date ? new Date(assignment.due_date).toLocaleString() : 'No due date'}</td>
+                                        <td>{assignment.full_mark || '-'}</td>
+                                        <td>
+                                            <span
+                                                style={{
+                                                    padding: '0.2rem 0.5rem',
+                                                    borderRadius: '999px',
+                                                    background: badge.background,
+                                                    color: badge.color,
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 700
+                                                }}
                                             >
-                                                <option value="" disabled>Select Class</option>
-                                                {classes.map(cls => (
-                                                    <option key={cls.id} value={cls.id}>
-                                                        {cls.classroom_name || cls.class} - {cls.course_name || cls.subject}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                        </>
-                                    )}
-                                </div>
+                                                {badge.label}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                                                <button type="button" className="icon-btn" onClick={() => openEditModal(assignment)} title="Edit">
+                                                    <Pencil size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="icon-btn"
+                                                    onClick={() => setMarkingAssignment(assignment)}
+                                                    title="Record marks"
+                                                >
+                                                    <Save size={14} />
+                                                </button>
+                                                {assignment.is_active !== false && (
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn danger"
+                                                        onClick={() => handleDeactivateAssignment(assignment.id)}
+                                                        title="Deactivate"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-                                <div className="relative min-w-[250px]">
-                                    {loading ? (
-                                        <Skeleton className="h-10 w-full rounded-xl" />
-                                    ) : (
-                                        <>
-                                            <select
-                                                value={selectedAssessmentId}
-                                                onChange={(e) => setSelectedAssessmentId(e.target.value)}
-                                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none"
-                                            >
-                                                <option value="" disabled>Select Assessment</option>
-                                                {filteredAssessments.map(a => (
-                                                    <option key={a.id} value={a.id}>{a.title}</option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handlePublishResults}
-                                disabled={loadingGrades || grades.length === 0}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Send size={16} />
-                                {t('teacher.assessments.publishResults')}
+            {showAssignmentModal && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.45)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '1rem'
+                    }}
+                    onClick={closeAssignmentModal}
+                >
+                    <div
+                        className="management-card"
+                        style={{ width: '640px', maxWidth: '100%', padding: '1rem 1.25rem' }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>{editingAssignment ? 'Edit Assignment' : 'Create Assignment'}</h3>
+                            <button type="button" className="icon-btn" onClick={closeAssignmentModal}>
+                                <X size={14} />
                             </button>
                         </div>
 
-                        {/* Stats Bar - Enhanced */}
-                        {selectedAssessment && (
-                            <div className="p-4 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border-b border-indigo-100 grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="text-center p-3 bg-white/60 backdrop-blur-sm rounded-xl">
-                                    <p className="text-xs font-bold text-gray-500 uppercase">Total Students</p>
-                                    <p className="text-3xl font-black text-gray-900 mt-1">{grades.length}</p>
+                        <form onSubmit={handleSubmitAssignment} style={{ display: 'grid', gap: '0.75rem', marginTop: '0.8rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                    Title
+                                </label>
+                                <input
+                                    type="text"
+                                    value={assignmentForm.title}
+                                    onChange={(event) => setAssignmentForm((prev) => ({ ...prev, title: event.target.value }))}
+                                    required
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                />
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                    Description
+                                </label>
+                                <textarea
+                                    rows={4}
+                                    value={assignmentForm.description}
+                                    onChange={(event) => setAssignmentForm((prev) => ({ ...prev, description: event.target.value }))}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                />
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                    Allocation
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Search class/subject"
+                                    value={allocationSearch}
+                                    onChange={(event) => setAllocationSearch(event.target.value)}
+                                    style={{ width: '100%', marginBottom: '0.45rem', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                />
+                                <select
+                                    value={assignmentForm.allocationId}
+                                    onChange={(event) => setAssignmentForm((prev) => ({ ...prev, allocationId: event.target.value }))}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                >
+                                    <option value="">Select allocation</option>
+                                    {filteredAllocations.map((allocation) => (
+                                        <option key={allocation.id} value={String(allocation.id)}>
+                                            {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.55rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                        Due Date
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        value={assignmentForm.dueDate}
+                                        onChange={(event) => setAssignmentForm((prev) => ({ ...prev, dueDate: event.target.value }))}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    />
                                 </div>
-                                <div className="text-center p-3 bg-white/60 backdrop-blur-sm rounded-xl">
-                                    <p className="text-xs font-bold text-emerald-600 uppercase">Graded</p>
-                                    <p className="text-3xl font-black text-emerald-600 mt-1">
-                                        {grades.filter(g => g.is_active).length}
-                                    </p>
+
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                        Max Marks
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={assignmentForm.maxMarks}
+                                        onChange={(event) => setAssignmentForm((prev) => ({ ...prev, maxMarks: event.target.value }))}
+                                        required
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    />
                                 </div>
-                                <div className="text-center p-3 bg-white/60 backdrop-blur-sm rounded-xl">
-                                    <p className="text-xs font-bold text-amber-600 uppercase">Pending</p>
-                                    <p className="text-3xl font-black text-amber-600 mt-1">
-                                        {grades.filter(g => !g.is_active).length}
-                                    </p>
-                                </div>
-                                <div className="text-center p-3 bg-white/60 backdrop-blur-sm rounded-xl">
-                                    <p className="text-xs font-bold text-indigo-600 uppercase">Max Points</p>
-                                    <p className="text-3xl font-black text-indigo-600 mt-1">
-                                        {selectedAssessment.full_mark || 100}
-                                    </p>
+
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                        Type
+                                    </label>
+                                    <select
+                                        value={assignmentForm.type}
+                                        onChange={(event) => setAssignmentForm((prev) => ({ ...prev, type: event.target.value }))}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    >
+                                        {assessmentTypes.map((type) => (
+                                            <option key={type} value={type}>
+                                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
-                        )}
 
-                        {/* Gradebook Table */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50/50 border-b border-gray-100">
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem', marginTop: '0.2rem' }}>
+                                <button type="button" onClick={closeAssignmentModal} className="icon-btn" style={{ width: 'auto', padding: '0.45rem 0.8rem' }}>
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}
+                                    style={{ opacity: createAssignmentMutation.isPending || updateAssignmentMutation.isPending ? 0.7 : 1 }}
+                                >
+                                    <Save size={15} />
+                                    {editingAssignment ? 'Update' : 'Create'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {markingAssignment && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.45)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '1rem'
+                    }}
+                    onClick={() => setMarkingAssignment(null)}
+                >
+                    <div
+                        className="management-card"
+                        style={{ width: '900px', maxWidth: '100%', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div style={{ padding: '0.9rem 1.1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0 }}>Record Marks</h3>
+                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                    {markingAssignment.title} • {getAllocationLabel(markingAssignment)}
+                                </p>
+                            </div>
+                            <button type="button" className="icon-btn" onClick={() => setMarkingAssignment(null)}>
+                                <X size={14} />
+                            </button>
+                        </div>
+
+                        <div style={{ padding: '0.8rem 1.1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                            <input
+                                type="file"
+                                accept=".csv"
+                                onChange={(event) => setBulkFile(event.target.files?.[0] || null)}
+                                style={{ fontSize: '0.8rem' }}
+                            />
+                            <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={handleBulkUpload}
+                                disabled={bulkImportMarksMutation.isPending}
+                            >
+                                <FileUp size={15} />
+                                {bulkImportMarksMutation.isPending ? 'Importing...' : 'Bulk CSV Import'}
+                            </button>
+                        </div>
+
+                        <div style={{ overflow: 'auto', flex: 1 }}>
+                            <table className="teacher-table">
+                                <thead>
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                            {t('teacher.classes.studentName')}
-                                        </th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                            {t('teacher.assessments.grade')}
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                            {t('teacher.assessments.feedback')}
-                                        </th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                            {t('teacher.classes.status')}
-                                        </th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                            Action
-                                        </th>
+                                        <th>Student</th>
+                                        <th>Score</th>
+                                        <th>Feedback</th>
+                                        <th>Status</th>
+                                        <th>Save</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {loadingGrades ? (
-                                        Array(5).fill(0).map((_, i) => (
-                                            <tr key={i}>
-                                                <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
-                                                <td className="px-6 py-4"><Skeleton className="h-10 w-20 mx-auto" /></td>
-                                                <td className="px-6 py-4"><Skeleton className="h-10 w-full max-w-xs" /></td>
-                                                <td className="px-6 py-4"><Skeleton className="h-6 w-20 mx-auto rounded-full" /></td>
-                                                <td className="px-6 py-4"><Skeleton className="h-8 w-16 mx-auto rounded-lg" /></td>
-                                            </tr>
-                                        ))
-                                    ) : grades.length > 0 ? (
-                                        grades.map((g) => (
-                                            <Motion.tr
-                                                key={g.id}
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                className="hover:bg-gray-50/50 transition-colors"
-                                            >
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
-                                                            {g.student_name.charAt(0)}
-                                                        </div>
-                                                        <span className="font-bold text-gray-900">{g.student_name}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <input
-                                                        type="number"
-                                                        value={g.score}
-                                                        onChange={(e) => handleGradeChange(g.id, e.target.value)}
-                                                        className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                                        placeholder="0"
-                                                        min="0"
-                                                        max={selectedAssessment?.full_mark || 100}
-                                                    />
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <input
-                                                        type="text"
-                                                        value={g.feedback || ''}
-                                                        onChange={(e) => handleFeedbackChange(g.id, e.target.value)}
-                                                        placeholder="Add feedback..."
-                                                        className="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                                    />
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${g.is_active
-                                                        ? 'bg-emerald-100 text-emerald-700'
-                                                        : 'bg-gray-100 text-gray-600'
-                                                        }`}>
-                                                        {g.is_active ? (
-                                                            <><Check size={12} className="mr-1" /> {t('teacher.assessments.graded')}</>
-                                                        ) : (
-                                                            t('teacher.assessments.pending')
-                                                        )}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <button
-                                                        onClick={() => handleSaveGrade(g.id)}
-                                                        disabled={!g.score || savingStudentId === g.id}
-                                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 mx-auto"
-                                                    >
-                                                        {savingStudentId === g.id ? (
-                                                            <><Loader2 size={14} className="animate-spin" /> Saving</>
-                                                        ) : (
-                                                            <><Save size={14} /> Save</>
-                                                        )}
-                                                    </button>
-                                                </td>
-                                            </Motion.tr>
-                                        ))
-                                    ) : (
+                                <tbody>
+                                    {(loadingMarkingStudents || loadingMarks) ? (
                                         <tr>
-                                            <td colSpan="5" className="px-6 py-20 text-center">
-                                                <div className="flex flex-col items-center">
-                                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                                                        <Users size={24} className="text-gray-300" />
-                                                    </div>
-                                                    <h3 className="text-lg font-bold text-gray-900">No students found</h3>
-                                                    <p className="text-gray-500 text-sm mt-1">Select a class and assessment to view grades.</p>
-                                                </div>
+                                            <td colSpan="5" style={{ padding: '1.1rem', color: 'var(--color-text-muted)' }}>
+                                                Loading students and marks...
                                             </td>
                                         </tr>
-                                    )}
+                                    ) : markingStudents.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" style={{ padding: '1.1rem', color: 'var(--color-text-muted)' }}>
+                                                No students found for this assignment allocation.
+                                            </td>
+                                        </tr>
+                                    ) : markingStudents.map((student) => {
+                                        const studentId = student.user_id || student.id;
+                                        const draft = markDrafts[studentId] || { score: '', feedback: '', saved: false };
+                                        const maxScore = Number(markingAssignment.full_mark || 100);
+
+                                        return (
+                                            <tr key={studentId}>
+                                                <td>{student.full_name}</td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={maxScore}
+                                                        value={draft.score}
+                                                        onChange={(event) => handleChangeMarkDraft(studentId, 'score', event.target.value)}
+                                                        style={{ width: '92px', border: '1px solid var(--color-border)', borderRadius: '0.5rem', padding: '0.35rem 0.5rem' }}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={draft.feedback}
+                                                        onChange={(event) => handleChangeMarkDraft(studentId, 'feedback', event.target.value)}
+                                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.5rem', padding: '0.35rem 0.5rem' }}
+                                                        placeholder="Optional feedback"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <span
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            padding: '0.2rem 0.45rem',
+                                                            borderRadius: '999px',
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 700,
+                                                            background: draft.saved ? '#dcfce7' : '#e2e8f0',
+                                                            color: draft.saved ? '#166534' : '#334155'
+                                                        }}
+                                                    >
+                                                        {draft.saved && <Check size={12} />}
+                                                        {draft.saved ? 'Saved' : 'Pending'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn"
+                                                        onClick={() => handleSaveStudentMark(studentId)}
+                                                        disabled={savingMarkStudentId === studentId || draft.score === ''}
+                                                        style={{ opacity: savingMarkStudentId === studentId ? 0.7 : 1 }}
+                                                    >
+                                                        <Save size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
-                    </Motion.div>
-                )}
-            </AnimatePresence>
-        </Motion.div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

@@ -1,7 +1,14 @@
 import React from 'react';
-import { Search, Bell, MessageSquare } from 'lucide-react';
+import { Search, Bell, Clock } from 'lucide-react';
 import styles from './Communication.module.css';
 import { useTheme } from '../../../context/ThemeContext';
+
+const resolveText = (value, fallbackKey, fallbackText) => {
+    if (!value || value === fallbackKey) {
+        return fallbackText;
+    }
+    return value;
+};
 
 const CommunicationList = ({
     items,
@@ -11,9 +18,20 @@ const CommunicationList = ({
     loading,
     searchTerm,
     onSearchChange,
-    onMarkAllRead
+    onMarkAllRead,
+    onMarkNotificationRead
 }) => {
     const { t } = useTheme();
+    const noNotificationsText = resolveText(
+        t('communication.noNotifications'),
+        'communication.noNotifications',
+        'No notifications'
+    );
+    const markAsReadText = resolveText(
+        t('header.markAsRead'),
+        'header.markAsRead',
+        'Mark as read'
+    );
 
     return (
         <div className={styles.sidebar}>
@@ -29,7 +47,7 @@ const CommunicationList = ({
                     />
                 </div>
 
-                {activeTab === 'notifications' && items.some(n => !n.is_read) && (
+                {activeTab === 'notifications' && items.some((notification) => !notification.is_read) && (
                     <div className={styles.markAllContainer}>
                         <button onClick={onMarkAllRead} className={styles.markAllBtn}>
                             {t('header.markAllRead')}
@@ -42,37 +60,128 @@ const CommunicationList = ({
                 {loading ? (
                     <div className={styles.emptyState}>{t('common.loading')}</div>
                 ) : items.length === 0 ? (
-                    <div className={styles.emptyState}>{t('communication.noItems')}</div>
+                    <div className={styles.emptyState}>
+                        {activeTab === 'notifications' && <Bell size={20} style={{ opacity: 0.35, marginBottom: '0.5rem' }} />}
+                        {activeTab === 'notifications' ? noNotificationsText : t('communication.noItems')}
+                    </div>
                 ) : activeTab === 'notifications' ? (
-                    items.map(notif => (
+                    items.map((notification) => (
                         <div
-                            key={notif.id}
-                            onClick={() => onItemClick(notif)}
-                            className={`${styles.listItem} ${!notif.is_read ? styles.unread : ''}`}
+                            key={notification.id}
+                            onClick={() => onItemClick(notification)}
+                            style={{
+                                padding: '1.5rem',
+                                borderBottom: '1px solid var(--color-border)',
+                                display: 'flex',
+                                gap: '1.25rem',
+                                backgroundColor: notification.is_read ? 'transparent' : 'rgba(var(--color-primary-rgb), 0.03)',
+                                position: 'relative',
+                                transition: 'all 0.2s ease',
+                                cursor: 'pointer'
+                            }}
                         >
-                            <div className={styles.itemHeader}>
-                                <span className={styles.itemSender}>{t((notif.title || notif.notification_type || '').trim())}</span>
-                                <span className={styles.itemDate}>{new Date(notif.created_at).toLocaleDateString()}</span>
+                            {!notification.is_read && (
+                                <div
+                                    style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        top: 0,
+                                        bottom: 0,
+                                        width: '4px',
+                                        background: 'var(--color-primary)'
+                                    }}
+                                />
+                            )}
+                            <div
+                                style={{
+                                    width: '44px',
+                                    height: '44px',
+                                    borderRadius: '12px',
+                                    background: 'var(--color-bg-body)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--color-primary)'
+                                }}
+                            >
+                                <Bell size={22} />
                             </div>
-                            <div className={styles.itemPreview}>{t(notif.message)}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '4px' }}>
+                                    <h4
+                                        style={{
+                                            fontSize: '1rem',
+                                            fontWeight: '600',
+                                            color: 'var(--color-text-main)',
+                                            margin: 0
+                                        }}
+                                    >
+                                        {notification.title || 'Notification'}
+                                    </h4>
+                                    <span
+                                        style={{
+                                            fontSize: '0.8rem',
+                                            color: 'var(--color-text-muted)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            flexShrink: 0
+                                        }}
+                                    >
+                                        <Clock size={14} />
+                                        {new Date(notification.created_at).toLocaleDateString()}
+                                    </span>
+                                </div>
+                                <p
+                                    style={{
+                                        fontSize: '0.925rem',
+                                        color: 'var(--color-text-muted)',
+                                        margin: '0.5rem 0 0',
+                                        lineHeight: '1.5'
+                                    }}
+                                >
+                                    {notification.message || notification.content}
+                                </p>
+                                {!notification.is_read && (
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            onMarkNotificationRead?.(notification.id);
+                                        }}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            padding: 0,
+                                            color: 'var(--color-primary)',
+                                            fontSize: '0.875rem',
+                                            fontWeight: '500',
+                                            cursor: 'pointer',
+                                            marginTop: '0.5rem'
+                                        }}
+                                    >
+                                        {markAsReadText}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))
                 ) : (
-                    items.map(msg => (
+                    items.map((message) => (
                         <div
-                            key={msg.id}
-                            onClick={() => onItemClick(msg)}
-                            className={`${styles.listItem} ${selectedItemId === msg.id ? styles.active : ''} ${!msg.read ? styles.unread : ''}`}
+                            key={message.id}
+                            onClick={() => onItemClick(message)}
+                            className={`${styles.listItem} ${selectedItemId === message.id ? styles.active : ''} ${!message.read ? styles.unread : ''}`}
                         >
                             <div className={styles.itemHeader}>
-                                <span className={styles.itemSender}>{msg.partner?.full_name || msg.partner?.email || 'System'}</span>
-                                <span className={styles.itemDate}>{new Date(msg.sent_at || msg.created_at).toLocaleDateString()}</span>
+                                <span className={styles.itemSender}>{message.partner?.full_name || message.partner?.email || 'System'}</span>
+                                <span className={styles.itemDate}>{new Date(message.sent_at || message.created_at).toLocaleDateString()}</span>
                             </div>
                             <div className={styles.itemSubject}>
-                                {msg.subject}
-                                {msg.unread_count > 0 && <span className={styles.unreadBadge}>{msg.unread_count}</span>}
+                                {message.subject}
+                                {message.unread_count > 0 && <span className={styles.unreadBadge}>{message.unread_count}</span>}
                             </div>
-                            <div className={styles.itemPreview}>{msg.body}</div>
+                            <div className={styles.itemPreview}>{message.body}</div>
                         </div>
                     ))
                 )}

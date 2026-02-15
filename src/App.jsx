@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
 import AppRoutes from './routes/AppRoutes';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 import NetworkStatusBar from './components/NetworkStatusBar';
@@ -37,6 +38,16 @@ function App() {
                         <ToastProvider>
                             <NetworkStatusBar />
                             <AppRoutes />
+                            <Toaster
+                                position="top-right"
+                                toastOptions={{
+                                    duration: 3200,
+                                    style: {
+                                        border: '1px solid #e2e8f0',
+                                        fontSize: '0.85rem'
+                                    }
+                                }}
+                            />
                             <PWAUpdatePrompt />
                         </ToastProvider>
                     </ThemeProvider>

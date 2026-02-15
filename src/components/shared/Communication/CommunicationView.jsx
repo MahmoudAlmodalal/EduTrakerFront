@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Plus, MessageSquare, ChevronLeft } from 'lucide-react';
 import Button from '../../ui/Button';
 import styles from './Communication.module.css';
@@ -10,12 +11,15 @@ import { useToast } from '../../ui/Toast';
 import { api } from '../../../utils/api';
 import notificationService from '../../../services/notificationService';
 
-const CommunicationView = ({ role = 'user' }) => {
+const CommunicationView = ({ role = 'user', allowedRoles = null }) => {
     const { t } = useTheme();
     const { user } = useAuth();
     const { showSuccess, showError } = useToast();
+    const location = useLocation();
 
-    const [activeTab, setActiveTab] = useState('messages');
+    const [activeTab, setActiveTab] = useState(
+        location.state?.activeTab === 'notifications' ? 'notifications' : 'messages'
+    );
     const [selectedItem, setSelectedItem] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [messages, setMessages] = useState([]);
@@ -55,7 +59,7 @@ const CommunicationView = ({ role = 'user' }) => {
         }
     }, [threadMessages, loadingMore]);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         if (!user) return;
         setLoading(true);
         try {
@@ -111,7 +115,7 @@ const CommunicationView = ({ role = 'user' }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [showError, user]);
 
     const fetchHistory = async (partnerId, loadMore = false) => {
         if (loadMore && !nextHistoryPage) return;
@@ -173,18 +177,31 @@ const CommunicationView = ({ role = 'user' }) => {
 
     useEffect(() => {
         fetchData();
-    }, [user]);
+    }, [fetchData]);
+
+    useEffect(() => {
+        if (location.state?.activeTab) {
+            setActiveTab(location.state.activeTab === 'notifications' ? 'notifications' : 'messages');
+            setSelectedItem(null);
+        }
+    }, [location.state]);
+
+    const handleMarkNotificationRead = async (notificationId) => {
+        try {
+            await notificationService.markAsRead(notificationId);
+            setNotifications((notifs) => notifs.map((notif) => (
+                notif.id === notificationId ? { ...notif, is_read: true } : notif
+            )));
+        } catch (err) {
+            console.error('Error marking notification read:', err);
+        }
+    };
 
     const handleItemClick = async (item) => {
         if (activeTab === 'notifications') {
             setSelectedItem(item);
             if (!item.is_read) {
-                try {
-                    await notificationService.markAsRead(item.id);
-                    setNotifications(notifs => notifs.map(n => n.id === item.id ? { ...n, is_read: true } : n));
-                } catch (err) {
-                    console.error('Error marking notification read:', err);
-                }
+                await handleMarkNotificationRead(item.id);
             }
         } else {
             setSelectedItem(item);
@@ -199,7 +216,7 @@ const CommunicationView = ({ role = 'user' }) => {
             await notificationService.markAllAsRead();
             setNotifications(notifs => notifs.map(n => ({ ...n, is_read: true })));
             showSuccess('All notifications marked as read');
-        } catch (err) {
+        } catch {
             showError('Failed to mark notifications as read');
         }
     };
@@ -254,6 +271,7 @@ const CommunicationView = ({ role = 'user' }) => {
                         searchTerm={searchTerm}
                         onSearchChange={setSearchTerm}
                         onMarkAllRead={handleMarkAllNotificationsRead}
+                        onMarkNotificationRead={handleMarkNotificationRead}
                     />
                 </div>
 
@@ -264,7 +282,11 @@ const CommunicationView = ({ role = 'user' }) => {
                                 <button className={styles.backBtn} onClick={handleBackToList}>
                                     <ChevronLeft size={20} />
                                 </button>
-                                <h2 className={styles.subjectLine}>{selectedItem.partner?.full_name || selectedItem.partner?.email}</h2>
+                                <h2 className={styles.subjectLine}>
+                                    {activeTab === 'notifications'
+                                        ? (selectedItem.title || selectedItem.notification_type || 'Notification')
+                                        : (selectedItem.partner?.full_name || selectedItem.partner?.email)}
+                                </h2>
                                 {activeTab !== 'notifications' && (
                                     <div className={styles.senderProfile}>
                                         <div className={styles.senderAvatar}>
@@ -283,7 +305,7 @@ const CommunicationView = ({ role = 'user' }) => {
                             <div className={styles.body} onScroll={handleScroll} ref={bodyRef}>
                                 {activeTab === 'notifications' ? (
                                     <div className={styles.notificationContent}>
-                                        <p>{t(selectedItem.message)}</p>
+                                        <p>{selectedItem.message || selectedItem.content}</p>
                                     </div>
                                 ) : loadingThread ? (
                                     <div className={styles.threadLoading}>{t('common.loading')}</div>
@@ -318,6 +340,7 @@ const CommunicationView = ({ role = 'user' }) => {
                                         }}
                                         initialRecipient={selectedItem.partner}
                                         role={role}
+                                        allowedRoles={allowedRoles}
                                     />
                                 </div>
                             )}
@@ -342,6 +365,7 @@ const CommunicationView = ({ role = 'user' }) => {
                             onSuccess={() => { setIsComposeOpen(false); fetchData(); }}
                             onCancel={() => setIsComposeOpen(false)}
                             role={role}
+                            allowedRoles={allowedRoles}
                         />
                     </div>
                 </div>
