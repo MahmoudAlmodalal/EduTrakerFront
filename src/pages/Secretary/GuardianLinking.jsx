@@ -38,6 +38,15 @@ const RELATIONSHIP_OPTIONS = [
     { value: 'other', label: 'Other' },
 ];
 
+const GUARDIAN_STATUS_OPTIONS = [
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'all', label: 'All' },
+];
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0];
+
 const toList = (payload) => {
     if (Array.isArray(payload)) {
         return payload;
@@ -79,15 +88,43 @@ const humanize = (value = '') => {
 };
 
 const formatApiError = (error, fallback) => {
-    const errData = error.response?.data || error;
+    const responseData = error?.response?.data ?? error?.data ?? null;
 
-    if (typeof errData === 'object' && !Array.isArray(errData)) {
-        return Object.entries(errData)
-            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-            .join(' | ');
+    if (typeof responseData === 'string' && responseData.trim()) {
+        return responseData.trim();
     }
 
-    return error.message || fallback;
+    if (responseData && typeof responseData === 'object' && !Array.isArray(responseData)) {
+        const message = Object.entries(responseData)
+            .map(([key, value]) => {
+                const normalizedValue = Array.isArray(value) ? value.filter(Boolean).join(', ') : value;
+                if (normalizedValue === undefined || normalizedValue === null || normalizedValue === '') {
+                    return '';
+                }
+                if (key === 'detail' || key === 'message') {
+                    return String(normalizedValue);
+                }
+                return `${key}: ${normalizedValue}`;
+            })
+            .filter(Boolean)
+            .join(' | ');
+
+        if (message) {
+            return message;
+        }
+    }
+
+    if (typeof error?.message === 'string' && error.message.trim()) {
+        return error.message.trim();
+    }
+
+    return fallback;
+};
+
+const isRequestCanceled = (error) => {
+    return error?.code === 'ERR_CANCELED'
+        || error?.name === 'CanceledError'
+        || error?.name === 'AbortError';
 };
 
 const GuardianLinking = () => {
@@ -97,7 +134,15 @@ const GuardianLinking = () => {
 
     const isMountedRef = useRef(true);
     const guardiansRequestRef = useRef(0);
+    const summaryRequestRef = useRef(0);
     const linksRequestRef = useRef(0);
+    const studentsRef = useRef([]);
+    const studentsLoadedRef = useRef(false);
+    const studentsLoadingRef = useRef(false);
+    const studentsAbortControllerRef = useRef(null);
+    const summaryAbortControllerRef = useRef(null);
+    const isResettingForSchoolRef = useRef(false);
+    const abortControllerRef = useRef(null);
 
     const [guardians, setGuardians] = useState([]);
     const [students, setStudents] = useState([]);
@@ -105,10 +150,29 @@ const GuardianLinking = () => {
     const [selectedGuardian, setSelectedGuardian] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [appliedSearch, setAppliedSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('active');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+    const [guardiansCount, setGuardiansCount] = useState(0);
+    const [guardiansTotalPages, setGuardiansTotalPages] = useState(1);
+    const [hasNextPage, setHasNextPage] = useState(false);
+    const [hasPreviousPage, setHasPreviousPage] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
+    const [hasLoadedGuardians, setHasLoadedGuardians] = useState(false);
+    const [summaryLoaded, setSummaryLoaded] = useState(false);
+    const [guardianSummary, setGuardianSummary] = useState({
+        total_guardians: 0,
+        active_guardians: 0,
+        inactive_guardians: 0,
+    });
     const [studentsLoading, setStudentsLoading] = useState(false);
     const [studentsLoaded, setStudentsLoaded] = useState(false);
     const [linksLoading, setLinksLoading] = useState(false);
+    const [deactivatingGuardianId, setDeactivatingGuardianId] = useState(null);
+    const [activatingGuardianId, setActivatingGuardianId] = useState(null);
+    const [deactivatingLinkId, setDeactivatingLinkId] = useState(null);
+    const [activatingLinkId, setActivatingLinkId] = useState(null);
     const [linkSubmitting, setLinkSubmitting] = useState(false);
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [banner, setBanner] = useState({ type: 'error', message: '' });
@@ -120,13 +184,30 @@ const GuardianLinking = () => {
     const [newGuardian, setNewGuardian] = useState({ ...DEFAULT_GUARDIAN });
     const [showGuardianPassword, setShowGuardianPassword] = useState(false);
 
-    const schoolId = user?.school_id || user?.school;
+    const schoolId = useMemo(() => {
+        const school = user?.school;
+        const candidate = user?.school_id ?? school?.id ?? school;
+        const parsed = Number.parseInt(candidate, 10);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    }, [user?.school, user?.school_id]);
 
     useEffect(() => {
+        isMountedRef.current = true;
+
         return () => {
             isMountedRef.current = false;
             guardiansRequestRef.current += 1;
+            summaryRequestRef.current += 1;
             linksRequestRef.current += 1;
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            if (studentsAbortControllerRef.current) {
+                studentsAbortControllerRef.current.abort();
+            }
+            if (summaryAbortControllerRef.current) {
+                summaryAbortControllerRef.current.abort();
+            }
         };
     }, []);
 
@@ -145,80 +226,198 @@ const GuardianLinking = () => {
         showError(message);
     }, [showError, showSuccess]);
 
-    const fetchGuardians = useCallback(async (search = '') => {
+    const fetchGuardians = useCallback(async ({
+        search = '',
+        status = 'active',
+        page = 1,
+        size = DEFAULT_PAGE_SIZE,
+        forceRefresh = false,
+    } = {}) => {
         const requestId = guardiansRequestRef.current + 1;
         guardiansRequestRef.current = requestId;
 
         try {
             setTableLoading(true);
-            const data = await secretaryService.getGuardians(search.trim());
+
+            // Abort any previous in-flight request
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+
+            const normalizedSearch = search.trim();
+            const includeInactive = status !== 'active';
+            const isActive = status === 'inactive' ? false : null;
+            const data = await secretaryService.getGuardians({
+                search: normalizedSearch,
+                includeInactive,
+                isActive,
+                page,
+                pageSize: size,
+                forceRefresh,
+                signal: controller.signal,
+            });
 
             if (!isMountedRef.current || guardiansRequestRef.current !== requestId) {
                 return;
             }
 
-            setGuardians(toList(data));
+            const nextGuardians = toList(data);
+            setGuardians(nextGuardians);
+
+            if (Array.isArray(data?.results)) {
+                const parsedCount = Number.parseInt(data.count, 10);
+                const totalCount = Number.isInteger(parsedCount) && parsedCount >= 0
+                    ? parsedCount
+                    : nextGuardians.length;
+                const totalPages = Math.max(1, Math.ceil(totalCount / size));
+
+                if (page > totalPages && totalCount > 0) {
+                    setCurrentPage(totalPages);
+                    return;
+                }
+
+                setGuardiansCount(totalCount);
+                setGuardiansTotalPages(totalPages);
+                setHasNextPage(Boolean(data.next));
+                setHasPreviousPage(Boolean(data.previous));
+            } else {
+                setGuardiansCount(nextGuardians.length);
+                setGuardiansTotalPages(1);
+                setHasNextPage(false);
+                setHasPreviousPage(false);
+            }
         } catch (error) {
             if (!isMountedRef.current || guardiansRequestRef.current !== requestId) {
                 return;
             }
 
+            if (isRequestCanceled(error)) {
+                return;
+            }
+
             console.error('Error fetching guardians:', error);
-            setFeedback('error', 'Failed to load guardians.');
+            setFeedback('error', formatApiError(error, 'Failed to load guardians.'));
         } finally {
             if (isMountedRef.current && guardiansRequestRef.current === requestId) {
                 setTableLoading(false);
+                setHasLoadedGuardians(true);
+            }
+        }
+    }, [setFeedback]);
+
+    const fetchGuardianSummary = useCallback(async ({ forceRefresh = false, silent = false } = {}) => {
+        const requestId = summaryRequestRef.current + 1;
+        summaryRequestRef.current = requestId;
+
+        if (summaryAbortControllerRef.current) {
+            summaryAbortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        summaryAbortControllerRef.current = controller;
+
+        try {
+            const data = await secretaryService.getGuardianSummary({
+                forceRefresh,
+                signal: controller.signal,
+            });
+
+            if (!isMountedRef.current || summaryRequestRef.current !== requestId) {
+                return data;
+            }
+
+            const totalGuardians = Number.parseInt(data?.total_guardians, 10);
+            const activeGuardians = Number.parseInt(data?.active_guardians, 10);
+            const inactiveGuardians = Number.parseInt(data?.inactive_guardians, 10);
+
+            setGuardianSummary({
+                total_guardians: Number.isInteger(totalGuardians) && totalGuardians >= 0 ? totalGuardians : 0,
+                active_guardians: Number.isInteger(activeGuardians) && activeGuardians >= 0 ? activeGuardians : 0,
+                inactive_guardians: Number.isInteger(inactiveGuardians) && inactiveGuardians >= 0 ? inactiveGuardians : 0,
+            });
+            setSummaryLoaded(true);
+            return data;
+        } catch (error) {
+            if (!isMountedRef.current || summaryRequestRef.current !== requestId || isRequestCanceled(error)) {
+                return null;
+            }
+
+            console.error('Error fetching guardian summary:', error);
+            setSummaryLoaded(false);
+            if (!silent) {
+                setFeedback('error', formatApiError(error, 'Failed to load guardian summary.'));
+            }
+            return null;
+        } finally {
+            if (summaryAbortControllerRef.current === controller) {
+                summaryAbortControllerRef.current = null;
             }
         }
     }, [setFeedback]);
 
     const fetchStudents = useCallback(async ({ force = false, silent = false } = {}) => {
-        if (!schoolId) {
-            if (isMountedRef.current) {
-                setStudents([]);
-                setStudentsLoaded(false);
-            }
-            return [];
+        if (studentsLoadingRef.current && !force && silent) {
+            return studentsRef.current;
         }
 
-        if (studentsLoading && !force) {
-            return students;
+        if (studentsLoadedRef.current && !force) {
+            return studentsRef.current;
         }
 
-        if (studentsLoaded && !force) {
-            return students;
+        studentsLoadingRef.current = true;
+        if (studentsAbortControllerRef.current) {
+            studentsAbortControllerRef.current.abort();
         }
+        const controller = new AbortController();
+        studentsAbortControllerRef.current = controller;
 
         try {
             if (!silent) {
                 setStudentsLoading(true);
             }
 
-            const data = await secretaryService.getStudents({ school_id: schoolId });
+            const data = await secretaryService.getStudents(
+                {},
+                { signal: controller.signal, timeout: 8000 },
+            );
             const nextStudents = toList(data);
 
-            if (!isMountedRef.current) {
+            if (!isMountedRef.current || studentsAbortControllerRef.current !== controller) {
                 return nextStudents;
             }
 
+            studentsRef.current = nextStudents;
+            studentsLoadedRef.current = true;
             setStudents(nextStudents);
             setStudentsLoaded(true);
             return nextStudents;
         } catch (error) {
+            if (isRequestCanceled(error)) {
+                return studentsRef.current;
+            }
+
             console.error('Error fetching students:', error);
 
-            if (isMountedRef.current) {
+            if (isMountedRef.current && studentsAbortControllerRef.current === controller) {
+                studentsLoadedRef.current = false;
                 setStudentsLoaded(false);
-                setFeedback('error', 'Failed to load students.');
+                if (!silent) {
+                    setFeedback('error', 'Failed to load students.');
+                }
             }
 
             return [];
         } finally {
-            if (!silent && isMountedRef.current) {
-                setStudentsLoading(false);
+            if (studentsAbortControllerRef.current === controller) {
+                studentsAbortControllerRef.current = null;
+                studentsLoadingRef.current = false;
+                if (!silent && isMountedRef.current) {
+                    setStudentsLoading(false);
+                }
             }
         }
-    }, [schoolId, setFeedback, students, studentsLoaded, studentsLoading]);
+    }, [setFeedback]);
 
     const fetchGuardianLinks = useCallback(async (guardianId) => {
         if (!guardianId) {
@@ -233,7 +432,9 @@ const GuardianLinking = () => {
 
         try {
             setLinksLoading(true);
-            const data = await secretaryService.getGuardianLinks(guardianId);
+            const data = await secretaryService.getGuardianLinks(guardianId, {
+                includeInactive: true,
+            });
             const links = toList(data);
 
             if (!isMountedRef.current || linksRequestRef.current !== requestId) {
@@ -258,34 +459,86 @@ const GuardianLinking = () => {
         }
     }, [setFeedback]);
 
-    useEffect(() => {
-        fetchGuardians('');
-    }, [fetchGuardians]);
+    const refreshCurrentGuardians = useCallback(async ({ forceRefresh = false } = {}) => {
+        await fetchGuardians({
+            search: appliedSearch,
+            status: statusFilter,
+            page: currentPage,
+            size: pageSize,
+            forceRefresh,
+        });
+    }, [appliedSearch, currentPage, fetchGuardians, pageSize, statusFilter]);
 
     useEffect(() => {
+        isResettingForSchoolRef.current = true;
+        if (studentsAbortControllerRef.current) {
+            studentsAbortControllerRef.current.abort();
+            studentsAbortControllerRef.current = null;
+        }
+        if (summaryAbortControllerRef.current) {
+            summaryAbortControllerRef.current.abort();
+            summaryAbortControllerRef.current = null;
+        }
+        setGuardians([]);
+        setGuardiansCount(0);
+        setGuardiansTotalPages(1);
+        setHasNextPage(false);
+        setHasPreviousPage(false);
+        setSummaryLoaded(false);
+        setGuardianSummary({
+            total_guardians: 0,
+            active_guardians: 0,
+            inactive_guardians: 0,
+        });
+        studentsRef.current = [];
+        studentsLoadedRef.current = false;
+        studentsLoadingRef.current = false;
         setStudents([]);
+        setStudentsLoading(false);
         setStudentsLoaded(false);
-    }, [schoolId]);
+        setDeactivatingGuardianId(null);
+        setActivatingGuardianId(null);
+        setHasLoadedGuardians(false);
+        setSearchTerm('');
+        setAppliedSearch('');
+        setStatusFilter('active');
+        setCurrentPage(1);
+        setPageSize(DEFAULT_PAGE_SIZE);
+        void fetchGuardians({ search: '', status: 'active', page: 1, size: DEFAULT_PAGE_SIZE });
+        void fetchGuardianSummary({ forceRefresh: true, silent: true });
+        void fetchStudents({ silent: true, force: true });
+    }, [schoolId, fetchGuardians, fetchGuardianSummary, fetchStudents]);
 
-    const filteredGuardians = useMemo(() => {
-        const search = searchTerm.trim().toLowerCase();
+    useEffect(() => {
+        if (isResettingForSchoolRef.current) {
+            const defaultsApplied = appliedSearch === ''
+                && statusFilter === 'active'
+                && currentPage === 1
+                && pageSize === DEFAULT_PAGE_SIZE;
 
-        if (!search) {
-            return guardians;
+            if (defaultsApplied) {
+                isResettingForSchoolRef.current = false;
+            }
+            return;
         }
 
-        return guardians.filter((guardian) => {
-            const name = (guardian.full_name || '').toLowerCase();
-            const email = (guardian.email || '').toLowerCase();
-            const phone = (guardian.phone_number || '').toLowerCase();
-            return name.includes(search) || email.includes(search) || phone.includes(search);
+        void fetchGuardians({
+            search: appliedSearch,
+            status: statusFilter,
+            page: currentPage,
+            size: pageSize,
         });
-    }, [guardians, searchTerm]);
+    }, [appliedSearch, currentPage, fetchGuardians, pageSize, statusFilter]);
+
+    const filteredGuardians = guardians;
 
     const linkedStudentIds = useMemo(() => {
         const ids = new Set();
 
         guardianLinks.forEach((link) => {
+            if (link?.is_active === false) {
+                return;
+            }
             const id = getStudentIdFromLink(link);
             if (id !== null && id !== undefined) {
                 ids.add(String(id));
@@ -303,23 +556,29 @@ const GuardianLinking = () => {
     }, [students, linkedStudentIds]);
 
     const statCards = useMemo(() => {
-        const activeGuardians = guardians.filter((guardian) => guardian.is_active !== false).length;
+        const activeGuardians = summaryLoaded
+            ? guardianSummary.active_guardians
+            : statusFilter === 'active'
+            ? guardiansCount
+            : guardians.filter((guardian) => guardian.is_active !== false).length;
+        const totalGuardians = summaryLoaded ? guardianSummary.total_guardians : guardiansCount;
         const studentValue = studentsLoaded ? students.length : '...';
 
         return [
-            { title: 'Total Guardians', value: guardians.length, icon: Users, color: 'indigo' },
+            { title: 'Total Guardians', value: totalGuardians, icon: Users, color: 'indigo' },
             { title: 'Active Guardians', value: activeGuardians, icon: Users, color: 'green' },
             { title: 'Students', value: studentValue, icon: Users, color: 'blue' },
         ];
-    }, [guardians, students.length, studentsLoaded]);
+    }, [guardians, guardiansCount, guardianSummary.active_guardians, guardianSummary.total_guardians, statusFilter, students.length, studentsLoaded, summaryLoaded]);
 
     const handleSearchChange = useCallback((event) => {
         setSearchTerm(event.target.value);
     }, []);
 
     const handleSearchSubmit = useCallback(() => {
-        fetchGuardians(searchTerm);
-    }, [fetchGuardians, searchTerm]);
+        setAppliedSearch(searchTerm.trim());
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     const handleSearchKeyDown = useCallback((event) => {
         if (event.key === 'Enter') {
@@ -335,6 +594,8 @@ const GuardianLinking = () => {
         setGuardianLinks([]);
         setLinkData({ ...DEFAULT_LINK_DATA });
         setLinksLoading(false);
+        setDeactivatingLinkId(null);
+        setActivatingLinkId(null);
     }, []);
 
     const closeCreateModal = useCallback(() => {
@@ -342,6 +603,37 @@ const GuardianLinking = () => {
         setNewGuardian({ ...DEFAULT_GUARDIAN });
         setShowGuardianPassword(false);
     }, []);
+
+    const handleStatusFilterChange = useCallback((event) => {
+        setStatusFilter(event.target.value);
+        setCurrentPage(1);
+    }, []);
+
+    const handlePageSizeChange = useCallback((event) => {
+        const nextSize = Number.parseInt(event.target.value, 10);
+        if (!Number.isInteger(nextSize) || nextSize <= 0) {
+            return;
+        }
+
+        setPageSize(nextSize);
+        setCurrentPage(1);
+    }, []);
+
+    const handlePreviousPage = useCallback(() => {
+        if (!hasPreviousPage || tableLoading) {
+            return;
+        }
+
+        setCurrentPage((prev) => Math.max(1, prev - 1));
+    }, [hasPreviousPage, tableLoading]);
+
+    const handleNextPage = useCallback(() => {
+        if (!hasNextPage || tableLoading) {
+            return;
+        }
+
+        setCurrentPage((prev) => prev + 1);
+    }, [hasNextPage, tableLoading]);
 
     const handleOpenLinkModal = useCallback((guardian) => {
         const guardianId = getEntityId(guardian);
@@ -361,10 +653,116 @@ const GuardianLinking = () => {
 
         void fetchGuardianLinks(guardianId);
 
-        if (!studentsLoaded) {
+        if (!studentsLoadedRef.current) {
             void fetchStudents({ silent: false });
         }
-    }, [fetchGuardianLinks, fetchStudents, setFeedback, studentsLoaded]);
+    }, [fetchGuardianLinks, fetchStudents, setFeedback]);
+
+    const handleDeactivateGuardian = useCallback(async (guardian) => {
+        const guardianId = getEntityId(guardian);
+
+        if (!guardianId) {
+            setFeedback('error', 'Selected guardian does not have a valid identifier.');
+            return;
+        }
+
+        if (guardian.is_active === false) {
+            return;
+        }
+
+        const guardianName = guardian.full_name || `Guardian #${guardianId}`;
+        const confirmed = window.confirm(`Deactivate ${guardianName}?`);
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            setDeactivatingGuardianId(guardianId);
+            await secretaryService.deactivateGuardian(guardianId);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            if (selectedGuardian?.id === guardianId) {
+                closeLinkModal();
+            }
+
+            if (summaryLoaded) {
+                setGuardianSummary((prev) => ({
+                    ...prev,
+                    active_guardians: Math.max(Number(prev.active_guardians || 0) - 1, 0),
+                    inactive_guardians: Math.max(Number(prev.inactive_guardians || 0) + 1, 0),
+                    total_guardians: Math.max(Number(prev.total_guardians || 0), 0),
+                }));
+            }
+
+            setFeedback('success', 'Guardian deactivated successfully.');
+            await Promise.all([
+                refreshCurrentGuardians({ forceRefresh: true }),
+                fetchGuardianSummary({ forceRefresh: true, silent: true }),
+            ]);
+        } catch (error) {
+            console.error('Error deactivating guardian:', error);
+            setFeedback('error', formatApiError(error, 'Failed to deactivate guardian.'));
+        } finally {
+            if (isMountedRef.current) {
+                setDeactivatingGuardianId(null);
+            }
+        }
+    }, [closeLinkModal, fetchGuardianSummary, refreshCurrentGuardians, selectedGuardian, setFeedback, summaryLoaded]);
+
+    const handleActivateGuardian = useCallback(async (guardian) => {
+        const guardianId = getEntityId(guardian);
+
+        if (!guardianId) {
+            setFeedback('error', 'Selected guardian does not have a valid identifier.');
+            return;
+        }
+
+        if (guardian.is_active !== false) {
+            return;
+        }
+
+        const guardianName = guardian.full_name || `Guardian #${guardianId}`;
+        const confirmed = window.confirm(`Activate ${guardianName}?`);
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            setActivatingGuardianId(guardianId);
+            await secretaryService.activateGuardian(guardianId);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            if (summaryLoaded) {
+                setGuardianSummary((prev) => ({
+                    ...prev,
+                    active_guardians: Math.max(Number(prev.active_guardians || 0) + 1, 0),
+                    inactive_guardians: Math.max(Number(prev.inactive_guardians || 0) - 1, 0),
+                    total_guardians: Math.max(Number(prev.total_guardians || 0), 0),
+                }));
+            }
+
+            setFeedback('success', 'Guardian activated successfully.');
+            await Promise.all([
+                refreshCurrentGuardians({ forceRefresh: true }),
+                fetchGuardianSummary({ forceRefresh: true, silent: true }),
+            ]);
+        } catch (error) {
+            console.error('Error activating guardian:', error);
+            setFeedback('error', formatApiError(error, 'Failed to activate guardian.'));
+        } finally {
+            if (isMountedRef.current) {
+                setActivatingGuardianId(null);
+            }
+        }
+    }, [fetchGuardianSummary, refreshCurrentGuardians, setFeedback, summaryLoaded]);
 
     const handleLinkFieldChange = useCallback((field, value) => {
         setLinkData((prev) => ({ ...prev, [field]: value }));
@@ -401,7 +799,7 @@ const GuardianLinking = () => {
             setLinkData({ ...DEFAULT_LINK_DATA });
             await Promise.all([
                 fetchGuardianLinks(guardianId),
-                fetchGuardians(searchTerm),
+                refreshCurrentGuardians({ forceRefresh: true }),
             ]);
         } catch (error) {
             console.error('Error linking guardian:', error);
@@ -413,13 +811,84 @@ const GuardianLinking = () => {
         }
     }, [
         fetchGuardianLinks,
-        fetchGuardians,
         linkData,
         linkedStudentIds,
-        searchTerm,
+        refreshCurrentGuardians,
         selectedGuardian,
         setFeedback,
     ]);
+
+    const handleDeactivateLink = useCallback(async (link) => {
+        const guardianId = selectedGuardian?.id;
+        const linkId = link?.id;
+
+        if (!guardianId || !linkId) {
+            setFeedback('error', 'Selected guardian link is invalid.');
+            return;
+        }
+
+        const studentName = link.student_name || 'this student';
+        const confirmed = window.confirm(`Deactivate link with ${studentName}?`);
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            setDeactivatingLinkId(linkId);
+            await secretaryService.deactivateGuardianLink(linkId);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            setFeedback('success', 'Guardian link deactivated successfully.');
+            setLinkData((prev) => ({ ...prev, student_id: '' }));
+            await Promise.all([
+                fetchGuardianLinks(guardianId),
+                refreshCurrentGuardians({ forceRefresh: true }),
+            ]);
+        } catch (error) {
+            console.error('Error deactivating guardian link:', error);
+            setFeedback('error', formatApiError(error, 'Failed to deactivate guardian link.'));
+        } finally {
+            if (isMountedRef.current) {
+                setDeactivatingLinkId(null);
+            }
+        }
+    }, [fetchGuardianLinks, refreshCurrentGuardians, selectedGuardian, setFeedback]);
+
+    const handleActivateLink = useCallback(async (link) => {
+        const guardianId = selectedGuardian?.id;
+        const linkId = link?.id;
+
+        if (!guardianId || !linkId) {
+            setFeedback('error', 'Selected guardian link is invalid.');
+            return;
+        }
+
+        try {
+            setActivatingLinkId(linkId);
+            await secretaryService.activateGuardianLink(linkId);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            setFeedback('success', 'Guardian link activated successfully.');
+            await Promise.all([
+                fetchGuardianLinks(guardianId),
+                refreshCurrentGuardians({ forceRefresh: true }),
+            ]);
+        } catch (error) {
+            console.error('Error activating guardian link:', error);
+            setFeedback('error', formatApiError(error, 'Failed to activate guardian link.'));
+        } finally {
+            if (isMountedRef.current) {
+                setActivatingLinkId(null);
+            }
+        }
+    }, [fetchGuardianLinks, refreshCurrentGuardians, selectedGuardian, setFeedback]);
 
     const handleCreateGuardianField = useCallback((field, value) => {
         setNewGuardian((prev) => ({ ...prev, [field]: value }));
@@ -457,7 +926,10 @@ const GuardianLinking = () => {
 
             closeCreateModal();
             setFeedback('success', 'Guardian created successfully.');
-            await fetchGuardians(searchTerm);
+            await Promise.all([
+                refreshCurrentGuardians({ forceRefresh: true }),
+                fetchGuardianSummary({ forceRefresh: true, silent: true }),
+            ]);
         } catch (error) {
             console.error('Error creating guardian:', error);
             setFeedback('error', formatApiError(error, 'Failed to create guardian.'));
@@ -466,7 +938,7 @@ const GuardianLinking = () => {
                 setCreateSubmitting(false);
             }
         }
-    }, [closeCreateModal, fetchGuardians, newGuardian, schoolId, searchTerm, setFeedback]);
+    }, [closeCreateModal, fetchGuardianSummary, newGuardian, refreshCurrentGuardians, schoolId, setFeedback]);
 
     const canSubmitLink = Boolean(
         selectedGuardian?.id
@@ -474,8 +946,13 @@ const GuardianLinking = () => {
         && !linkSubmitting
         && !studentsLoading
         && !linksLoading
+        && !activatingLinkId
+        && !deactivatingLinkId
         && availableStudents.length > 0
     );
+    const showGuardiansInitialLoader = tableLoading && !hasLoadedGuardians && guardians.length === 0;
+    const summaryStart = guardiansCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+    const summaryEnd = guardiansCount === 0 ? 0 : Math.min(currentPage * pageSize, guardiansCount);
 
     return (
         <div className="secretary-dashboard guardian-linking-page">
@@ -525,17 +1002,48 @@ const GuardianLinking = () => {
                             />
                         </div>
                     </div>
-                    <button className="btn-primary" type="button" onClick={handleSearchSubmit}>
+                    <div className="sec-field sec-field--compact">
+                        <label htmlFor="guardian-status-filter" className="form-label">Status</label>
+                        <select
+                            id="guardian-status-filter"
+                            className="form-select"
+                            value={statusFilter}
+                            onChange={handleStatusFilterChange}
+                            disabled={tableLoading}
+                        >
+                            {GUARDIAN_STATUS_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="sec-field sec-field--compact">
+                        <label htmlFor="guardian-page-size" className="form-label">Rows</label>
+                        <select
+                            id="guardian-page-size"
+                            className="form-select"
+                            value={pageSize}
+                            onChange={handlePageSizeChange}
+                            disabled={tableLoading}
+                        >
+                            {PAGE_SIZE_OPTIONS.map((sizeOption) => (
+                                <option key={sizeOption} value={sizeOption}>{sizeOption}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <button className="btn-primary" type="button" onClick={handleSearchSubmit} disabled={tableLoading}>
                         <Search size={16} />
-                        Search
+                        {tableLoading && hasLoadedGuardians ? 'Loading...' : 'Search'}
                     </button>
                 </div>
 
                 <div className="sec-table-wrap">
-                    {tableLoading ? (
+                    {showGuardiansInitialLoader ? (
                         <LoadingSpinner message="Loading guardians..." />
                     ) : (
                         <>
+                            {tableLoading ? (
+                                <p className="sec-subtle-text">Refreshing guardians...</p>
+                            ) : null}
                             <div className="sec-table-scroll">
                                 <table className="data-table sec-data-table">
                                     <thead>
@@ -578,16 +1086,30 @@ const GuardianLinking = () => {
                                                         <StatusBadge status={guardian.is_active !== false ? 'active' : 'inactive'} />
                                                     </td>
                                                     <td>
-                                                        <button
-                                                            type="button"
-                                                            className="sec-inline-action"
-                                                            onClick={() => handleOpenLinkModal(guardian)}
-                                                            title={t('secretary.guardians.manageLink') || 'Link to Student'}
-                                                            disabled={!guardianId}
-                                                        >
-                                                            <LinkIcon size={14} />
-                                                            Link
-                                                        </button>
+                                                        <div className="sec-row-actions">
+                                                            <button
+                                                                type="button"
+                                                                className="sec-inline-action"
+                                                                onClick={() => handleOpenLinkModal(guardian)}
+                                                                title={t('secretary.guardians.manageLink') || 'Link to Student'}
+                                                                disabled={!guardianId}
+                                                            >
+                                                                <LinkIcon size={14} />
+                                                                Link
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`sec-inline-action ${guardian.is_active === false ? '' : 'sec-inline-action--danger'}`.trim()}
+                                                                onClick={() => (guardian.is_active === false
+                                                                    ? void handleActivateGuardian(guardian)
+                                                                    : void handleDeactivateGuardian(guardian))}
+                                                                disabled={!guardianId || deactivatingGuardianId === guardianId || activatingGuardianId === guardianId}
+                                                            >
+                                                                {guardian.is_active === false
+                                                                    ? activatingGuardianId === guardianId ? 'Activating...' : 'Activate'
+                                                                    : deactivatingGuardianId === guardianId ? 'Deactivating...' : 'Deactivate'}
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -603,6 +1125,34 @@ const GuardianLinking = () => {
                                     </tbody>
                                 </table>
                             </div>
+                            {guardiansCount > 0 ? (
+                                <div className="sec-table-pagination">
+                                    <span className="sec-table-pagination-summary">
+                                        Showing {summaryStart} to {summaryEnd} of {guardiansCount} guardians
+                                    </span>
+                                    <div className="sec-table-pagination-controls">
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={handlePreviousPage}
+                                            disabled={tableLoading || !hasPreviousPage}
+                                        >
+                                            Previous
+                                        </button>
+                                        <span className="sec-table-pagination-page">
+                                            Page {currentPage} of {guardiansTotalPages}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={handleNextPage}
+                                            disabled={tableLoading || !hasNextPage}
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
                         </>
                     )}
                 </div>
@@ -628,10 +1178,35 @@ const GuardianLinking = () => {
                             <div className="sec-link-list">
                                 {guardianLinks.map((link, index) => {
                                     const linkKey = link?.id ?? `${getStudentIdFromLink(link) || 'student'}-${index}`;
+                                    const isInactive = link?.is_active === false;
                                     return (
                                         <div className="sec-link-item" key={linkKey}>
-                                            <span>{link.student_name || 'Student'}</span>
-                                            <span className="sec-link-relation">{humanize(link.relationship_display || link.relationship_type)}</span>
+                                            <div className="sec-link-item-main">
+                                                <span>{link.student_name || 'Student'}</span>
+                                                <span className="sec-link-relation">
+                                                    {humanize(link.relationship_display || link.relationship_type)}
+                                                    {isInactive ? ' · Inactive' : ' · Active'}
+                                                </span>
+                                            </div>
+                                            {isInactive ? (
+                                                <button
+                                                    type="button"
+                                                    className="sec-inline-action sec-inline-action--compact"
+                                                    onClick={() => void handleActivateLink(link)}
+                                                    disabled={!link?.id || activatingLinkId === link.id || Boolean(deactivatingLinkId)}
+                                                >
+                                                    {activatingLinkId === link.id ? 'Activating...' : 'Activate Link'}
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    className="sec-inline-action sec-inline-action--danger sec-inline-action--compact"
+                                                    onClick={() => void handleDeactivateLink(link)}
+                                                    disabled={!link?.id || deactivatingLinkId === link.id || Boolean(activatingLinkId)}
+                                                >
+                                                    {deactivatingLinkId === link.id ? 'Deactivating...' : 'Deactivate Link'}
+                                                </button>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -648,7 +1223,7 @@ const GuardianLinking = () => {
                             value={linkData.student_id}
                             onChange={(event) => handleLinkFieldChange('student_id', event.target.value)}
                             required
-                            disabled={studentsLoading || linksLoading || linkSubmitting || availableStudents.length === 0}
+                            disabled={studentsLoading || linksLoading || linkSubmitting || Boolean(deactivatingLinkId) || Boolean(activatingLinkId) || availableStudents.length === 0}
                         >
                             <option value="">
                                 {studentsLoading ? 'Loading students...' : 'Choose a student...'}

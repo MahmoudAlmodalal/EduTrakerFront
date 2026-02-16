@@ -24,6 +24,44 @@ import {
 import './Secretary.css';
 
 const AttendanceTrendChart = lazy(() => import('./components/AttendanceTrendChart'));
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+const formatDateParam = (value) => {
+    const date = new Date(value);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getStartOfWeek = (value) => {
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    const day = date.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    date.setDate(date.getDate() + diffToMonday);
+    return date;
+};
+
+const getWeekRange = (weekKey = 'current-week') => {
+    const startDate = getStartOfWeek(new Date());
+    if (weekKey === 'last-week') {
+        startDate.setDate(startDate.getDate() - 7);
+    }
+
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 4);
+
+    return {
+        startDate,
+        dateFrom: formatDateParam(startDate),
+        dateTo: formatDateParam(endDate),
+    };
+};
+
+const normalizeAttendanceStatus = (status) => {
+    return String(status || '').trim().toLowerCase();
+};
 
 const SecretaryDashboard = () => {
     const { t } = useTheme();
@@ -38,6 +76,9 @@ const SecretaryDashboard = () => {
     });
     const [recentApplications, setRecentApplications] = useState([]);
     const [academicYears, setAcademicYears] = useState([]);
+    const [selectedWeek, setSelectedWeek] = useState('current-week');
+    const [weeklyAttendanceRecords, setWeeklyAttendanceRecords] = useState([]);
+    const [trendLoading, setTrendLoading] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -81,6 +122,43 @@ const SecretaryDashboard = () => {
         };
     }, []);
 
+    const weekRange = useMemo(() => getWeekRange(selectedWeek), [selectedWeek]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const fetchAttendanceTrend = async () => {
+            try {
+                setTrendLoading(true);
+                const records = await secretaryService.getAllAttendance({
+                    date_from: weekRange.dateFrom,
+                    date_to: weekRange.dateTo,
+                });
+
+                if (!isMounted) {
+                    return;
+                }
+
+                setWeeklyAttendanceRecords(Array.isArray(records) ? records : []);
+            } catch (error) {
+                console.error('Error fetching attendance trend:', error);
+                if (isMounted) {
+                    setWeeklyAttendanceRecords([]);
+                }
+            } finally {
+                if (isMounted) {
+                    setTrendLoading(false);
+                }
+            }
+        };
+
+        fetchAttendanceTrend();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [weekRange.dateFrom, weekRange.dateTo]);
+
     const currentYear = useMemo(() => {
         const now = new Date();
         const activeYear = academicYears.find((year) => {
@@ -93,14 +171,41 @@ const SecretaryDashboard = () => {
     }, [academicYears]);
 
     const trendData = useMemo(() => {
-        return [
-            { name: 'Mon', count: Math.floor(stats.totalStudents * 0.95) },
-            { name: 'Tue', count: Math.floor(stats.totalStudents * 0.92) },
-            { name: 'Wed', count: Math.floor(stats.totalStudents * 0.96) },
-            { name: 'Thu', count: Math.floor(stats.totalStudents * 0.94) },
-            { name: 'Fri', count: Math.max(0, stats.totalStudents - stats.absentToday) },
-        ];
-    }, [stats.totalStudents, stats.absentToday]);
+        const attendanceByDate = new Map();
+
+        weeklyAttendanceRecords.forEach((record) => {
+            const dayKey = typeof record?.date === 'string' ? record.date : '';
+            if (!dayKey) {
+                return;
+            }
+
+            const studentKey = String(record.student_id || record.id);
+            const status = normalizeAttendanceStatus(record.status);
+            if (!status) {
+                return;
+            }
+            const attended = status !== 'absent';
+
+            if (!attendanceByDate.has(dayKey)) {
+                attendanceByDate.set(dayKey, new Map());
+            }
+
+            const studentsForDay = attendanceByDate.get(dayKey);
+            studentsForDay.set(studentKey, (studentsForDay.get(studentKey) || false) || attended);
+        });
+
+        return WEEKDAY_LABELS.map((label, index) => {
+            const dayDate = new Date(weekRange.startDate);
+            dayDate.setDate(dayDate.getDate() + index);
+            const dayKey = formatDateParam(dayDate);
+            const studentsForDay = attendanceByDate.get(dayKey);
+            const count = studentsForDay
+                ? Array.from(studentsForDay.values()).filter(Boolean).length
+                : 0;
+
+            return { name: label, count };
+        });
+    }, [weekRange.startDate, weeklyAttendanceRecords]);
 
     const statCards = useMemo(() => {
         const attendanceRate = stats.totalStudents > 0
@@ -201,16 +306,28 @@ const SecretaryDashboard = () => {
                     <div className="sec-chart-header">
                         <div>
                             <h3>Weekly Attendance Trend</h3>
-                            <p>Student attendance tracking for the current week</p>
+                            <p>
+                                Student attendance tracking for the
+                                {' '}
+                                {selectedWeek === 'last-week' ? 'previous week' : 'current week'}
+                            </p>
                         </div>
-                        <select className="form-select sec-chart-select" defaultValue="current-week">
+                        <select
+                            className="form-select sec-chart-select"
+                            value={selectedWeek}
+                            onChange={(event) => setSelectedWeek(event.target.value)}
+                        >
                             <option value="current-week">Current Week</option>
                             <option value="last-week">Last Week</option>
                         </select>
                     </div>
-                    <Suspense fallback={<LoadingSpinner message="Loading chart..." />}>
-                        <AttendanceTrendChart trendData={trendData} />
-                    </Suspense>
+                    {trendLoading ? (
+                        <LoadingSpinner message="Loading attendance trend..." />
+                    ) : (
+                        <Suspense fallback={<LoadingSpinner message="Loading chart..." />}>
+                            <AttendanceTrendChart trendData={trendData} />
+                        </Suspense>
+                    )}
                 </article>
 
                 <aside className="sec-dashboard-sidebar">

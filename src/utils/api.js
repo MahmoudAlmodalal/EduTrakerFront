@@ -93,6 +93,51 @@ const shouldQueueOfflineMutation = (requestConfig) => {
     return true;
 };
 
+const isCanceledRequestError = (error) => {
+    if (!error) {
+        return false;
+    }
+
+    const normalizedCode = String(error.code || '').toUpperCase();
+    const normalizedName = String(error.name || '').toLowerCase();
+    const normalizedMessage = String(error.message || '').toLowerCase();
+
+    return normalizedCode === 'ERR_CANCELED'
+        || normalizedName === 'cancelederror'
+        || normalizedName === 'aborterror'
+        || normalizedMessage === 'canceled';
+};
+
+const hasText = (value) => {
+    if (value === null || value === undefined) {
+        return false;
+    }
+
+    return String(value).trim().length > 0;
+};
+
+const extractFirstErrorValue = (payload) => {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return '';
+    }
+
+    for (const value of Object.values(payload)) {
+        if (Array.isArray(value)) {
+            const firstNonEmpty = value.find((item) => hasText(item));
+            if (hasText(firstNonEmpty)) {
+                return String(firstNonEmpty).trim();
+            }
+            continue;
+        }
+
+        if (hasText(value)) {
+            return String(value).trim();
+        }
+    }
+
+    return '';
+};
+
 const apiClient = axios.create({
     baseURL: BASE_URL,
     withCredentials: true,
@@ -144,6 +189,12 @@ apiClient.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
+
+        // Let request-abort errors bubble through with original metadata.
+        // Callers can detect and ignore these without showing UI errors.
+        if (isCanceledRequestError(error)) {
+            return Promise.reject(error);
+        }
 
         // Handle 401 Unauthorized - Token Refresh Logic
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -210,26 +261,53 @@ apiClient.interceptors.response.use(
             }
         }
 
-        let message = 'Something went wrong. Please try again.';
+        let message = '';
+
+        if (!error.response) {
+            const normalizedCode = String(error.code || '').toUpperCase();
+            const normalizedMessage = String(error.message || '').toLowerCase();
+
+            if (normalizedCode === 'ECONNABORTED' || normalizedMessage.includes('timeout')) {
+                message = 'Request timed out. Please try again.';
+            } else if (normalizedCode === 'ERR_NETWORK') {
+                message = 'Unable to reach the server. Please check your connection and backend status.';
+            } else if (hasText(error.message)) {
+                message = String(error.message).trim();
+            }
+        }
 
         if (data) {
             if (typeof data === 'string') {
-                message = data;
-            } else if (data.detail) {
-                message = data.detail;
-            } else if (data.message) {
-                message = data.message;
+                if (hasText(data)) {
+                    message = data.trim();
+                }
+            } else if (hasText(data.detail)) {
+                message = String(data.detail).trim();
+            } else if (hasText(data.message)) {
+                message = String(data.message).trim();
             } else if (typeof data === 'object') {
                 // Handle multiple validation errors (common in Django REST)
-                const firstError = Object.values(data)[0];
-                message = Array.isArray(firstError) ? firstError[0] : firstError;
+                const firstError = extractFirstErrorValue(data);
+                if (hasText(firstError)) {
+                    message = firstError;
+                }
             }
+        }
+
+        if (!hasText(message) && hasText(error.message)) {
+            message = String(error.message).trim();
+        }
+
+        if (!hasText(message)) {
+            message = 'Something went wrong. Please try again.';
         }
 
         const errorToThrow = new Error(message);
         errorToThrow.response = error.response; // Re-attach for compatibility with catch blocks
         errorToThrow.status = error.response?.status;
         errorToThrow.data = data;
+        errorToThrow.code = error.code;
+        errorToThrow.name = error.name || errorToThrow.name;
 
         return Promise.reject(errorToThrow);
     }

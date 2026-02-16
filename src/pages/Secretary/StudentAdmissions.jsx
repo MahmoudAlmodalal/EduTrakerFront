@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AlertCircle,
     Check,
@@ -30,13 +30,40 @@ import {
 import './Secretary.css';
 
 const STUDENT_STATUS_OPTIONS = [
-    { value: 'pending', label: 'Pending' },
     { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'pending', label: 'Pending' },
     { value: 'suspended', label: 'Suspended' },
     { value: 'graduated', label: 'Graduated' },
+    { value: 'transferred', label: 'Transferred' },
     { value: 'expelled', label: 'Expelled' },
     { value: 'withdrawn', label: 'Withdrawn' },
     { value: 'rejected', label: 'Rejected' },
+];
+
+const GENDER_OPTIONS = [
+    { value: '', label: 'Select Gender' },
+    { value: 'male', label: 'Male' },
+    { value: 'female', label: 'Female' },
+    { value: 'other', label: 'Other' },
+];
+
+const STUDENT_ACTIVITY_FILTER_OPTIONS = [
+    { value: '', label: 'All Students' },
+    { value: 'active', label: 'Active' },
+    { value: 'not_active', label: 'Not Active' },
+];
+
+const APPLICATIONS_PAGE_SIZE = 10;
+const ASSIGNMENT_PAGE_SIZE = 12;
+const FILES_PAGE_SIZE = 10;
+
+const DOCUMENT_TYPE_OPTIONS = [
+    { value: 'birth_certificate', label: 'Birth Certificate' },
+    { value: 'id_card', label: 'ID Card' },
+    { value: 'medical_record', label: 'Medical Record' },
+    { value: 'previous_school_report', label: 'Previous School Report' },
+    { value: 'other', label: 'Other' },
 ];
 
 const createDefaultStudent = () => ({
@@ -44,9 +71,28 @@ const createDefaultStudent = () => ({
     last_name: '',
     email: '',
     password: 'Student@123',
+    gender: '',
     date_of_birth: '',
     admission_date: new Date().toISOString().split('T')[0],
     grade_id: '',
+    enrollment_status: 'active',
+    phone: '',
+    address: '',
+    national_id: '',
+    emergency_contact: '',
+    medical_notes: '',
+});
+
+const createDefaultDocumentUpload = () => ({
+    student_id: '',
+    document_type: DOCUMENT_TYPE_OPTIONS[0].value,
+    file: null,
+});
+
+const createEmptyPaginationState = () => ({
+    count: 0,
+    next: null,
+    previous: null,
 });
 
 const normalizeListResponse = (payload) => {
@@ -59,6 +105,27 @@ const normalizeListResponse = (payload) => {
     }
 
     return [];
+};
+
+const normalizePaginatedListResponse = (payload) => {
+    const results = normalizeListResponse(payload);
+    const countValue = Number(payload?.count);
+
+    if (Array.isArray(payload?.results)) {
+        return {
+            results,
+            count: Number.isFinite(countValue) ? countValue : results.length,
+            next: payload?.next || null,
+            previous: payload?.previous || null,
+        };
+    }
+
+    return {
+        results,
+        count: results.length,
+        next: null,
+        previous: null,
+    };
 };
 
 const stringifyApiValue = (value) => {
@@ -111,9 +178,58 @@ const getApiErrorMessage = (error, fallbackMessage) => {
     return fallbackMessage;
 };
 
+const formatFileSize = (bytes) => {
+    const value = Number(bytes);
+    if (!Number.isFinite(value) || value <= 0) {
+        return 'N/A';
+    }
+
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const unitIndex = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+    const unitSize = value / (1024 ** unitIndex);
+    const fractionDigits = unitIndex === 0 ? 0 : 1;
+    return `${unitSize.toFixed(fractionDigits)} ${units[unitIndex]}`;
+};
+
+const formatDateValue = (value) => {
+    if (!value) {
+        return 'N/A';
+    }
+
+    const dateValue = new Date(value);
+    if (Number.isNaN(dateValue.getTime())) {
+        return 'N/A';
+    }
+
+    return dateValue.toLocaleDateString();
+};
+
+const useDebouncedValue = (value, delay = 300) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => clearTimeout(timeoutId);
+    }, [delay, value]);
+
+    return debouncedValue;
+};
+
 const getStudentName = (student) => {
     const fallback = [student?.first_name, student?.last_name].filter(Boolean).join(' ');
     return student?.full_name || fallback || 'N/A';
+};
+
+const getStudentId = (student) => {
+    const candidate = student?.user_id ?? student?.id;
+    if (candidate === null || candidate === undefined || candidate === '') {
+        return null;
+    }
+
+    return String(candidate);
 };
 
 const resolveSchoolId = (user) => {
@@ -143,6 +259,15 @@ const getEnrollmentClassroomId = (enrollment) => {
     return Number(enrollment?.class_room_id ?? enrollment?.class_room?.id ?? enrollment?.class_room);
 };
 
+const getEnrollmentStudentId = (enrollment) => {
+    const candidate = enrollment?.student_id ?? enrollment?.student?.id ?? enrollment?.student;
+    if (candidate === null || candidate === undefined || candidate === '') {
+        return null;
+    }
+
+    return String(candidate);
+};
+
 const getStudentGradeId = (student) => {
     const candidateGrade = (
         student?.current_grade?.id
@@ -157,6 +282,89 @@ const getStudentGradeId = (student) => {
     }
 
     return gradeId;
+};
+
+const getClassroomId = (classroom) => {
+    const candidate = (
+        classroom?.id
+        ?? classroom?.classroom_id
+        ?? classroom?.class_room_id
+        ?? classroom?.class_room?.id
+        ?? classroom?.class_room
+    );
+
+    if (candidate === null || candidate === undefined || candidate === '') {
+        return null;
+    }
+
+    return String(candidate);
+};
+
+const resolveStudentStatus = (student) => {
+    const currentStatus = String(student?.current_status || '').trim().toLowerCase();
+    if (currentStatus) {
+        return currentStatus;
+    }
+
+    const enrollmentStatus = String(student?.enrollment_status || '').trim().toLowerCase();
+    if (enrollmentStatus) {
+        return enrollmentStatus;
+    }
+
+    return student?.is_active ? 'active' : 'inactive';
+};
+
+const hasAssignedClassroom = (student) => {
+    const hasCurrentEnrollmentGrade = Boolean(
+        student?.current_grade?.id
+        || student?.current_grade?.name
+    );
+
+    return Boolean(
+        hasCurrentEnrollmentGrade
+        || student?.classroom_name
+        || student?.classroom?.classroom_name
+        || student?.classroom?.id
+        || student?.classroom_id
+        || student?.class_room_name
+        || student?.class_room?.classroom_name
+        || student?.class_room?.id
+        || student?.class_room_id
+    );
+};
+
+const createEmptySchoolStudentStats = () => ({
+    totalStudents: 0,
+    activeStudents: 0,
+    pendingStudents: 0,
+    assignedStudents: 0,
+});
+
+const ASSIGNED_ENROLLMENT_STATUSES = new Set(['active', 'enrolled']);
+
+const calculateSchoolStudentStats = (studentList, assignedStudentIds = null) => {
+    return studentList.reduce((stats, student) => {
+        const status = resolveStudentStatus(student);
+        const studentId = getStudentId(student);
+
+        stats.totalStudents += 1;
+        if (status === 'active') {
+            stats.activeStudents += 1;
+        }
+        if (status === 'pending') {
+            stats.pendingStudents += 1;
+        }
+
+        const isAssigned = assignedStudentIds
+            ? Boolean(studentId && assignedStudentIds.has(studentId))
+            : hasAssignedClassroom(student);
+
+        if (isAssigned) {
+            stats.assignedStudents += 1;
+        }
+
+        return stats;
+    }, createEmptySchoolStudentStats());
 };
 
 const EditStudentStatusModal = memo(function EditStudentStatusModal({
@@ -216,6 +424,7 @@ const StudentAdmissions = () => {
 
     const [applications, setApplications] = useState([]);
     const [students, setStudents] = useState([]);
+    const [files, setFiles] = useState([]);
     const [grades, setGrades] = useState([]);
     const [classrooms, setClassrooms] = useState([]);
     const [academicYears, setAcademicYears] = useState([]);
@@ -223,31 +432,58 @@ const StudentAdmissions = () => {
     const [newStudent, setNewStudent] = useState(createDefaultStudent);
     const [selectedClassroom, setSelectedClassroom] = useState('');
     const [selectedStudent, setSelectedStudent] = useState('');
+    const [isClassroomStepOpen, setIsClassroomStepOpen] = useState(false);
     const [applicationYearFilter, setApplicationYearFilter] = useState('');
     const [assignmentAcademicYear, setAssignmentAcademicYear] = useState('');
     const [selectedGradeFilter, setSelectedGradeFilter] = useState('');
     const [applicationSearch, setApplicationSearch] = useState('');
+    const [assignmentSearch, setAssignmentSearch] = useState('');
+    const [applicationActivityFilter, setApplicationActivityFilter] = useState('');
+    const [assignmentActivityFilter, setAssignmentActivityFilter] = useState('');
+    const [applicationsPage, setApplicationsPage] = useState(1);
+    const [assignmentPage, setAssignmentPage] = useState(1);
+    const [filesPage, setFilesPage] = useState(1);
+    const [applicationsPagination, setApplicationsPagination] = useState(createEmptyPaginationState);
+    const [assignmentPagination, setAssignmentPagination] = useState(createEmptyPaginationState);
+    const [filesPagination, setFilesPagination] = useState(createEmptyPaginationState);
+    const [schoolStudentStats, setSchoolStudentStats] = useState(createEmptySchoolStudentStats);
 
     const [gradeQuery, setGradeQuery] = useState('');
+    const [gradeOptions, setGradeOptions] = useState([]);
     const [showGradeDropdown, setShowGradeDropdown] = useState(false);
+    const [fileSearch, setFileSearch] = useState('');
+    const [documentUpload, setDocumentUpload] = useState(createDefaultDocumentUpload);
+    const [documentStudentQuery, setDocumentStudentQuery] = useState('');
+    const [documentStudentOptions, setDocumentStudentOptions] = useState([]);
+    const [showDocumentStudentDropdown, setShowDocumentStudentDropdown] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
 
     const [isApplicationsLoading, setIsApplicationsLoading] = useState(false);
     const [isStudentsLoading, setIsStudentsLoading] = useState(false);
+    const [isFilesLoading, setIsFilesLoading] = useState(false);
+    const [isDocumentStudentLoading, setIsDocumentStudentLoading] = useState(false);
+    const [isGradeOptionsLoading, setIsGradeOptionsLoading] = useState(false);
     const [isCreatingStudent, setIsCreatingStudent] = useState(false);
     const [isAssigningStudent, setIsAssigningStudent] = useState(false);
     const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+    const [isUploadingDocument, setIsUploadingDocument] = useState(false);
 
     const applicationsRequestRef = useRef(0);
     const studentsRequestRef = useRef(0);
+    const filesRequestRef = useRef(0);
+    const documentStudentsRequestRef = useRef(0);
     const classroomsRequestRef = useRef(0);
     const gradesRequestRef = useRef(0);
+    const gradeOptionsRequestRef = useRef(0);
     const academicYearsRequestRef = useRef(0);
+    const schoolStatsRequestRef = useRef(0);
 
     const schoolId = useMemo(() => resolveSchoolId(user), [user]);
-    const deferredApplicationSearch = useDeferredValue(applicationSearch);
-    const deferredGradeQuery = useDeferredValue(gradeQuery);
-    const files = [];
+    const debouncedApplicationSearch = useDebouncedValue(applicationSearch, 350);
+    const debouncedAssignmentSearch = useDebouncedValue(assignmentSearch, 350);
+    const debouncedGradeQuery = useDebouncedValue(gradeQuery, 250);
+    const debouncedFileSearch = useDebouncedValue(fileSearch, 350);
+    const debouncedDocumentStudentQuery = useDebouncedValue(documentStudentQuery, 300);
 
     const tabs = useMemo(() => {
         return [
@@ -255,7 +491,7 @@ const StudentAdmissions = () => {
                 id: 'applications',
                 label: t('secretary.admissions.newApplications') || 'Applications',
                 icon: FileText,
-                badge: applications.length,
+                badge: schoolStudentStats.totalStudents,
             },
             {
                 id: 'add-student',
@@ -273,29 +509,9 @@ const StudentAdmissions = () => {
                 icon: Upload,
             },
         ];
-    }, [applications.length, t]);
+    }, [schoolStudentStats.totalStudents, t]);
 
-    const filteredGrades = useMemo(() => {
-        const search = deferredGradeQuery.trim().toLowerCase();
-        if (!search) {
-            return grades;
-        }
-
-        return grades.filter((grade) => (grade?.name || '').toLowerCase().includes(search));
-    }, [deferredGradeQuery, grades]);
-
-    const filteredApplications = useMemo(() => {
-        const search = deferredApplicationSearch.trim().toLowerCase();
-        if (!search) {
-            return applications;
-        }
-
-        return applications.filter((student) => {
-            const fullName = getStudentName(student).toLowerCase();
-            const email = (student?.email || '').toLowerCase();
-            return fullName.includes(search) || email.includes(search);
-        });
-    }, [applications, deferredApplicationSearch]);
+    const filteredApplications = applications;
 
     const filteredClassrooms = useMemo(() => {
         if (!selectedGradeFilter) {
@@ -325,6 +541,21 @@ const StudentAdmissions = () => {
         });
     }, [selectedGradeFilter, students]);
 
+    const applicationsTotalPages = useMemo(() => {
+        const total = Math.ceil((applicationsPagination.count || 0) / APPLICATIONS_PAGE_SIZE);
+        return Math.max(total, 1);
+    }, [applicationsPagination.count]);
+
+    const assignmentTotalPages = useMemo(() => {
+        const total = Math.ceil((assignmentPagination.count || 0) / ASSIGNMENT_PAGE_SIZE);
+        return Math.max(total, 1);
+    }, [assignmentPagination.count]);
+
+    const filesTotalPages = useMemo(() => {
+        const total = Math.ceil((filesPagination.count || 0) / FILES_PAGE_SIZE);
+        return Math.max(total, 1);
+    }, [filesPagination.count]);
+
     const getAcademicYearLabel = useCallback((year, includeStatus = true) => {
         const rawName = year?.name || year?.academic_year_code || `Year #${year?.id || ''}`;
         const name = rawName.toString().trim();
@@ -341,17 +572,10 @@ const StudentAdmissions = () => {
     }, []);
 
     const statCards = useMemo(() => {
-        const totalStudents = applications.length;
-        const activeStudents = applications.filter((student) => {
-            const status = (student.current_status || '').toLowerCase();
-            return status === 'active' || student.is_active;
-        }).length;
-        const pendingStudents = applications.filter((student) => {
-            return (student.current_status || '').toLowerCase() === 'pending';
-        }).length;
-        const assignedStudents = applications.filter((student) => {
-            return Boolean(student.classroom?.classroom_name || student.class_room?.classroom_name);
-        }).length;
+        const totalStudents = schoolStudentStats.totalStudents;
+        const activeStudents = schoolStudentStats.activeStudents;
+        const pendingStudents = schoolStudentStats.pendingStudents;
+        const assignedStudents = schoolStudentStats.assignedStudents;
 
         return [
             { title: 'Total Students', value: totalStudents, icon: Users, color: 'indigo' },
@@ -359,7 +583,7 @@ const StudentAdmissions = () => {
             { title: 'Pending', value: pendingStudents, icon: Clock, color: 'amber' },
             { title: 'Assigned to Class', value: assignedStudents, icon: GraduationCap, color: 'blue' },
         ];
-    }, [applications]);
+    }, [schoolStudentStats]);
 
     const setFeedback = useCallback((type, message, showToast = true) => {
         setBanner({ type, message });
@@ -375,10 +599,71 @@ const StudentAdmissions = () => {
         }
     }, [showError, showSuccess]);
 
-    const fetchStudentApplications = useCallback(async (yearId = '') => {
+    const fetchSchoolStudentStats = useCallback(async () => {
+        if (!schoolId) {
+            schoolStatsRequestRef.current += 1;
+            setSchoolStudentStats(createEmptySchoolStudentStats());
+            return;
+        }
+
+        const requestId = schoolStatsRequestRef.current + 1;
+        schoolStatsRequestRef.current = requestId;
+
+        try {
+            const [studentsResult, enrollmentsResult] = await Promise.allSettled([
+                secretaryService.getAllStudents({ school_id: schoolId }),
+                secretaryService.getAllEnrollments(),
+            ]);
+
+            if (studentsResult.status !== 'fulfilled') {
+                throw studentsResult.reason;
+            }
+
+            const allStudents = studentsResult.value;
+            if (schoolStatsRequestRef.current !== requestId) {
+                return;
+            }
+
+            let assignedStudentIds = null;
+
+            if (enrollmentsResult.status === 'fulfilled') {
+                const schoolStudentIds = new Set(
+                    allStudents
+                        .map((student) => getStudentId(student))
+                        .filter(Boolean)
+                );
+
+                assignedStudentIds = new Set(
+                    enrollmentsResult.value
+                        .filter((enrollment) => {
+                            const status = String(enrollment?.status || '').trim().toLowerCase();
+                            return ASSIGNED_ENROLLMENT_STATUSES.has(status) && enrollment?.is_active !== false;
+                        })
+                        .map((enrollment) => getEnrollmentStudentId(enrollment))
+                        .filter((studentId) => studentId && schoolStudentIds.has(studentId))
+                );
+            }
+
+            setSchoolStudentStats(calculateSchoolStudentStats(allStudents, assignedStudentIds));
+        } catch (error) {
+            if (schoolStatsRequestRef.current !== requestId) {
+                return;
+            }
+
+            console.error('Error fetching school-wide student stats:', error);
+        }
+    }, [schoolId]);
+
+    const fetchStudentApplications = useCallback(async (
+        yearId = '',
+        activityStatus = '',
+        pageNumber = 1,
+        searchFilter = ''
+    ) => {
         if (!schoolId) {
             applicationsRequestRef.current += 1;
             setApplications([]);
+            setApplicationsPagination(createEmptyPaginationState());
             return;
         }
 
@@ -391,12 +676,27 @@ const StudentAdmissions = () => {
             if (yearId) {
                 params.academic_year_id = yearId;
             }
+            if (activityStatus) {
+                params.activity_status = activityStatus;
+            }
+            const normalizedSearch = searchFilter.trim();
+            if (normalizedSearch) {
+                params.search = normalizedSearch;
+            }
+            params.page = pageNumber;
+            params.page_size = APPLICATIONS_PAGE_SIZE;
 
             const data = await secretaryService.getStudents(params);
             if (applicationsRequestRef.current !== requestId) {
                 return;
             }
-            setApplications(normalizeListResponse(data));
+            const normalizedData = normalizePaginatedListResponse(data);
+            setApplications(normalizedData.results);
+            setApplicationsPagination({
+                count: normalizedData.count,
+                next: normalizedData.next,
+                previous: normalizedData.previous,
+            });
         } catch (error) {
             if (applicationsRequestRef.current !== requestId) {
                 return;
@@ -410,10 +710,16 @@ const StudentAdmissions = () => {
         }
     }, [schoolId, setFeedback]);
 
-    const fetchAssignmentStudents = useCallback(async () => {
+    const fetchAssignmentStudents = useCallback(async (
+        activityStatus = '',
+        pageNumber = 1,
+        gradeFilter = '',
+        searchFilter = ''
+    ) => {
         if (!schoolId) {
             studentsRequestRef.current += 1;
             setStudents([]);
+            setAssignmentPagination(createEmptyPaginationState());
             return;
         }
 
@@ -422,11 +728,31 @@ const StudentAdmissions = () => {
 
         try {
             setIsStudentsLoading(true);
-            const data = await secretaryService.getAllStudents({ school_id: schoolId });
+            const params = { school_id: schoolId };
+            if (activityStatus) {
+                params.activity_status = activityStatus;
+            }
+            if (gradeFilter) {
+                params.grade_id = gradeFilter;
+            }
+            const normalizedSearch = searchFilter.trim();
+            if (normalizedSearch) {
+                params.search = normalizedSearch;
+            }
+            params.page = pageNumber;
+            params.page_size = ASSIGNMENT_PAGE_SIZE;
+
+            const data = await secretaryService.getStudents(params);
             if (studentsRequestRef.current !== requestId) {
                 return;
             }
-            setStudents(normalizeListResponse(data));
+            const normalizedData = normalizePaginatedListResponse(data);
+            setStudents(normalizedData.results);
+            setAssignmentPagination({
+                count: normalizedData.count,
+                next: normalizedData.next,
+                previous: normalizedData.previous,
+            });
         } catch (error) {
             if (studentsRequestRef.current !== requestId) {
                 return;
@@ -439,6 +765,178 @@ const StudentAdmissions = () => {
             }
         }
     }, [schoolId, setFeedback]);
+
+    const fetchStudentDocuments = useCallback(async (pageNumber = 1, searchFilter = '') => {
+        if (!schoolId) {
+            filesRequestRef.current += 1;
+            setFiles([]);
+            setFilesPagination(createEmptyPaginationState());
+            return;
+        }
+
+        const requestId = filesRequestRef.current + 1;
+        filesRequestRef.current = requestId;
+
+        try {
+            setIsFilesLoading(true);
+            const params = {
+                school_id: schoolId,
+                page: pageNumber,
+                page_size: FILES_PAGE_SIZE,
+            };
+
+            const normalizedSearch = searchFilter.trim();
+            if (normalizedSearch) {
+                params.search = normalizedSearch;
+            }
+
+            const data = await secretaryService.getStudentDocuments(params);
+            if (filesRequestRef.current !== requestId) {
+                return;
+            }
+
+            const normalizedData = normalizePaginatedListResponse(data);
+            setFiles(normalizedData.results);
+            setFilesPagination({
+                count: normalizedData.count,
+                next: normalizedData.next,
+                previous: normalizedData.previous,
+            });
+        } catch (error) {
+            if (filesRequestRef.current !== requestId) {
+                return;
+            }
+            console.error('Error fetching student documents:', error);
+            setFeedback('error', getApiErrorMessage(error, 'Failed to load uploaded files.'));
+        } finally {
+            if (filesRequestRef.current === requestId) {
+                setIsFilesLoading(false);
+            }
+        }
+    }, [schoolId, setFeedback]);
+
+    const fetchDocumentStudentOptions = useCallback(async (searchFilter = '') => {
+        if (!schoolId) {
+            documentStudentsRequestRef.current += 1;
+            setDocumentStudentOptions([]);
+            setIsDocumentStudentLoading(false);
+            return;
+        }
+
+        const requestId = documentStudentsRequestRef.current + 1;
+        documentStudentsRequestRef.current = requestId;
+
+        try {
+            setIsDocumentStudentLoading(true);
+            const params = {
+                school_id: schoolId,
+                page_size: 20,
+            };
+            const normalizedSearch = searchFilter.trim();
+            if (normalizedSearch) {
+                params.search = normalizedSearch;
+            }
+
+            const data = await secretaryService.getStudents(params);
+            if (documentStudentsRequestRef.current !== requestId) {
+                return;
+            }
+
+            setDocumentStudentOptions(normalizeListResponse(data));
+        } catch (error) {
+            if (documentStudentsRequestRef.current !== requestId) {
+                return;
+            }
+            console.error('Error fetching students for file assignment:', error);
+            setFeedback('error', getApiErrorMessage(error, 'Failed to load student options.'));
+        } finally {
+            if (documentStudentsRequestRef.current === requestId) {
+                setIsDocumentStudentLoading(false);
+            }
+        }
+    }, [schoolId, setFeedback]);
+
+    const fetchGradeOptions = useCallback(async (query = '') => {
+        if (!schoolId) {
+            gradeOptionsRequestRef.current += 1;
+            setGradeOptions([]);
+            setIsGradeOptionsLoading(false);
+            return;
+        }
+
+        const requestId = gradeOptionsRequestRef.current + 1;
+        gradeOptionsRequestRef.current = requestId;
+
+        try {
+            setIsGradeOptionsLoading(true);
+            const params = {
+                school_id: schoolId,
+                page_size: 20,
+            };
+            const normalizedQuery = query.trim();
+            if (normalizedQuery) {
+                params.name = normalizedQuery;
+            }
+
+            const data = await secretaryService.getGrades(params);
+            if (gradeOptionsRequestRef.current !== requestId) {
+                return;
+            }
+            setGradeOptions(normalizeListResponse(data));
+        } catch (error) {
+            if (gradeOptionsRequestRef.current !== requestId) {
+                return;
+            }
+            console.error('Error fetching grade options:', error);
+            setFeedback('error', getApiErrorMessage(error, 'Failed to load grade options.'));
+        } finally {
+            if (gradeOptionsRequestRef.current === requestId) {
+                setIsGradeOptionsLoading(false);
+            }
+        }
+    }, [schoolId, setFeedback]);
+
+    const resolveGradeIdFromQuery = useCallback(async () => {
+        const normalizedQuery = gradeQuery.trim();
+        if (!normalizedQuery) {
+            return null;
+        }
+
+        const lowerCaseQuery = normalizedQuery.toLowerCase();
+        const exactOption = gradeOptions.find((option) => {
+            return (option?.name || '').trim().toLowerCase() === lowerCaseQuery;
+        });
+        if (exactOption?.id) {
+            return Number(exactOption.id);
+        }
+
+        try {
+            const data = await secretaryService.getGrades({
+                school_id: schoolId,
+                name: normalizedQuery,
+                page_size: 20,
+            });
+            const options = normalizeListResponse(data);
+            if (options.length) {
+                setGradeOptions(options);
+            }
+
+            const exactApiOption = options.find((option) => {
+                return (option?.name || '').trim().toLowerCase() === lowerCaseQuery;
+            });
+            if (exactApiOption?.id) {
+                return Number(exactApiOption.id);
+            }
+
+            if (options.length === 1 && options[0]?.id) {
+                return Number(options[0].id);
+            }
+        } catch (error) {
+            console.error('Error resolving grade from query:', error);
+        }
+
+        return null;
+    }, [gradeOptions, gradeQuery, schoolId]);
 
     const fetchGrades = useCallback(async () => {
         if (!schoolId) {
@@ -518,23 +1016,66 @@ const StudentAdmissions = () => {
     useEffect(() => {
         applicationsRequestRef.current += 1;
         studentsRequestRef.current += 1;
+        filesRequestRef.current += 1;
+        documentStudentsRequestRef.current += 1;
         classroomsRequestRef.current += 1;
         gradesRequestRef.current += 1;
+        gradeOptionsRequestRef.current += 1;
         academicYearsRequestRef.current += 1;
+        schoolStatsRequestRef.current += 1;
 
         setApplications([]);
         setStudents([]);
+        setFiles([]);
         setClassrooms([]);
         setGrades([]);
+        setGradeOptions([]);
         setAcademicYears([]);
+        setDocumentStudentOptions([]);
 
         setApplicationYearFilter('');
         setAssignmentAcademicYear('');
         setSelectedGradeFilter('');
         setSelectedClassroom('');
         setSelectedStudent('');
+        setIsClassroomStepOpen(false);
         setApplicationSearch('');
+        setAssignmentSearch('');
+        setFileSearch('');
+        setDocumentStudentQuery('');
+        setDocumentUpload(createDefaultDocumentUpload());
+        setApplicationActivityFilter('');
+        setAssignmentActivityFilter('');
+        setGradeQuery('');
+        setShowGradeDropdown(false);
+        setShowDocumentStudentDropdown(false);
+        setIsFilesLoading(false);
+        setIsDocumentStudentLoading(false);
+        setIsGradeOptionsLoading(false);
+        setApplicationsPage(1);
+        setAssignmentPage(1);
+        setFilesPage(1);
+        setApplicationsPagination(createEmptyPaginationState());
+        setAssignmentPagination(createEmptyPaginationState());
+        setFilesPagination(createEmptyPaginationState());
+        setSchoolStudentStats(createEmptySchoolStudentStats());
     }, [schoolId]);
+
+    useEffect(() => {
+        fetchSchoolStudentStats();
+    }, [fetchSchoolStudentStats]);
+
+    useEffect(() => {
+        setApplicationsPage(1);
+    }, [applicationActivityFilter, applicationSearch, applicationYearFilter]);
+
+    useEffect(() => {
+        setAssignmentPage(1);
+    }, [assignmentAcademicYear, assignmentActivityFilter, assignmentSearch, selectedGradeFilter]);
+
+    useEffect(() => {
+        setFilesPage(1);
+    }, [fileSearch]);
 
     useEffect(() => {
         if (!schoolId) {
@@ -558,12 +1099,32 @@ const StudentAdmissions = () => {
     ]);
 
     useEffect(() => {
+        if (activeTab !== 'add-student') {
+            return;
+        }
+
+        fetchGradeOptions(debouncedGradeQuery);
+    }, [activeTab, debouncedGradeQuery, fetchGradeOptions]);
+
+    useEffect(() => {
         if (activeTab !== 'applications') {
             return;
         }
 
-        fetchStudentApplications(applicationYearFilter);
-    }, [activeTab, applicationYearFilter, fetchStudentApplications]);
+        fetchStudentApplications(
+            applicationYearFilter,
+            applicationActivityFilter,
+            applicationsPage,
+            debouncedApplicationSearch
+        );
+    }, [
+        activeTab,
+        applicationActivityFilter,
+        applicationYearFilter,
+        applicationsPage,
+        debouncedApplicationSearch,
+        fetchStudentApplications,
+    ]);
 
     useEffect(() => {
         if (activeTab !== 'class-assignment' || !assignmentAcademicYear || !schoolId) {
@@ -580,8 +1141,37 @@ const StudentAdmissions = () => {
             return;
         }
 
-        fetchAssignmentStudents();
-    }, [activeTab, fetchAssignmentStudents]);
+        fetchAssignmentStudents(
+            assignmentActivityFilter,
+            assignmentPage,
+            selectedGradeFilter,
+            debouncedAssignmentSearch
+        );
+    }, [
+        activeTab,
+        assignmentActivityFilter,
+        assignmentPage,
+        debouncedAssignmentSearch,
+        fetchAssignmentStudents,
+        selectedGradeFilter,
+    ]);
+
+    useEffect(() => {
+        if (activeTab !== 'files') {
+            return;
+        }
+
+        fetchStudentDocuments(filesPage, debouncedFileSearch);
+    }, [activeTab, debouncedFileSearch, fetchStudentDocuments, filesPage]);
+
+    useEffect(() => {
+        if (activeTab !== 'files') {
+            setShowDocumentStudentDropdown(false);
+            return;
+        }
+
+        fetchDocumentStudentOptions(debouncedDocumentStudentQuery);
+    }, [activeTab, debouncedDocumentStudentQuery, fetchDocumentStudentOptions]);
 
     useEffect(() => {
         if (!selectedClassroom) {
@@ -589,7 +1179,7 @@ const StudentAdmissions = () => {
         }
 
         const classroomExists = filteredClassrooms.some((classroom) => {
-            return classroom.id?.toString() === selectedClassroom.toString();
+            return getClassroomId(classroom) === selectedClassroom.toString();
         });
 
         if (!classroomExists) {
@@ -599,7 +1189,20 @@ const StudentAdmissions = () => {
 
     useEffect(() => {
         setSelectedStudent('');
-    }, [assignmentAcademicYear, selectedClassroom, selectedGradeFilter]);
+    }, [
+        assignmentAcademicYear,
+        assignmentActivityFilter,
+        assignmentPage,
+        assignmentSearch,
+        selectedGradeFilter,
+    ]);
+
+    useEffect(() => {
+        if (!selectedStudent || !assignmentAcademicYear) {
+            setIsClassroomStepOpen(false);
+            setSelectedClassroom('');
+        }
+    }, [assignmentAcademicYear, selectedStudent]);
 
     const handleGradeSelect = useCallback((grade) => {
         setNewStudent((previous) => ({ ...previous, grade_id: grade.id.toString() }));
@@ -614,6 +1217,71 @@ const StudentAdmissions = () => {
         setNewStudent((previous) => ({ ...previous, grade_id: '' }));
     }, []);
 
+    const handleDocumentStudentQueryChange = useCallback((event) => {
+        const query = event.target.value;
+        setDocumentStudentQuery(query);
+        setShowDocumentStudentDropdown(true);
+        setDocumentUpload((previous) => ({ ...previous, student_id: '' }));
+    }, []);
+
+    const handleDocumentStudentSelect = useCallback((student) => {
+        const studentId = String(student?.user_id || student?.id || '');
+        if (!studentId) {
+            return;
+        }
+
+        setDocumentUpload((previous) => ({ ...previous, student_id: studentId }));
+        setDocumentStudentQuery(getStudentName(student));
+        setShowDocumentStudentDropdown(false);
+    }, []);
+
+    const handleDocumentFileChange = useCallback((event) => {
+        const selectedFile = event.target.files?.[0] || null;
+        setDocumentUpload((previous) => ({ ...previous, file: selectedFile }));
+    }, []);
+
+    const handleUploadDocument = useCallback(async (event) => {
+        event.preventDefault();
+
+        if (!schoolId) {
+            setFeedback('error', 'School information is missing. Please re-login and try again.');
+            return;
+        }
+
+        const studentId = Number.parseInt(documentUpload.student_id, 10);
+        if (!Number.isInteger(studentId) || studentId <= 0) {
+            setFeedback('error', 'Please search and select a student before uploading.');
+            return;
+        }
+
+        if (!documentUpload.file) {
+            setFeedback('error', 'Please choose a file to upload.');
+            return;
+        }
+
+        try {
+            setIsUploadingDocument(true);
+
+            const formData = new FormData();
+            formData.append('student_id', String(studentId));
+            formData.append('document_type', documentUpload.document_type || DOCUMENT_TYPE_OPTIONS[0].value);
+            formData.append('file', documentUpload.file);
+
+            await secretaryService.uploadStudentDocument(formData);
+
+            setFeedback('success', 'Document uploaded successfully.');
+            setDocumentUpload(createDefaultDocumentUpload());
+            setDocumentStudentQuery('');
+            setShowDocumentStudentDropdown(false);
+            setFilesPage(1);
+        } catch (error) {
+            console.error('Error uploading student document:', error);
+            setFeedback('error', getApiErrorMessage(error, 'Failed to upload document.'));
+        } finally {
+            setIsUploadingDocument(false);
+        }
+    }, [documentUpload, schoolId, setFeedback]);
+
     const handleCreateStudent = useCallback(async (event) => {
         event.preventDefault();
 
@@ -625,7 +1293,21 @@ const StudentAdmissions = () => {
         const firstName = newStudent.first_name.trim();
         const lastName = newStudent.last_name.trim();
         const email = newStudent.email.trim();
-        const gradeId = Number.parseInt(newStudent.grade_id, 10);
+        const gender = newStudent.gender.trim();
+        const phone = newStudent.phone.trim();
+        const address = newStudent.address.trim();
+        const nationalId = newStudent.national_id.trim();
+        const emergencyContact = newStudent.emergency_contact.trim();
+        const medicalNotes = newStudent.medical_notes.trim();
+        const enrollmentStatus = (newStudent.enrollment_status || '').trim();
+        let gradeId = Number.parseInt(newStudent.grade_id, 10);
+        if (!Number.isInteger(gradeId)) {
+            const resolvedGradeId = await resolveGradeIdFromQuery();
+            if (Number.isInteger(resolvedGradeId) && resolvedGradeId > 0) {
+                gradeId = resolvedGradeId;
+                setNewStudent((previous) => ({ ...previous, grade_id: String(resolvedGradeId) }));
+            }
+        }
 
         if (
             !firstName
@@ -639,20 +1321,34 @@ const StudentAdmissions = () => {
             return;
         }
 
+        const payload = {
+            email,
+            full_name: `${firstName} ${lastName}`.trim(),
+            password: newStudent.password || 'Student@123',
+            school_id: schoolId,
+            grade_id: gradeId,
+            date_of_birth: newStudent.date_of_birth,
+            admission_date: newStudent.admission_date,
+        };
+
+        if (gender) payload.gender = gender;
+        if (phone) payload.phone = phone;
+        if (address) payload.address = address;
+        if (nationalId) payload.national_id = nationalId;
+        if (emergencyContact) payload.emergency_contact = emergencyContact;
+        if (medicalNotes) payload.medical_notes = medicalNotes;
+        if (enrollmentStatus) {
+            payload.enrollment_status = enrollmentStatus;
+            payload.current_status = enrollmentStatus;
+        }
+
         try {
             setIsCreatingStudent(true);
 
-            await secretaryService.createStudent({
-                email,
-                full_name: `${firstName} ${lastName}`.trim(),
-                password: newStudent.password || 'Student@123',
-                school_id: schoolId,
-                grade_id: gradeId,
-                date_of_birth: newStudent.date_of_birth,
-                admission_date: newStudent.admission_date,
-            });
+            await secretaryService.createStudent(payload);
 
             setFeedback('success', 'Student created successfully!');
+            fetchSchoolStudentStats();
             setNewStudent(createDefaultStudent());
             setGradeQuery('');
             setShowGradeDropdown(false);
@@ -663,11 +1359,22 @@ const StudentAdmissions = () => {
         } finally {
             setIsCreatingStudent(false);
         }
-    }, [newStudent, schoolId, setFeedback]);
+    }, [fetchSchoolStudentStats, newStudent, resolveGradeIdFromQuery, schoolId, setFeedback]);
 
     const handleAssign = useCallback(async () => {
-        if (!selectedStudent || !selectedClassroom || !assignmentAcademicYear) {
-            setFeedback('error', 'Please select a student, classroom and academic year.');
+        if (!selectedStudent || !assignmentAcademicYear) {
+            setFeedback('error', 'Please select a student and academic year.');
+            return;
+        }
+
+        if (!isClassroomStepOpen) {
+            setIsClassroomStepOpen(true);
+            setSelectedClassroom('');
+            return;
+        }
+
+        if (!selectedClassroom) {
+            setFeedback('error', 'Please select a classroom to finish assignment.');
             return;
         }
 
@@ -714,14 +1421,34 @@ const StudentAdmissions = () => {
 
             setFeedback('success', 'Student assigned to class successfully!');
             setSelectedStudent('');
-            fetchAssignmentStudents();
+            setIsClassroomStepOpen(false);
+            setSelectedClassroom('');
+            fetchSchoolStudentStats();
+            fetchAssignmentStudents(
+                assignmentActivityFilter,
+                assignmentPage,
+                selectedGradeFilter,
+                debouncedAssignmentSearch
+            );
         } catch (error) {
             console.error('Error assigning student:', error);
             setFeedback('error', getApiErrorMessage(error, 'Failed to assign student to class.'));
         } finally {
             setIsAssigningStudent(false);
         }
-    }, [assignmentAcademicYear, fetchAssignmentStudents, selectedClassroom, selectedStudent, setFeedback]);
+    }, [
+        assignmentAcademicYear,
+        assignmentActivityFilter,
+        assignmentPage,
+        debouncedAssignmentSearch,
+        fetchSchoolStudentStats,
+        fetchAssignmentStudents,
+        isClassroomStepOpen,
+        selectedGradeFilter,
+        selectedClassroom,
+        selectedStudent,
+        setFeedback,
+    ]);
 
     const handleUpdateStudent = useCallback(async (event) => {
         event.preventDefault();
@@ -745,14 +1472,29 @@ const StudentAdmissions = () => {
 
             setFeedback('success', 'Student status updated successfully!');
             setEditingStudent(null);
-            fetchStudentApplications(applicationYearFilter);
+            fetchSchoolStudentStats();
+            fetchStudentApplications(
+                applicationYearFilter,
+                applicationActivityFilter,
+                applicationsPage,
+                debouncedApplicationSearch
+            );
         } catch (error) {
             console.error('Error updating student:', error);
             setFeedback('error', getApiErrorMessage(error, 'Failed to update student status.'));
         } finally {
             setIsUpdatingStudent(false);
         }
-    }, [applicationYearFilter, editingStudent, fetchStudentApplications, setFeedback]);
+    }, [
+        applicationActivityFilter,
+        applicationsPage,
+        applicationYearFilter,
+        debouncedApplicationSearch,
+        editingStudent,
+        fetchSchoolStudentStats,
+        fetchStudentApplications,
+        setFeedback,
+    ]);
 
     const updateNewStudentField = useCallback((field, value) => {
         setNewStudent((previous) => ({ ...previous, [field]: value }));
@@ -779,7 +1521,6 @@ const StudentAdmissions = () => {
 
     const isAssignDisabled = (
         !selectedStudent
-        || !selectedClassroom
         || !assignmentAcademicYear
         || isAssigningStudent
     );
@@ -868,6 +1609,22 @@ const StudentAdmissions = () => {
                                         ))}
                                     </select>
                                 </div>
+
+                                <div className="sec-field">
+                                    <label htmlFor="application-status-filter" className="form-label">Status</label>
+                                    <select
+                                        id="application-status-filter"
+                                        className="form-select"
+                                        value={applicationActivityFilter}
+                                        onChange={(event) => setApplicationActivityFilter(event.target.value)}
+                                    >
+                                        {STUDENT_ACTIVITY_FILTER_OPTIONS.map((option) => (
+                                            <option key={option.value || 'all'} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="sec-table-wrap">
@@ -890,7 +1647,7 @@ const StudentAdmissions = () => {
                                                 {filteredApplications.map((student) => {
                                                     const studentId = student.user_id || student.id;
                                                     const studentName = getStudentName(student);
-                                                    const status = student.current_status || (student.is_active ? 'active' : 'inactive');
+                                                    const status = resolveStudentStatus(student);
                                                     const gradeName = (
                                                         student.current_grade?.name
                                                         || student.grade?.name
@@ -926,7 +1683,7 @@ const StudentAdmissions = () => {
                                                                         aria-label={`Edit status for ${studentName}`}
                                                                         onClick={() => setEditingStudent({
                                                                             ...student,
-                                                                            current_status: student.current_status || 'pending',
+                                                                            current_status: resolveStudentStatus(student),
                                                                         })}
                                                                     >
                                                                         <Edit2 size={16} />
@@ -949,6 +1706,35 @@ const StudentAdmissions = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {applicationsPagination.count > 0 ? (
+                                <div className="sec-table-pagination">
+                                    <span className="sec-table-pagination-summary">
+                                        Showing {applications.length} students on this page ({applicationsPagination.count} total)
+                                    </span>
+                                    <div className="sec-table-pagination-controls">
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={() => setApplicationsPage((previous) => Math.max(1, previous - 1))}
+                                            disabled={!applicationsPagination.previous || isApplicationsLoading}
+                                        >
+                                            Previous
+                                        </button>
+                                        <span className="sec-table-pagination-page">
+                                            Page {applicationsPage} of {applicationsTotalPages}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={() => setApplicationsPage((previous) => Math.min(applicationsTotalPages, previous + 1))}
+                                            disabled={!applicationsPagination.next || isApplicationsLoading}
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
                         </section>
                     </>
                 ) : null}
@@ -1010,6 +1796,32 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field">
+                                    <label className="form-label">Gender</label>
+                                    <select
+                                        className="form-select"
+                                        value={newStudent.gender}
+                                        onChange={(event) => updateNewStudentField('gender', event.target.value)}
+                                    >
+                                        {GENDER_OPTIONS.map((option) => (
+                                            <option key={option.value || 'none'} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="sec-field">
+                                    <label className="form-label">Phone</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Optional phone"
+                                        value={newStudent.phone}
+                                        onChange={(event) => updateNewStudentField('phone', event.target.value)}
+                                    />
+                                </div>
+
+                                <div className="sec-field">
                                     <label className="form-label">Date of Birth *</label>
                                     <input
                                         type="date"
@@ -1046,8 +1858,10 @@ const StudentAdmissions = () => {
 
                                     {showGradeDropdown ? (
                                         <div className="sec-grade-dropdown">
-                                            {filteredGrades.length > 0 ? (
-                                                filteredGrades.map((grade) => (
+                                            {isGradeOptionsLoading ? (
+                                                <div className="sec-grade-empty">Loading grades...</div>
+                                            ) : gradeOptions.length > 0 ? (
+                                                gradeOptions.map((grade) => (
                                                     <button
                                                         key={grade.id}
                                                         type="button"
@@ -1062,6 +1876,65 @@ const StudentAdmissions = () => {
                                             )}
                                         </div>
                                     ) : null}
+                                </div>
+
+                                <div className="sec-field">
+                                    <label className="form-label">Enrollment Status</label>
+                                    <select
+                                        className="form-select"
+                                        value={newStudent.enrollment_status}
+                                        onChange={(event) => updateNewStudentField('enrollment_status', event.target.value)}
+                                    >
+                                        {STUDENT_STATUS_OPTIONS.map((statusOption) => (
+                                            <option key={`enrollment-${statusOption.value}`} value={statusOption.value}>
+                                                {statusOption.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="sec-field">
+                                    <label className="form-label">National ID</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Optional national ID"
+                                        value={newStudent.national_id}
+                                        onChange={(event) => updateNewStudentField('national_id', event.target.value)}
+                                    />
+                                </div>
+
+                                <div className="sec-field">
+                                    <label className="form-label">Emergency Contact</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Optional emergency contact"
+                                        value={newStudent.emergency_contact}
+                                        onChange={(event) => updateNewStudentField('emergency_contact', event.target.value)}
+                                    />
+                                </div>
+
+                                <div className="sec-field">
+                                    <label className="form-label">Address</label>
+                                    <textarea
+                                        className="form-input"
+                                        rows={3}
+                                        placeholder="Optional address"
+                                        value={newStudent.address}
+                                        onChange={(event) => updateNewStudentField('address', event.target.value)}
+                                    />
+                                </div>
+
+                                <div className="sec-field">
+                                    <label className="form-label">Medical Notes</label>
+                                    <textarea
+                                        className="form-input"
+                                        rows={3}
+                                        placeholder="Optional medical notes"
+                                        value={newStudent.medical_notes}
+                                        onChange={(event) => updateNewStudentField('medical_notes', event.target.value)}
+                                    />
                                 </div>
                             </div>
 
@@ -1117,21 +1990,73 @@ const StudentAdmissions = () => {
                             </div>
 
                             <div className="sec-field sec-field--compact">
-                                <label className="form-label">Classroom</label>
+                                <label className="form-label">Status</label>
                                 <select
                                     className="form-select"
-                                    value={selectedClassroom}
-                                    onChange={(event) => setSelectedClassroom(event.target.value)}
+                                    value={assignmentActivityFilter}
+                                    onChange={(event) => setAssignmentActivityFilter(event.target.value)}
                                     disabled={!assignmentAcademicYear}
                                 >
-                                    <option value="">Select Classroom...</option>
-                                    {filteredClassrooms.map((classroom) => (
-                                        <option key={classroom.id} value={classroom.id}>
-                                            {classroom.classroom_name} {classroom.grade_name ? `(${classroom.grade_name})` : ''}
+                                    {STUDENT_ACTIVITY_FILTER_OPTIONS.map((option) => (
+                                        <option key={option.value || 'all'} value={option.value}>
+                                            {option.label}
                                         </option>
                                     ))}
                                 </select>
                             </div>
+
+                            <div className="sec-field sec-field--compact">
+                                <label htmlFor="assignment-search" className="form-label">Search Student</label>
+                                <div className="search-wrapper sec-search-wrapper">
+                                    <Search size={16} className="search-icon" />
+                                    <input
+                                        id="assignment-search"
+                                        type="text"
+                                        className="search-input"
+                                        placeholder="Search by name or email..."
+                                        value={assignmentSearch}
+                                        onChange={(event) => setAssignmentSearch(event.target.value)}
+                                        disabled={!assignmentAcademicYear}
+                                    />
+                                </div>
+                            </div>
+
+                            {isClassroomStepOpen ? (
+                                <div className="sec-field sec-field--compact">
+                                    <label className="form-label">Classroom</label>
+                                    <select
+                                        className="form-select"
+                                        value={selectedClassroom}
+                                        onChange={(event) => setSelectedClassroom(event.target.value)}
+                                        disabled={!assignmentAcademicYear}
+                                    >
+                                        <option value="">Select Classroom...</option>
+                                        {filteredClassrooms.map((classroom) => {
+                                            const classroomId = getClassroomId(classroom);
+                                            if (!classroomId) {
+                                                return null;
+                                            }
+
+                                            return (
+                                                <option key={classroomId} value={classroomId}>
+                                                    {classroom.classroom_name} {classroom.grade_name ? `(${classroom.grade_name})` : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+                            ) : (
+                                <div className="sec-field sec-field--compact">
+                                    <label className="form-label">Classroom</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value="Select a student, then click Assign Student"
+                                        readOnly
+                                        disabled
+                                    />
+                                </div>
+                            )}
 
                             <div className="sec-assignment-action">
                                 <button
@@ -1141,7 +2066,11 @@ const StudentAdmissions = () => {
                                     disabled={isAssignDisabled}
                                 >
                                     <UserPlus size={18} />
-                                    {isAssigningStudent ? 'Assigning...' : 'Assign Student'}
+                                    {isAssigningStudent
+                                        ? 'Assigning...'
+                                        : isClassroomStepOpen
+                                            ? 'Confirm Assignment'
+                                            : 'Assign Student'}
                                 </button>
                             </div>
                         </div>
@@ -1195,6 +2124,35 @@ const StudentAdmissions = () => {
                                 </div>
                             )}
                         </div>
+
+                        {assignmentAcademicYear && assignmentPagination.count > 0 ? (
+                            <div className="sec-table-pagination">
+                                <span className="sec-table-pagination-summary">
+                                    Showing {assignmentStudents.length} students on this page ({assignmentPagination.count} total)
+                                </span>
+                                <div className="sec-table-pagination-controls">
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={() => setAssignmentPage((previous) => Math.max(1, previous - 1))}
+                                        disabled={!assignmentPagination.previous || isStudentsLoading}
+                                    >
+                                        Previous
+                                    </button>
+                                    <span className="sec-table-pagination-page">
+                                        Page {assignmentPage} of {assignmentTotalPages}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={() => setAssignmentPage((previous) => Math.min(assignmentTotalPages, previous + 1))}
+                                        disabled={!assignmentPagination.next || isStudentsLoading}
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        ) : null}
                     </section>
                 ) : null}
 
@@ -1202,30 +2160,92 @@ const StudentAdmissions = () => {
                     <section className="file-management-grid">
                         <article className="management-card">
                             <h3>Upload Documents</h3>
-                            <div className="file-upload-area">
-                                <div className="file-upload-icon">
-                                    <Upload size={28} />
+                            <form onSubmit={handleUploadDocument}>
+                                <div className="file-upload-area">
+                                    <div className="file-upload-icon">
+                                        <Upload size={28} />
+                                    </div>
+                                    <p>Select a document file to upload</p>
+                                    <label htmlFor="student-document-upload" className="btn-secondary sec-upload-trigger">
+                                        Choose File
+                                    </label>
+                                    <input
+                                        id="student-document-upload"
+                                        type="file"
+                                        className="sec-hidden-file-input"
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        onChange={handleDocumentFileChange}
+                                    />
+                                    <span>
+                                        {documentUpload.file
+                                            ? `${documentUpload.file.name} (${formatFileSize(documentUpload.file.size)})`
+                                            : 'PDF, JPG, PNG up to 10MB'}
+                                    </span>
                                 </div>
-                                <p>Click to upload or drag and drop</p>
-                                <span>PDF, JPG up to 10MB</span>
-                            </div>
 
-                            <div className="sec-field">
-                                <label className="form-label">Assign to Student</label>
-                                <input type="text" className="form-input" placeholder="Search student name..." />
-                            </div>
+                                <div className="sec-field sec-grade-field">
+                                    <label className="form-label">Assign to Student *</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Search and select student..."
+                                        value={documentStudentQuery}
+                                        onChange={handleDocumentStudentQueryChange}
+                                        onFocus={() => setShowDocumentStudentDropdown(true)}
+                                        onBlur={() => setTimeout(() => setShowDocumentStudentDropdown(false), 200)}
+                                        required={!documentUpload.student_id}
+                                    />
 
-                            <div className="sec-field">
-                                <label className="form-label">Document Type</label>
-                                <select className="form-select">
-                                    <option>Birth Certificate</option>
-                                    <option>ID Card</option>
-                                    <option>Medical Record</option>
-                                    <option>Previous School Report</option>
-                                </select>
-                            </div>
+                                    {showDocumentStudentDropdown ? (
+                                        <div className="sec-grade-dropdown">
+                                            {isDocumentStudentLoading ? (
+                                                <div className="sec-grade-empty">Loading students...</div>
+                                            ) : documentStudentOptions.length > 0 ? (
+                                                documentStudentOptions.map((studentOption) => {
+                                                    const studentId = String(studentOption?.user_id || studentOption?.id || '');
+                                                    const studentLabel = getStudentName(studentOption);
+                                                    const studentEmail = studentOption?.email || '';
 
-                            <button type="button" className="btn-primary sec-btn-block">Upload File</button>
+                                                    return (
+                                                        <button
+                                                            key={`${studentId}-${studentEmail}`}
+                                                            type="button"
+                                                            className={`sec-grade-option ${documentUpload.student_id === studentId ? 'is-selected' : ''}`}
+                                                            onMouseDown={() => handleDocumentStudentSelect(studentOption)}
+                                                        >
+                                                            {studentLabel}{studentEmail ? ` (${studentEmail})` : ''}
+                                                        </button>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div className="sec-grade-empty">No students found</div>
+                                            )}
+                                        </div>
+                                    ) : null}
+                                </div>
+
+                                <div className="sec-field">
+                                    <label className="form-label">Document Type</label>
+                                    <select
+                                        className="form-select"
+                                        value={documentUpload.document_type}
+                                        onChange={(event) => {
+                                            const value = event.target.value;
+                                            setDocumentUpload((previous) => ({ ...previous, document_type: value }));
+                                        }}
+                                    >
+                                        {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <button type="submit" className="btn-primary sec-btn-block" disabled={isUploadingDocument}>
+                                    {isUploadingDocument ? 'Uploading...' : 'Upload File'}
+                                </button>
+                            </form>
                         </article>
 
                         <article className="management-card">
@@ -1233,50 +2253,110 @@ const StudentAdmissions = () => {
                                 <h3>Recent Uploads</h3>
                                 <div className="search-wrapper sec-search-wrapper sec-search-narrow">
                                     <Search size={16} className="search-icon" />
-                                    <input type="text" className="search-input" placeholder="Search files..." />
+                                    <input
+                                        type="text"
+                                        className="search-input"
+                                        placeholder="Search files..."
+                                        value={fileSearch}
+                                        onChange={(event) => setFileSearch(event.target.value)}
+                                    />
                                 </div>
                             </div>
 
-                            <div className="sec-table-scroll">
-                                <table className="data-table sec-data-table sec-data-table--files">
-                                    <thead>
-                                        <tr>
-                                            <th>File Type</th>
-                                            <th>Student</th>
-                                            <th>Size</th>
-                                            <th>Date</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {files.map((file) => (
-                                            <tr key={file.id}>
-                                                <td>
-                                                    <div className="sec-file-cell">
-                                                        <FileText size={16} />
-                                                        <span>{file.type}</span>
-                                                    </div>
-                                                </td>
-                                                <td>{file.student}</td>
-                                                <td className="cell-muted">{file.size}</td>
-                                                <td className="cell-muted">{file.date}</td>
-                                                <td>
-                                                    <button type="button" className="btn-icon success" aria-label={`Download ${file.type}`}>
-                                                        <Download size={16} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {files.length === 0 ? (
+                            {isFilesLoading ? (
+                                <LoadingSpinner message="Loading files..." />
+                            ) : (
+                                <div className="sec-table-scroll">
+                                    <table className="data-table sec-data-table sec-data-table--files">
+                                        <thead>
                                             <tr>
-                                                <td colSpan="5">
-                                                    <EmptyState icon={FileText} message="No files uploaded yet." />
-                                                </td>
+                                                <th>File Type</th>
+                                                <th>Student</th>
+                                                <th>Size</th>
+                                                <th>Date</th>
+                                                <th>Actions</th>
                                             </tr>
-                                        ) : null}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody>
+                                            {files.map((file) => {
+                                                const fileTypeLabel = file.document_type_label || file.document_type || 'Document';
+                                                const studentLabel = file.student_name || 'Unknown Student';
+                                                const studentEmail = file.student_email || '';
+
+                                                return (
+                                                    <tr key={file.id}>
+                                                        <td>
+                                                            <div className="sec-file-cell">
+                                                                <FileText size={16} />
+                                                                <span>{fileTypeLabel}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="sec-file-student">
+                                                                <span>{studentLabel}</span>
+                                                                {studentEmail ? <small className="cell-muted">{studentEmail}</small> : null}
+                                                            </div>
+                                                        </td>
+                                                        <td className="cell-muted">{formatFileSize(file.file_size)}</td>
+                                                        <td className="cell-muted">{formatDateValue(file.created_at)}</td>
+                                                        <td>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-icon success"
+                                                                aria-label={`Download ${fileTypeLabel}`}
+                                                                disabled={!file.file_url}
+                                                                onClick={() => {
+                                                                    if (file.file_url) {
+                                                                        window.open(file.file_url, '_blank', 'noopener,noreferrer');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Download size={16} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {files.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="5">
+                                                        <EmptyState icon={FileText} message="No files uploaded yet." />
+                                                    </td>
+                                                </tr>
+                                            ) : null}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {filesPagination.count > 0 ? (
+                                <div className="sec-table-pagination">
+                                    <span className="sec-table-pagination-summary">
+                                        Showing {files.length} files on this page ({filesPagination.count} total)
+                                    </span>
+                                    <div className="sec-table-pagination-controls">
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={() => setFilesPage((previous) => Math.max(1, previous - 1))}
+                                            disabled={!filesPagination.previous || isFilesLoading}
+                                        >
+                                            Previous
+                                        </button>
+                                        <span className="sec-table-pagination-page">
+                                            Page {filesPage} of {filesTotalPages}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={() => setFilesPage((previous) => Math.min(filesTotalPages, previous + 1))}
+                                            disabled={!filesPagination.next || isFilesLoading}
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
                         </article>
                     </section>
                 ) : null}
