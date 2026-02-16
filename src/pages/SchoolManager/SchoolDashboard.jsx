@@ -27,7 +27,8 @@ const normalizeClassroom = (room = {}, index = 0) => {
         student_count: toNumber(
             room?.student_count ?? room?.count ?? room?.total_students ?? room?.students_count,
             0
-        )
+        ),
+        homeroom_teacher: room?.homeroom_teacher ?? null,
     };
 };
 
@@ -228,10 +229,37 @@ const GradeBreakdown = ({ classrooms = [] }) => {
                                         borderBottom: rIdx < grade.classrooms.length - 1 ? '1px solid var(--color-border)' : 'none',
                                         background: 'var(--color-bg-surface)'
                                     }}>
-                                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-main)' }}>
-                                            {room.classroom_name}
-                                        </span>
-                                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                                                {room.classroom_name}
+                                            </span>
+                                            {room.homeroom_teacher ? (
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.3rem',
+                                                    fontSize: '0.75rem',
+                                                    color: '#2563eb',
+                                                    background: '#dbeafe',
+                                                    borderRadius: '999px',
+                                                    padding: '0.15rem 0.55rem',
+                                                    fontWeight: 500,
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    <UserCheck size={11} />
+                                                    {room.homeroom_teacher}
+                                                </span>
+                                            ) : (
+                                                <span style={{
+                                                    fontSize: '0.72rem',
+                                                    color: 'var(--color-text-muted)',
+                                                    fontStyle: 'italic'
+                                                }}>
+                                                    No homeroom teacher
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
                                             {room.student_count ?? 0} student{(room.student_count ?? 0) !== 1 ? 's' : ''}
                                         </span>
                                     </div>

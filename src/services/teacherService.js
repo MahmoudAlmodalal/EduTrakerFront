@@ -160,6 +160,13 @@ const teacherService = {
                 threshold
             })
         });
+    },
+
+    // Homeroom
+    getHomeroomAttendanceSummary: async (date) => {
+        return api.get('/teacher/homeroom/attendance-summary/', {
+            params: sanitizeParams({ date })
+        });
     }
 };
 

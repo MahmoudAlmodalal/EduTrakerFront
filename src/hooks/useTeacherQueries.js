@@ -10,6 +10,7 @@ export const teacherQueryKeys = {
     notifications: (params = {}) => ['teacher', 'notifications', params],
     students: (filters = {}) => ['teacher', 'students', filters],
     attendance: (allocationId, date) => ['teacher', 'attendance', allocationId, date],
+    homeroomAttendance: (date) => ['teacher', 'homeroom-attendance', date],
     assignments: (filters = {}) => ['teacher', 'assignments', filters],
     assignmentDetail: (assignmentId) => ['teacher', 'assignment', assignmentId],
     marks: (assignmentId) => ['teacher', 'marks', assignmentId],
@@ -157,6 +158,15 @@ export const useTeacherAttendance = (allocationId, date, options = {}) => {
         ...options
     });
 };
+
+export const useHomeroomAttendanceSummary = (date, options = {}) =>
+    useQuery({
+        queryKey: teacherQueryKeys.homeroomAttendance(date),
+        queryFn: () => teacherService.getHomeroomAttendanceSummary(date),
+        enabled: Boolean(date) && (options.enabled ?? true),
+        staleTime: 2 * 60 * 1000,
+        ...options
+    });
 
 export const useRecordBulkAttendanceMutation = () => {
     const queryClient = useQueryClient();

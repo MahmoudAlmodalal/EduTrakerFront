@@ -271,6 +271,11 @@ const managerService = {
         return res.data !== undefined ? res.data : res;
     },
 
+    copyAcademicYearStructure: async (targetYearId, sourceYearId) => {
+        const res = await api.post(`/academic-years/${targetYearId}/copy-structure/`, { source_year_id: sourceYearId });
+        return res.data !== undefined ? res.data : res;
+    },
+
     // ============================================
     // Student Management
     // ============================================

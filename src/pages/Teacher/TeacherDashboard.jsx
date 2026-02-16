@@ -17,7 +17,8 @@ import {
     useMarkTeacherNotificationRead,
     useTeacherDashboardStats,
     useTeacherNotifications,
-    useTeacherSchedule
+    useTeacherSchedule,
+    useHomeroomAttendanceSummary
 } from '../../hooks/useTeacherQueries';
 import { toList, todayIsoDate } from '../../utils/helpers';
 import './Teacher.css';
@@ -85,17 +86,26 @@ const TeacherDashboard = () => {
         refetch: refetchNotifications
     } = useTeacherNotifications({ page_size: 5 });
 
+    const {
+        data: homeroomData,
+        isLoading: loadingHomeroom
+    } = useHomeroomAttendanceSummary(date);
+
     const markAllReadMutation = useMarkAllTeacherNotificationsRead();
     const markNotificationReadMutation = useMarkTeacherNotificationRead();
 
     const stats = useMemo(() => statsData?.statistics || {}, [statsData]);
     const schedule = useMemo(() => toList(scheduleData), [scheduleData]);
     const notifications = useMemo(() => toList(notificationsData), [notificationsData]);
+    const homeroom = useMemo(() => homeroomData || null, [homeroomData]);
+
+    const homeroomStudentCount = stats.homeroom_classroom?.total_students ?? stats.total_students ?? 0;
+    const homeroomClassroomName = stats.homeroom_classroom?.name ?? null;
 
     const dashboardCards = useMemo(() => ([
         {
-            label: 'Total Students',
-            value: stats.total_students ?? 0,
+            label: homeroomClassroomName ? `Homeroom: ${homeroomClassroomName}` : 'Total Students',
+            value: homeroomStudentCount,
             icon: Users
         },
         {
@@ -121,7 +131,7 @@ const TeacherDashboard = () => {
                 ?? 0,
             icon: BookOpen
         }
-    ]), [schedule.length, stats]);
+    ]), [schedule.length, stats, homeroomStudentCount, homeroomClassroomName]);
 
     const hasAnyError = hasStatsError || hasScheduleError || hasNotificationsError;
 
@@ -273,6 +283,73 @@ const TeacherDashboard = () => {
                     );
                 })}
             </div>
+
+            {/* Homeroom Attendance Summary */}
+            {(loadingHomeroom || homeroom) && (
+                <div className="management-card" style={{ marginBottom: '1rem' }}>
+                    <div
+                        style={{
+                            padding: '1rem 1.25rem',
+                            borderBottom: '1px solid var(--color-border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <Users size={18} style={{ color: 'var(--color-primary)' }} />
+                        <h3 style={{ margin: 0, fontSize: '1rem' }}>
+                            Homeroom Attendance Today
+                            {homeroom?.classroom && (
+                                <span style={{ marginLeft: '0.5rem', fontSize: '0.82rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>
+                                    — {homeroom.classroom.name}
+                                </span>
+                            )}
+                        </h3>
+                    </div>
+                    <div style={{ padding: '1rem 1.25rem' }}>
+                        {loadingHomeroom ? (
+                            <SkeletonBlock height="64px" />
+                        ) : homeroom?.summary ? (
+                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                {[
+                                    { label: 'Present', key: 'present', color: '#16a34a', bg: '#dcfce7' },
+                                    { label: 'Absent', key: 'absent', color: '#dc2626', bg: '#fee2e2' },
+                                    { label: 'Late', key: 'late', color: '#d97706', bg: '#fef3c7' },
+                                    { label: 'Excused', key: 'excused', color: '#7c3aed', bg: '#ede9fe' },
+                                    { label: 'Not Recorded', key: 'not_recorded', color: '#64748b', bg: '#f1f5f9' },
+                                ].map(({ label, key, color, bg }) => (
+                                    homeroom.summary[key] > 0 && (
+                                        <div
+                                            key={key}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.45rem',
+                                                padding: '0.4rem 0.85rem',
+                                                borderRadius: '999px',
+                                                background: bg,
+                                                color,
+                                                fontWeight: 700,
+                                                fontSize: '0.85rem'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '1.05rem' }}>{homeroom.summary[key]}</span>
+                                            <span style={{ fontWeight: 500 }}>{label}</span>
+                                        </div>
+                                    )
+                                ))}
+                                <span style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                    {homeroom.summary.recorded} / {homeroom.summary.total} recorded
+                                </span>
+                            </div>
+                        ) : (
+                            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+                                No homeroom classroom assigned.
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <div className="teacher-split-grid">
                 <div style={{ display: 'grid', gap: '1rem' }}>

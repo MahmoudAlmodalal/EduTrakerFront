@@ -11,7 +11,8 @@ import {
     Edit,
     Building,
     UserCheck,
-    Trash2
+    Trash2,
+    Copy
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -229,7 +230,7 @@ const AcademicConfiguration = () => {
             case 'subjects':
                 return <SubjectAllocation courses={courses} schoolId={schoolId} onCourseUpdated={fetchCourses} />;
             case 'classrooms':
-                return <ClassroomManagement schoolId={schoolId} academicYears={academicYears} />;
+                return <ClassroomManagement schoolId={schoolId} academicYears={academicYears} teachers={teachers} />;
             case 'teachers':
                 return <TeacherAllocation courses={courses} teachers={teachers} schoolId={schoolId} onCourseUpdated={fetchCourses} hasActiveAcademicYear={hasActiveAcademicYear} />;
             case 'timetable':
@@ -340,6 +341,10 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ start_date: '', end_date: '' });
     const [saving, setSaving] = useState(false);
+    // Copy-structure state
+    const [copyPrompt, setCopyPrompt] = useState(null); // { targetYear }
+    const [copySourceId, setCopySourceId] = useState('');
+    const [copying, setCopying] = useState(false);
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -349,7 +354,7 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
         }
         setSaving(true);
         try {
-            await managerService.createAcademicYear({
+            const created = await managerService.createAcademicYear({
                 school: parseInt(schoolId),
                 start_date: formData.start_date,
                 end_date: formData.end_date
@@ -357,13 +362,38 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
             showSuccess('Academic year created successfully.');
             setIsModalOpen(false);
             setFormData({ start_date: '', end_date: '' });
-            onUpdated();
+            await onUpdated();
+            // If other years exist, prompt to copy structure
+            if (academicYears.length > 0 && created?.id) {
+                const latestYear = [...academicYears].sort((a, b) => b.id - a.id)[0];
+                setCopySourceId(String(latestYear.id));
+                setCopyPrompt({ targetYear: created });
+            }
         } catch (error) {
             console.error('Failed to create academic year:', error);
             const msg = error?.response?.data?.detail || error?.response?.data?.non_field_errors?.[0] || error.message || 'Failed to create academic year.';
             showError(msg);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleCopyStructure = async (targetYearId) => {
+        if (!copySourceId) {
+            showError('Please select a source year.');
+            return;
+        }
+        setCopying(true);
+        try {
+            const result = await managerService.copyAcademicYearStructure(targetYearId, parseInt(copySourceId));
+            showSuccess(`Copied ${result.copied} classroom(s)${result.skipped > 0 ? `, skipped ${result.skipped} (already exist)` : ''}.`);
+            setCopyPrompt(null);
+            onUpdated();
+        } catch (error) {
+            console.error('Failed to copy structure:', error);
+            showError(error?.response?.data?.detail || 'Failed to copy classroom structure.');
+        } finally {
+            setCopying(false);
         }
     };
 
@@ -416,6 +446,7 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                                 <th>Start Date</th>
                                 <th>End Date</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -434,6 +465,35 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                                             {ay.is_active ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
+                                    <td>
+                                        {academicYears.length > 1 && (
+                                            <button
+                                                type="button"
+                                                title="Copy classroom structure from another year into this year"
+                                                onClick={() => {
+                                                    const other = [...academicYears].filter(y => y.id !== ay.id).sort((a, b) => b.id - a.id)[0];
+                                                    setCopySourceId(other ? String(other.id) : '');
+                                                    setCopyPrompt({ targetYear: ay });
+                                                }}
+                                                style={{
+                                                    padding: '0.3rem 0.7rem',
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: 600,
+                                                    border: '1px solid var(--color-primary)',
+                                                    borderRadius: '6px',
+                                                    background: 'transparent',
+                                                    color: 'var(--color-primary)',
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                }}
+                                            >
+                                                <Copy size={13} />
+                                                Copy Structure
+                                            </button>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -447,7 +507,7 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                     <div className="sm-modal-panel">
                         <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Create Academic Year</h2>
                         <p style={{ marginBottom: '1.5rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-                            The academic year code will be auto-generated from the dates (e.g. 2025-2026).
+                            The academic year code will be auto-generated from the dates (e.g. 2025/2026).
                         </p>
                         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div>
@@ -481,14 +541,71 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                 </div>
             )}
 
+            {/* Copy Structure Prompt */}
+            {copyPrompt && (
+                <div className="sm-modal-backdrop">
+                    <div className="sm-modal-panel">
+                        <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>
+                            Copy Classroom Structure
+                        </h2>
+                        <p style={{ marginBottom: '1.25rem', color: 'var(--color-text-muted)', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                            Copy all classrooms (grade assignments &amp; homeroom teachers) into{' '}
+                            <strong>{copyPrompt.targetYear?.academic_year_code}</strong>.
+                            Student enrollments and course allocations are <em>not</em> copied — those are set up per year.
+                        </p>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                                Copy classrooms from:
+                            </label>
+                            <select
+                                value={copySourceId}
+                                onChange={e => setCopySourceId(e.target.value)}
+                                className="sm-form-select"
+                            >
+                                <option value="">Select year…</option>
+                                {academicYears
+                                    .filter(y => y.id !== copyPrompt.targetYear?.id)
+                                    .sort((a, b) => b.id - a.id)
+                                    .map(y => (
+                                        <option key={y.id} value={y.id}>
+                                            {y.academic_year_code}
+                                        </option>
+                                    ))
+                                }
+                            </select>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                            <button
+                                type="button"
+                                onClick={() => setCopyPrompt(null)}
+                                style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}
+                            >
+                                Skip
+                            </button>
+                            <button
+                                type="button"
+                                className="btn-primary"
+                                disabled={copying || !copySourceId}
+                                onClick={() => handleCopyStructure(copyPrompt.targetYear.id)}
+                            >
+                                {copying ? 'Copying...' : 'Copy Structure'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };
 
 // Sub-components for Tabs
 export const GradeManagement = () => {
+    const { user } = useAuth();
     const { showSuccess, showError, showWarning } = useToast();
     const [grades, setGrades] = useState([]);
+    const [academicYears, setAcademicYears] = useState([]);
+    const [selectedYearId, setSelectedYearId] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -499,14 +616,21 @@ export const GradeManagement = () => {
     const [formData, setFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
     const [editFormData, setEditFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
 
+    const schoolId = user?.school_id || user?.school?.id || user?.school;
+
     const gradeTotalPages = Math.max(1, Math.ceil(grades.length / TABLE_ROWS_PER_PAGE));
     const activeGradePage = Math.min(gradePage, gradeTotalPages);
     const gradePageStart = (activeGradePage - 1) * TABLE_ROWS_PER_PAGE;
     const paginatedGrades = grades.slice(gradePageStart, gradePageStart + TABLE_ROWS_PER_PAGE);
 
-    const fetchGrades = async () => {
+    const fetchGrades = async (yearId) => {
         try {
-            const data = await managerService.getGrades({ include_inactive: true });
+            const params = { include_inactive: true };
+            if (yearId) {
+                params.academic_year_id = yearId;
+                if (schoolId) params.school_id = schoolId;
+            }
+            const data = await managerService.getGrades(params);
             setGrades(data.results || data || []);
         } catch (error) {
             console.error('Failed to fetch grades:', error);
@@ -515,8 +639,38 @@ export const GradeManagement = () => {
     };
 
     useEffect(() => {
-        fetchGrades();
+        const loadInitial = async () => {
+            try {
+                const yearsData = await (schoolId
+                    ? managerService.getAcademicYears({ school_id: schoolId, include_inactive: true })
+                    : Promise.resolve([]));
+                const years = yearsData.results || yearsData || [];
+                setAcademicYears(years);
+                // Auto-select the active year and fetch grades filtered by it
+                const activeYear = years.find(y => y.is_active);
+                const initialYearId = activeYear ? activeYear.id : null;
+                if (activeYear) setSelectedYearId(String(activeYear.id));
+                await fetchGrades(initialYearId);
+            } catch (error) {
+                console.error('Failed to fetch grades:', error);
+                setGrades([]);
+            }
+        };
+        loadInitial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Re-fetch when year filter changes (skip on mount since loadInitial covers it)
+    const isFirstRender = React.useRef(true);
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+        fetchGrades(selectedYearId ? parseInt(selectedYearId, 10) : null);
+        setGradePage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedYearId]);
 
     const resetCreateForm = () => {
         setFormData({ name: '', numeric_level: '', min_age: '', max_age: '' });
@@ -548,7 +702,7 @@ export const GradeManagement = () => {
                 min_age: Number.parseInt(formData.min_age, 10),
                 max_age: Number.parseInt(formData.max_age, 10),
             });
-            setGrades((prev) => [...prev, createdGrade].sort((a, b) => a.numeric_level - b.numeric_level));
+            await fetchGrades(selectedYearId ? parseInt(selectedYearId, 10) : null);
             showSuccess('Grade created successfully.');
             setIsCreateModalOpen(false);
             resetCreateForm();
@@ -594,9 +748,7 @@ export const GradeManagement = () => {
                 min_age: Number.parseInt(editFormData.min_age, 10),
                 max_age: Number.parseInt(editFormData.max_age, 10),
             });
-            setGrades((prev) => prev
-                .map((grade) => (grade.id === updated.id ? updated : grade))
-                .sort((a, b) => a.numeric_level - b.numeric_level));
+            await fetchGrades(selectedYearId ? parseInt(selectedYearId, 10) : null);
             showSuccess('Grade updated successfully.');
             setIsEditModalOpen(false);
             setEditingGrade(null);
@@ -667,9 +819,37 @@ export const GradeManagement = () => {
                 </button>
             </div>
 
+            {/* Academic Year Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                    <Calendar size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
+                    Academic Year:
+                </label>
+                <select
+                    value={selectedYearId}
+                    onChange={(e) => setSelectedYearId(e.target.value)}
+                    className="sm-form-input"
+                    style={{ maxWidth: '220px', padding: '0.4rem 0.6rem' }}
+                >
+                    <option value="">All Years (global grades)</option>
+                    {academicYears.map(ay => (
+                        <option key={ay.id} value={String(ay.id)}>
+                            {ay.academic_year_code}{ay.is_active ? ' (Active)' : ''}
+                        </option>
+                    ))}
+                </select>
+                {selectedYearId && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                        Showing grades with classrooms in selected year
+                    </span>
+                )}
+            </div>
+
             {grades.length === 0 ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No grades found. Create your first grade.
+                    {selectedYearId
+                        ? 'No grades have classrooms in the selected academic year.'
+                        : 'No grades found. Create your first grade.'}
                 </div>
             ) : (
                 <>
@@ -680,6 +860,7 @@ export const GradeManagement = () => {
                                     <th>Grade</th>
                                     <th>Level</th>
                                     <th>Age Range</th>
+                                    {selectedYearId && <th>Classrooms</th>}
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -690,6 +871,22 @@ export const GradeManagement = () => {
                                         <td style={{ fontWeight: 600 }}>{grade.name}</td>
                                         <td>{grade.numeric_level}</td>
                                         <td>{grade.min_age} - {grade.max_age}</td>
+                                        {selectedYearId && (
+                                            <td>
+                                                <span style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                                    background: 'var(--color-primary-light, #eff6ff)',
+                                                    color: 'var(--color-primary, #2563eb)',
+                                                    borderRadius: '0.75rem',
+                                                    padding: '0.15rem 0.6rem',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 600
+                                                }}>
+                                                    <Building size={12} />
+                                                    {grade.classroom_count ?? 0}
+                                                </span>
+                                            </td>
+                                        )}
                                         <td>
                                             <span
                                                 className={`status-badge ${grade.is_active ? 'status-active' : 'status-inactive'}`}
@@ -732,6 +929,23 @@ export const GradeManagement = () => {
 
             <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Add Grade">
                 <form onSubmit={handleCreateGrade} className="sm-modal-form">
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">
+                            <Calendar size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
+                            Academic Year
+                        </label>
+                        <input
+                            readOnly
+                            className="sm-form-input"
+                            style={{ background: 'var(--color-bg-secondary, #f9fafb)', cursor: 'default', color: 'var(--color-text-secondary)' }}
+                            value={
+                                (() => {
+                                    const activeYear = academicYears.find(y => y.is_active);
+                                    return activeYear ? `${activeYear.academic_year_code} (Active)` : 'No active academic year';
+                                })()
+                            }
+                        />
+                    </div>
                     <div className="sm-form-field">
                         <label className="sm-form-label">Grade Name</label>
                         <input
@@ -1648,7 +1862,7 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
 // ============================================
 // Classroom Management Tab
 // ============================================
-const ClassroomManagement = ({ schoolId, academicYears }) => {
+const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
     const { showSuccess, showError, showWarning } = useToast();
     const [classrooms, setClassrooms] = useState([]);
     const [courses, setCourses] = useState([]);
@@ -1660,8 +1874,8 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingClassroom, setEditingClassroom] = useState(null);
     const [pendingStatusAction, setPendingStatusAction] = useState(null);
-    const [formData, setFormData] = useState({ grade_id: '', classroom_name: '' });
-    const [editFormData, setEditFormData] = useState({ grade_id: '', classroom_name: '' });
+    const [formData, setFormData] = useState({ grade_id: '', classroom_name: '', homeroom_teacher_id: '' });
+    const [editFormData, setEditFormData] = useState({ grade_id: '', classroom_name: '', homeroom_teacher_id: '' });
     const [saving, setSaving] = useState(false);
     const [loadingClassrooms, setLoadingClassrooms] = useState(false);
     const [togglingClassroomId, setTogglingClassroomId] = useState(null);
@@ -1768,12 +1982,15 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
         try {
             const created = await managerService.createClassroom(schoolId, selectedAcademicYear, {
                 grade_id: Number.parseInt(formData.grade_id, 10),
-                classroom_name: formData.classroom_name
+                classroom_name: formData.classroom_name,
+                homeroom_teacher_id: formData.homeroom_teacher_id
+                    ? Number.parseInt(formData.homeroom_teacher_id, 10)
+                    : null,
             });
             setClassrooms((prev) => [...prev, created]);
             showSuccess('Classroom created successfully.');
             setIsModalOpen(false);
-            setFormData({ grade_id: '', classroom_name: '' });
+            setFormData({ grade_id: '', classroom_name: '', homeroom_teacher_id: '' });
         } catch (error) {
             console.error('Failed to create classroom:', error);
             showError(getErrorMessage(error, 'Failed to create classroom.'));
@@ -1791,6 +2008,7 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
         setEditFormData({
             grade_id: String(classroom.grade || ''),
             classroom_name: classroom.classroom_name || '',
+            homeroom_teacher_id: String(classroom.homeroom_teacher || ''),
         });
         setIsEditModalOpen(true);
     };
@@ -1808,6 +2026,9 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
                 {
                     grade_id: Number.parseInt(editFormData.grade_id, 10),
                     classroom_name: editFormData.classroom_name.trim(),
+                    homeroom_teacher_id: editFormData.homeroom_teacher_id
+                        ? Number.parseInt(editFormData.homeroom_teacher_id, 10)
+                        : null,
                 }
             );
             setClassrooms((prev) =>
@@ -2036,6 +2257,23 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
                             className="sm-form-input"
                         />
                     </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">
+                            Homeroom Teacher <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Optional)</span>
+                        </label>
+                        <select
+                            value={formData.homeroom_teacher_id}
+                            onChange={(event) => setFormData({ ...formData, homeroom_teacher_id: event.target.value })}
+                            className="sm-form-select"
+                        >
+                            <option value="">— No homeroom teacher —</option>
+                            {teachers.map((teacher) => (
+                                <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>
+                                    {teacher.full_name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="sm-form-actions">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="sm-btn-secondary" disabled={saving}>
                             Cancel
@@ -2071,6 +2309,23 @@ const ClassroomManagement = ({ schoolId, academicYears }) => {
                             onChange={(event) => setEditFormData({ ...editFormData, classroom_name: event.target.value })}
                             className="sm-form-input"
                         />
+                    </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">
+                            Homeroom Teacher <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Optional)</span>
+                        </label>
+                        <select
+                            value={editFormData.homeroom_teacher_id}
+                            onChange={(event) => setEditFormData({ ...editFormData, homeroom_teacher_id: event.target.value })}
+                            className="sm-form-select"
+                        >
+                            <option value="">— No homeroom teacher —</option>
+                            {teachers.map((teacher) => (
+                                <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>
+                                    {teacher.full_name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                     <div className="sm-form-actions">
                         <button type="button" onClick={() => setIsEditModalOpen(false)} className="sm-btn-secondary" disabled={saving}>
