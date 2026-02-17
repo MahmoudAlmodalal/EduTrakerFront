@@ -1,10 +1,11 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Calendar,
+    Download,
     FileImage,
     FileText,
     FileUp,
-    Link as LinkIcon,
+    Loader2,
     Pencil,
     Plus,
     Trash2,
@@ -23,6 +24,7 @@ import {
     useTeacherLessonPlans,
     useUpdateLessonPlanMutation
 } from '../../hooks/useTeacherQueries';
+import teacherService from '../../services/teacherService';
 import { toList } from '../../utils/helpers';
 import './Teacher.css';
 
@@ -100,8 +102,91 @@ const getFileTypeIcon = (fileType = '') => {
     return FileText;
 };
 
+const ConfirmDeleteModal = ({ isOpen, title, description, onConfirm, onCancel, isPending }) => {
+    if (!isOpen) {
+        return null;
+    }
+
+    return (
+        <div
+            style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 2000,
+                padding: '1rem'
+            }}
+            onClick={isPending ? undefined : onCancel}
+        >
+            <div
+                className="management-card"
+                style={{ width: '420px', maxWidth: '100%', padding: '1.4rem 1.5rem' }}
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.9rem' }}>
+                    <div
+                        style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '50%',
+                            background: '#fee2e2',
+                            display: 'grid',
+                            placeItems: 'center',
+                            flexShrink: 0
+                        }}
+                    >
+                        <Trash2 size={18} color="#dc2626" />
+                    </div>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>{title}</h3>
+                        <p style={{ margin: '0.2rem 0 0', fontSize: '0.83rem', color: 'var(--color-text-muted)' }}>{description}</p>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem' }}>
+                    <button
+                        type="button"
+                        className="icon-btn"
+                        style={{ width: 'auto', padding: '0.45rem 0.9rem' }}
+                        onClick={onCancel}
+                        disabled={isPending}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            background: '#dc2626',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '0.55rem',
+                            padding: '0.45rem 1rem',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            opacity: isPending ? 0.7 : 1
+                        }}
+                        onClick={onConfirm}
+                        disabled={isPending}
+                    >
+                        <Trash2 size={14} />
+                        {isPending ? 'Deleting...' : 'Delete'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const LessonPlans = () => {
     const { t } = useTheme();
+    const MATERIALS_PAGE_SIZE = 8;
 
     const [timeFilter, setTimeFilter] = useState('all');
     const [showLessonModal, setShowLessonModal] = useState(false);
@@ -111,6 +196,14 @@ const LessonPlans = () => {
     const [showMaterialUpload, setShowMaterialUpload] = useState(false);
     const [materialForm, setMaterialForm] = useState(emptyMaterialForm);
     const [selectedFile, setSelectedFile] = useState(null);
+    const [downloadingId, setDownloadingId] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState({
+        show: false,
+        type: null,
+        id: null,
+        label: ''
+    });
+    const [materialsPage, setMaterialsPage] = useState(1);
 
     const {
         data: allocationsData,
@@ -125,7 +218,10 @@ const LessonPlans = () => {
     const {
         data: materialsData,
         isLoading: loadingMaterials
-    } = useTeacherLearningMaterials();
+    } = useTeacherLearningMaterials({
+        page: materialsPage,
+        page_size: MATERIALS_PAGE_SIZE
+    });
 
     const createLessonPlanMutation = useCreateLessonPlanMutation();
     const updateLessonPlanMutation = useUpdateLessonPlanMutation();
@@ -137,6 +233,18 @@ const LessonPlans = () => {
     const allocations = useMemo(() => toList(allocationsData), [allocationsData]);
     const lessonPlans = useMemo(() => toList(lessonPlansData), [lessonPlansData]);
     const materials = useMemo(() => toList(materialsData), [materialsData]);
+    const materialsCount = materialsData?.count ?? 0;
+    const materialsTotalPages = Math.ceil(materialsCount / MATERIALS_PAGE_SIZE);
+
+    useEffect(() => {
+        if (materialsTotalPages === 0 && materialsPage !== 1) {
+            setMaterialsPage(1);
+            return;
+        }
+        if (materialsTotalPages > 0 && materialsPage > materialsTotalPages) {
+            setMaterialsPage(materialsTotalPages);
+        }
+    }, [materialsPage, materialsTotalPages]);
 
     const filteredLessonPlans = useMemo(() => {
         if (timeFilter === 'all') {
@@ -243,18 +351,14 @@ const LessonPlans = () => {
         }
     }, [allocations, closeLessonModal, createLessonPlanMutation, editingLesson, lessonForm, updateLessonPlanMutation]);
 
-    const handleDeleteLessonPlan = useCallback(async (lessonId) => {
-        if (!window.confirm('Delete this lesson plan?')) {
-            return;
-        }
-
-        try {
-            await deleteLessonPlanMutation.mutateAsync(lessonId);
-            toast.success('Lesson plan deleted.');
-        } catch (error) {
-            toast.error(error?.message || 'Failed to delete lesson plan.');
-        }
-    }, [deleteLessonPlanMutation]);
+    const requestDeleteLessonPlan = useCallback((plan) => {
+        setDeleteConfirm({
+            show: true,
+            type: 'lesson',
+            id: plan.id,
+            label: plan.title || ''
+        });
+    }, []);
 
     const onDropFile = useCallback((acceptedFiles) => {
         if (acceptedFiles.length === 0) {
@@ -294,7 +398,6 @@ const LessonPlans = () => {
         formData.append('course', String(allocation.course_id));
         formData.append('classroom', String(allocation.class_room_id));
         formData.append('academic_year', String(allocation.academic_year_id));
-        formData.append('file_url', selectedFile.name);
         formData.append('file_type', selectedFile.type || selectedFile.name.split('.').pop() || 'file');
         formData.append('file_size', String(selectedFile.size || 0));
         formData.append('file', selectedFile);
@@ -305,23 +408,72 @@ const LessonPlans = () => {
             setShowMaterialUpload(false);
             setMaterialForm(emptyMaterialForm);
             setSelectedFile(null);
+            setMaterialsPage(1);
         } catch (error) {
             toast.error(error?.message || 'Failed to upload learning material.');
         }
     }, [allocations, createMaterialMutation, materialForm, selectedFile]);
 
-    const handleDeleteMaterial = useCallback(async (materialId) => {
-        if (!window.confirm('Delete this learning material?')) {
+    const requestDeleteMaterial = useCallback((material) => {
+        setDeleteConfirm({
+            show: true,
+            type: 'material',
+            id: material.id,
+            label: material.title || ''
+        });
+    }, []);
+
+    const handleConfirmDelete = useCallback(async () => {
+        try {
+            if (deleteConfirm.type === 'lesson') {
+                await deleteLessonPlanMutation.mutateAsync(deleteConfirm.id);
+                toast.success('Lesson plan deleted.');
+            } else if (deleteConfirm.type === 'material') {
+                await deleteMaterialMutation.mutateAsync(deleteConfirm.id);
+                toast.success('Learning material deleted.');
+            }
+            setDeleteConfirm({
+                show: false,
+                type: null,
+                id: null,
+                label: ''
+            });
+        } catch (error) {
+            toast.error(error?.message || 'Failed to delete.');
+        }
+    }, [deleteConfirm, deleteLessonPlanMutation, deleteMaterialMutation]);
+
+    const handleCancelDelete = useCallback(() => {
+        setDeleteConfirm({
+            show: false,
+            type: null,
+            id: null,
+            label: ''
+        });
+    }, []);
+
+    const handleDownloadMaterial = useCallback(async (material) => {
+        if (downloadingId) {
             return;
         }
-
-        try {
-            await deleteMaterialMutation.mutateAsync(materialId);
-            toast.success('Learning material deleted.');
-        } catch (error) {
-            toast.error(error?.message || 'Failed to delete material.');
+        if (!material.download_url) {
+            toast.error('No file attached to this material. Please delete it and re-upload.');
+            return;
         }
-    }, [deleteMaterialMutation]);
+        setDownloadingId(material.id);
+        try {
+            await teacherService.downloadMaterial(material);
+        } catch (error) {
+            const msg = error?.message || '';
+            if (msg.toLowerCase().includes('no file') || msg.toLowerCase().includes('not found') || error?.status === 404) {
+                toast.error('No file attached. Please delete this material and re-upload.');
+            } else {
+                toast.error('Could not download the file. Please try again.');
+            }
+        } finally {
+            setDownloadingId(null);
+        }
+    }, [downloadingId]);
 
     return (
         <div className="teacher-page">
@@ -401,7 +553,7 @@ const LessonPlans = () => {
                                     <button type="button" className="icon-btn" onClick={() => openEditLessonModal(plan)} title="Edit">
                                         <Pencil size={14} />
                                     </button>
-                                    <button type="button" className="icon-btn danger" onClick={() => handleDeleteLessonPlan(plan.id)} title="Delete">
+                                    <button type="button" className="icon-btn danger" onClick={() => requestDeleteLessonPlan(plan)} title="Delete">
                                         <Trash2 size={14} />
                                     </button>
                                 </div>
@@ -618,52 +770,88 @@ const LessonPlans = () => {
                 ) : materials.length === 0 ? (
                     <div style={{ color: 'var(--color-text-muted)' }}>No materials uploaded yet.</div>
                 ) : (
-                    <div style={{ display: 'grid', gap: '0.55rem' }}>
-                        {materials.map((material) => {
-                            const MaterialIcon = getFileTypeIcon(material.file_type || '');
+                    <>
+                        <div style={{ display: 'grid', gap: '0.55rem' }}>
+                            {materials.map((material) => {
+                                const MaterialIcon = getFileTypeIcon(material.file_type || '');
 
-                            return (
-                                <div key={material.id} style={{ border: '1px solid var(--color-border)', borderRadius: '0.75rem', background: 'var(--color-bg-surface)', padding: '0.75rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
-                                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--color-bg-body)', display: 'grid', placeItems: 'center', color: 'var(--color-primary)', flexShrink: 0 }}>
-                                            <MaterialIcon size={16} />
+                                return (
+                                    <div key={material.id} style={{ border: '1px solid var(--color-border)', borderRadius: '0.75rem', background: 'var(--color-bg-surface)', padding: '0.75rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--color-bg-body)', display: 'grid', placeItems: 'center', color: 'var(--color-primary)', flexShrink: 0 }}>
+                                                <MaterialIcon size={16} />
+                                            </div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                                    <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--color-text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        {material.title}
+                                                    </span>
+                                                    {!material.download_url && (
+                                                        <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '999px', background: '#fef3c7', color: '#92400e', flexShrink: 0 }}>
+                                                            No file
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div style={{ marginTop: '2px', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                                                    {(material.course_name || 'Course')} • {(material.classroom_name || 'Class')} • {material.created_at ? new Date(material.created_at).toLocaleDateString() : 'N/A'}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div style={{ minWidth: 0 }}>
-                                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--color-text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {material.title}
-                                            </div>
-                                            <div style={{ marginTop: '2px', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                                                {(material.course_name || 'Course')} • {(material.classroom_name || 'Class')} • {material.created_at ? new Date(material.created_at).toLocaleDateString() : 'N/A'}
-                                            </div>
+
+                                        <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                                            <button
+                                                type="button"
+                                                className="icon-btn"
+                                                title={material.download_url ? 'Download material' : 'No file attached — re-upload to enable download'}
+                                                disabled={downloadingId === material.id}
+                                                style={!material.download_url ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                                                onClick={() => handleDownloadMaterial(material)}
+                                            >
+                                                {downloadingId === material.id ? <Loader2 size={14} /> : <Download size={14} />}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="icon-btn danger"
+                                                onClick={() => requestDeleteMaterial(material)}
+                                                title="Delete material"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                     </div>
+                                );
+                            })}
+                        </div>
 
-                                    <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
-                                        <a
-                                            href={material.file_url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="icon-btn"
-                                            style={{ textDecoration: 'none' }}
-                                            title="Open material"
-                                        >
-                                            <LinkIcon size={14} />
-                                        </a>
-                                        <button
-                                            type="button"
-                                            className="icon-btn danger"
-                                            onClick={() => handleDeleteMaterial(material.id)}
-                                            title="Delete material"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
+                        {materialsTotalPages > 1 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                <span>
+                                    Showing {(materialsPage - 1) * MATERIALS_PAGE_SIZE + 1}-
+                                    {Math.min(materialsPage * MATERIALS_PAGE_SIZE, materialsCount)} of {materialsCount}
+                                </span>
+                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                    <button className="icon-btn" disabled={materialsPage === 1} onClick={() => setMaterialsPage((page) => page - 1)}>
+                                        ‹ Prev
+                                    </button>
+                                    <span style={{ padding: '0.4rem 0.6rem' }}>{materialsPage} / {materialsTotalPages}</span>
+                                    <button className="icon-btn" disabled={materialsPage === materialsTotalPages} onClick={() => setMaterialsPage((page) => page + 1)}>
+                                        Next ›
+                                    </button>
                                 </div>
-                            );
-                        })}
-                    </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
+
+            <ConfirmDeleteModal
+                isOpen={deleteConfirm.show}
+                title={deleteConfirm.type === 'lesson' ? 'Delete Lesson Plan' : 'Delete Material'}
+                description={`"${deleteConfirm.label}" will be permanently removed. This cannot be undone.`}
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+                isPending={deleteLessonPlanMutation.isPending || deleteMaterialMutation.isPending}
+            />
 
             {(loadingAllocations || loadingLessonPlans || loadingMaterials) && (
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>

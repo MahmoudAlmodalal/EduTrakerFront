@@ -1,4 +1,4 @@
-import { api } from '../utils/api';
+import { api, apiClient } from '../utils/api';
 
 const sanitizeParams = (filters = {}) => Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -10,6 +10,9 @@ const teacherService = {
     // Teacher Profile/Settings
     getProfile: async (id) => {
         return api.get(`/teacher/teachers/${id}/`);
+    },
+    getSchoolContext: async () => {
+        return api.get('/teacher/profile/context/');
     },
 
     // Dashboard Stats
@@ -45,19 +48,36 @@ const teacherService = {
         return api.get('/teacher/assignments/', { params: sanitizeParams(filters) });
     },
     createAssignment: async (data) => {
-        return api.post('/teacher/assignments/', data);
+        return api.post('/teacher/assignments/', data, {
+            headers: data instanceof FormData
+                ? { 'Content-Type': 'multipart/form-data' }
+                : undefined
+        });
     },
     getAssignmentDetail: async (id) => {
         return api.get(`/teacher/assignments/${id}/`);
     },
     updateAssignment: async (id, data) => {
-        return api.patch(`/teacher/assignments/${id}/`, data);
+        return api.patch(`/teacher/assignments/${id}/`, data, {
+            headers: data instanceof FormData
+                ? { 'Content-Type': 'multipart/form-data' }
+                : undefined
+        });
     },
     deleteAssignment: async (id) => {
         return api.post(`/teacher/assignments/${id}/deactivate/`);
     },
     activateAssignment: async (id) => {
         return api.post(`/teacher/assignments/${id}/activate/`);
+    },
+    getAssignmentSubmissions: async (id) => {
+        return api.get(`/teacher/assignments/${id}/submissions/`);
+    },
+    gradeAssignmentSubmission: async (assignmentId, submissionId, data) => {
+        return api.post(`/teacher/assignments/${assignmentId}/submissions/${submissionId}/grade/`, data);
+    },
+    publishAssignmentGrades: async (assignmentId, is_grades_published) => {
+        return api.patch(`/teacher/assignments/${assignmentId}/publish-grades/`, { is_grades_published });
     },
 
     // Attendance
@@ -132,6 +152,26 @@ const teacherService = {
     deleteLearningMaterial: async (id) => {
         return api.delete(`/teacher/learning-materials/${id}/`);
     },
+    downloadMaterial: async (material) => {
+        const blob = await apiClient.get(
+            `/teacher/learning-materials/${material.id}/download/`,
+            { responseType: 'blob' }
+        );
+        const blobUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+
+        const rawType = material?.file_type || '';
+        const normalizedType = rawType.includes('/') ? rawType.split('/').pop() : rawType;
+        const extension = normalizedType ? `.${normalizedType.replace(/^\./, '')}` : '';
+        const title = (material?.title || 'material').trim();
+        anchor.download = title.endsWith(extension) || !extension ? title : `${title}${extension}`;
+
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(blobUrl);
+    },
 
     // Communication
     sendMessage: async (data) => {
@@ -153,9 +193,9 @@ const teacherService = {
             throw error;
         }
     },
-    searchUsers: async (search) => {
+    searchUsers: async ({ query, category = 'all' } = {}) => {
         return api.get('/user-messages/search/', {
-            params: sanitizeParams({ search, q: search })
+            params: sanitizeParams({ search: query, category })
         });
     },
 

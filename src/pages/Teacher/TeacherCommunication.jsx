@@ -30,8 +30,18 @@ const ALLOWED_ROLE_LABELS = {
     teacher: 'Teacher',
     secretary: 'Secretary',
     school_manager: 'School Manager',
-    student: 'Student'
+    student: 'Student',
+    guardian: 'Guardian'
 };
+
+const RECIPIENT_CATEGORIES = [
+    { value: 'all', label: 'All' },
+    { value: 'manager', label: 'School Manager' },
+    { value: 'secretary', label: 'Secretaries' },
+    { value: 'colleagues', label: 'Teacher Mates' },
+    { value: 'students', label: 'My Students' },
+    { value: 'guardians', label: 'Guardians' }
+];
 
 const normalizeRole = (role) => {
     const current = (role || '').toLowerCase();
@@ -59,6 +69,8 @@ const getRoleColor = (role) => {
             return { bg: '#ede9fe', text: '#6d28d9' };
         case 'student':
             return { bg: '#fef3c7', text: '#92400e' };
+        case 'guardian':
+            return { bg: '#fee2e2', text: '#b91c1c' };
         default:
             return { bg: '#e2e8f0', text: '#334155' };
     }
@@ -78,6 +90,7 @@ const TeacherCommunication = () => {
     const [showCompose, setShowCompose] = useState(false);
     const [composeSearchText, setComposeSearchText] = useState('');
     const [composeSearch, setComposeSearch] = useState('');
+    const [recipientCategory, setRecipientCategory] = useState('all');
     const [composeRecipient, setComposeRecipient] = useState(null);
     const [composeSubject, setComposeSubject] = useState('');
     const [composeBody, setComposeBody] = useState('');
@@ -108,8 +121,11 @@ const TeacherCommunication = () => {
     const {
         data: searchedRecipients,
         isLoading: loadingRecipientSearch
-    } = useSearchCommunicationUsers(composeSearch, {
-        enabled: showCompose && composeSearch.length > 0
+    } = useSearchCommunicationUsers({
+        query: composeSearch,
+        category: recipientCategory
+    }, {
+        enabled: showCompose && (composeSearch.length > 0 || recipientCategory !== 'all')
     });
 
     const markAllNotificationsRead = useMarkAllTeacherNotificationsRead();
@@ -255,13 +271,13 @@ const TeacherCommunication = () => {
                     normalizedRole: role
                 };
             })
-            .filter((item) => ['secretary', 'teacher', 'school_manager', 'student'].includes(item.normalizedRole))
+            .filter((item) => ['secretary', 'teacher', 'school_manager', 'student', 'guardian'].includes(item.normalizedRole))
             .filter((item) => (
-                item.normalizedRole !== 'student' || ownStudentIds.includes(item.id)
+                item.normalizedRole !== 'student' || recipientCategory === 'students' || ownStudentIds.includes(item.id)
             ));
 
         return users;
-    }, [ownStudentIds, searchedRecipients, user?.id]);
+    }, [ownStudentIds, recipientCategory, searchedRecipients, user?.id]);
 
     const unreadNotificationCount = notifications.filter((notification) => !notification.is_read).length;
 
@@ -269,6 +285,7 @@ const TeacherCommunication = () => {
         setShowCompose(true);
         setComposeSearchText('');
         setComposeSearch('');
+        setRecipientCategory('all');
         setComposeRecipient(null);
         setComposeSubject('');
         setComposeBody('');
@@ -276,6 +293,10 @@ const TeacherCommunication = () => {
 
     const closeCompose = useCallback(() => {
         setShowCompose(false);
+        setComposeSearchText('');
+        setComposeSearch('');
+        setRecipientCategory('all');
+        setComposeRecipient(null);
     }, []);
 
     const handleSelectThread = useCallback(async (thread) => {
@@ -869,6 +890,33 @@ const TeacherCommunication = () => {
                                     Recipient
                                 </label>
 
+                                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+                                    {RECIPIENT_CATEGORIES.map((category) => (
+                                        <button
+                                            key={category.value}
+                                            type="button"
+                                            onClick={() => {
+                                                setRecipientCategory(category.value);
+                                                setComposeSearchText('');
+                                                setComposeSearch('');
+                                                setComposeRecipient(null);
+                                            }}
+                                            style={{
+                                                borderRadius: '999px',
+                                                padding: '0.25rem 0.7rem',
+                                                fontSize: '0.78rem',
+                                                fontWeight: 600,
+                                                border: `1.5px solid ${recipientCategory === category.value ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                background: recipientCategory === category.value ? 'var(--color-primary)' : 'transparent',
+                                                color: recipientCategory === category.value ? '#fff' : 'var(--color-text-muted)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {category.label}
+                                        </button>
+                                    ))}
+                                </div>
+
                                 <div style={{ position: 'relative' }}>
                                     <Search
                                         size={16}
@@ -903,11 +951,11 @@ const TeacherCommunication = () => {
                                         borderRadius: '0.6rem'
                                     }}
                                 >
-                                    {composeSearch.length === 0 ? (
+                                    {composeSearch.length === 0 && recipientCategory === 'all' ? (
                                         <div style={{ padding: '0.75rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
                                             Type to search recipients.
                                         </div>
-                                    ) : loadingRecipientSearch || loadingOwnStudents ? (
+                                    ) : loadingRecipientSearch || (loadingOwnStudents && recipientCategory === 'all') ? (
                                         <div style={{ padding: '0.75rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
                                             Searching recipients...
                                         </div>

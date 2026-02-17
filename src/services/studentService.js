@@ -56,7 +56,19 @@ const studentService = {
     // Get assignments
     getAssignments: async (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/teacher/assignments/?${queryParams}`);
+        return api.get(`/student/assignments/${queryParams ? `?${queryParams}` : ''}`);
+    },
+    submitAssignment: async (assignmentId, file) => {
+        const formData = new FormData();
+        formData.append('submission_file', file);
+        return api.post(`/student/assignments/${assignmentId}/submit/`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+    },
+    getAssignmentSubmission: async (assignmentId) => {
+        return api.get(`/student/assignments/${assignmentId}/submission/`);
     },
 
     // Get marks/results

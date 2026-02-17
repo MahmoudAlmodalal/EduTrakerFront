@@ -378,6 +378,7 @@ export const translations = {
         'teacher.nav.assessments': 'Assessments',
         'teacher.nav.lessonPlans': 'Lesson Plans',
         'teacher.nav.communication': 'Communication',
+        'teacher.nav.info': 'Info',
         'teacher.nav.settings': 'Settings',
 
         // Teacher Settings
@@ -784,6 +785,7 @@ export const translations = {
         // Student Navigation
         'student.nav.dashboard': 'Overview',
         'student.nav.subjects': 'Subjects',
+        'student.nav.assignments': 'Assignments',
         'student.nav.results': 'Academic Results',
         'student.nav.attendance': 'Attendance',
         'student.nav.communication': 'Messages',
@@ -1298,6 +1300,7 @@ export const translations = {
         'teacher.nav.assessments': 'التقييمات',
         'teacher.nav.lessonPlans': 'خطط الدروس',
         'teacher.nav.communication': 'التواصل',
+        'teacher.nav.info': 'المعلومات',
         'teacher.nav.settings': 'الإعدادات',
 
         // Teacher Settings
@@ -1700,6 +1703,7 @@ export const translations = {
         // Student Navigation
         'student.nav.dashboard': 'نظرة عامة',
         'student.nav.subjects': 'المواد',
+        'student.nav.assignments': 'الواجبات',
         'student.nav.results': 'النتائج الأكاديمية',
         'student.nav.attendance': 'الحضور',
         'student.nav.communication': 'الرسائل',

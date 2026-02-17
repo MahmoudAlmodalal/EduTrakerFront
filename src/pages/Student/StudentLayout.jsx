@@ -3,6 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import {
     LayoutDashboard,
     BookOpen,
+    FileUp,
     GraduationCap,
     CalendarCheck,
     Settings,
@@ -57,6 +58,7 @@ const StudentLayoutContent = () => {
     const navItems = [
         { path: '/student/dashboard', labelKey: 'student.nav.dashboard', icon: LayoutDashboard },
         { path: '/student/subjects', labelKey: 'student.nav.subjects', icon: BookOpen },
+        { path: '/student/assignments', labelKey: 'student.nav.assignments', icon: FileUp },
         { path: '/student/results', labelKey: 'student.nav.results', icon: GraduationCap },
         { path: '/student/attendance', labelKey: 'student.nav.attendance', icon: CalendarCheck },
         { path: '/student/communication', labelKey: 'student.nav.communication', icon: MessageSquare },

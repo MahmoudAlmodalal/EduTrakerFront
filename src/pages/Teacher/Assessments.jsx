@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+    ChevronRight,
     Check,
     FileUp,
     Pencil,
@@ -33,7 +34,9 @@ const emptyForm = {
     allocationId: '',
     dueDate: '',
     maxMarks: '',
-    type: 'assignment'
+    type: 'assignment',
+    attachmentFile: null,
+    existingAttachmentUrl: null
 };
 
 const assessmentTypes = [
@@ -96,7 +99,10 @@ const statusBadgeStyles = {
 
 const Assessments = () => {
     const { t } = useTheme();
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
+    const [page, setPage] = useState(1);
+    const pageSize = 10;
 
     const [allocationFilter, setAllocationFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -121,10 +127,12 @@ const Assessments = () => {
     const {
         data: assignmentsData,
         isLoading: loadingAssignments
-    } = useTeacherAssignments({ include_inactive: true });
+    } = useTeacherAssignments({ include_inactive: true, page, page_size: pageSize });
 
     const allocations = useMemo(() => toList(allocationsData), [allocationsData]);
     const assignments = useMemo(() => toList(assignmentsData), [assignmentsData]);
+    const totalAssignmentsCount = Number(assignmentsData?.count || assignments.length || 0);
+    const totalPages = Math.max(1, Math.ceil(totalAssignmentsCount / pageSize));
 
     const createAssignmentMutation = useCreateTeacherAssignmentMutation();
     const updateAssignmentMutation = useUpdateTeacherAssignmentMutation();
@@ -257,7 +265,9 @@ const Assessments = () => {
             allocationId: String(getAllocationId(assignment) || ''),
             dueDate: toDateTimeLocal(assignment.due_date),
             maxMarks: String(assignment.full_mark || ''),
-            type: assignment.assignment_type || assignment.exam_type || 'assignment'
+            type: assignment.assignment_type || assignment.exam_type || 'assignment',
+            attachmentFile: null,
+            existingAttachmentUrl: assignment.attachment_file_url || null
         });
         setShowAssignmentModal(true);
     }, [getAllocationId]);
@@ -271,36 +281,42 @@ const Assessments = () => {
     const handleSubmitAssignment = useCallback(async (event) => {
         event.preventDefault();
 
-        const payload = {
-            title: assignmentForm.title.trim(),
-            description: assignmentForm.description.trim(),
-            full_mark: Number(assignmentForm.maxMarks),
-            exam_type: assignmentForm.type
-        };
+        const title = assignmentForm.title.trim();
+        const fullMark = assignmentForm.maxMarks;
 
-        const createPayload = {
-            ...payload,
-            assignment_type: assignmentForm.type,
-            due_date: toIsoFromLocal(assignmentForm.dueDate),
-            course_allocation: assignmentForm.allocationId ? Number(assignmentForm.allocationId) : null
-        };
-
-        const updatePayload = {
-            ...payload,
-            due_date: assignmentForm.dueDate ? assignmentForm.dueDate.split('T')[0] : null
-        };
-
-        if (!payload.title || !payload.full_mark) {
+        if (!title || !fullMark) {
             toast.error('Title and max marks are required.');
             return;
         }
 
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('description', assignmentForm.description.trim());
+        formData.append('full_mark', String(Number(fullMark)));
+        formData.append('exam_type', assignmentForm.type);
+        formData.append('assignment_type', assignmentForm.type);
+
+        const dueDateIso = toIsoFromLocal(assignmentForm.dueDate);
+        if (dueDateIso) {
+            formData.append('due_date', dueDateIso);
+        }
+
+        if (!editingAssignment) {
+            if (assignmentForm.allocationId) {
+                formData.append('course_allocation', String(Number(assignmentForm.allocationId)));
+            }
+        }
+
+        if (assignmentForm.attachmentFile) {
+            formData.append('attachment_file', assignmentForm.attachmentFile);
+        }
+
         try {
             if (editingAssignment) {
-                await updateAssignmentMutation.mutateAsync({ id: editingAssignment.id, payload: updatePayload });
+                await updateAssignmentMutation.mutateAsync({ id: editingAssignment.id, payload: formData });
                 toast.success('Assignment updated.');
             } else {
-                await createAssignmentMutation.mutateAsync(createPayload);
+                await createAssignmentMutation.mutateAsync(formData);
                 toast.success('Assignment created.');
             }
             closeAssignmentModal();
@@ -571,6 +587,22 @@ const Assessments = () => {
                                                     {assignment.description}
                                                 </div>
                                             )}
+                                            <div style={{ marginTop: '0.4rem' }}>
+                                                <span
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        borderRadius: '999px',
+                                                        padding: '0.15rem 0.45rem',
+                                                        background: '#e2e8f0',
+                                                        color: '#334155',
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 700
+                                                    }}
+                                                >
+                                                    Submissions: {assignment.submitted_count ?? 0} / {assignment.total_students ?? 0}
+                                                </span>
+                                            </div>
                                         </td>
                                         <td>{getAllocationLabel(assignment)}</td>
                                         <td>{assignment.due_date ? new Date(assignment.due_date).toLocaleString() : 'No due date'}</td>
@@ -597,6 +629,14 @@ const Assessments = () => {
                                                 <button
                                                     type="button"
                                                     className="icon-btn"
+                                                    onClick={() => navigate(`/teacher/assignments/${assignment.id}/submissions`)}
+                                                    title="View submissions"
+                                                >
+                                                    <ChevronRight size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="icon-btn"
                                                     onClick={() => setMarkingAssignment(assignment)}
                                                     title="Record marks"
                                                 >
@@ -619,6 +659,39 @@ const Assessments = () => {
                             })}
                         </tbody>
                     </table>
+                </div>
+                <div
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.75rem 1rem',
+                        borderTop: '1px solid var(--color-border)'
+                    }}
+                >
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                        Page {page} of {totalPages}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            type="button"
+                            className="icon-btn"
+                            style={{ width: 'auto', padding: '0.35rem 0.7rem' }}
+                            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                            disabled={page <= 1}
+                        >
+                            Previous
+                        </button>
+                        <button
+                            type="button"
+                            className="icon-btn"
+                            style={{ width: 'auto', padding: '0.35rem 0.7rem' }}
+                            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                            disabled={page >= totalPages}
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -742,6 +815,28 @@ const Assessments = () => {
                                         ))}
                                     </select>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                    Attachment File (optional)
+                                </label>
+                                {assignmentForm.existingAttachmentUrl && !assignmentForm.attachmentFile && (
+                                    <div style={{ marginBottom: '0.45rem', fontSize: '0.78rem' }}>
+                                        <a href={assignmentForm.existingAttachmentUrl} target="_blank" rel="noreferrer">
+                                            Current attachment
+                                        </a>
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                                    onChange={(event) => setAssignmentForm((prev) => ({
+                                        ...prev,
+                                        attachmentFile: event.target.files?.[0] || null
+                                    }))}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.5rem 0.6rem' }}
+                                />
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem', marginTop: '0.2rem' }}>

@@ -5,6 +5,7 @@ import {
     Users,
     BookOpen,
     FileText,
+    Info,
     MessageSquare,
     LogOut,
     GraduationCap,
@@ -43,6 +44,7 @@ const TeacherLayout = () => {
         { path: '/teacher/assessments', label: t('teacher.nav.assessments'), icon: FileText },
         { path: '/teacher/lesson-plans', label: t('teacher.nav.lessonPlans'), icon: BookOpen },
         { path: '/teacher/communication', label: t('teacher.nav.communication'), icon: MessageSquare },
+        { path: '/teacher/info', label: t('teacher.nav.info'), icon: Info },
         { path: '/teacher/settings', label: t('teacher.nav.settings'), icon: Settings },
     ];
 

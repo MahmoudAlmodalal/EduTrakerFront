@@ -320,3 +320,5 @@ export const api = {
     patch: (endpoint, body, config) => apiClient.patch(endpoint, body, config),
     delete: (endpoint, config) => apiClient.delete(endpoint, config),
 };
+
+export { apiClient };

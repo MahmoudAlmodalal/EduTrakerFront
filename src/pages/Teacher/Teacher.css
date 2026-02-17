@@ -1305,3 +1305,720 @@
         max-width: 100%;
     }
 }
+
+/* ==========================================================================
+   Teacher Settings - School Context Card
+   ========================================================================== */
+.teacher-profile-card {
+    overflow: hidden;
+}
+
+.teacher-profile-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.teacher-profile-card-title {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--color-text-main);
+    font-weight: 700;
+}
+
+.teacher-profile-card-subtitle {
+    margin: 0.24rem 0 0;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.teacher-profile-collapse-btn {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-body);
+    color: var(--color-text-muted);
+    border-radius: 0.55rem;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+}
+
+.teacher-profile-collapse-btn:hover {
+    border-color: rgba(var(--color-primary-rgb), 0.45);
+    color: var(--color-primary);
+}
+
+.teacher-profile-card-body {
+    padding: 1rem 1.25rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+}
+
+.teacher-profile-card .profile-skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--color-border) 25%,
+        var(--color-bg-body) 50%,
+        var(--color-border) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 0.55rem;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.teacher-profile-skeleton-hero {
+    height: 120px;
+}
+
+.teacher-profile-skeleton-leadership {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.teacher-profile-skeleton-leadership-card {
+    height: 95px;
+}
+
+.teacher-profile-skeleton-classroom {
+    height: 76px;
+}
+
+.teacher-profile-error {
+    margin: 0;
+    padding: 0.8rem;
+    border: 1px solid #fecaca;
+    border-radius: 0.65rem;
+    font-size: 0.82rem;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.teacher-profile-section {
+    min-width: 0;
+}
+
+.teacher-profile-hero {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+}
+
+.teacher-profile-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary), #6366f1);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.teacher-profile-hero-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.33rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.teacher-profile-hero-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.teacher-profile-hero-name {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+}
+
+.teacher-profile-hero-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.teacher-profile-employment-badge {
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.teacher-profile-employment-full-time {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.teacher-profile-employment-part-time {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.teacher-profile-employment-contract {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.teacher-profile-employment-substitute {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.teacher-profile-exp-badge {
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: #ede9fe;
+    color: #6d28d9;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.teacher-profile-line {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.teacher-profile-line span {
+    min-width: 0;
+}
+
+.teacher-profile-line-muted {
+    color: var(--color-text-muted);
+}
+
+.teacher-profile-line-school {
+    color: var(--color-primary);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.teacher-profile-dot {
+    color: var(--color-text-muted);
+}
+
+.teacher-profile-divider {
+    border-bottom: 1px solid var(--color-border);
+    margin: 0.05rem 0;
+}
+
+.teacher-profile-section-title {
+    margin: 0 0 0.65rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    font-weight: 700;
+}
+
+.teacher-leadership-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.teacher-leadership-card {
+    border: 1px solid var(--color-border);
+    border-radius: 0.85rem;
+    padding: 0.85rem 1rem;
+    background: var(--color-bg-body);
+}
+
+.teacher-leadership-card-muted {
+    opacity: 0.75;
+}
+
+.teacher-leadership-role {
+    margin-bottom: 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.teacher-leadership-content {
+    display: flex;
+    gap: 0.62rem;
+    min-width: 0;
+}
+
+.teacher-leadership-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.teacher-leadership-icon-manager {
+    background: #eef2ff;
+    color: #4f46e5;
+}
+
+.teacher-leadership-icon-workstream {
+    background: #f5f3ff;
+    color: #7c3aed;
+}
+
+.teacher-leadership-icon-muted {
+    background: #f1f5f9;
+    color: #94a3b8;
+}
+
+.teacher-leadership-copy {
+    min-width: 0;
+}
+
+.teacher-leadership-empty {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.teacher-leadership-name {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+}
+
+.teacher-leadership-email {
+    margin: 0.2rem 0 0;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.teacher-leadership-workstream {
+    margin-top: 0.35rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background: #f5f3ff;
+    color: #7c3aed;
+    display: inline-flex;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.teacher-profile-empty {
+    margin: 0;
+    border: 1px dashed var(--color-border);
+    border-radius: 0.7rem;
+    background: var(--color-bg-body);
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    padding: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.teacher-classrooms-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.teacher-classroom-item {
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    background: var(--color-bg-body);
+    overflow: hidden;
+}
+
+.teacher-classroom-toggle {
+    width: 100%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.teacher-classroom-item:hover {
+    border-color: rgba(var(--color-primary-rgb), 0.35);
+    background: rgba(var(--color-primary-rgb), 0.04);
+}
+
+.teacher-classroom-toggle-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.teacher-classroom-title {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    color: var(--color-text-main);
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.teacher-classroom-name {
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+
+.teacher-classroom-tags {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.teacher-tag {
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.teacher-tag-homeroom {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.teacher-tag-students {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.teacher-tag-grade {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.teacher-classroom-students-panel {
+    margin: 0 0.75rem 0.75rem;
+    padding: 0.6rem;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.55rem;
+}
+
+.teacher-classroom-empty {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.teacher-student-block {
+    border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
+    padding: 0.45rem 0.5rem;
+}
+
+.teacher-student-block:last-child {
+    border-bottom: none;
+}
+
+.teacher-student-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.teacher-student-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.teacher-student-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.teacher-student-copy {
+    min-width: 0;
+}
+
+.teacher-student-name {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+}
+
+.teacher-student-email {
+    margin: 0.1rem 0 0;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.teacher-student-guardians-badge {
+    border-radius: 999px;
+    padding: 0.15rem 0.5rem;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.72rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.teacher-guardian-empty {
+    margin: 0.35rem 0 0 2.4rem;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+}
+
+.teacher-guardian-row {
+    margin-top: 0.35rem;
+    padding-left: 2.4rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+}
+
+.teacher-guardian-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #d1fae5;
+    color: #047857;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.teacher-guardian-copy {
+    min-width: 0;
+}
+
+.teacher-guardian-name-row {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    color: var(--color-text-main);
+    font-weight: 600;
+    flex-wrap: wrap;
+}
+
+.teacher-guardian-primary {
+    border-radius: 999px;
+    padding: 0.1rem 0.42rem;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.67rem;
+    font-weight: 700;
+}
+
+.teacher-guardian-meta {
+    margin: 0.15rem 0 0;
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+}
+
+.teacher-people-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.teacher-people-tab {
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    padding: 0.34rem 0.6rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    background: transparent;
+    cursor: pointer;
+}
+
+.teacher-people-tab:hover {
+    background: rgba(var(--color-primary-rgb), 0.1);
+}
+
+.teacher-people-tab.active {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.teacher-profile-empty-people {
+    width: 100%;
+}
+
+.teacher-people-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.6rem;
+}
+
+.teacher-person-card {
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    padding: 0.7rem 0.85rem;
+    background: var(--color-bg-body);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+}
+
+.teacher-person-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.teacher-person-avatar-teacher {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.teacher-person-avatar-secretary {
+    background: #ccfbf1;
+    color: #0f766e;
+}
+
+.teacher-person-copy {
+    min-width: 0;
+}
+
+.teacher-person-name {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+}
+
+.teacher-person-role {
+    margin: 0.12rem 0 0;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.teacher-person-email {
+    margin: 0.2rem 0 0;
+    font-size: 0.73rem;
+    color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .teacher-leadership-grid,
+    .teacher-profile-skeleton-leadership {
+        grid-template-columns: 1fr;
+    }
+
+    .teacher-profile-hero {
+        flex-direction: column;
+    }
+
+    .teacher-classroom-toggle {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .teacher-classroom-tags {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 640px) {
+    .teacher-profile-card-header,
+    .teacher-profile-card-body {
+        padding: 0.9rem;
+    }
+
+    .teacher-profile-hero-name {
+        font-size: 1.08rem;
+    }
+
+    .teacher-people-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .teacher-student-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .teacher-student-guardians-badge {
+        margin-left: 2rem;
+    }
+}

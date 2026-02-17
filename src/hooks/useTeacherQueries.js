@@ -13,13 +13,15 @@ export const teacherQueryKeys = {
     homeroomAttendance: (date) => ['teacher', 'homeroom-attendance', date],
     assignments: (filters = {}) => ['teacher', 'assignments', filters],
     assignmentDetail: (assignmentId) => ['teacher', 'assignment', assignmentId],
+    assignmentSubmissions: (assignmentId) => ['teacher', 'assignment-submissions', assignmentId],
     marks: (assignmentId) => ['teacher', 'marks', assignmentId],
     lessonPlans: (filters = {}) => ['teacher', 'lesson-plans', filters],
     learningMaterials: (filters = {}) => ['teacher', 'learning-materials', filters],
     profile: (userId) => ['teacher', 'profile', userId],
+    schoolContext: ['teacher', 'school-context'],
     messages: (params = {}) => ['teacher', 'messages', params],
     messageThread: (threadId) => ['teacher', 'message-thread', threadId],
-    communicationUsers: (query) => ['teacher', 'communication-users', query],
+    communicationUsers: (params = {}) => ['teacher', 'communication-users', params],
     knowledgeGaps: (allocationId, threshold = 50.0) => ['teacher', 'knowledge-gaps', allocationId, threshold]
 };
 
@@ -207,6 +209,17 @@ export const useTeacherAssignmentDetail = (assignmentId, options = {}) => {
     });
 };
 
+export const useTeacherAssignmentSubmissions = (assignmentId, options = {}) => {
+    const normalizedAssignmentId = assignmentId ? Number(assignmentId) : assignmentId;
+
+    return useQuery({
+        queryKey: teacherQueryKeys.assignmentSubmissions(normalizedAssignmentId),
+        queryFn: () => teacherService.getAssignmentSubmissions(normalizedAssignmentId),
+        enabled: Boolean(normalizedAssignmentId) && (options.enabled ?? true),
+        ...options
+    });
+};
+
 export const useTeacherMarks = (assignmentId, options = {}) => {
     const normalizedAssignmentId = assignmentId ? Number(assignmentId) : assignmentId;
 
@@ -239,6 +252,35 @@ export const useUpdateTeacherAssignmentMutation = () => {
             queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
             queryClient.invalidateQueries({ queryKey: teacherQueryKeys.assignmentDetail(Number(variables.id)) });
             queryClient.invalidateQueries({ queryKey: teacherQueryKeys.dashboardStats });
+        }
+    });
+};
+
+export const usePublishAssignmentGradesMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ assignmentId, is_grades_published }) => (
+            teacherService.publishAssignmentGrades(assignmentId, is_grades_published)
+        ),
+        onSuccess: (_response, variables) => {
+            queryClient.invalidateQueries({ queryKey: teacherQueryKeys.assignmentDetail(Number(variables.assignmentId)) });
+            queryClient.invalidateQueries({ queryKey: teacherQueryKeys.assignmentSubmissions(Number(variables.assignmentId)) });
+            queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+        }
+    });
+};
+
+export const useGradeAssignmentSubmissionMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ assignmentId, submissionId, payload }) => (
+            teacherService.gradeAssignmentSubmission(assignmentId, submissionId, payload)
+        ),
+        onSuccess: (_response, variables) => {
+            queryClient.invalidateQueries({ queryKey: teacherQueryKeys.assignmentSubmissions(Number(variables.assignmentId)) });
+            queryClient.invalidateQueries({ queryKey: teacherQueryKeys.marks(Number(variables.assignmentId)) });
         }
     });
 };
@@ -393,14 +435,18 @@ export const useSendTeacherMessageMutation = () => {
     });
 };
 
-export const useSearchCommunicationUsers = (query, options = {}) =>
-    useQuery({
-        queryKey: teacherQueryKeys.communicationUsers(query),
-        queryFn: () => teacherService.searchUsers(query),
-        enabled: Boolean(query && query.trim()) && (options.enabled ?? true),
+export const useSearchCommunicationUsers = ({ query = '', category = 'all' } = {}, options = {}) => {
+    const hasSearchText = Boolean(query && query.trim());
+    const hasCategoryScope = category !== 'all';
+
+    return useQuery({
+        queryKey: teacherQueryKeys.communicationUsers({ query, category }),
+        queryFn: () => teacherService.searchUsers({ query, category }),
+        enabled: (hasSearchText || hasCategoryScope) && (options.enabled ?? true),
         staleTime: 2 * 60 * 1000,
         ...options
     });
+};
 
 export const useMarkTeacherMessageReadMutation = () => {
     const queryClient = useQueryClient();
@@ -419,6 +465,14 @@ export const useTeacherProfile = (userId, options = {}) =>
         queryKey: teacherQueryKeys.profile(userId),
         queryFn: () => teacherService.getProfile(userId),
         enabled: Boolean(userId) && (options.enabled ?? true),
+        ...options
+    });
+
+export const useTeacherSchoolContext = (options = {}) =>
+    useQuery({
+        queryKey: teacherQueryKeys.schoolContext,
+        queryFn: () => teacherService.getSchoolContext(),
+        staleTime: 5 * 60 * 1000,
         ...options
     });
 
