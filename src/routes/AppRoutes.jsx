@@ -185,7 +185,9 @@ const AppRoutes = () => {
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<StudentDashboard />} />
                         <Route path="subjects" element={<StudentSubjects />} />
+                        <Route path="subjects/:courseId" element={<StudentSubjects />} />
                         <Route path="assignments" element={<StudentAssignments />} />
+                        <Route path="assignments/:id" element={<StudentAssignments />} />
                         <Route path="results" element={<StudentResults />} />
                         <Route path="attendance" element={<StudentAttendance />} />
                         <Route path="communication" element={<GeneralCommunication />} />

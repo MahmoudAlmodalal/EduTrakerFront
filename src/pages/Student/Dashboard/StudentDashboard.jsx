@@ -1,17 +1,20 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Clock,
     AlertCircle,
-    Calendar,
-    BookOpen,
-    TrendingUp,
     Award,
+    Bell,
+    BookOpen,
+    Building2,
+    Calendar,
     CheckCircle,
-    Target,
-    Zap,
+    Clock,
+    MessageCircle,
     RefreshCw,
-    Bell
+    Target,
+    TrendingUp,
+    User,
+    Zap
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -26,6 +29,45 @@ const resolveText = (value, fallbackKey, fallbackText) => {
     }
     return value;
 };
+
+const todayIsoDate = () => new Date().toISOString().split('T')[0];
+
+const formatHourMinute = (value) => {
+    if (!value || typeof value !== 'string' || value.length < 5) {
+        return value || 'N/A';
+    }
+    const [hourText, minuteText] = value.split(':');
+    const hour = Number(hourText);
+    const minute = Number(minuteText);
+    if (Number.isNaN(hour) || Number.isNaN(minute)) {
+        return value;
+    }
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const normalizedHour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${normalizedHour}:${String(minute).padStart(2, '0')} ${period}`;
+};
+
+const getInitials = (fullName = '') => {
+    const tokens = String(fullName).trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) {
+        return 'ST';
+    }
+    if (tokens.length === 1) {
+        return tokens[0].slice(0, 2).toUpperCase();
+    }
+    return `${tokens[0][0]}${tokens[1][0]}`.toUpperCase();
+};
+
+const notifConfig = {
+    grade_posted: { icon: Award, bg: '#dcfce7', color: '#166534', label: 'Grade' },
+    assignment_due: { icon: Clock, bg: '#fef3c7', color: '#92400e', label: 'Due Soon' },
+    attendance_marked: { icon: Calendar, bg: '#dbeafe', color: '#1e40af', label: 'Attendance' },
+    announcement: { icon: BookOpen, bg: '#ede9fe', color: '#6d28d9', label: 'Content' },
+    message_received: { icon: MessageCircle, bg: '#fce7f3', color: '#9d174d', label: 'Message' },
+    system: { icon: Bell, bg: '#f1f5f9', color: '#475569', label: 'System' }
+};
+
+const getNotifConfig = (type) => notifConfig[type] || notifConfig.system;
 
 const StudentDashboard = () => {
     const { t } = useTheme();
@@ -66,7 +108,7 @@ const StudentDashboard = () => {
         setScheduleLoading(true);
         setScheduleError(null);
         try {
-            const scheduleData = await studentService.getSchedule(user.id);
+            const scheduleData = await studentService.getSchedule(user.id, { date: todayIsoDate() });
             const nextSchedule = Array.isArray(scheduleData?.results)
                 ? scheduleData.results
                 : Array.isArray(scheduleData)
@@ -145,6 +187,21 @@ const StudentDashboard = () => {
         }
     };
 
+    const handleNotificationClick = async (notification) => {
+        if (!notification?.id) {
+            return;
+        }
+        if (!notification.is_read) {
+            await handleMarkRead(notification.id);
+        }
+        const actionUrl = typeof notification.action_url === 'string' ? notification.action_url.trim() : '';
+        if (actionUrl && actionUrl.startsWith('/')) {
+            navigate(actionUrl);
+            return;
+        }
+        openNotifications();
+    };
+
     if (dashboardLoading && !dashboardData) {
         return (
             <div className="dashboard-loading">
@@ -162,7 +219,7 @@ const StudentDashboard = () => {
                 <AlertCircle size={48} color="#ef4444" />
                 <h2>Oops! Something went wrong</h2>
                 <p>{dashboardErrorText}</p>
-                <button onClick={handleRetryDashboard} className="retry-btn">
+                <button onClick={handleRetryDashboard} className="retry-btn" type="button">
                     <RefreshCw size={18} />
                     Try Again
                 </button>
@@ -188,6 +245,18 @@ const StudentDashboard = () => {
         rank: classmates?.rank || `Top ${classmates?.active_classmates || 'N/A'}`
     };
 
+    const classroomName = profile?.current_classroom?.classroom_name || 'No classroom';
+    const gradeName = profile?.current_grade?.grade_name || profile?.current_classroom?.grade_name || 'Grade N/A';
+    const academicYear = profile?.current_classroom?.academic_year || 'Academic year N/A';
+    const profileCard = {
+        fullName: profile?.student_name || user?.full_name || 'Student',
+        email: profile?.email || user?.email || '—',
+        schoolName: profile?.school_name || 'School not available',
+        homeroomTeacher: profile?.current_classroom?.homeroom_teacher || 'Homeroom teacher not assigned',
+        classroomText: `${classroomName} • ${academicYear}`,
+        gradeText: gradeName
+    };
+
     const todaySchedule = schedule.length > 0 ? schedule : [];
     const hasUnreadNotifications = unreadCount > 0;
     const noNotificationsText = resolveText(
@@ -201,13 +270,13 @@ const StudentDashboard = () => {
             case 'completed':
             case 'graded':
             case 'done':
-                return <span className="status-badge status-done"><CheckCircle size={12} /> Completed</span>;
+                return <span className="status-badge status-done"><CheckCircle size={12} /> Done</span>;
             case 'current':
             case 'now':
-                return <span className="status-badge status-now"><Zap size={12} /> In Progress</span>;
+                return <span className="status-badge status-now"><Zap size={12} /> Now</span>;
             case 'upcoming':
             case 'pending':
-                return <span className="status-badge status-upcoming"><Clock size={12} /> Pending</span>;
+                return <span className="status-badge status-upcoming"><Clock size={12} /> Upcoming</span>;
             default:
                 return null;
         }
@@ -336,15 +405,16 @@ const StudentDashboard = () => {
                             </div>
                         )}
                         {!scheduleLoading && !scheduleError && todaySchedule.length === 0 && (
-                            <div className="empty-state">No schedule available.</div>
+                            <div className="empty-state">No classes scheduled for today.</div>
                         )}
                         {!scheduleLoading && !scheduleError && todaySchedule.map((item) => (
                             <div key={item.id} className={`schedule-item ${item.status === 'now' ? 'current' : ''}`}>
                                 <div className="schedule-time">
-                                    <span className="schedule-time-text">{item.time}</span>
+                                    <span className="schedule-time-text">{formatHourMinute(item.start_time)}</span>
+                                    <span className="schedule-time-end">{formatHourMinute(item.end_time)}</span>
                                 </div>
                                 <div className="schedule-details">
-                                    <div className="schedule-subject">{item.subject}</div>
+                                    <div className="schedule-subject">{item.course_name || item.subject}</div>
                                     <div className="schedule-meta">
                                         {item.teacher_name || 'Teacher'} • {item.room || 'Room TBD'}
                                     </div>
@@ -356,57 +426,38 @@ const StudentDashboard = () => {
                 </div>
 
                 <div className="dashboard-side-column">
-                    <div className="dashboard-card attendance-widget">
-                        <div className="card-header">
-                            <h2 className="card-title">
-                                <Calendar size={20} />
-                                {t('student.dashboard.attendance') || 'Attendance'}
-                            </h2>
-                        </div>
-                        <div className="attendance-ring-container">
-                            <div className="attendance-ring">
-                                <svg viewBox="0 0 100 100">
-                                    <circle
-                                        cx="50"
-                                        cy="50"
-                                        r="40"
-                                        fill="none"
-                                        stroke="#e0f2fe"
-                                        strokeWidth="10"
-                                    />
-                                    <circle
-                                        cx="50"
-                                        cy="50"
-                                        r="40"
-                                        fill="none"
-                                        stroke="url(#gradient)"
-                                        strokeWidth="10"
-                                        strokeLinecap="round"
-                                        strokeDasharray={`${stats.attendance * 2.51} 251`}
-                                        transform="rotate(-90 50 50)"
-                                    />
-                                    <defs>
-                                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                            <stop offset="0%" stopColor="#0891b2" />
-                                            <stop offset="100%" stopColor="#06b6d4" />
-                                        </linearGradient>
-                                    </defs>
-                                </svg>
-                                <div className="attendance-ring-value">
-                                    <span className="attendance-percentage">{stats.attendance}%</span>
-                                    <span className="attendance-label">Present</span>
-                                </div>
+                    <div className="dashboard-card student-profile-card">
+                        <div className="student-profile-top">
+                            <div className="student-profile-avatar">
+                                {getInitials(profileCard.fullName)}
+                            </div>
+                            <div className="student-profile-meta">
+                                <h3>{profileCard.fullName}</h3>
+                                <p>{profileCard.email}</p>
+                                <span className="student-profile-pill">{profileCard.gradeText} • {profileCard.classroomText}</span>
                             </div>
                         </div>
-                        <div className="attendance-stats">
-                            <div className="attendance-stat">
-                                <span className="attendance-stat-value text-success">{attendance?.by_status?.present || 0}</span>
-                                <span className="attendance-stat-label">Days Present</span>
+
+                        <div className="student-profile-lines">
+                            <div className="student-profile-line school">
+                                <Building2 size={15} />
+                                <span>{profileCard.schoolName}</span>
                             </div>
-                            <div className="attendance-stat">
-                                <span className="attendance-stat-value text-danger">{attendance?.by_status?.absent || 0}</span>
-                                <span className="attendance-stat-label">Days Absent</span>
+                            <div className="student-profile-line">
+                                <User size={15} />
+                                <span>{profileCard.homeroomTeacher} (Homeroom Teacher)</span>
                             </div>
+                        </div>
+
+                        <div className="student-profile-badges">
+                            <span className="student-profile-badge gpa">
+                                <Award size={13} />
+                                GPA: {stats.gpa}
+                            </span>
+                            <span className="student-profile-badge attendance">
+                                <Calendar size={13} />
+                                Att: {stats.attendance}%
+                            </span>
                         </div>
                     </div>
 
@@ -487,80 +538,113 @@ const StudentDashboard = () => {
                                 </div>
                             )}
 
-                            {!notifLoading && notifications.map((notification) => (
-                                <div
-                                    key={notification.id}
-                                    style={{
-                                        padding: '1.5rem',
-                                        borderBottom: '1px solid var(--color-border)',
-                                        display: 'flex',
-                                        gap: '1.25rem',
-                                        backgroundColor: notification.is_read ? 'transparent' : 'rgba(var(--color-primary-rgb), 0.03)',
-                                        position: 'relative',
-                                        transition: 'all 0.2s ease'
-                                    }}
-                                >
-                                    {!notification.is_read && (
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                top: 0,
-                                                bottom: 0,
-                                                width: '4px',
-                                                background: 'var(--color-primary)'
-                                            }}
-                                        />
-                                    )}
+                            {!notifLoading && notifications.map((notification) => {
+                                const config = getNotifConfig(notification.notification_type);
+                                const Icon = config.icon;
+                                return (
                                     <div
+                                        key={notification.id}
+                                        onClick={() => handleNotificationClick(notification)}
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                handleNotificationClick(notification);
+                                            }
+                                        }}
                                         style={{
-                                            width: '44px',
-                                            height: '44px',
-                                            borderRadius: '12px',
-                                            background: 'var(--color-bg-body)',
+                                            padding: '1rem 1rem 1rem 1.2rem',
+                                            borderBottom: '1px solid var(--color-border)',
                                             display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: 'var(--color-primary)',
-                                            flexShrink: 0
+                                            gap: '0.9rem',
+                                            backgroundColor: notification.is_read ? 'transparent' : `${config.bg}66`,
+                                            position: 'relative',
+                                            transition: 'all 0.2s ease',
+                                            cursor: 'pointer'
                                         }}
                                     >
-                                        <Bell size={22} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', gap: '1rem' }}>
-                                            <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-main)', margin: 0 }}>
-                                                {notification.title || 'Notification'}
-                                            </h4>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Clock size={14} />
-                                                {new Date(notification.created_at).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                        <p style={{ fontSize: '0.925rem', color: 'var(--color-text-muted)', margin: '0.5rem 0 0', lineHeight: '1.5' }}>
-                                            {notification.message || notification.content}
-                                        </p>
                                         {!notification.is_read && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleMarkRead(notification.id)}
+                                            <div
                                                 style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    padding: 0,
-                                                    color: 'var(--color-primary)',
-                                                    fontSize: '0.875rem',
-                                                    fontWeight: 500,
-                                                    cursor: 'pointer',
-                                                    marginTop: '0.5rem'
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    top: 0,
+                                                    bottom: 0,
+                                                    width: '4px',
+                                                    background: config.color
                                                 }}
-                                            >
-                                                Mark as read
-                                            </button>
+                                            />
                                         )}
+                                        <div
+                                            style={{
+                                                width: '38px',
+                                                height: '38px',
+                                                borderRadius: '10px',
+                                                background: config.bg,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: config.color,
+                                                flexShrink: 0
+                                            }}
+                                        >
+                                            <Icon size={18} />
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.7rem' }}>
+                                                <h4 style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-text-main)', margin: 0 }}>
+                                                    {notification.title || 'Notification'}
+                                                </h4>
+                                                <span
+                                                    style={{
+                                                        fontSize: '0.68rem',
+                                                        fontWeight: 700,
+                                                        color: config.color,
+                                                        background: config.bg,
+                                                        borderRadius: '999px',
+                                                        padding: '0.2rem 0.45rem',
+                                                        height: 'fit-content',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.03em'
+                                                    }}
+                                                >
+                                                    {config.label}
+                                                </span>
+                                            </div>
+                                            <p style={{ fontSize: '0.845rem', color: 'var(--color-text-muted)', margin: '0.35rem 0 0', lineHeight: '1.45' }}>
+                                                {notification.message || notification.content}
+                                            </p>
+                                            <div style={{ marginTop: '0.45rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Clock size={13} />
+                                                    {new Date(notification.created_at).toLocaleDateString()}
+                                                </span>
+                                                {!notification.is_read && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            handleMarkRead(notification.id);
+                                                        }}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            padding: 0,
+                                                            color: config.color,
+                                                            fontSize: '0.79rem',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        Mark as read
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 

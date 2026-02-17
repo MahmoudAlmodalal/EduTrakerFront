@@ -1,4 +1,8 @@
-import { api } from '../utils/api';
+import { api, apiClient } from '../utils/api';
+
+const sanitizeParams = (filters = {}) => Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
+);
 
 const studentService = {
     // Get dashboard statistics
@@ -17,6 +21,7 @@ const studentService = {
         const coursesData = stats?.courses?.courses || [];
 
         return coursesData.map((course) => ({
+            course_allocation_id: course.course_allocation_id,
             id: course.course_id,
             classroom_id: course.classroom_id,
             name: course.course_name,
@@ -49,14 +54,16 @@ const studentService = {
     },
 
     // Get student schedule
-    getSchedule: async (studentId) => {
-        return api.get(`/manager/students/${studentId}/schedule/`);
+    getSchedule: async (studentId, filters = {}) => {
+        return api.get(`/student/students/${studentId}/schedule/`, { params: sanitizeParams(filters) });
     },
 
     // Get assignments
     getAssignments: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/student/assignments/${queryParams ? `?${queryParams}` : ''}`);
+        return api.get('/student/assignments/', { params: sanitizeParams(filters) });
+    },
+    getAssignmentDetail: async (assignmentId) => {
+        return api.get(`/student/assignments/${assignmentId}/`);
     },
     submitAssignment: async (assignmentId, file) => {
         const formData = new FormData();
@@ -78,8 +85,32 @@ const studentService = {
 
     // Get learning materials
     getLearningMaterials: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/teacher/learning-materials/?${queryParams}`);
+        return api.get('/teacher/learning-materials/', { params: sanitizeParams(filters) });
+    },
+    getLessonPlans: async (filters = {}) => {
+        return api.get('/teacher/lesson-plans/', { params: sanitizeParams(filters) });
+    },
+    getTeacherInfo: async (allocationId) => {
+        return api.get(`/teacher/allocations/${allocationId}/`);
+    },
+    downloadMaterial: async (material) => {
+        const blob = await apiClient.get(
+            `/teacher/learning-materials/${material.id}/download/`,
+            { responseType: 'blob' }
+        );
+
+        const blobUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        const title = (material?.title || 'material').trim();
+        const rawType = material?.file_type || '';
+        const normalizedType = rawType.includes('/') ? rawType.split('/').pop() : rawType;
+        const extension = normalizedType ? `.${normalizedType.replace(/^\./, '')}` : '';
+        anchor.download = title.endsWith(extension) || !extension ? title : `${title}${extension}`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(blobUrl);
     },
 
     // Messages
