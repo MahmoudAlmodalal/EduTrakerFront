@@ -12,7 +12,8 @@ import {
     Building,
     UserCheck,
     Trash2,
-    Copy
+    Copy,
+    UserPlus,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -1562,14 +1563,17 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
     const [togglingAllocationId, setTogglingAllocationId] = useState(null);
     const [allocationStatusOverrides, setAllocationStatusOverrides] = useState({});
 
+    /* Collect all unique classroom names across all courses */
     const classroomOptions = useMemo(() => {
-        return Array.from(
-            new Set(
-                courses
-                    .map((course) => course.classroom_name)
-                    .filter(Boolean)
-            )
-        ).sort((a, b) => a.localeCompare(b));
+        const names = new Set();
+        courses.forEach((course) => {
+            (course.all_classrooms || []).forEach((c) => {
+                if (c.classroom_name) names.add(c.classroom_name);
+            });
+            // fallback for older API responses
+            if (course.classroom_name) names.add(course.classroom_name);
+        });
+        return Array.from(names).sort((a, b) => a.localeCompare(b));
     }, [courses]);
 
     const teacherOptions = useMemo(() => {
@@ -1585,7 +1589,8 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
 
     const filteredCourses = useMemo(() => {
         return courses.filter((course) => {
-            const matchesClassroom = !classroomFilter || (course.classroom_name || '') === classroomFilter;
+            const classrooms = course.all_classrooms || [];
+            const matchesClassroom = !classroomFilter || classrooms.some((c) => c.classroom_name === classroomFilter);
             const matchesTeacher = !teacherFilter || (course.teacher_name || '') === teacherFilter;
             return matchesClassroom && matchesTeacher;
         });
@@ -1619,7 +1624,11 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
             return;
         }
         setSelectedCourse(course);
-        setSelectedTeacher('');
+        // Pre-select the currently assigned teacher if any
+        const currentTeacher = teachers.find(
+            (t) => t.full_name === course.teacher_name
+        );
+        setSelectedTeacher(currentTeacher ? String(currentTeacher.user_id || currentTeacher.id) : '');
         setIsAssignModalOpen(true);
     };
 
@@ -1685,7 +1694,13 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <h3 className="chart-title">Teacher Allocations</h3>
+                <div>
+                    <h3 className="chart-title" style={{ marginBottom: '0.2rem' }}>Teacher Allocations</h3>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                        Click <strong>Assign Teacher</strong> on any subject row to assign or change the teacher.
+                        Classroom badges show per-classroom status — click to toggle.
+                    </p>
+                </div>
                 <div className="sm-inline-controls sm-allocation-filters">
                     <select
                         className="sm-form-select sm-select-control"
@@ -1731,65 +1746,137 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                         <tr>
                             <th>Subject</th>
                             <th>Grade</th>
-                            <th>Classroom Name</th>
                             <th>Assigned Teacher</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>Classrooms & Status</th>
+                            <th style={{ textAlign: 'center' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {courses.length === 0 ? (
                             <tr>
-                                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
                                     No subjects found. Configure subjects first.
                                 </td>
                             </tr>
                         ) : filteredCourses.length === 0 ? (
                             <tr>
-                                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
                                     No allocations match the selected filters.
                                 </td>
                             </tr>
                         ) : paginatedAllocations.map((item) => {
-                            const hasAllocation = Boolean(item.allocation_id);
-                            const isAllocationActive = hasAllocation
-                                ? (allocationStatusOverrides[item.allocation_id] ?? (item.allocation_is_active !== false))
-                                : null;
+                            const allClassrooms = item.all_classrooms || [];
+                            const hasAnyAllocation = allClassrooms.length > 0;
+
+                            /* Count active classrooms (respect local overrides) */
+                            const activeCount = allClassrooms.filter((c) =>
+                                allocationStatusOverrides[c.allocation_id] !== undefined
+                                    ? allocationStatusOverrides[c.allocation_id]
+                                    : c.is_active
+                            ).length;
+
                             return (
                             <tr key={item.id} className={item.is_active ? '' : 'inactive-row'}>
-                                <td>{item.name}</td>
-                                <td>{item.grade_name || item.grade}</td>
-                                <td>{item.classroom_name || 'Not Allocated'}</td>
-                                <td>{item.teacher_name || 'Unassigned'}</td>
                                 <td>
-                                    <span
-                                        className={`status-badge ${hasAllocation ? (isAllocationActive ? 'status-active' : 'status-inactive') : 'status-inactive'}`}
-                                        onClick={() => handleStatusBadgeToggle(item)}
-                                        style={{
-                                            cursor: hasAllocation && togglingAllocationId !== item.allocation_id ? 'pointer' : (hasAllocation ? 'wait' : 'not-allowed'),
-                                            opacity: togglingAllocationId === item.allocation_id ? 0.75 : (hasAllocation ? 1 : 0.7)
-                                        }}
-                                        title={
-                                            hasAllocation
-                                                ? (togglingAllocationId === item.allocation_id ? 'Updating status...' : 'Click to toggle status')
-                                                : 'No allocation to toggle'
-                                        }
-                                    >
-                                        {togglingAllocationId === item.allocation_id
-                                            ? 'Updating...'
-                                            : (hasAllocation ? (isAllocationActive ? 'Active' : 'Inactive') : 'Not Allocated')}
-                                    </span>
+                                    <div style={{ fontWeight: 600 }}>{item.name}</div>
+                                    {item.course_code && (
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                            {item.course_code}
+                                        </div>
+                                    )}
                                 </td>
+                                <td>{item.grade_name || item.grade}</td>
+
+                                {/* Assigned Teacher */}
                                 <td>
-                                    <RowActions
-                                        isActive={hasAllocation ? isAllocationActive : false}
-                                        onUpdate={() => handleOpenAssign(item)}
-                                        onActivate={() => setPendingStatusAction({ course: item, nextIsActive: true })}
-                                        onDeactivate={() => setPendingStatusAction({ course: item, nextIsActive: false })}
-                                        updateTitle="Update Allocation"
-                                        activateTitle="Activate Allocation"
-                                        deactivateTitle="Deactivate Allocation"
-                                    />
+                                    {item.teacher_name ? (
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 500 }}>
+                                            <UserCheck size={14} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                                            {item.teacher_name}
+                                        </span>
+                                    ) : (
+                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                                            Unassigned
+                                        </span>
+                                    )}
+                                </td>
+
+                                {/* Classrooms & Status — one clickable chip per classroom */}
+                                <td>
+                                    {!hasAnyAllocation ? (
+                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.82rem', fontStyle: 'italic' }}>
+                                            No classrooms allocated
+                                        </span>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                                            {allClassrooms.map((cls) => {
+                                                const resolvedActive = allocationStatusOverrides[cls.allocation_id] !== undefined
+                                                    ? allocationStatusOverrides[cls.allocation_id]
+                                                    : cls.is_active;
+                                                const isToggling = togglingAllocationId === cls.allocation_id;
+                                                return (
+                                                    <span
+                                                        key={cls.allocation_id}
+                                                        onClick={() => !isToggling && handleStatusBadgeToggle({
+                                                            ...item,
+                                                            allocation_id: cls.allocation_id,
+                                                            allocation_is_active: cls.is_active,
+                                                        })}
+                                                        title={isToggling ? 'Updating…' : (resolvedActive ? 'Active — click to deactivate' : 'Inactive — click to activate')}
+                                                        style={{
+                                                            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                                            padding: '0.22rem 0.55rem', borderRadius: '999px',
+                                                            fontSize: '0.78rem', fontWeight: 600,
+                                                            cursor: isToggling ? 'wait' : 'pointer',
+                                                            opacity: isToggling ? 0.65 : 1,
+                                                            transition: 'all .12s',
+                                                            background: resolvedActive ? '#dcfce7' : 'var(--color-bg-body)',
+                                                            color: resolvedActive ? '#16a34a' : 'var(--color-text-muted)',
+                                                            border: resolvedActive ? '1px solid #86efac' : '1px solid var(--color-border)',
+                                                            userSelect: 'none',
+                                                        }}
+                                                    >
+                                                        <span style={{
+                                                            width: 6, height: 6, borderRadius: '50%',
+                                                            background: 'currentColor', flexShrink: 0,
+                                                        }} />
+                                                        {isToggling ? '…' : cls.classroom_name}
+                                                    </span>
+                                                );
+                                            })}
+                                            {/* Summary label */}
+                                            <span style={{
+                                                fontSize: '0.73rem', color: 'var(--color-text-muted)',
+                                                marginLeft: '0.1rem',
+                                            }}>
+                                                {activeCount}/{allClassrooms.length} active
+                                            </span>
+                                        </div>
+                                    )}
+                                </td>
+
+                                {/* Actions */}
+                                <td style={{ textAlign: 'center' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenAssign(item)}
+                                        disabled={!item.is_active}
+                                        title={!item.is_active ? 'Subject is inactive' : (item.teacher_name ? 'Change teacher assignment' : 'Assign a teacher to this subject')}
+                                        style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                                            padding: '0.38rem 0.8rem', borderRadius: '0.5rem',
+                                            fontSize: '0.8rem', fontWeight: 600, cursor: item.is_active ? 'pointer' : 'not-allowed',
+                                            opacity: item.is_active ? 1 : 0.45,
+                                            border: '1.5px solid var(--color-primary)',
+                                            background: item.teacher_name ? 'transparent' : 'var(--color-primary)',
+                                            color: item.teacher_name ? 'var(--color-primary)' : '#fff',
+                                            transition: 'all .15s',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        <UserPlus size={14} />
+                                        {item.teacher_name ? 'Change Teacher' : 'Assign Teacher'}
+                                    </button>
                                 </td>
                             </tr>
                         )})}
@@ -1824,10 +1911,34 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                 </div>
             </Modal>
 
-            <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title="Assign Teacher">
-                <p style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--color-text-muted)' }}>
-                    Assigning teacher for <strong>{selectedCourse?.name} ({selectedCourse?.grade_name})</strong>
-                </p>
+            <Modal
+                isOpen={isAssignModalOpen}
+                onClose={() => setIsAssignModalOpen(false)}
+                title={selectedCourse?.teacher_name ? 'Change Teacher Assignment' : 'Assign Teacher'}
+            >
+                <div style={{ marginTop: 0, marginBottom: '1rem' }}>
+                    <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+                        Subject: <strong style={{ color: 'var(--color-text-main)' }}>
+                            {selectedCourse?.name}
+                        </strong>
+                        &nbsp;·&nbsp;Grade: <strong style={{ color: 'var(--color-text-main)' }}>
+                            {selectedCourse?.grade_name}
+                        </strong>
+                    </p>
+                    {selectedCourse?.teacher_name && (
+                        <p style={{ margin: '0.4rem 0 0', fontSize: '0.83rem', color: 'var(--color-text-muted)' }}>
+                            Currently assigned to: <strong style={{ color: 'var(--color-text-main)' }}>
+                                {selectedCourse.teacher_name}
+                            </strong>
+                        </p>
+                    )}
+                    {(selectedCourse?.all_classrooms || []).length > 0 && (
+                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                            Will be assigned to {selectedCourse.all_classrooms.length} classroom(s):&nbsp;
+                            {selectedCourse.all_classrooms.map((c) => c.classroom_name).join(', ')}
+                        </p>
+                    )}
+                </div>
                 <form onSubmit={handleAssign} className="sm-modal-form">
                     <div className="sm-form-field">
                         <label className="sm-form-label">Select Teacher</label>

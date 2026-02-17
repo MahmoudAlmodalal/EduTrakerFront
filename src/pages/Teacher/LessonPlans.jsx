@@ -350,7 +350,7 @@ const LessonPlans = () => {
                     <select
                         value={timeFilter}
                         onChange={(event) => setTimeFilter(event.target.value)}
-                        style={{ border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.5rem 0.65rem', fontSize: '0.85rem' }}
+                        style={{ border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.5rem 0.65rem', fontSize: '0.85rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                     >
                         <option value="all">All plans</option>
                         <option value="week">This week</option>
@@ -371,7 +371,7 @@ const LessonPlans = () => {
                         }
 
                         return (
-                            <div key={plan.id} style={{ border: '1px solid var(--color-border)', borderRadius: '0.85rem', background: '#fff', padding: '0.85rem 0.95rem' }}>
+                            <div key={plan.id} style={{ border: '1px solid var(--color-border)', borderRadius: '0.85rem', background: 'var(--color-bg-surface)', padding: '0.85rem 0.95rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                                     <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{plan.title}</h4>
                                     <span
@@ -446,7 +446,7 @@ const LessonPlans = () => {
                                         required
                                         value={lessonForm.title}
                                         onChange={(event) => setLessonForm((prev) => ({ ...prev, title: event.target.value }))}
-                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
                                 </div>
                                 <div>
@@ -456,7 +456,7 @@ const LessonPlans = () => {
                                         required
                                         value={lessonForm.weekStartDate}
                                         onChange={(event) => setLessonForm((prev) => ({ ...prev, weekStartDate: event.target.value }))}
-                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
                                 </div>
                             </div>
@@ -467,9 +467,11 @@ const LessonPlans = () => {
                                     value={lessonForm.allocationId}
                                     onChange={(event) => setLessonForm((prev) => ({ ...prev, allocationId: event.target.value }))}
                                     required
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 >
-                                    <option value="">Select allocation</option>
+                                    <option value="">
+                                        {loadingAllocations ? 'Loading classes…' : allocations.length === 0 ? 'No classes found' : 'Select a class'}
+                                    </option>
                                     {allocations.map((allocation) => (
                                         <option key={allocation.id} value={String(allocation.id)}>
                                             {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
@@ -484,7 +486,7 @@ const LessonPlans = () => {
                                     rows={3}
                                     value={lessonForm.objectives}
                                     onChange={(event) => setLessonForm((prev) => ({ ...prev, objectives: event.target.value }))}
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 />
                             </div>
 
@@ -494,7 +496,7 @@ const LessonPlans = () => {
                                     rows={4}
                                     value={lessonForm.activities}
                                     onChange={(event) => setLessonForm((prev) => ({ ...prev, activities: event.target.value }))}
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 />
                             </div>
 
@@ -505,7 +507,7 @@ const LessonPlans = () => {
                                         rows={3}
                                         value={lessonForm.resources}
                                         onChange={(event) => setLessonForm((prev) => ({ ...prev, resources: event.target.value }))}
-                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
                                 </div>
                                 <div>
@@ -514,7 +516,7 @@ const LessonPlans = () => {
                                         rows={3}
                                         value={lessonForm.notes}
                                         onChange={(event) => setLessonForm((prev) => ({ ...prev, notes: event.target.value }))}
-                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                     />
                                 </div>
                             </div>
@@ -550,7 +552,7 @@ const LessonPlans = () => {
                                     value={materialForm.title}
                                     onChange={(event) => setMaterialForm((prev) => ({ ...prev, title: event.target.value }))}
                                     required
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 />
                             </div>
                             <div>
@@ -559,9 +561,11 @@ const LessonPlans = () => {
                                     value={materialForm.allocationId}
                                     onChange={(event) => setMaterialForm((prev) => ({ ...prev, allocationId: event.target.value }))}
                                     required
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 >
-                                    <option value="">Select allocation</option>
+                                    <option value="">
+                                        {loadingAllocations ? 'Loading classes…' : allocations.length === 0 ? 'No classes found' : 'Select a class'}
+                                    </option>
                                     {allocations.map((allocation) => (
                                         <option key={allocation.id} value={String(allocation.id)}>
                                             {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
@@ -577,7 +581,7 @@ const LessonPlans = () => {
                                 rows={3}
                                 value={materialForm.description}
                                 onChange={(event) => setMaterialForm((prev) => ({ ...prev, description: event.target.value }))}
-                                style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                             />
                         </div>
 
@@ -619,7 +623,7 @@ const LessonPlans = () => {
                             const MaterialIcon = getFileTypeIcon(material.file_type || '');
 
                             return (
-                                <div key={material.id} style={{ border: '1px solid var(--color-border)', borderRadius: '0.75rem', background: '#fff', padding: '0.75rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                                <div key={material.id} style={{ border: '1px solid var(--color-border)', borderRadius: '0.75rem', background: 'var(--color-bg-surface)', padding: '0.75rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
                                         <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--color-bg-body)', display: 'grid', placeItems: 'center', color: 'var(--color-primary)', flexShrink: 0 }}>
                                             <MaterialIcon size={16} />

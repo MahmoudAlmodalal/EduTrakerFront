@@ -192,6 +192,11 @@ const Assessments = () => {
     ), [assignmentDetails]);
 
     const getAllocationLabel = useCallback((assignment) => {
+        // Prefer the fields now returned directly by the serializer
+        if (assignment?.classroom_name && assignment?.course_name) {
+            return `${assignment.classroom_name} • ${assignment.course_name}`;
+        }
+
         const allocationId = Number(getAllocationId(assignment));
         const allocation = allocations.find((item) => item.id === allocationId);
 
@@ -199,7 +204,7 @@ const Assessments = () => {
             return `${allocation.classroom_name || allocation.class || 'Class'} • ${allocation.course_name || allocation.subject || 'Subject'}`;
         }
 
-        return 'Unassigned class';
+        return 'All my classes';
     }, [allocations, getAllocationId]);
 
     const filteredAllocations = useMemo(() => {
@@ -478,7 +483,9 @@ const Assessments = () => {
                                 border: '1px solid var(--color-border)',
                                 borderRadius: '0.55rem',
                                 padding: '0.55rem 0.65rem 0.55rem 2rem',
-                                fontSize: '0.85rem'
+                                fontSize: '0.85rem',
+                                background: 'var(--color-bg-surface)',
+                                color: 'var(--color-text-main)',
                             }}
                         />
                     </div>
@@ -491,10 +498,12 @@ const Assessments = () => {
                             borderRadius: '0.55rem',
                             padding: '0.55rem 0.65rem',
                             fontSize: '0.85rem',
-                            minWidth: '220px'
+                            minWidth: '220px',
+                            background: 'var(--color-bg-surface)',
+                            color: 'var(--color-text-main)',
                         }}
                     >
-                        <option value="all">All allocations</option>
+                        <option value="all">All classes</option>
                         {allocations.map((allocation) => (
                             <option key={allocation.id} value={String(allocation.id)}>
                                 {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
@@ -510,7 +519,9 @@ const Assessments = () => {
                             borderRadius: '0.55rem',
                             padding: '0.55rem 0.65rem',
                             fontSize: '0.85rem',
-                            minWidth: '150px'
+                            minWidth: '150px',
+                            background: 'var(--color-bg-surface)',
+                            color: 'var(--color-text-main)',
                         }}
                     >
                         <option value="all">All status</option>
@@ -647,7 +658,7 @@ const Assessments = () => {
                                     value={assignmentForm.title}
                                     onChange={(event) => setAssignmentForm((prev) => ({ ...prev, title: event.target.value }))}
                                     required
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 />
                             </div>
 
@@ -659,7 +670,7 @@ const Assessments = () => {
                                     rows={4}
                                     value={assignmentForm.description}
                                     onChange={(event) => setAssignmentForm((prev) => ({ ...prev, description: event.target.value }))}
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 />
                             </div>
 
@@ -677,9 +688,9 @@ const Assessments = () => {
                                 <select
                                     value={assignmentForm.allocationId}
                                     onChange={(event) => setAssignmentForm((prev) => ({ ...prev, allocationId: event.target.value }))}
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
+                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 >
-                                    <option value="">Select allocation</option>
+                                    <option value="">All my classes (no specific class)</option>
                                     {filteredAllocations.map((allocation) => (
                                         <option key={allocation.id} value={String(allocation.id)}>
                                             {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}

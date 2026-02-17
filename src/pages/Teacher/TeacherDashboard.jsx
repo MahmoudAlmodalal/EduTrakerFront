@@ -104,7 +104,7 @@ const TeacherDashboard = () => {
 
     const dashboardCards = useMemo(() => ([
         {
-            label: homeroomClassroomName ? `Homeroom: ${homeroomClassroomName}` : 'Total Students',
+            label: homeroomClassroomName ? `Homeroom — ${homeroomClassroomName}` : 'Homeroom Students',
             value: homeroomStudentCount,
             icon: Users
         },
@@ -119,16 +119,13 @@ const TeacherDashboard = () => {
             icon: ClipboardCheck
         },
         {
-            label: 'Average Attendance %',
+            label: 'Avg Attendance Today (Homeroom)',
             value: `${Math.round(Number(stats.average_attendance || 0))}%`,
             icon: CheckCircle2
         },
         {
             label: 'Lesson Plans (This Week)',
-            value: stats.lesson_plans_this_week
-                ?? stats.weekly_lesson_plans
-                ?? stats.lesson_plan_count
-                ?? 0,
+            value: stats.lesson_plans_this_week ?? 0,
             icon: BookOpen
         }
     ]), [schedule.length, stats, homeroomStudentCount, homeroomClassroomName]);

@@ -20,13 +20,20 @@ const teacherService = {
         return api.patch(`/teacher/teachers/${id}/`, data);
     },
 
-    // Course Allocations / Classes
+    // Schedule (ClassSchedule entries – day_of_week + real times)
     getSchedule: async (date = todayDate()) => {
         return api.get('/teacher/schedule/', { params: { date } });
     },
+    createScheduleSlot: async (data) => {
+        return api.post('/teacher/schedule/', data);
+    },
+    deleteScheduleSlot: async (id) => {
+        return api.delete(`/teacher/schedule/${id}/`);
+    },
 
-    getCourseAllocations: async (date = todayDate()) => {
-        return teacherService.getSchedule(date);
+    // All course allocations for this teacher (no date/day filter)
+    getCourseAllocations: async () => {
+        return api.get('/teacher/allocations/');
     },
 
     getStudents: async (filters = {}) => {
