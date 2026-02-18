@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Calendar,
     CheckCircle,
@@ -39,16 +39,30 @@ const SecretaryAttendance = () => {
         dateTo: initialDate,
         statusFilter: '',
     });
+    const attendanceRequestRef = useRef(0);
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            setDebouncedFilters({ dateFrom, dateTo, statusFilter });
+            setDebouncedFilters((previous) => {
+                if (
+                    previous.dateFrom === dateFrom
+                    && previous.dateTo === dateTo
+                    && previous.statusFilter === statusFilter
+                ) {
+                    return previous;
+                }
+
+                return { dateFrom, dateTo, statusFilter };
+            });
         }, 350);
 
         return () => clearTimeout(timer);
     }, [dateFrom, dateTo, statusFilter]);
 
     const fetchAttendance = useCallback(async (filters) => {
+        const requestId = attendanceRequestRef.current + 1;
+        attendanceRequestRef.current = requestId;
+
         try {
             setLoading(true);
             setError('');
@@ -59,12 +73,21 @@ const SecretaryAttendance = () => {
             if (filters.statusFilter) params.status = filters.statusFilter;
 
             const data = await secretaryService.getAttendance(params);
+            if (attendanceRequestRef.current !== requestId) {
+                return;
+            }
             setRecords(data.results || data || []);
+            setError('');
         } catch (err) {
+            if (attendanceRequestRef.current !== requestId) {
+                return;
+            }
             console.error('Error fetching attendance:', err);
             setError('Failed to load attendance records.');
         } finally {
-            setLoading(false);
+            if (attendanceRequestRef.current === requestId) {
+                setLoading(false);
+            }
         }
     }, []);
 
@@ -188,7 +211,7 @@ const SecretaryAttendance = () => {
                 </div>
 
                 <div className="sec-table-wrap">
-                    {loading ? (
+                    {loading && records.length === 0 ? (
                         <SkeletonTable rows={6} cols={7} />
                     ) : (
                         <div className="sec-table-scroll">

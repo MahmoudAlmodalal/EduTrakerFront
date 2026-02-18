@@ -2,12 +2,25 @@ import React from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const normalizeRole = (role) => {
+    if (role === null || role === undefined) {
+        return '';
+    }
+
+    return String(role).trim().toUpperCase();
+};
+
 const ProtectedRoute = ({ allowedRoles = [] }) => {
     const { user } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
+    const normalizedAllowedRoles = React.useMemo(
+        () => allowedRoles.map(normalizeRole),
+        [allowedRoles]
+    );
+    const normalizedUserRole = normalizeRole(user?.role);
 
-    const resolveLoginPath = () => {
+    const resolveLoginPath = React.useCallback(() => {
         const portalType =
             localStorage.getItem('portalType') || localStorage.getItem('lastPortalType');
         const workstreamSlug =
@@ -20,7 +33,7 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
         return shouldUseWorkstreamLogin
             ? `/login/workstream/${workstreamSlug}`
             : '/login/portal';
-    };
+    }, [location.pathname]);
 
     React.useEffect(() => {
         if (!user) return;
@@ -46,13 +59,13 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
         return () => {
             window.removeEventListener('popstate', handleBackNavigation);
         };
-    }, [location.pathname, navigate, user]);
+    }, [location.pathname, navigate, resolveLoginPath, user]);
 
     if (!user) {
         return <Navigate to={resolveLoginPath()} replace />;
     }
 
-    if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    if (normalizedAllowedRoles.length > 0 && !normalizedAllowedRoles.includes(normalizedUserRole)) {
         return <Navigate to="/unauthorized" replace />;
     }
 

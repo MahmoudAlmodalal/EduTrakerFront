@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import {
     useGradeAssignmentSubmissionMutation,
     usePublishAssignmentGradesMutation,
+    useRecordTeacherMarkMutation,
     useTeacherAssignmentSubmissions
 } from '../../hooks/useTeacherQueries';
 import './Teacher.css';
@@ -38,6 +39,7 @@ const AssignmentSubmissions = () => {
     });
 
     const gradeMutation = useGradeAssignmentSubmissionMutation();
+    const recordMarkMutation = useRecordTeacherMarkMutation();
     const publishMutation = usePublishAssignmentGradesMutation();
 
     const assignment = data?.assignment || null;
@@ -54,11 +56,12 @@ const AssignmentSubmissions = () => {
             : row.status.charAt(0).toUpperCase() + row.status.slice(1)
     })), [students]);
 
+    const gradedCount = useMemo(
+        () => tableRows.filter((r) => r.score != null).length,
+        [tableRows]
+    );
+
     const openGradeModal = (row) => {
-        if (!row?.submission_id) {
-            toast.error('No submission file found for this student.');
-            return;
-        }
         setSelectedRow(row);
         setScore(row.score ?? '');
         setFeedback(row.feedback ?? '');
@@ -72,7 +75,7 @@ const AssignmentSubmissions = () => {
 
     const handleSaveGrade = async (event) => {
         event.preventDefault();
-        if (!selectedRow?.submission_id) {
+        if (!selectedRow) {
             return;
         }
         if (score === '' || score === null) {
@@ -81,14 +84,25 @@ const AssignmentSubmissions = () => {
         }
 
         try {
-            await gradeMutation.mutateAsync({
-                assignmentId,
-                submissionId: selectedRow.submission_id,
-                payload: {
+            if (selectedRow.submission_id) {
+                // Student submitted — use submission grade endpoint
+                await gradeMutation.mutateAsync({
+                    assignmentId,
+                    submissionId: selectedRow.submission_id,
+                    payload: {
+                        score: Number(score),
+                        feedback: feedback || ''
+                    }
+                });
+            } else {
+                // No submission — record mark directly
+                await recordMarkMutation.mutateAsync({
+                    assignment_id: assignmentId,
+                    student_id: selectedRow.student_id,
                     score: Number(score),
                     feedback: feedback || ''
-                }
-            });
+                });
+            }
             toast.success('Grade saved.');
             closeGradeModal();
         } catch (error) {
@@ -108,6 +122,8 @@ const AssignmentSubmissions = () => {
         }
     };
 
+    const isSaving = gradeMutation.isPending || recordMarkMutation.isPending;
+
     return (
         <div className="teacher-page">
             <div className="teacher-header">
@@ -126,20 +142,7 @@ const AssignmentSubmissions = () => {
                         {assignment?.assignment_type || 'Assignment'} • Due {formatDateTime(assignment?.due_date)} • Full Mark {assignment?.full_mark || '—'}
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-                    <span
-                        style={{
-                            alignSelf: 'center',
-                            borderRadius: '999px',
-                            padding: '0.25rem 0.65rem',
-                            background: '#e2e8f0',
-                            color: '#1e293b',
-                            fontSize: '0.78rem',
-                            fontWeight: 700
-                        }}
-                    >
-                        Submitted: {submittedCount} / {totalStudents}
-                    </span>
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     {assignment?.attachment_file_url && (
                         <a
                             href={assignment.attachment_file_url}
@@ -160,6 +163,36 @@ const AssignmentSubmissions = () => {
                         {published ? <EyeOff size={15} /> : <Eye size={15} />}
                         {published ? 'Hide Grades' : 'Publish Grades'}
                     </button>
+                </div>
+            </div>
+
+            {/* Stats bar */}
+            <div className="management-card" style={{ padding: '0.85rem 1.25rem', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
+                    <div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Submitted</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                            {submittedCount} / {totalStudents}
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Graded</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#059669' }}>
+                            {gradedCount}
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pending</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#d97706' }}>
+                            {totalStudents - gradedCount}
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Grades Visible</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: published ? '#059669' : '#94a3b8' }}>
+                            {published ? 'Yes' : 'No'}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -199,8 +232,24 @@ const AssignmentSubmissions = () => {
                                 </tr>
                             ) : tableRows.map((row) => (
                                 <tr key={row.student_id}>
-                                    <td>{row.student_name}</td>
-                                    <td>{row.submitted_at ? formatDateTime(row.submitted_at) : 'Not submitted'}</td>
+                                    <td>
+                                        <div style={{ fontWeight: 600 }}>{row.student_name}</div>
+                                        {!row.submission_id && (
+                                            <span style={{
+                                                display: 'inline-block',
+                                                marginTop: '3px',
+                                                fontSize: '0.7rem',
+                                                color: '#b45309',
+                                                background: '#fef3c7',
+                                                padding: '0.1rem 0.4rem',
+                                                borderRadius: '999px',
+                                                fontWeight: 600
+                                            }}>
+                                                No Submission
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td>{row.submitted_at ? formatDateTime(row.submitted_at) : '—'}</td>
                                     <td>
                                         {row.submission_file_url ? (
                                             <a href={row.submission_file_url} target="_blank" rel="noreferrer">
@@ -209,7 +258,7 @@ const AssignmentSubmissions = () => {
                                         ) : '—'}
                                     </td>
                                     <td>{row.submitted_at ? (row.is_late ? 'Yes' : 'No') : '—'}</td>
-                                    <td>{row.score ? `${row.score}/${row.max_score}` : '—'}</td>
+                                    <td>{row.score != null ? `${row.score}/${row.max_score}` : '—'}</td>
                                     <td>{row.feedback || '—'}</td>
                                     <td>{row.is_grade_visible ? 'Yes' : 'No'}</td>
                                     <td>
@@ -217,8 +266,7 @@ const AssignmentSubmissions = () => {
                                             type="button"
                                             className="icon-btn"
                                             onClick={() => openGradeModal(row)}
-                                            disabled={!row.submission_id}
-                                            title={row.submission_id ? 'Edit grade' : 'No submission yet'}
+                                            title="Grade student"
                                         >
                                             <Save size={14} />
                                         </button>
@@ -250,7 +298,7 @@ const AssignmentSubmissions = () => {
                         onClick={(event) => event.stopPropagation()}
                     >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Grade Submission</h3>
+                            <h3 style={{ margin: 0 }}>Grade Student</h3>
                             <button type="button" className="icon-btn" onClick={closeGradeModal}>
                                 <X size={14} />
                             </button>
@@ -258,12 +306,17 @@ const AssignmentSubmissions = () => {
 
                         <p style={{ marginTop: '0.5rem', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
                             {selectedRow.student_name}
+                            {!selectedRow.submission_id && (
+                                <span style={{ marginLeft: '0.5rem', color: '#b45309', fontWeight: 600 }}>
+                                    (No submission — grading manually)
+                                </span>
+                            )}
                         </p>
 
                         <form onSubmit={handleSaveGrade} style={{ marginTop: '0.8rem', display: 'grid', gap: '0.7rem' }}>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
-                                    Score
+                                    Score (max {assignment?.full_mark || 100})
                                 </label>
                                 <input
                                     type="number"
@@ -292,9 +345,9 @@ const AssignmentSubmissions = () => {
                                 <button type="button" className="icon-btn" style={{ width: 'auto', padding: '0.45rem 0.8rem' }} onClick={closeGradeModal}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn-primary" disabled={gradeMutation.isPending}>
+                                <button type="submit" className="btn-primary" disabled={isSaving}>
                                     <Save size={14} />
-                                    Save Grade
+                                    {isSaving ? 'Saving...' : 'Save Grade'}
                                 </button>
                             </div>
                         </form>

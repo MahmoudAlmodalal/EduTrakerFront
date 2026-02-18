@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Calendar as CalendarIcon,
     ChevronRight,
@@ -7,6 +7,7 @@ import {
     Hourglass,
     MessageSquare,
     Plus,
+    RefreshCw,
     TrendingUp,
     UserPlus,
     Users,
@@ -124,96 +125,133 @@ const SecretaryDashboard = () => {
     const [selectedWeek, setSelectedWeek] = useState('current-week');
     const [weeklyAttendanceRecords, setWeeklyAttendanceRecords] = useState([]);
     const [trendLoading, setTrendLoading] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [statsLoading, setStatsLoading] = useState(true);
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const isMountedRef = useRef(true);
+    const initialFetchDoneRef = useRef(false);
 
     useEffect(() => {
-        let isMounted = true;
-
-        const fetchDashboardData = async () => {
-            try {
-                setLoading(true);
-                const pendingStudentsParams = {
-                    current_status: 'pending',
-                    page: 1,
-                    page_size: 1,
-                };
-                const schoolId = resolveSchoolId(user);
-                if (schoolId) {
-                    pendingStudentsParams.school_id = schoolId;
-                }
-
-                const [statsResult, applicationsResult, yearsResult, pendingStudentsResult] = await Promise.allSettled([
-                    secretaryService.getSecretaryDashboardStats()
-                        .catch(() => secretaryService.getDashboardStats()),
-                    secretaryService.getApplications({ page: 1, status: 'pending' }),
-                    secretaryService.getAcademicYears(),
-                    secretaryService.getStudents(pendingStudentsParams),
-                ]);
-
-                if (!isMounted) {
-                    return;
-                }
-
-                const applicationsPayload = applicationsResult.status === 'fulfilled'
-                    ? (applicationsResult.value || {})
-                    : null;
-                const pendingApplicationsCount = applicationsPayload ? getListCount(applicationsPayload) : 0;
-                const pendingStudentsCount = pendingStudentsResult.status === 'fulfilled'
-                    ? getListCount(pendingStudentsResult.value || {})
-                    : null;
-
-                if (statsResult.status !== 'fulfilled') {
-                    console.error('Error fetching secretary dashboard stats:', statsResult.reason);
-                }
-                if (pendingStudentsResult.status !== 'fulfilled') {
-                    console.error('Error fetching pending students count:', pendingStudentsResult.reason);
-                }
-                const normalizedStats = statsResult.status === 'fulfilled'
-                    ? (statsResult.value?.statistics || statsResult.value || {})
-                    : {};
-
-                setStats({
-                    totalStudents: toSafeNumber(normalizedStats.total_students),
-                    pendingStudents: toSafeNumber(
-                        pendingStudentsCount
-                        ?? normalizedStats.pending_students
-                        ?? normalizedStats.pending_enrollments
-                        ?? normalizedStats.pending_applications
-                        ?? pendingApplicationsCount
-                    ),
-                    unreadMessages: toSafeNumber(normalizedStats.unread_messages),
-                    absentToday: toSafeNumber(normalizedStats.absent_today),
-                    schoolName: normalizedStats.school_name || 'My School',
-                });
-
-                if (applicationsResult.status === 'fulfilled') {
-                    setRecentApplications((applicationsPayload?.results || applicationsPayload || []).slice(0, 5));
-                } else {
-                    console.error('Error fetching recent applications:', applicationsResult.reason);
-                    setRecentApplications([]);
-                }
-
-                if (yearsResult.status === 'fulfilled') {
-                    setAcademicYears(yearsResult.value?.results || yearsResult.value || []);
-                } else {
-                    console.error('Error fetching academic years:', yearsResult.reason);
-                    setAcademicYears([]);
-                }
-            } catch (error) {
-                console.error('Error fetching dashboard data:', error);
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        fetchDashboardData();
-
         return () => {
-            isMounted = false;
+            isMountedRef.current = false;
         };
+    }, []);
+
+    const fetchDashboardData = useCallback(async ({ forceRefresh = false } = {}) => {
+        if (!user) {
+            return;
+        }
+
+        setStatsLoading(true);
+
+        const pendingStudentsParams = {
+            current_status: 'pending',
+            page: 1,
+            page_size: 1,
+        };
+        const schoolId = resolveSchoolId(user);
+        if (schoolId) {
+            pendingStudentsParams.school_id = schoolId;
+        }
+
+        let pendingFromPrimarySources = null;
+
+        try {
+            const [statsResult, pendingStudentsResult] = await Promise.allSettled([
+                secretaryService.getSecretaryDashboardStats({ forceRefresh })
+                    .catch(() => secretaryService.getDashboardStats()),
+                secretaryService.getStudents(pendingStudentsParams),
+            ]);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            const pendingStudentsCount = pendingStudentsResult.status === 'fulfilled'
+                ? getListCount(pendingStudentsResult.value || {})
+                : null;
+
+            if (statsResult.status !== 'fulfilled') {
+                console.error('Error fetching secretary dashboard stats:', statsResult.reason);
+            }
+            if (pendingStudentsResult.status !== 'fulfilled') {
+                console.error('Error fetching pending students count:', pendingStudentsResult.reason);
+            }
+            const normalizedStats = statsResult.status === 'fulfilled'
+                ? (statsResult.value?.statistics || statsResult.value || {})
+                : {};
+
+            pendingFromPrimarySources = (
+                pendingStudentsCount
+                ?? normalizedStats.pending_students
+                ?? normalizedStats.pending_enrollments
+                ?? normalizedStats.pending_applications
+            );
+
+            setStats({
+                totalStudents: toSafeNumber(normalizedStats.total_students),
+                pendingStudents: toSafeNumber(pendingFromPrimarySources),
+                unreadMessages: toSafeNumber(normalizedStats.unread_messages),
+                absentToday: toSafeNumber(normalizedStats.absent_today),
+                schoolName: normalizedStats.school_name || 'My School',
+            });
+            setStatsLoading(false);
+
+            const [applicationsResult, yearsResult] = await Promise.allSettled([
+                secretaryService.getApplications({
+                    page: 1,
+                    status: 'pending',
+                    ...(schoolId ? { school_id: schoolId } : {}),
+                }),
+                secretaryService.getAcademicYears(
+                    schoolId ? { school_id: schoolId } : {}
+                ),
+            ]);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            if (applicationsResult.status === 'fulfilled') {
+                const applicationsPayload = applicationsResult.value || {};
+                const pendingApplicationsCount = getListCount(applicationsPayload);
+                setRecentApplications((applicationsPayload?.results || applicationsPayload || []).slice(0, 5));
+
+                if (pendingFromPrimarySources === null) {
+                    setStats((previous) => ({
+                        ...previous,
+                        pendingStudents: toSafeNumber(pendingApplicationsCount),
+                    }));
+                }
+            } else {
+                console.error('Error fetching recent applications:', applicationsResult.reason);
+                setRecentApplications([]);
+            }
+
+            if (yearsResult.status === 'fulfilled') {
+                setAcademicYears(yearsResult.value?.results || yearsResult.value || []);
+            } else {
+                console.error('Error fetching academic years:', yearsResult.reason);
+                setAcademicYears([]);
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            if (isMountedRef.current) {
+                setStatsLoading(false);
+                setLastUpdated(new Date());
+            }
+        }
     }, [user]);
+
+    useEffect(() => {
+        initialFetchDoneRef.current = false;
+    }, [user?.id, user?.email, user?.role]);
+
+    useEffect(() => {
+        const forceRefresh = !initialFetchDoneRef.current;
+        initialFetchDoneRef.current = true;
+        fetchDashboardData({ forceRefresh });
+    }, [fetchDashboardData]);
 
     const weekRange = useMemo(() => getWeekRange(selectedWeek), [selectedWeek]);
 
@@ -223,10 +261,12 @@ const SecretaryDashboard = () => {
         const fetchAttendanceTrend = async () => {
             try {
                 setTrendLoading(true);
-                const records = await secretaryService.getAllAttendance({
+                const attendancePayload = await secretaryService.getAttendance({
                     date_from: weekRange.dateFrom,
                     date_to: weekRange.dateTo,
+                    page_size: 200,
                 });
+                const records = attendancePayload?.results || attendancePayload || [];
 
                 if (!isMounted) {
                     return;
@@ -360,21 +400,28 @@ const SecretaryDashboard = () => {
     );
 
     const headerAction = useMemo(() => {
-        return (
-            <button className="btn-primary" onClick={() => handleNavigate('/secretary/admissions')}>
-                <Plus size={18} />
-                New Admission
-            </button>
-        );
-    }, [handleNavigate]);
+        const updatedLabel = lastUpdated
+            ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : 'N/A';
 
-    if (loading) {
         return (
-            <div className="secretary-dashboard">
-                <LoadingSpinner message="Loading dashboard..." />
+            <div className="sec-header-actions">
+                <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => fetchDashboardData({ forceRefresh: true })}
+                >
+                    <RefreshCw size={16} />
+                    Refresh
+                </button>
+                <button className="btn-primary" onClick={() => handleNavigate('/secretary/admissions')}>
+                    <Plus size={18} />
+                    New Admission
+                </button>
+                <span className="sec-header-updated">Updated {updatedLabel}</span>
             </div>
         );
-    }
+    }, [fetchDashboardData, handleNavigate, lastUpdated]);
 
     const firstName = user?.displayName?.split(' ')[0] || user?.full_name?.split(' ')[0] || 'Secretary';
 
@@ -387,17 +434,27 @@ const SecretaryDashboard = () => {
             />
 
             <section className="sec-stats-grid">
-                {statCards.map((stat) => (
-                    <StatCard
-                        key={stat.title}
-                        title={stat.title}
-                        value={stat.value}
-                        icon={stat.icon}
-                        color={stat.color}
-                        trend={stat.trend}
-                        trendUp={stat.trendUp}
-                    />
-                ))}
+                {statsLoading ? (
+                    Array.from({ length: 5 }).map((_, index) => (
+                        <article key={`sec-stat-skeleton-${index}`} className="stat-card sec-stat-card sec-stat-skeleton">
+                            <div className="sec-stat-skeleton-line"></div>
+                            <div className="sec-stat-skeleton-value"></div>
+                            <div className="sec-stat-skeleton-line short"></div>
+                        </article>
+                    ))
+                ) : (
+                    statCards.map((stat) => (
+                        <StatCard
+                            key={stat.title}
+                            title={stat.title}
+                            value={stat.value}
+                            icon={stat.icon}
+                            color={stat.color}
+                            trend={stat.trend}
+                            trendUp={stat.trendUp}
+                        />
+                    ))
+                )}
             </section>
 
             <section className="secretary-dashboard-main-grid">

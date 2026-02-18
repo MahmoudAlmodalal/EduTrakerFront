@@ -1,10 +1,29 @@
 import { api } from '../utils/api';
 
 const CACHE_TTL = 5 * 60 * 1000;
+const DASHBOARD_STATS_CACHE_TTL = 2 * 60 * 1000;
+const STUDENT_APPLICATIONS_CACHE_TTL = 60 * 1000;
+const ATTENDANCE_CACHE_TTL = 60 * 1000;
 const inMemoryCache = new Map();
 const inFlightRequests = new Map();
 const DEFAULT_LIST_TIMEOUT = 12000;
 const RETRY_LIST_TIMEOUT = 20000;
+
+const getSessionCacheScope = () => {
+    try {
+        const rawUser = localStorage.getItem('user');
+        if (!rawUser) {
+            return 'anonymous';
+        }
+
+        const parsedUser = JSON.parse(rawUser);
+        const userId = parsedUser?.id ?? parsedUser?.user_id ?? parsedUser?.email ?? 'anonymous';
+        const role = parsedUser?.role ?? 'unknown';
+        return `${String(role)}:${String(userId)}`;
+    } catch {
+        return 'anonymous';
+    }
+};
 
 const getCacheKey = (key, params = {}) => {
     const sortedParams = Object.keys(params)
@@ -31,10 +50,10 @@ const getCachedValue = (cacheKey) => {
     return cached.value;
 };
 
-const setCachedValue = (cacheKey, value) => {
+const setCachedValue = (cacheKey, value, ttlMs = CACHE_TTL) => {
     inMemoryCache.set(cacheKey, {
         value,
-        expiresAt: Date.now() + CACHE_TTL,
+        expiresAt: Date.now() + ttlMs,
     });
 };
 
@@ -88,8 +107,25 @@ const secretaryService = {
     getDashboardStats: async () => {
         return api.get('/statistics/dashboard/');
     },
-    getSecretaryDashboardStats: async () => {
-        return api.get('/secretary/dashboard-stats/');
+    getSecretaryDashboardStats: async ({ forceRefresh = false } = {}) => {
+        const cacheKey = getCacheKey('secretary_dashboard_stats', {
+            scope: getSessionCacheScope(),
+        });
+        if (!forceRefresh) {
+            const cached = getCachedValue(cacheKey);
+            if (cached) {
+                return cached;
+            }
+        }
+
+        let data;
+        try {
+            data = await api.get('/secretary/dashboard-stats/');
+        } catch {
+            data = await api.get('/statistics/dashboard/');
+        }
+        setCachedValue(cacheKey, data, DASHBOARD_STATS_CACHE_TTL);
+        return data;
     },
 
     getPendingTasks: async () => {
@@ -115,26 +151,53 @@ const secretaryService = {
 
     // Admissions & Students
     getStudentApplications: async (params = {}) => {
-        const queryParams = new URLSearchParams(params).toString();
-        return api.get(`/secretary/admissions/${queryParams ? `?${queryParams}` : ''}`);
+        const normalizedParams = { ...(params || {}) };
+        const forceRefresh = Boolean(normalizedParams.forceRefresh);
+        delete normalizedParams.forceRefresh;
+
+        const cacheKey = getCacheKey('student_applications', {
+            ...normalizedParams,
+            scope: getSessionCacheScope(),
+        });
+        if (!forceRefresh) {
+            const cached = getCachedValue(cacheKey);
+            if (cached) {
+                return cached;
+            }
+        }
+
+        const queryParams = new URLSearchParams(normalizedParams).toString();
+        const data = await api.get(`/secretary/admissions/${queryParams ? `?${queryParams}` : ''}`);
+        setCachedValue(cacheKey, data, STUDENT_APPLICATIONS_CACHE_TTL);
+        return data;
     },
     getStudentApplicationDetail: async (applicationId) => {
         return api.get(`/secretary/admissions/${applicationId}/`);
     },
     updateStudentApplicationStatus: async (applicationId, statusValue) => {
-        return api.patch(`/secretary/admissions/${applicationId}/status/`, { status: statusValue });
+        const result = await api.patch(`/secretary/admissions/${applicationId}/status/`, { status: statusValue });
+        clearCacheByPrefix('secretary_dashboard_stats');
+        clearCacheByPrefix('student_applications');
+        return result;
     },
     getApplications: async (params = {}) => {
         return secretaryService.getStudentApplications(params);
     },
     approveApplication: async (id) => {
-        return secretaryService.updateStudentApplicationStatus(id, 'active');
+        return secretaryService.updateStudentApplicationStatus(id, 'enrolled');
     },
     rejectApplication: async (id) => {
         return secretaryService.updateStudentApplicationStatus(id, 'rejected');
     },
     createStudent: async (data) => {
-        return api.post('/manager/students/create/', data);
+        const payload = await api.post('/manager/students/create/', data, {
+            headers: data instanceof FormData
+                ? { 'Content-Type': 'multipart/form-data' }
+                : undefined,
+        });
+        clearCacheByPrefix('secretary_dashboard_stats');
+        clearCacheByPrefix('student_applications');
+        return payload;
     },
     getStudents: async (params = {}, config = {}) => {
         const queryParams = new URLSearchParams(params).toString();
@@ -203,7 +266,17 @@ const secretaryService = {
     },
     assignToClass: async (data) => {
         // Create an enrollment: { student_id, class_room_id, academic_year_id }
-        return api.post('/manager/enrollments/create/', data);
+        const payload = await api.post('/manager/enrollments/create/', data);
+        clearCacheByPrefix('secretary_dashboard_stats');
+        clearCacheByPrefix('student_applications');
+        clearCacheByPrefix('attendance');
+        return payload;
+    },
+    reassignStudentClassroom: async (studentId, data) => {
+        const payload = await api.post(`/secretary/students/${studentId}/reassign-classroom/`, data);
+        clearCacheByPrefix('secretary_dashboard_stats');
+        clearCacheByPrefix('attendance');
+        return payload;
     },
     getStudentEnrollments: async (studentId, params = {}) => {
         const queryParams = new URLSearchParams(params).toString();
@@ -214,11 +287,18 @@ const secretaryService = {
         return api.get(`/secretary/student-documents/${queryParams ? `?${queryParams}` : ''}`);
     },
     uploadStudentDocument: async (data) => {
-        return api.post('/secretary/student-documents/', data, {
+        const payload = await api.post('/secretary/student-documents/', data, {
             headers: data instanceof FormData
                 ? { 'Content-Type': 'multipart/form-data' }
                 : undefined
         });
+        clearCacheByPrefix('student_documents');
+        return payload;
+    },
+    deleteStudentDocument: async (documentId) => {
+        const result = await api.delete(`/secretary/student-documents/${documentId}/`);
+        clearCacheByPrefix('student_documents');
+        return result;
     },
 
     // Grades & Classrooms
@@ -508,35 +588,43 @@ const secretaryService = {
 
     // Attendance (view only for secretary - recording is teacher-only)
     getAttendance: async (params = {}) => {
-        const queryParams = new URLSearchParams(params).toString();
-        return api.get(`/teacher/attendance/${queryParams ? `?${queryParams}` : ''}`);
-    },
-    getAllAttendance: async (params = {}) => {
-        const allAttendance = [];
-        let page = 1;
+        const normalizedParams = { ...(params || {}) };
+        const forceRefresh = Boolean(normalizedParams.forceRefresh);
+        delete normalizedParams.forceRefresh;
 
-        while (page !== null) {
-            const queryParams = new URLSearchParams({
-                ...params,
-                page_size: '100',
-                page: String(page),
-            }).toString();
-            const payload = await api.get(`/teacher/attendance/${queryParams ? `?${queryParams}` : ''}`);
-
-            if (Array.isArray(payload?.results)) {
-                allAttendance.push(...payload.results);
-                page = resolveNextPage(payload.next);
-                continue;
+        const cacheKey = getCacheKey('attendance', {
+            ...normalizedParams,
+            scope: getSessionCacheScope(),
+        });
+        if (!forceRefresh) {
+            const cached = getCachedValue(cacheKey);
+            if (cached) {
+                return cached;
             }
-
-            if (Array.isArray(payload)) {
-                allAttendance.push(...payload);
-            }
-
-            break;
         }
 
-        return allAttendance;
+        const queryParams = new URLSearchParams(normalizedParams).toString();
+        const data = await api.get(`/teacher/attendance/${queryParams ? `?${queryParams}` : ''}`);
+        setCachedValue(cacheKey, data, ATTENDANCE_CACHE_TTL);
+        return data;
+    },
+    getAllAttendance: async (params = {}) => {
+        const queryParams = new URLSearchParams({
+            ...params,
+            page: String(params.page || 1),
+            page_size: String(params.page_size || 200),
+        }).toString();
+        const payload = await api.get(`/teacher/attendance/${queryParams ? `?${queryParams}` : ''}`);
+
+        if (Array.isArray(payload?.results)) {
+            return payload.results;
+        }
+
+        if (Array.isArray(payload)) {
+            return payload;
+        }
+
+        return [];
     },
 
     // Communication

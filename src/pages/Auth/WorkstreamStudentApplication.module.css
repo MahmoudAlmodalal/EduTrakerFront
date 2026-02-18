@@ -101,6 +101,9 @@
     font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--slate-700);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .input {
@@ -119,6 +122,42 @@
     background-color: white;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 4px var(--color-primary-light);
+}
+
+.passwordWrapper {
+    position: relative;
+}
+
+.passwordWrapper .input {
+    padding-right: 2.5rem;
+}
+
+.passwordToggle {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+}
+
+.passwordToggle:hover {
+    color: var(--color-text-main);
+}
+
+.inputError {
+    border-color: var(--color-error);
+}
+
+.fieldError {
+    color: var(--color-error);
+    font-size: var(--font-size-xs);
 }
 
 textarea.input {

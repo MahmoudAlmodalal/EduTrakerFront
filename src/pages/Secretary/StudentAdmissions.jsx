@@ -6,12 +6,15 @@ import {
     Clock,
     Download,
     Eye,
+    EyeOff,
     FileText,
     GraduationCap,
     Search,
+    Trash2,
     Upload,
     UserPlus,
     Users,
+    X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
@@ -21,6 +24,7 @@ import secretaryService from '../../services/secretaryService';
 import {
     AlertBanner,
     AvatarInitial,
+    ConfirmModal,
     EmptyState,
     LoadingSpinner,
     PageHeader,
@@ -72,7 +76,8 @@ const createDefaultStudent = () => ({
     first_name: '',
     last_name: '',
     email: '',
-    password: 'Student@123',
+    password: '',
+    confirm_password: '',
     gender: '',
     date_of_birth: '',
     admission_date: new Date().toISOString().split('T')[0],
@@ -83,10 +88,13 @@ const createDefaultStudent = () => ({
     national_id: '',
     emergency_contact: '',
     medical_notes: '',
+    birth_certificate: null,
 });
 
 const createDefaultDocumentUpload = () => ({
     student_id: '',
+    studentSearch: '',
+    selectedStudent: null,
     document_type: DOCUMENT_TYPE_OPTIONS[0].value,
     file: null,
 });
@@ -439,13 +447,15 @@ const StudentAdmissions = () => {
     const [students, setStudents] = useState([]);
     const [files, setFiles] = useState([]);
     const [grades, setGrades] = useState([]);
-    const [classrooms, setClassrooms] = useState([]);
     const [academicYears, setAcademicYears] = useState([]);
 
     const [newStudent, setNewStudent] = useState(createDefaultStudent);
-    const [selectedClassroom, setSelectedClassroom] = useState('');
+    const [showPwd, setShowPwd] = useState(false);
+    const [showConfirmPwd, setShowConfirmPwd] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState('');
-    const [isClassroomStepOpen, setIsClassroomStepOpen] = useState(false);
+    const [selectedAssignmentStudent, setSelectedAssignmentStudent] = useState(null);
+    const [availableClassrooms, setAvailableClassrooms] = useState([]);
+    const [currentClassroomId, setCurrentClassroomId] = useState(null);
     const [applicationYearFilter, setApplicationYearFilter] = useState('');
     const [assignmentAcademicYear, setAssignmentAcademicYear] = useState('');
     const [selectedGradeFilter, setSelectedGradeFilter] = useState('');
@@ -466,10 +476,15 @@ const StudentAdmissions = () => {
     const [gradeOptions, setGradeOptions] = useState([]);
     const [showGradeDropdown, setShowGradeDropdown] = useState(false);
     const [fileSearch, setFileSearch] = useState('');
+    const [filesTypeFilter, setFilesTypeFilter] = useState('');
+    const [showUploadModal, setShowUploadModal] = useState(false);
     const [documentUpload, setDocumentUpload] = useState(createDefaultDocumentUpload);
     const [documentStudentQuery, setDocumentStudentQuery] = useState('');
     const [documentStudentOptions, setDocumentStudentOptions] = useState([]);
     const [showDocumentStudentDropdown, setShowDocumentStudentDropdown] = useState(false);
+    const [studentSearchResults, setStudentSearchResults] = useState([]);
+    const [showDeleteDocConfirm, setShowDeleteDocConfirm] = useState(false);
+    const [documentToDelete, setDocumentToDelete] = useState(null);
 
     const [isApplicationsLoading, setIsApplicationsLoading] = useState(false);
     const [isStudentsLoading, setIsStudentsLoading] = useState(false);
@@ -484,13 +499,13 @@ const StudentAdmissions = () => {
     const studentsRequestRef = useRef(0);
     const filesRequestRef = useRef(0);
     const documentStudentsRequestRef = useRef(0);
-    const classroomsRequestRef = useRef(0);
     const gradesRequestRef = useRef(0);
     const gradeOptionsRequestRef = useRef(0);
     const academicYearsRequestRef = useRef(0);
     const schoolStatsRequestRef = useRef(0);
     const schoolClassroomsRequestRef = useRef(0);
     const documentFileInputRef = useRef(null);
+    const birthCertificateInputRef = useRef(null);
 
     const schoolId = useMemo(() => resolveSchoolId(user), [user]);
     const debouncedApplicationSearch = useDebouncedValue(applicationSearch, 350);
@@ -555,17 +570,6 @@ const StudentAdmissions = () => {
         });
     }, [applicationActivityFilter, applications, debouncedApplicationSearch]);
 
-    const filteredClassrooms = useMemo(() => {
-        if (!selectedGradeFilter) {
-            return classrooms;
-        }
-
-        return classrooms.filter((classroom) => {
-            const gradeId = classroom.grade_id ?? classroom.grade?.id ?? classroom.grade;
-            return gradeId?.toString() === selectedGradeFilter;
-        });
-    }, [classrooms, selectedGradeFilter]);
-
     const activeAcademicYears = useMemo(() => {
         return academicYears.filter((year) => year.is_active);
     }, [academicYears]);
@@ -582,6 +586,30 @@ const StudentAdmissions = () => {
             return getStudentName(leftStudent).localeCompare(getStudentName(rightStudent));
         });
     }, [selectedGradeFilter, students]);
+
+    const selectedAssignmentGradeLabel = useMemo(() => {
+        if (!selectedAssignmentStudent) {
+            return '';
+        }
+
+        if (selectedAssignmentStudent.grade_name) {
+            return selectedAssignmentStudent.grade_name;
+        }
+        if (selectedAssignmentStudent.current_grade?.name) {
+            return selectedAssignmentStudent.current_grade.name;
+        }
+
+        const gradeId = getStudentGradeId(selectedAssignmentStudent);
+        if (Number.isInteger(gradeId)) {
+            const matchedGrade = grades.find((grade) => Number(grade?.id) === gradeId);
+            if (matchedGrade?.name) {
+                return matchedGrade.name;
+            }
+            return `Grade ${gradeId}`;
+        }
+
+        return 'selected grade';
+    }, [grades, selectedAssignmentStudent]);
 
     const applicationsTotalPages = useMemo(() => {
         const total = Math.ceil((applicationsPagination.count || 0) / APPLICATIONS_PAGE_SIZE);
@@ -889,7 +917,7 @@ const StudentAdmissions = () => {
         }
     }, [schoolId, setFeedback]);
 
-    const fetchStudentDocuments = useCallback(async (pageNumber = 1, searchFilter = '') => {
+    const fetchStudentDocuments = useCallback(async (pageNumber = 1, searchFilter = '', typeFilter = '') => {
         if (!schoolId) {
             filesRequestRef.current += 1;
             setFiles([]);
@@ -911,6 +939,11 @@ const StudentAdmissions = () => {
             const normalizedSearch = searchFilter.trim();
             if (normalizedSearch) {
                 params.search = normalizedSearch;
+            }
+            if (typeFilter) {
+                params.search = normalizedSearch
+                    ? `${normalizedSearch} ${typeFilter}`
+                    : typeFilter;
             }
 
             const data = await secretaryService.getStudentDocuments(params);
@@ -1111,37 +1144,11 @@ const StudentAdmissions = () => {
         }
     }, [schoolId, setFeedback]);
 
-    const fetchClassrooms = useCallback(async (currentSchoolId, academicYearId) => {
-        if (!currentSchoolId || !academicYearId) {
-            classroomsRequestRef.current += 1;
-            setClassrooms([]);
-            return;
-        }
-
-        const requestId = classroomsRequestRef.current + 1;
-        classroomsRequestRef.current = requestId;
-
-        try {
-            const data = await secretaryService.getClassrooms(currentSchoolId, academicYearId);
-            if (classroomsRequestRef.current !== requestId) {
-                return;
-            }
-            setClassrooms(normalizeListResponse(data));
-        } catch (error) {
-            if (classroomsRequestRef.current !== requestId) {
-                return;
-            }
-            console.error('Error fetching classrooms:', error);
-            setFeedback('error', getApiErrorMessage(error, 'Failed to load classrooms.'));
-        }
-    }, [setFeedback]);
-
     useEffect(() => {
         applicationsRequestRef.current += 1;
         studentsRequestRef.current += 1;
         filesRequestRef.current += 1;
         documentStudentsRequestRef.current += 1;
-        classroomsRequestRef.current += 1;
         gradesRequestRef.current += 1;
         gradeOptionsRequestRef.current += 1;
         academicYearsRequestRef.current += 1;
@@ -1151,7 +1158,6 @@ const StudentAdmissions = () => {
         setApplications([]);
         setStudents([]);
         setFiles([]);
-        setClassrooms([]);
         setGrades([]);
         setGradeOptions([]);
         setAcademicYears([]);
@@ -1160,19 +1166,27 @@ const StudentAdmissions = () => {
         setApplicationYearFilter('');
         setAssignmentAcademicYear('');
         setSelectedGradeFilter('');
-        setSelectedClassroom('');
         setSelectedStudent('');
-        setIsClassroomStepOpen(false);
+        setSelectedAssignmentStudent(null);
+        setAvailableClassrooms([]);
+        setCurrentClassroomId(null);
         setApplicationSearch('');
         setAssignmentSearch('');
         setFileSearch('');
+        setFilesTypeFilter('');
         setDocumentStudentQuery('');
         setDocumentUpload(createDefaultDocumentUpload());
+        setShowUploadModal(false);
+        setStudentSearchResults([]);
+        setShowDeleteDocConfirm(false);
+        setDocumentToDelete(null);
         setApplicationActivityFilter('pending');
         setAssignmentActivityFilter('');
         setGradeQuery('');
         setShowGradeDropdown(false);
         setShowDocumentStudentDropdown(false);
+        setShowPwd(false);
+        setShowConfirmPwd(false);
         setIsFilesLoading(false);
         setIsDocumentStudentLoading(false);
         setIsGradeOptionsLoading(false);
@@ -1204,7 +1218,7 @@ const StudentAdmissions = () => {
 
     useEffect(() => {
         setFilesPage(1);
-    }, [fileSearch]);
+    }, [fileSearch, filesTypeFilter]);
 
     useEffect(() => {
         if (!schoolId) {
@@ -1257,13 +1271,10 @@ const StudentAdmissions = () => {
 
     useEffect(() => {
         if (activeTab !== 'class-assignment' || !assignmentAcademicYear || !schoolId) {
-            setClassrooms([]);
-            setSelectedClassroom('');
-            return;
+            setAvailableClassrooms([]);
+            setCurrentClassroomId(null);
         }
-
-        fetchClassrooms(schoolId, assignmentAcademicYear);
-    }, [activeTab, assignmentAcademicYear, fetchClassrooms, schoolId]);
+    }, [activeTab, assignmentAcademicYear, schoolId]);
 
     useEffect(() => {
         if (activeTab !== 'class-assignment') {
@@ -1290,8 +1301,8 @@ const StudentAdmissions = () => {
             return;
         }
 
-        fetchStudentDocuments(filesPage, debouncedFileSearch);
-    }, [activeTab, debouncedFileSearch, fetchStudentDocuments, filesPage]);
+        fetchStudentDocuments(filesPage, debouncedFileSearch, filesTypeFilter);
+    }, [activeTab, debouncedFileSearch, fetchStudentDocuments, filesPage, filesTypeFilter]);
 
     useEffect(() => {
         if (activeTab !== 'files') {
@@ -1303,21 +1314,14 @@ const StudentAdmissions = () => {
     }, [activeTab, debouncedDocumentStudentQuery, fetchDocumentStudentOptions]);
 
     useEffect(() => {
-        if (!selectedClassroom) {
-            return;
-        }
-
-        const classroomExists = filteredClassrooms.some((classroom) => {
-            return getClassroomId(classroom) === selectedClassroom.toString();
-        });
-
-        if (!classroomExists) {
-            setSelectedClassroom('');
-        }
-    }, [filteredClassrooms, selectedClassroom]);
+        setStudentSearchResults(documentStudentOptions);
+    }, [documentStudentOptions]);
 
     useEffect(() => {
         setSelectedStudent('');
+        setSelectedAssignmentStudent(null);
+        setAvailableClassrooms([]);
+        setCurrentClassroomId(null);
     }, [
         assignmentAcademicYear,
         assignmentActivityFilter,
@@ -1328,8 +1332,9 @@ const StudentAdmissions = () => {
 
     useEffect(() => {
         if (!selectedStudent || !assignmentAcademicYear) {
-            setIsClassroomStepOpen(false);
-            setSelectedClassroom('');
+            setSelectedAssignmentStudent(null);
+            setAvailableClassrooms([]);
+            setCurrentClassroomId(null);
         }
     }, [assignmentAcademicYear, selectedStudent]);
 
@@ -1346,23 +1351,40 @@ const StudentAdmissions = () => {
         setNewStudent((previous) => ({ ...previous, grade_id: '' }));
     }, []);
 
-    const handleDocumentStudentQueryChange = useCallback((event) => {
-        const query = event.target.value;
-        setDocumentStudentQuery(query);
-        setShowDocumentStudentDropdown(true);
-        setDocumentUpload((previous) => ({ ...previous, student_id: '' }));
-    }, []);
-
     const handleDocumentStudentSelect = useCallback((student) => {
         const studentId = String(student?.user_id || student?.id || '');
         if (!studentId) {
             return;
         }
 
-        setDocumentUpload((previous) => ({ ...previous, student_id: studentId }));
+        setDocumentUpload((previous) => ({
+            ...previous,
+            student_id: studentId,
+            studentSearch: getStudentName(student),
+            selectedStudent: {
+                id: studentId,
+                full_name: getStudentName(student),
+                email: student?.email || '',
+            },
+        }));
         setDocumentStudentQuery(getStudentName(student));
         setShowDocumentStudentDropdown(false);
     }, []);
+
+    const handleStudentSearch = useCallback((value) => {
+        setDocumentStudentQuery(value);
+        setShowDocumentStudentDropdown(true);
+        setDocumentUpload((previous) => ({
+            ...previous,
+            student_id: '',
+            studentSearch: value,
+            selectedStudent: null,
+        }));
+    }, []);
+
+    const selectUploadStudent = useCallback((student) => {
+        handleDocumentStudentSelect(student);
+    }, [handleDocumentStudentSelect]);
 
     const handleDocumentFileChange = useCallback((event) => {
         const selectedFile = event.target.files?.[0] || null;
@@ -1404,7 +1426,9 @@ const StudentAdmissions = () => {
                 documentFileInputRef.current.value = '';
             }
             setDocumentStudentQuery('');
+            setStudentSearchResults([]);
             setShowDocumentStudentDropdown(false);
+            setShowUploadModal(false);
             setFilesPage(1);
         } catch (error) {
             console.error('Error uploading student document:', error);
@@ -1453,25 +1477,48 @@ const StudentAdmissions = () => {
             return;
         }
 
-        const payload = {
-            email,
-            full_name: `${firstName} ${lastName}`.trim(),
-            password: newStudent.password || 'Student@123',
-            school_id: schoolId,
-            grade_id: gradeId,
-            date_of_birth: newStudent.date_of_birth,
-            admission_date: newStudent.admission_date,
-        };
+        const password = newStudent.password || '';
+        if (password.length < 8) {
+            setFeedback('error', 'Password must be at least 8 characters.');
+            return;
+        }
 
-        if (gender) payload.gender = gender;
-        if (phone) payload.phone = phone;
-        if (address) payload.address = address;
-        if (nationalId) payload.national_id = nationalId;
-        if (emergencyContact) payload.emergency_contact = emergencyContact;
-        if (medicalNotes) payload.medical_notes = medicalNotes;
+        if (password !== (newStudent.confirm_password || '')) {
+            setFeedback('error', 'Passwords do not match.');
+            return;
+        }
+
+        const birthCertificate = newStudent.birth_certificate;
+        if (!birthCertificate) {
+            setFeedback('error', 'Birth certificate PDF is required.');
+            return;
+        }
+
+        const fileName = String(birthCertificate.name || '').toLowerCase();
+        if (!fileName.endsWith('.pdf')) {
+            setFeedback('error', 'Birth certificate must be a PDF file.');
+            return;
+        }
+
+        const fullName = `${firstName} ${lastName}`.trim();
+        const payload = new FormData();
+        payload.append('email', email);
+        payload.append('full_name', fullName);
+        payload.append('password', password);
+        payload.append('school_id', String(schoolId));
+        payload.append('grade_id', String(gradeId));
+        payload.append('date_of_birth', newStudent.date_of_birth);
+        payload.append('admission_date', newStudent.admission_date);
+        payload.append('birth_certificate', birthCertificate);
+        if (gender) payload.append('gender', gender);
+        if (phone) payload.append('phone', phone);
+        if (address) payload.append('address', address);
+        if (nationalId) payload.append('national_id', nationalId);
+        if (emergencyContact) payload.append('emergency_contact', emergencyContact);
+        if (medicalNotes) payload.append('medical_notes', medicalNotes);
         if (enrollmentStatus) {
-            payload.enrollment_status = enrollmentStatus;
-            payload.current_status = enrollmentStatus;
+            payload.append('enrollment_status', enrollmentStatus);
+            payload.append('current_status', enrollmentStatus);
         }
 
         try {
@@ -1482,8 +1529,13 @@ const StudentAdmissions = () => {
             setFeedback('success', 'Student created successfully!');
             fetchSchoolStudentStats();
             setNewStudent(createDefaultStudent());
+            if (birthCertificateInputRef.current) {
+                birthCertificateInputRef.current.value = '';
+            }
             setGradeQuery('');
             setShowGradeDropdown(false);
+            setShowPwd(false);
+            setShowConfirmPwd(false);
             setActiveTab('applications');
         } catch (error) {
             console.error('Error creating student:', error);
@@ -1493,68 +1545,121 @@ const StudentAdmissions = () => {
         }
     }, [fetchSchoolStudentStats, newStudent, resolveGradeIdFromQuery, schoolId, setFeedback]);
 
-    const handleAssign = useCallback(async () => {
-        if (!selectedStudent || !assignmentAcademicYear) {
-            setFeedback('error', 'Please select a student and academic year.');
-            return;
-        }
+    const handleDeleteDocument = useCallback((documentRecord) => {
+        setDocumentToDelete(documentRecord);
+        setShowDeleteDocConfirm(true);
+    }, []);
 
-        if (!isClassroomStepOpen) {
-            setIsClassroomStepOpen(true);
-            setSelectedClassroom('');
-            return;
-        }
-
-        if (!selectedClassroom) {
-            setFeedback('error', 'Please select a classroom to finish assignment.');
-            return;
-        }
-
-        const studentId = Number(selectedStudent);
-        const classroomId = Number(selectedClassroom);
-        const academicYearId = Number(assignmentAcademicYear);
-
-        if (!Number.isInteger(studentId) || !Number.isInteger(classroomId) || !Number.isInteger(academicYearId)) {
-            setFeedback('error', 'Invalid student/classroom/academic year selection.');
+    const confirmDeleteDocument = useCallback(async () => {
+        if (!documentToDelete?.id) {
+            setShowDeleteDocConfirm(false);
+            setDocumentToDelete(null);
             return;
         }
 
         try {
-            setIsAssigningStudent(true);
+            await secretaryService.deleteStudentDocument(documentToDelete.id);
+            setFeedback('success', 'Document deleted successfully.');
+            fetchStudentDocuments(filesPage, debouncedFileSearch, filesTypeFilter);
+        } catch (error) {
+            setFeedback('error', getApiErrorMessage(error, 'Failed to delete document.'));
+        } finally {
+            setShowDeleteDocConfirm(false);
+            setDocumentToDelete(null);
+        }
+    }, [debouncedFileSearch, documentToDelete, fetchStudentDocuments, filesPage, filesTypeFilter, setFeedback]);
 
-            const enrollmentData = await secretaryService.getStudentEnrollments(studentId);
+    const handleSelectStudentForAssignment = useCallback(async (student) => {
+        const studentId = Number(student?.user_id || student?.id);
+        if (!Number.isInteger(studentId) || studentId <= 0) {
+            setSelectedStudent('');
+            setSelectedAssignmentStudent(null);
+            setCurrentClassroomId(null);
+            setAvailableClassrooms([]);
+            return;
+        }
+
+        setSelectedStudent(String(studentId));
+        setSelectedAssignmentStudent(student);
+        setCurrentClassroomId(null);
+        setAvailableClassrooms([]);
+
+        if (!assignmentAcademicYear || !schoolId) {
+            return;
+        }
+
+        const gradeId = getStudentGradeId(student);
+        if (!gradeId) {
+            return;
+        }
+
+        try {
+            const [enrollmentData, roomsData] = await Promise.all([
+                secretaryService.getStudentEnrollments(studentId, { academic_year_id: assignmentAcademicYear }),
+                secretaryService.getClassrooms(schoolId, assignmentAcademicYear, { grade_id: gradeId }),
+            ]);
+
             const enrollments = normalizeListResponse(enrollmentData);
-
-            const alreadyAssigned = enrollments.some((enrollment) => {
+            const currentEnrollment = enrollments.find((enrollment) => {
                 const enrollmentYearId = getEnrollmentAcademicYearId(enrollment);
-                const enrollmentClassId = getEnrollmentClassroomId(enrollment);
-                const enrollmentStatus = String(enrollment?.status || '').toLowerCase();
-                const isEnrollmentActive = enrollment.is_active !== false && enrollmentStatus !== 'withdrawn';
-
-                return enrollmentYearId === academicYearId && enrollmentClassId === classroomId && isEnrollmentActive;
+                const enrollmentStatus = String(enrollment?.status || '').trim().toLowerCase();
+                return enrollmentYearId === Number(assignmentAcademicYear)
+                    && enrollment.is_active !== false
+                    && (enrollmentStatus === 'active' || enrollmentStatus === 'enrolled');
             });
 
-            if (alreadyAssigned) {
-                setFeedback(
-                    'success',
-                    'Student is already assigned to this classroom for the selected academic year.',
-                    false
-                );
-                setSelectedStudent('');
+            setCurrentClassroomId(currentEnrollment ? getEnrollmentClassroomId(currentEnrollment) : null);
+            setAvailableClassrooms(normalizeListResponse(roomsData));
+        } catch (error) {
+            console.error('Error loading classrooms for selected student:', error);
+            setFeedback('error', getApiErrorMessage(error, 'Failed to load grade classrooms.'));
+        }
+    }, [assignmentAcademicYear, schoolId, setFeedback]);
+
+    const handleAssignToClassroom = useCallback(async (classroomId) => {
+        const studentId = Number(selectedStudent);
+        const academicYearId = Number(assignmentAcademicYear);
+        const targetClassroomId = Number(classroomId);
+
+        if (!Number.isInteger(studentId) || studentId <= 0 || !Number.isInteger(academicYearId) || academicYearId <= 0) {
+            setFeedback('error', 'Please select a student and academic year.');
+            return;
+        }
+        if (!Number.isInteger(targetClassroomId) || targetClassroomId <= 0) {
+            setFeedback('error', 'Please choose a valid classroom.');
+            return;
+        }
+        if (currentClassroomId === targetClassroomId) {
+            setFeedback('success', 'Student is already assigned to this classroom.', false);
+            return;
+        }
+
+        const isReassignment = Number.isInteger(currentClassroomId) && currentClassroomId > 0;
+        if (isReassignment) {
+            const shouldProceed = window.confirm('This student already has an active classroom. Re-assign now?');
+            if (!shouldProceed) {
                 return;
             }
+        }
 
-            await secretaryService.assignToClass({
-                student_id: studentId,
-                class_room_id: classroomId,
-                academic_year_id: academicYearId,
-                status: 'enrolled',
-            });
+        try {
+            setIsAssigningStudent(true);
+            if (isReassignment) {
+                await secretaryService.reassignStudentClassroom(studentId, {
+                    class_room_id: targetClassroomId,
+                    academic_year_id: academicYearId,
+                });
+            } else {
+                await secretaryService.assignToClass({
+                    student_id: studentId,
+                    class_room_id: targetClassroomId,
+                    academic_year_id: academicYearId,
+                    status: 'enrolled',
+                });
+            }
 
-            setFeedback('success', 'Student assigned to class successfully!');
-            setSelectedStudent('');
-            setIsClassroomStepOpen(false);
-            setSelectedClassroom('');
+            setCurrentClassroomId(targetClassroomId);
+            setFeedback('success', isReassignment ? 'Student re-assigned successfully.' : 'Student assigned successfully.');
             fetchSchoolStudentStats();
             fetchAssignmentStudents(
                 assignmentActivityFilter,
@@ -1572,12 +1677,11 @@ const StudentAdmissions = () => {
         assignmentAcademicYear,
         assignmentActivityFilter,
         assignmentPage,
+        currentClassroomId,
         debouncedAssignmentSearch,
         fetchSchoolStudentStats,
         fetchAssignmentStudents,
-        isClassroomStepOpen,
         selectedGradeFilter,
-        selectedClassroom,
         selectedStudent,
         setFeedback,
     ]);
@@ -1590,13 +1694,6 @@ const StudentAdmissions = () => {
         setActiveTab(tabId);
         setBanner((previous) => ({ ...previous, message: '' }));
     }, []);
-
-    const isAssignDisabled = (
-        !selectedStudent
-        || !assignmentAcademicYear
-        || (isClassroomStepOpen && !selectedClassroom)
-        || isAssigningStudent
-    );
 
     return (
         <div className="secretary-dashboard secretary-admissions-page">
@@ -1684,7 +1781,7 @@ const StudentAdmissions = () => {
                             </div>
 
                             <div className="sec-table-wrap">
-                                {isApplicationsLoading ? (
+                                {isApplicationsLoading && applications.length === 0 ? (
                                     <SkeletonTable rows={5} cols={6} />
                                 ) : (
                                     <div className="sec-table-scroll">
@@ -1872,14 +1969,41 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Password</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Default: Student@123"
-                                        value={newStudent.password}
-                                        onChange={(event) => updateNewStudentField('password', event.target.value)}
-                                    />
+                                    <label className="form-label">Password *</label>
+                                    <div className="password-input-wrapper">
+                                        <input
+                                            type={showPwd ? 'text' : 'password'}
+                                            className="form-input"
+                                            placeholder="Min 8 characters"
+                                            value={newStudent.password}
+                                            onChange={(event) => updateNewStudentField('password', event.target.value)}
+                                            required
+                                            minLength={8}
+                                        />
+                                        <button type="button" className="eye-toggle" onClick={() => setShowPwd((value) => !value)}>
+                                            {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="sec-field">
+                                    <label className="form-label">Confirm Password *</label>
+                                    <div className="password-input-wrapper">
+                                        <input
+                                            type={showConfirmPwd ? 'text' : 'password'}
+                                            className={`form-input ${newStudent.confirm_password && newStudent.password !== newStudent.confirm_password ? 'form-input--error' : ''}`}
+                                            placeholder="Repeat password"
+                                            value={newStudent.confirm_password}
+                                            onChange={(event) => updateNewStudentField('confirm_password', event.target.value)}
+                                            required
+                                        />
+                                        <button type="button" className="eye-toggle" onClick={() => setShowConfirmPwd((value) => !value)}>
+                                            {showConfirmPwd ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                    </div>
+                                    {newStudent.confirm_password && newStudent.password !== newStudent.confirm_password ? (
+                                        <p className="field-error-text">Passwords do not match</p>
+                                    ) : null}
                                 </div>
 
                                 <div className="sec-field">
@@ -2023,6 +2147,45 @@ const StudentAdmissions = () => {
                                         onChange={(event) => updateNewStudentField('medical_notes', event.target.value)}
                                     />
                                 </div>
+
+                                <div className="sec-field sec-field--full">
+                                    <label className="form-label">
+                                        Birth Certificate <span className="cell-muted">(PDF only, optional)</span>
+                                    </label>
+                                    <div className={`file-drop-zone ${newStudent.birth_certificate ? 'file-drop-zone--has-file' : ''}`}>
+                                        {newStudent.birth_certificate ? (
+                                            <div className="file-selected">
+                                                <FileText size={20} />
+                                                <span>{newStudent.birth_certificate.name}</span>
+                                                <button
+                                                    type="button"
+                                                    className="file-remove-btn"
+                                                    onClick={() => {
+                                                        updateNewStudentField('birth_certificate', null);
+                                                        if (birthCertificateInputRef.current) {
+                                                            birthCertificateInputRef.current.value = '';
+                                                        }
+                                                    }}
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label className="file-drop-label" htmlFor="birth_cert_input">
+                                                <Upload size={24} />
+                                                <span>Click to upload PDF</span>
+                                                <input
+                                                    id="birth_cert_input"
+                                                    type="file"
+                                                    ref={birthCertificateInputRef}
+                                                    accept=".pdf,application/pdf"
+                                                    style={{ display: 'none' }}
+                                                    onChange={(event) => updateNewStudentField('birth_certificate', event.target.files?.[0] || null)}
+                                                />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="sec-form-actions">
@@ -2107,61 +2270,6 @@ const StudentAdmissions = () => {
                                     />
                                 </div>
                             </div>
-
-                            {isClassroomStepOpen ? (
-                                <div className="sec-field sec-field--compact">
-                                    <label className="form-label">Classroom</label>
-                                    <select
-                                        className="form-select"
-                                        value={selectedClassroom}
-                                        onChange={(event) => setSelectedClassroom(event.target.value)}
-                                        disabled={!assignmentAcademicYear}
-                                    >
-                                        <option value="">Select Classroom...</option>
-                                        {filteredClassrooms.map((classroom) => {
-                                            const classroomId = getClassroomId(classroom);
-                                            if (!classroomId) {
-                                                return null;
-                                            }
-
-                                            const homeroomTeacherName = classroom.homeroom_teacher_name || 'No homeroom teacher';
-
-                                            return (
-                                                <option key={classroomId} value={classroomId}>
-                                                    {classroom.classroom_name} {classroom.grade_name ? `(${classroom.grade_name})` : ''} - {homeroomTeacherName}
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
-                                </div>
-                            ) : (
-                                <div className="sec-field sec-field--compact">
-                                    <label className="form-label">Classroom</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        value="Select a student, then click Assign Student"
-                                        readOnly
-                                        disabled
-                                    />
-                                </div>
-                            )}
-
-                            <div className="sec-assignment-action">
-                                <button
-                                    type="button"
-                                    className="btn-primary"
-                                    onClick={handleAssign}
-                                    disabled={isAssignDisabled}
-                                >
-                                    <UserPlus size={18} />
-                                    {isAssigningStudent
-                                        ? 'Assigning...'
-                                        : isClassroomStepOpen
-                                            ? 'Confirm Assignment'
-                                            : 'Assign Student'}
-                                </button>
-                            </div>
                         </div>
 
                         <div className="sec-assignment-content">
@@ -2170,58 +2278,12 @@ const StudentAdmissions = () => {
                                     icon={AlertCircle}
                                     message="Please select an academic year to see classrooms and assign students."
                                 />
-                            ) : isStudentsLoading ? (
+                            ) : isStudentsLoading && students.length === 0 ? (
                                 <LoadingSpinner message="Loading students..." />
                             ) : assignmentStudents.length === 0 ? (
                                 <EmptyState icon={Users} message="No students found." />
                             ) : (
                                 <>
-                                    {isClassroomStepOpen ? (
-                                        <div className="sec-classroom-card-section">
-                                            <h4 className="sec-classroom-card-title">Available Classrooms</h4>
-                                            {filteredClassrooms.length === 0 ? (
-                                                <EmptyState
-                                                    icon={GraduationCap}
-                                                    message="No classrooms found for the selected academic year and grade."
-                                                />
-                                            ) : (
-                                                <div className="sec-classroom-grid">
-                                                    {filteredClassrooms.map((classroom) => {
-                                                        const classroomId = getClassroomId(classroom);
-                                                        if (!classroomId) {
-                                                            return null;
-                                                        }
-
-                                                        const classroomName = classroom.classroom_name || `Classroom #${classroomId}`;
-                                                        const gradeName = classroom.grade_name || classroom.grade?.name || 'Grade not set';
-                                                        const homeroomTeacherName = classroom.homeroom_teacher_name || 'No homeroom teacher';
-                                                        const isSelectedClassroom = selectedClassroom === classroomId.toString();
-
-                                                        return (
-                                                            <button
-                                                                key={classroomId}
-                                                                type="button"
-                                                                className={`sec-classroom-card ${isSelectedClassroom ? 'is-selected' : ''}`}
-                                                                onClick={() => setSelectedClassroom(classroomId.toString())}
-                                                            >
-                                                                <div className="sec-classroom-card-head">
-                                                                    <h4>{classroomName}</h4>
-                                                                    {isSelectedClassroom ? (
-                                                                        <span className="sec-checkmark"><Check size={14} /></span>
-                                                                    ) : null}
-                                                                </div>
-                                                                <div className="sec-classroom-card-meta">
-                                                                    <span>Grade: {gradeName}</span>
-                                                                    <span>Homeroom: {homeroomTeacherName}</span>
-                                                                </div>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : null}
-
                                     <div className="sec-assignment-grid">
                                         {assignmentStudents.map((student) => {
                                             const studentId = (student.user_id || student.id)?.toString();
@@ -2232,7 +2294,16 @@ const StudentAdmissions = () => {
                                                     key={studentId}
                                                     type="button"
                                                     className={`sec-student-card ${isSelected ? 'is-selected' : ''}`}
-                                                    onClick={() => setSelectedStudent(isSelected ? '' : studentId)}
+                                                    onClick={() => {
+                                                        if (isSelected) {
+                                                            setSelectedStudent('');
+                                                            setSelectedAssignmentStudent(null);
+                                                            setAvailableClassrooms([]);
+                                                            setCurrentClassroomId(null);
+                                                            return;
+                                                        }
+                                                        handleSelectStudentForAssignment(student);
+                                                    }}
                                                 >
                                                     <div className="sec-student-card-head">
                                                         <div className="sec-row-user">
@@ -2258,6 +2329,61 @@ const StudentAdmissions = () => {
                                             );
                                         })}
                                     </div>
+
+                                    {selectedAssignmentStudent ? (
+                                        <div className="sec-classroom-card-section">
+                                            <div className="assignment-grade-notice">
+                                                <GraduationCap size={16} />
+                                                <span>
+                                                    Showing classrooms for <strong>{selectedAssignmentGradeLabel}</strong> only
+                                                </span>
+                                            </div>
+                                            <p className="sec-subtle-text">
+                                                {getStudentName(selectedAssignmentStudent)} | Current classroom: {selectedAssignmentStudent?.classroom_name || 'Unassigned'}
+                                            </p>
+                                            {availableClassrooms.length === 0 ? (
+                                                <EmptyState
+                                                    icon={GraduationCap}
+                                                    message="No classrooms found for this student's grade."
+                                                />
+                                            ) : (
+                                                <div className="classroom-assign-grid">
+                                                    {availableClassrooms.map((room) => {
+                                                        const roomId = Number(room?.id ?? room?.classroom_id ?? room?.class_room_id);
+                                                        if (!Number.isInteger(roomId) || roomId <= 0) {
+                                                            return null;
+                                                        }
+
+                                                        const isCurrent = currentClassroomId === roomId;
+                                                        const roomName = room.classroom_name || `Classroom #${roomId}`;
+                                                        const studentCount = room.student_count ?? 0;
+                                                        const capacity = room.capacity ?? '∞';
+
+                                                        return (
+                                                            <button
+                                                                key={roomId}
+                                                                type="button"
+                                                                className={`classroom-assign-card ${isCurrent ? 'classroom-assign-card--current' : ''}`}
+                                                                onClick={() => handleAssignToClassroom(roomId)}
+                                                                disabled={isAssigningStudent}
+                                                            >
+                                                                <div className="classroom-assign-name">{roomName}</div>
+                                                                <div className="classroom-assign-meta">
+                                                                    <Users size={14} />
+                                                                    {studentCount} / {capacity} students
+                                                                </div>
+                                                                {isCurrent ? (
+                                                                    <span className="classroom-assign-badge">Current</span>
+                                                                ) : null}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <EmptyState icon={UserPlus} message="Select a student to load grade-matched classrooms." />
+                                    )}
                                 </>
                             )}
                         </div>
@@ -2294,210 +2420,295 @@ const StudentAdmissions = () => {
                 ) : null}
 
                 {activeTab === 'files' ? (
-                    <section className="file-management-grid">
-                        <article className="management-card">
-                            <h3>Upload Documents</h3>
-                            <form onSubmit={handleUploadDocument}>
-                                <div className="file-upload-area">
-                                    <div className="file-upload-icon">
-                                        <Upload size={28} />
-                                    </div>
-                                    <p>Select a document file to upload</p>
-                                    <label htmlFor="student-document-upload" className="btn-secondary sec-upload-trigger">
-                                        Choose File
-                                    </label>
-                                    <input
-                                        id="student-document-upload"
-                                        type="file"
-                                        ref={documentFileInputRef}
-                                        className="sec-hidden-file-input"
-                                        accept=".pdf,.jpg,.jpeg,.png"
-                                        onChange={handleDocumentFileChange}
-                                    />
-                                    <span>
-                                        {documentUpload.file
-                                            ? `${documentUpload.file.name} (${formatFileSize(documentUpload.file.size)})`
-                                            : 'PDF, JPG, PNG up to 10MB'}
-                                    </span>
-                                </div>
-
-                                <div className="sec-field sec-grade-field">
-                                    <label className="form-label">Assign to Student *</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Search and select student..."
-                                        value={documentStudentQuery}
-                                        onChange={handleDocumentStudentQueryChange}
-                                        onFocus={() => setShowDocumentStudentDropdown(true)}
-                                        onBlur={() => setTimeout(() => setShowDocumentStudentDropdown(false), 200)}
-                                        required={!documentUpload.student_id}
-                                    />
-
-                                    {showDocumentStudentDropdown ? (
-                                        <div className="sec-grade-dropdown">
-                                            {isDocumentStudentLoading ? (
-                                                <div className="sec-grade-empty">Loading students...</div>
-                                            ) : documentStudentOptions.length > 0 ? (
-                                                documentStudentOptions.map((studentOption) => {
-                                                    const studentId = String(studentOption?.user_id || studentOption?.id || '');
-                                                    const studentLabel = getStudentName(studentOption);
-                                                    const studentEmail = studentOption?.email || '';
-
-                                                    return (
-                                                        <button
-                                                            key={`${studentId}-${studentEmail}`}
-                                                            type="button"
-                                                            className={`sec-grade-option ${documentUpload.student_id === studentId ? 'is-selected' : ''}`}
-                                                            onMouseDown={() => handleDocumentStudentSelect(studentOption)}
-                                                        >
-                                                            {studentLabel}{studentEmail ? ` (${studentEmail})` : ''}
-                                                        </button>
-                                                    );
-                                                })
-                                            ) : (
-                                                <div className="sec-grade-empty">No students found</div>
-                                            )}
-                                        </div>
-                                    ) : null}
-                                </div>
-
-                                <div className="sec-field">
-                                    <label className="form-label">Document Type</label>
-                                    <select
-                                        className="form-select"
-                                        value={documentUpload.document_type}
-                                        onChange={(event) => {
-                                            const value = event.target.value;
-                                            setDocumentUpload((previous) => ({ ...previous, document_type: value }));
-                                        }}
-                                    >
-                                        {DOCUMENT_TYPE_OPTIONS.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <button type="submit" className="btn-primary sec-btn-block" disabled={isUploadingDocument}>
-                                    {isUploadingDocument ? 'Uploading...' : 'Upload File'}
-                                </button>
-                            </form>
-                        </article>
-
-                        <article className="management-card">
-                            <div className="sec-files-head">
-                                <h3>Recent Uploads</h3>
-                                <div className="search-wrapper sec-search-wrapper sec-search-narrow">
-                                    <Search size={16} className="search-icon" />
-                                    <input
-                                        type="text"
-                                        className="search-input"
-                                        placeholder="Search files..."
-                                        value={fileSearch}
-                                        onChange={(event) => setFileSearch(event.target.value)}
-                                    />
-                                </div>
+                    <section className="management-card">
+                        <div className="files-filter-bar">
+                            <div className="search-input-wrapper">
+                                <Search size={16} className="search-icon" />
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Search by student name..."
+                                    value={fileSearch}
+                                    onChange={(event) => setFileSearch(event.target.value)}
+                                />
                             </div>
 
-                            {isFilesLoading ? (
-                                <SkeletonTable rows={5} cols={5} />
-                            ) : (
-                                <div className="sec-table-scroll">
-                                    <table className="data-table sec-data-table sec-data-table--files">
-                                        <thead>
-                                            <tr>
-                                                <th>File Type</th>
-                                                <th>Student</th>
-                                                <th>Size</th>
-                                                <th>Date</th>
-                                                <th>Actions</th>
+                            <select
+                                className="form-select"
+                                value={filesTypeFilter}
+                                onChange={(event) => setFilesTypeFilter(event.target.value)}
+                            >
+                                <option value="">All Document Types</option>
+                                {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+
+                            <button type="button" className="btn-primary" onClick={() => setShowUploadModal(true)}>
+                                <Upload size={16} />
+                                Upload Document
+                            </button>
+                        </div>
+
+                        {isFilesLoading && files.length === 0 ? (
+                            <SkeletonTable rows={6} cols={7} />
+                        ) : (
+                            <div className="sec-table-scroll">
+                                <table className="data-table sec-data-table sec-data-table--files-wide">
+                                    <thead>
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>Document Type</th>
+                                            <th>File Name</th>
+                                            <th>Size</th>
+                                            <th>Uploaded By</th>
+                                            <th>Date</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {files.map((documentRecord) => (
+                                            <tr key={documentRecord.id}>
+                                                <td>
+                                                    <div className="student-cell">
+                                                        <AvatarInitial name={documentRecord.student_name} color="indigo" size="sm" />
+                                                        <div>
+                                                            <p className="student-name">{documentRecord.student_name || 'N/A'}</p>
+                                                            <p className="student-email">{documentRecord.student_email || 'N/A'}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <StatusBadge status={documentRecord.document_type} />
+                                                </td>
+                                                <td className="file-name-cell">
+                                                    <FileText size={14} />
+                                                    {documentRecord.file_name || 'N/A'}
+                                                </td>
+                                                <td>{formatFileSize(documentRecord.file_size)}</td>
+                                                <td>{documentRecord.uploaded_by_name || '—'}</td>
+                                                <td>{formatDateValue(documentRecord.created_at)}</td>
+                                                <td>
+                                                    <div className="action-btns">
+                                                        <a
+                                                            href={documentRecord.file_url || '#'}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="btn-icon btn-icon--secondary"
+                                                            title="View/Download"
+                                                            onClick={(event) => {
+                                                                if (!documentRecord.file_url) {
+                                                                    event.preventDefault();
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Download size={15} />
+                                                        </a>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-icon btn-icon--danger"
+                                                            title="Delete"
+                                                            onClick={() => handleDeleteDocument(documentRecord)}
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody>
-                                            {files.map((file) => {
-                                                const fileTypeLabel = file.document_type_label || file.document_type || 'Document';
-                                                const studentLabel = file.student_name || 'Unknown Student';
-                                                const studentEmail = file.student_email || '';
+                                        ))}
+                                        {files.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="7">
+                                                    <EmptyState icon={FileText} message="No documents found." />
+                                                </td>
+                                            </tr>
+                                        ) : null}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
 
-                                                return (
-                                                    <tr key={file.id}>
-                                                        <td>
-                                                            <div className="sec-file-cell">
-                                                                <FileText size={16} />
-                                                                <span>{fileTypeLabel}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="sec-file-student">
-                                                                <span>{studentLabel}</span>
-                                                                {studentEmail ? <small className="cell-muted">{studentEmail}</small> : null}
-                                                            </div>
-                                                        </td>
-                                                        <td className="cell-muted">{formatFileSize(file.file_size)}</td>
-                                                        <td className="cell-muted">{formatDateValue(file.created_at)}</td>
-                                                        <td>
-                                                            <button
-                                                                type="button"
-                                                                className="btn-icon success"
-                                                                aria-label={`Download ${fileTypeLabel}`}
-                                                                disabled={!file.file_url}
-                                                                onClick={() => {
-                                                                    if (file.file_url) {
-                                                                        window.open(file.file_url, '_blank', 'noopener,noreferrer');
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Download size={16} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                            {files.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan="5">
-                                                        <EmptyState icon={FileText} message="No files uploaded yet." />
-                                                    </td>
-                                                </tr>
-                                            ) : null}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {filesPagination.count > 0 ? (
-                                <div className="sec-table-pagination">
-                                    <span className="sec-table-pagination-summary">
-                                        Showing {files.length} files on this page ({filesPagination.count} total)
+                        {filesPagination.count > 0 ? (
+                            <div className="sec-table-pagination">
+                                <span className="sec-table-pagination-summary">
+                                    Showing {files.length} files on this page ({filesPagination.count} total)
+                                </span>
+                                <div className="sec-table-pagination-controls">
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={() => setFilesPage((previous) => Math.max(1, previous - 1))}
+                                        disabled={!filesPagination.previous || isFilesLoading}
+                                    >
+                                        Previous
+                                    </button>
+                                    <span className="sec-table-pagination-page">
+                                        Page {filesPage} of {filesTotalPages}
                                     </span>
-                                    <div className="sec-table-pagination-controls">
-                                        <button
-                                            type="button"
-                                            className="btn-secondary"
-                                            onClick={() => setFilesPage((previous) => Math.max(1, previous - 1))}
-                                            disabled={!filesPagination.previous || isFilesLoading}
-                                        >
-                                            Previous
-                                        </button>
-                                        <span className="sec-table-pagination-page">
-                                            Page {filesPage} of {filesTotalPages}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            className="btn-secondary"
-                                            onClick={() => setFilesPage((previous) => Math.min(filesTotalPages, previous + 1))}
-                                            disabled={!filesPagination.next || isFilesLoading}
-                                        >
-                                            Next
-                                        </button>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={() => setFilesPage((previous) => Math.min(filesTotalPages, previous + 1))}
+                                        disabled={!filesPagination.next || isFilesLoading}
+                                    >
+                                        Next
+                                    </button>
                                 </div>
-                            ) : null}
-                        </article>
+                            </div>
+                        ) : null}
                     </section>
                 ) : null}
+
+                {showUploadModal ? (
+                    <div className="sec-modal-overlay" onClick={() => setShowUploadModal(false)}>
+                        <div className="sec-modal sec-modal--sm" onClick={(event) => event.stopPropagation()}>
+                            <div className="sec-modal-header">
+                                <h3>Upload Student Document</h3>
+                                <button
+                                    type="button"
+                                    className="modal-close-btn"
+                                    onClick={() => setShowUploadModal(false)}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleUploadDocument}>
+                                <div className="sec-modal-body">
+                                    <div className="form-group">
+                                        <label className="form-label">Student <span className="required-star">*</span></label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Search student name..."
+                                            value={documentUpload.studentSearch || documentStudentQuery}
+                                            onChange={(event) => handleStudentSearch(event.target.value)}
+                                            onFocus={() => setShowDocumentStudentDropdown(true)}
+                                        />
+
+                                        {showDocumentStudentDropdown ? (
+                                            <div className="student-search-dropdown">
+                                                {isDocumentStudentLoading ? (
+                                                    <div className="student-search-option text-muted">Loading students...</div>
+                                                ) : studentSearchResults.length > 0 ? (
+                                                    studentSearchResults.map((studentOption) => (
+                                                        <button
+                                                            key={studentOption.id || studentOption.user_id}
+                                                            type="button"
+                                                            className="student-search-option"
+                                                            onClick={() => selectUploadStudent(studentOption)}
+                                                        >
+                                                            <AvatarInitial name={getStudentName(studentOption)} size="sm" />
+                                                            <span>{getStudentName(studentOption)}</span>
+                                                            <span className="text-muted">{studentOption.email}</span>
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="student-search-option text-muted">No students found</div>
+                                                )}
+                                            </div>
+                                        ) : null}
+
+                                        {documentUpload.selectedStudent ? (
+                                            <div className="selected-student-badge">
+                                                <AvatarInitial name={documentUpload.selectedStudent.full_name} size="sm" />
+                                                {documentUpload.selectedStudent.full_name}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setDocumentUpload((previous) => ({
+                                                            ...previous,
+                                                            selectedStudent: null,
+                                                            student_id: '',
+                                                            studentSearch: '',
+                                                        }));
+                                                        setDocumentStudentQuery('');
+                                                    }}
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        ) : null}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Document Type <span className="required-star">*</span></label>
+                                        <select
+                                            className="form-select"
+                                            value={documentUpload.document_type}
+                                            onChange={(event) => setDocumentUpload((previous) => ({ ...previous, document_type: event.target.value }))}
+                                        >
+                                            {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">File <span className="required-star">*</span></label>
+                                        <div className={`file-drop-zone ${documentUpload.file ? 'file-drop-zone--has-file' : ''}`}>
+                                            {documentUpload.file ? (
+                                                <div className="file-selected">
+                                                    <FileText size={20} />
+                                                    <span>{documentUpload.file.name}</span>
+                                                    <span className="text-muted">({formatFileSize(documentUpload.file.size)})</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDocumentUpload((previous) => ({ ...previous, file: null }))}
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <label className="file-drop-label" htmlFor="doc_file_input">
+                                                    <Upload size={28} />
+                                                    <span>Drag & drop or click to upload</span>
+                                                    <span className="file-hint">PDF, JPG, PNG accepted</span>
+                                                    <input
+                                                        id="doc_file_input"
+                                                        type="file"
+                                                        ref={documentFileInputRef}
+                                                        style={{ display: 'none' }}
+                                                        accept=".pdf,.jpg,.jpeg,.png"
+                                                        onChange={handleDocumentFileChange}
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="sec-modal-footer">
+                                    <button type="button" className="btn-secondary" onClick={() => setShowUploadModal(false)}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="btn-primary" disabled={isUploadingDocument}>
+                                        {isUploadingDocument ? 'Uploading...' : (
+                                            <>
+                                                <Upload size={16} />
+                                                Upload
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                ) : null}
+
+                <ConfirmModal
+                    isOpen={showDeleteDocConfirm}
+                    title="Delete Document?"
+                    message={`Delete ${documentToDelete?.file_name || 'this document'}? This action cannot be undone.`}
+                    confirmLabel="Delete"
+                    cancelLabel="Cancel"
+                    danger
+                    onCancel={() => {
+                        setShowDeleteDocConfirm(false);
+                        setDocumentToDelete(null);
+                    }}
+                    onConfirm={confirmDeleteDocument}
+                />
             </div>
         </div>
     );

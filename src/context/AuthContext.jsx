@@ -22,12 +22,52 @@ const ROLE_MAP = {
     'guest': 'GUEST'
 };
 
+const normalizeRoleKey = (role) => {
+    if (role === null || role === undefined) {
+        return '';
+    }
+
+    const normalizedRole = String(role).trim().toLowerCase();
+    if (!normalizedRole) {
+        return '';
+    }
+
+    return ROLE_MAP[normalizedRole] || normalizedRole.toUpperCase();
+};
+
+const normalizeUser = (rawUser) => {
+    if (!rawUser || typeof rawUser !== 'object') {
+        return null;
+    }
+
+    const displayNameCandidate =
+        (typeof rawUser.displayName === 'string' && rawUser.displayName.trim())
+            ? rawUser.displayName
+            : (rawUser.full_name || rawUser.email || '');
+
+    return {
+        ...rawUser,
+        role: normalizeRoleKey(rawUser.role),
+        displayName: String(displayNameCandidate || '').trim() || 'User'
+    };
+};
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(() => {
         const savedUser = localStorage.getItem('user');
-        return savedUser ? JSON.parse(savedUser) : null;
+        if (!savedUser) {
+            return null;
+        }
+
+        try {
+            return normalizeUser(JSON.parse(savedUser));
+        } catch (error) {
+            console.warn('Failed to parse saved user session:', error);
+            localStorage.removeItem('user');
+            return null;
+        }
     });
     const [permissions, setPermissions] = useState([]);
     const [portalType, setPortalType] = useState(null); // 'PORTAL' or 'WORKSTREAM'
@@ -45,18 +85,22 @@ export const AuthProvider = ({ children }) => {
 
             if (accessToken && savedUser) {
                 try {
-                    const parsedUser = JSON.parse(savedUser);
-                    const roleConfig = getRoleConfig(parsedUser.role);
+                    const normalizedUser = normalizeUser(JSON.parse(savedUser));
+                    if (!normalizedUser?.role) {
+                        throw new Error('Saved user session is missing a valid role.');
+                    }
+                    const roleConfig = getRoleConfig(normalizedUser?.role);
 
                     // Check if session tracking exists
                     const sessionInfo = SessionManager.getSessionInfo();
 
                     // If no session info, user just logged in - skip check
                     if (!sessionInfo) {
-                        setUser(parsedUser);
+                        setUser(normalizedUser);
                         setPermissions(roleConfig?.permissions || []);
                         setPortalType(savedPortalType);
                         setWorkstreamId(savedWorkstreamId);
+                        localStorage.setItem('user', JSON.stringify(normalizedUser));
                         return;
                     }
 
@@ -108,10 +152,11 @@ export const AuthProvider = ({ children }) => {
                     }
 
                     // Session is valid - restore user
-                    setUser(parsedUser);
+                    setUser(normalizedUser);
                     setPermissions(roleConfig?.permissions || []);
                     setPortalType(savedPortalType);
                     setWorkstreamId(savedWorkstreamId);
+                    localStorage.setItem('user', JSON.stringify(normalizedUser));
 
                 } catch (e) {
                     console.error('Failed to restore session:', e);
@@ -139,17 +184,12 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('portalType', type);
         if (wsId) localStorage.setItem('workstreamId', wsId.toString());
 
-        // Map backend role to frontend role key
-        const backendRole = backendUser.role?.toLowerCase();
-        const roleKey = ROLE_MAP[backendRole] || backendRole?.toUpperCase();
-        const roleConfig = getRoleConfig(roleKey);
-
-        // 2. Set the authenticated user state
-        const userData = {
-            ...backendUser,
-            role: roleKey,
-            displayName: backendUser.full_name || backendUser.email
-        };
+        // 2. Normalize and store authenticated user data
+        const userData = normalizeUser(backendUser);
+        if (!userData?.role) {
+            throw new Error('Unable to resolve your account role. Please contact support.');
+        }
+        const roleConfig = getRoleConfig(userData?.role);
         setUser(userData);
         setPortalType(type);
         setWorkstreamId(wsId);
@@ -164,7 +204,7 @@ export const AuthProvider = ({ children }) => {
         SessionManager.initSession();
 
         // 5. Redirect to the role's base path
-        const basePath = getBasePath(roleKey);
+        const basePath = getBasePath(userData?.role);
         navigate(basePath);
     }, [navigate]);
 

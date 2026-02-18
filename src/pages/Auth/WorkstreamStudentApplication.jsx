@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CheckCircle2, GraduationCap, Upload } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, GraduationCap, Lock, Upload } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import authService from '../../services/authService';
 import styles from './WorkstreamStudentApplication.module.css';
@@ -65,6 +65,8 @@ const getApiErrorMessage = (error, fallbackMessage) => {
 const createDefaultFormState = () => ({
     full_name: '',
     email: '',
+    password: '',
+    confirm_password: '',
     school_id: '',
     grade_id: '',
     date_of_birth: '',
@@ -86,6 +88,8 @@ const WorkstreamStudentApplication = () => {
     const [workstreamName, setWorkstreamName] = useState('');
 
     const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const [loadingContext, setLoadingContext] = useState(true);
     const [loadingGrades, setLoadingGrades] = useState(false);
@@ -192,6 +196,16 @@ const WorkstreamStudentApplication = () => {
         event.preventDefault();
         setError('');
 
+        if ((formState.password || '').length < 8) {
+            setError('Password must be at least 8 characters.');
+            return;
+        }
+
+        if (formState.password !== formState.confirm_password) {
+            setError('Passwords do not match.');
+            return;
+        }
+
         if (!formState.birth_certificate) {
             setError('Birth certificate PDF is required.');
             return;
@@ -226,6 +240,8 @@ const WorkstreamStudentApplication = () => {
         const payload = new FormData();
         payload.append('full_name', formState.full_name.trim());
         payload.append('email', normalizedEmail);
+        payload.append('password', formState.password);
+        payload.append('confirm_password', formState.confirm_password);
         payload.append('school_id', formState.school_id);
         payload.append('grade_id', formState.grade_id);
         payload.append('date_of_birth', formState.date_of_birth);
@@ -339,6 +355,59 @@ const WorkstreamStudentApplication = () => {
                                 onChange={(event) => updateFormField('email', event.target.value)}
                                 required
                             />
+                        </div>
+
+                        <div className={styles.inputGroup}>
+                            <label className={styles.label} htmlFor="password">
+                                <Lock size={14} />
+                                Password
+                            </label>
+                            <div className={styles.passwordWrapper}>
+                                <input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    className={styles.input}
+                                    value={formState.password}
+                                    onChange={(event) => updateFormField('password', event.target.value)}
+                                    placeholder="Minimum 8 characters"
+                                    minLength={8}
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    className={styles.passwordToggle}
+                                    onClick={() => setShowPassword((previous) => !previous)}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className={styles.inputGroup}>
+                            <label className={styles.label} htmlFor="confirm_password">Confirm Password</label>
+                            <div className={styles.passwordWrapper}>
+                                <input
+                                    id="confirm_password"
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    className={`${styles.input} ${formState.confirm_password && formState.password !== formState.confirm_password ? styles.inputError : ''}`}
+                                    value={formState.confirm_password}
+                                    onChange={(event) => updateFormField('confirm_password', event.target.value)}
+                                    placeholder="Repeat your password"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    className={styles.passwordToggle}
+                                    onClick={() => setShowConfirmPassword((previous) => !previous)}
+                                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                                >
+                                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                            {formState.confirm_password && formState.password !== formState.confirm_password ? (
+                                <small className={styles.fieldError}>Passwords do not match.</small>
+                            ) : null}
                         </div>
 
                         <div className={styles.inputGroup}>

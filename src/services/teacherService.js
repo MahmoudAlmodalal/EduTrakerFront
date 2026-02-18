@@ -88,6 +88,20 @@ const teacherService = {
     publishAssignmentGrades: async (assignmentId, is_grades_published) => {
         return api.patch(`/teacher/assignments/${assignmentId}/publish-grades/`, { is_grades_published });
     },
+    getTeacherGrades: async () => {
+        return api.get('/teacher/grades/');
+    },
+    bulkCreateAssignmentByGrade: async (data) => {
+        const formData = new FormData();
+        Object.entries(data).forEach(([key, value]) => {
+            if (value !== null && value !== undefined && value !== '') {
+                formData.append(key, value);
+            }
+        });
+        return api.post('/teacher/assignments/bulk-by-grade/', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
 
     // Attendance
     getAttendance: async (filters = {}) => {

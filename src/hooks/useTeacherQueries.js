@@ -22,7 +22,8 @@ export const teacherQueryKeys = {
     messages: (params = {}) => ['teacher', 'messages', params],
     messageThread: (threadId) => ['teacher', 'message-thread', threadId],
     communicationUsers: (params = {}) => ['teacher', 'communication-users', params],
-    knowledgeGaps: (allocationId, threshold = 50.0) => ['teacher', 'knowledge-gaps', allocationId, threshold]
+    knowledgeGaps: (allocationId, threshold = 50.0) => ['teacher', 'knowledge-gaps', allocationId, threshold],
+    grades: () => ['teacher', 'grades'],
 };
 
 const mapListData = (data, updater) => {
@@ -65,6 +66,25 @@ export const useTeacherAllocations = (date = todayIsoDate(), options = {}) =>
         staleTime: 5 * 60 * 1000,
         ...options
     });
+
+export const useTeacherGrades = (options = {}) =>
+    useQuery({
+        queryKey: teacherQueryKeys.grades(),
+        queryFn: () => teacherService.getTeacherGrades(),
+        select: (data) => (Array.isArray(data) ? data : (data?.results ?? [])),
+        staleTime: 10 * 60 * 1000,
+        ...options
+    });
+
+export const useBulkCreateAssignmentByGrade = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data) => teacherService.bulkCreateAssignmentByGrade(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+        }
+    });
+};
 
 export const useTeacherNotifications = (params = { page_size: 5 }, options = {}) =>
     useQuery({

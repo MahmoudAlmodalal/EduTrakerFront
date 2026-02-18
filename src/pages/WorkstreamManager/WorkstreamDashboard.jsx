@@ -1,33 +1,60 @@
-import React, { useState, useEffect } from 'react';
-import { School, Users, GraduationCap, TrendingUp, TrendingDown, Activity, Award, Calendar } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { School, Users, GraduationCap, TrendingUp, TrendingDown, Calendar, RefreshCw } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import workstreamService from '../../services/workstreamService';
-import ActivityChart from '../../components/charts/ActivityChart';
 import './Workstream.css';
 
 const WorkstreamDashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
+    const [isRefreshingRows, setIsRefreshingRows] = useState(false);
     const [dashboardData, setDashboardData] = useState(null);
-    const [activityData, setActivityData] = useState([]);
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const hasLoadedRef = useRef(false);
+    const lastDashboardSignatureRef = useRef('');
+
+    const fetchDashboardData = useCallback(async ({ showSkeletonRows = false, onlyIfChanged = false } = {}) => {
+        const isInitialLoad = !hasLoadedRef.current;
+        if (isInitialLoad) {
+            setLoading(true);
+        } else if (showSkeletonRows) {
+            setIsRefreshingRows(true);
+        }
+
+        try {
+            const response = await workstreamService.getDashboardStatistics();
+            const nextStatistics = response?.statistics || null;
+            const nextSignature = JSON.stringify(nextStatistics || {});
+            const hasChanged = nextSignature !== lastDashboardSignatureRef.current;
+
+            if (hasChanged || !onlyIfChanged) {
+                setDashboardData(nextStatistics);
+                lastDashboardSignatureRef.current = nextSignature;
+                setLastUpdated(new Date());
+            }
+        } catch (error) {
+            console.error('Failed to fetch dashboard data:', error);
+        } finally {
+            hasLoadedRef.current = true;
+            setLoading(false);
+            setIsRefreshingRows(false);
+        }
+    }, []);
 
     useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                const response = await workstreamService.getDashboardStatistics();
-                setDashboardData(response.statistics);
-                setActivityData(response.activity_chart || []);
-            } catch (error) {
-                console.error('Failed to fetch dashboard data:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchDashboardData();
-    }, []);
+    }, [fetchDashboardData]);
+
+    useEffect(() => {
+        const handleFocus = () => {
+            // Silent refresh on focus: update UI only when payload changed.
+            fetchDashboardData({ onlyIfChanged: true });
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, [fetchDashboardData]);
 
     const stats = [
         {
@@ -110,12 +137,34 @@ const WorkstreamDashboard = () => {
         return <div className="workstream-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading...</div>;
     }
 
+    const lastUpdatedLabel = lastUpdated
+        ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : 'N/A';
+
     return (
         <div className="workstream-dashboard">
             {/* Header */}
             <div className="workstream-header">
-                <h1 className="workstream-title">Welcome back, {user?.displayName?.split(' ')[0] || user?.name?.split(' ')[0] || 'Manager'}! 👋</h1>
-                <p className="workstream-subtitle">{t('workstream.dashboard.subtitle')}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div>
+                        <h1 className="workstream-title">Welcome back, {user?.displayName?.split(' ')[0] || user?.name?.split(' ')[0] || 'Manager'}! 👋</h1>
+                        <p className="workstream-subtitle">{t('workstream.dashboard.subtitle')}</p>
+                    </div>
+                    <div className="workstream-refresh-meta">
+                        <button
+                            type="button"
+                            className="workstream-refresh-btn"
+                            onClick={() => fetchDashboardData({ showSkeletonRows: true })}
+                            title="Refresh dashboard"
+                            aria-label="Refresh dashboard"
+                        >
+                            <RefreshCw size={16} />
+                        </button>
+                        <span className="workstream-last-updated">
+                            Updated {lastUpdatedLabel}
+                        </span>
+                    </div>
+                </div>
             </div>
 
             {/* Stats Cards */}
@@ -151,7 +200,16 @@ const WorkstreamDashboard = () => {
                         </p>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {schoolPerformance.length > 0 ? schoolPerformance.map((school, index) => {
+                        {isRefreshingRows ? Array.from({ length: Math.max(3, schoolPerformance.length || 0) }).map((_, index) => (
+                            <div key={`skeleton-${index}`} className="workstream-skeleton-row">
+                                <div className="workstream-skeleton-badge"></div>
+                                <div className="workstream-skeleton-main">
+                                    <div className="workstream-skeleton-line"></div>
+                                    <div className="workstream-skeleton-line short"></div>
+                                </div>
+                                <div className="workstream-skeleton-progress"></div>
+                            </div>
+                        )) : schoolPerformance.length > 0 ? schoolPerformance.map((school, index) => {
                             const score = school.score;
                             const name = school.name;
                             const students = school.students;

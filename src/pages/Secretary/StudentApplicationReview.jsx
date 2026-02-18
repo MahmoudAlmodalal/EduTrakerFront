@@ -5,6 +5,7 @@ import { useToast } from '../../components/ui/Toast';
 import secretaryService from '../../services/secretaryService';
 import {
     AlertBanner,
+    ConfirmModal,
     LoadingSpinner,
     PageHeader,
     StatusBadge,
@@ -92,6 +93,7 @@ const StudentApplicationReview = () => {
     const [application, setApplication] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showRejectConfirm, setShowRejectConfirm] = useState(false);
     const [banner, setBanner] = useState({ type: 'error', message: '' });
 
     const setFeedback = useCallback((type, message) => {
@@ -140,7 +142,7 @@ const StudentApplicationReview = () => {
         return `${baseName || 'student'}_birth_certificate.pdf`;
     }, [application?.full_name]);
 
-    const handleUpdateStatus = useCallback(async (targetStatus, successMessage) => {
+    const handleUpdateStatus = useCallback(async (targetStatus, successMessage, { redirect = false } = {}) => {
         if (!application?.id) {
             setFeedback('error', 'Could not determine application id.');
             return;
@@ -158,6 +160,9 @@ const StudentApplicationReview = () => {
 
             setApplication(updated);
             setFeedback('success', successMessage);
+            if (redirect) {
+                navigate('/secretary/admissions');
+            }
         } catch (error) {
             const message = getApiErrorMessage(error, 'Failed to update application status.');
             setFeedback('error', message);
@@ -263,7 +268,7 @@ const StudentApplicationReview = () => {
                             type="button"
                             className="btn-secondary"
                             disabled={!canReject}
-                            onClick={() => handleUpdateStatus('rejected', 'Application rejected successfully.')}
+                            onClick={() => setShowRejectConfirm(true)}
                         >
                             <XCircle size={16} />
                             Reject
@@ -272,14 +277,29 @@ const StudentApplicationReview = () => {
                             type="button"
                             className="btn-primary"
                             disabled={!canEnroll}
-                            onClick={() => handleUpdateStatus('active', 'Application enrolled successfully.')}
+                            onClick={() => handleUpdateStatus('enrolled', 'Application enrolled successfully.', { redirect: true })}
                         >
                             <UserCheck size={16} />
-                            {isSubmitting ? 'Saving...' : (isEnrolled ? 'Already Enrolled' : 'Mark as Enrolled')}
+                            {isSubmitting ? 'Saving...' : (isEnrolled ? 'Already Enrolled' : 'Approve & Enroll')}
                         </button>
                     </div>
                 </section>
             )}
+
+            <ConfirmModal
+                isOpen={showRejectConfirm}
+                title="Reject Application"
+                message={`Are you sure you want to reject ${application?.full_name || 'this student'}'s application? If a student account was created, it will be removed.`}
+                confirmLabel={isSubmitting ? 'Rejecting...' : 'Yes, Reject'}
+                cancelLabel="Cancel"
+                danger
+                confirmDisabled={isSubmitting}
+                onCancel={() => setShowRejectConfirm(false)}
+                onConfirm={async () => {
+                    setShowRejectConfirm(false);
+                    await handleUpdateStatus('rejected', 'Application rejected successfully.', { redirect: true });
+                }}
+            />
         </div>
     );
 };

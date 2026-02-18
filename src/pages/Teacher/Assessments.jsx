@@ -15,11 +15,13 @@ import { toast } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
 import {
     useBulkImportTeacherMarksMutation,
+    useBulkCreateAssignmentByGrade,
     useCreateTeacherAssignmentMutation,
     useDeactivateTeacherAssignmentMutation,
     useRecordTeacherMarkMutation,
     useTeacherAllocations,
     useTeacherAssignments,
+    useTeacherGrades,
     useTeacherMarks,
     useTeacherStudents,
     useUpdateTeacherAssignmentMutation
@@ -114,6 +116,9 @@ const Assessments = () => {
     const [assignmentForm, setAssignmentForm] = useState(emptyForm);
     const [allocationSearch, setAllocationSearch] = useState('');
 
+    const [assignmentMode, setAssignmentMode] = useState('individual');
+    const [selectedGradeId, setSelectedGradeId] = useState('');
+
     const [markingAssignment, setMarkingAssignment] = useState(null);
     const [markDrafts, setMarkDrafts] = useState({});
     const [bulkFile, setBulkFile] = useState(null);
@@ -134,9 +139,12 @@ const Assessments = () => {
     const totalAssignmentsCount = Number(assignmentsData?.count || assignments.length || 0);
     const totalPages = Math.max(1, Math.ceil(totalAssignmentsCount / pageSize));
 
+    const { data: gradesData = [] } = useTeacherGrades();
+
     const createAssignmentMutation = useCreateTeacherAssignmentMutation();
     const updateAssignmentMutation = useUpdateTeacherAssignmentMutation();
     const deactivateAssignmentMutation = useDeactivateTeacherAssignmentMutation();
+    const bulkCreateByGradeMutation = useBulkCreateAssignmentByGrade();
 
     const recordMarkMutation = useRecordTeacherMarkMutation();
     const bulkImportMarksMutation = useBulkImportTeacherMarksMutation();
@@ -251,6 +259,8 @@ const Assessments = () => {
     const openCreateModal = useCallback(() => {
         setEditingAssignment(null);
         setAssignmentForm(emptyForm);
+        setAssignmentMode('individual');
+        setSelectedGradeId('');
         setShowAssignmentModal(true);
         const nextParams = new URLSearchParams(searchParams);
         nextParams.delete('tab');
@@ -276,6 +286,8 @@ const Assessments = () => {
         setShowAssignmentModal(false);
         setEditingAssignment(null);
         setAssignmentForm(emptyForm);
+        setAssignmentMode('individual');
+        setSelectedGradeId('');
     }, []);
 
     const handleSubmitAssignment = useCallback(async (event) => {
@@ -289,33 +301,65 @@ const Assessments = () => {
             return;
         }
 
-        const formData = new FormData();
-        formData.append('title', title);
-        formData.append('description', assignmentForm.description.trim());
-        formData.append('full_mark', String(Number(fullMark)));
-        formData.append('exam_type', assignmentForm.type);
-        formData.append('assignment_type', assignmentForm.type);
-
-        const dueDateIso = toIsoFromLocal(assignmentForm.dueDate);
-        if (dueDateIso) {
-            formData.append('due_date', dueDateIso);
-        }
-
-        if (!editingAssignment) {
-            if (assignmentForm.allocationId) {
-                formData.append('course_allocation', String(Number(assignmentForm.allocationId)));
-            }
-        }
-
-        if (assignmentForm.attachmentFile) {
-            formData.append('attachment_file', assignmentForm.attachmentFile);
-        }
-
         try {
             if (editingAssignment) {
+                // Edit is always individual
+                const formData = new FormData();
+                formData.append('title', title);
+                formData.append('description', assignmentForm.description.trim());
+                formData.append('full_mark', String(Number(fullMark)));
+                formData.append('exam_type', assignmentForm.type);
+                formData.append('assignment_type', assignmentForm.type);
+                const dueDateIso = toIsoFromLocal(assignmentForm.dueDate);
+                if (dueDateIso) {
+                    formData.append('due_date', dueDateIso);
+                }
+                if (assignmentForm.attachmentFile) {
+                    formData.append('attachment_file', assignmentForm.attachmentFile);
+                }
                 await updateAssignmentMutation.mutateAsync({ id: editingAssignment.id, payload: formData });
                 toast.success('Assignment updated.');
+            } else if (assignmentMode === 'by-grade') {
+                if (!selectedGradeId) {
+                    toast.error('Select a grade first.');
+                    return;
+                }
+                const payload = {
+                    grade_id: Number(selectedGradeId),
+                    title,
+                    description: assignmentForm.description.trim(),
+                    full_mark: String(Number(fullMark)),
+                    exam_type: assignmentForm.type,
+                    assignment_type: assignmentForm.type,
+                };
+                const dueDateIso = toIsoFromLocal(assignmentForm.dueDate);
+                if (dueDateIso) {
+                    payload.due_date = dueDateIso;
+                }
+                if (assignmentForm.attachmentFile) {
+                    payload.attachment_file = assignmentForm.attachmentFile;
+                }
+                const created = await bulkCreateByGradeMutation.mutateAsync(payload);
+                const count = Array.isArray(created) ? created.length : 1;
+                toast.success(`Assignment created for ${count} classroom(s) in this grade.`);
             } else {
+                // Individual classroom
+                const formData = new FormData();
+                formData.append('title', title);
+                formData.append('description', assignmentForm.description.trim());
+                formData.append('full_mark', String(Number(fullMark)));
+                formData.append('exam_type', assignmentForm.type);
+                formData.append('assignment_type', assignmentForm.type);
+                const dueDateIso = toIsoFromLocal(assignmentForm.dueDate);
+                if (dueDateIso) {
+                    formData.append('due_date', dueDateIso);
+                }
+                if (assignmentForm.allocationId) {
+                    formData.append('course_allocation', String(Number(assignmentForm.allocationId)));
+                }
+                if (assignmentForm.attachmentFile) {
+                    formData.append('attachment_file', assignmentForm.attachmentFile);
+                }
                 await createAssignmentMutation.mutateAsync(formData);
                 toast.success('Assignment created.');
             }
@@ -323,7 +367,11 @@ const Assessments = () => {
         } catch (error) {
             toast.error(error?.message || 'Failed to save assignment.');
         }
-    }, [assignmentForm, closeAssignmentModal, createAssignmentMutation, editingAssignment, updateAssignmentMutation]);
+    }, [
+        assignmentForm, assignmentMode, selectedGradeId,
+        closeAssignmentModal, createAssignmentMutation,
+        updateAssignmentMutation, bulkCreateByGradeMutation, editingAssignment
+    ]);
 
     const handleDeactivateAssignment = useCallback(async (assignmentId) => {
         if (!window.confirm('Deactivate this assignment?')) {
@@ -722,6 +770,47 @@ const Assessments = () => {
                         </div>
 
                         <form onSubmit={handleSubmitAssignment} style={{ display: 'grid', gap: '0.75rem', marginTop: '0.8rem' }}>
+                            {/* Mode toggle — only shown when creating, not editing */}
+                            {!editingAssignment && (
+                                <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: '0.55rem', overflow: 'hidden' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAssignmentMode('individual')}
+                                        style={{
+                                            flex: 1,
+                                            padding: '0.5rem 0.75rem',
+                                            fontSize: '0.82rem',
+                                            fontWeight: 600,
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            background: assignmentMode === 'individual' ? 'var(--color-primary)' : 'var(--color-bg-surface)',
+                                            color: assignmentMode === 'individual' ? '#fff' : 'var(--color-text-main)',
+                                            transition: 'background 0.15s',
+                                        }}
+                                    >
+                                        Individual Classroom
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAssignmentMode('by-grade')}
+                                        style={{
+                                            flex: 1,
+                                            padding: '0.5rem 0.75rem',
+                                            fontSize: '0.82rem',
+                                            fontWeight: 600,
+                                            border: 'none',
+                                            borderLeft: '1px solid var(--color-border)',
+                                            cursor: 'pointer',
+                                            background: assignmentMode === 'by-grade' ? 'var(--color-primary)' : 'var(--color-bg-surface)',
+                                            color: assignmentMode === 'by-grade' ? '#fff' : 'var(--color-text-main)',
+                                            transition: 'background 0.15s',
+                                        }}
+                                    >
+                                        All Classes in Grade
+                                    </button>
+                                </div>
+                            )}
+
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
                                     Title
@@ -740,37 +829,65 @@ const Assessments = () => {
                                     Description
                                 </label>
                                 <textarea
-                                    rows={4}
+                                    rows={3}
                                     value={assignmentForm.description}
                                     onChange={(event) => setAssignmentForm((prev) => ({ ...prev, description: event.target.value }))}
                                     style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
                                 />
                             </div>
 
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
-                                    Allocation
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="Search class/subject"
-                                    value={allocationSearch}
-                                    onChange={(event) => setAllocationSearch(event.target.value)}
-                                    style={{ width: '100%', marginBottom: '0.45rem', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem' }}
-                                />
-                                <select
-                                    value={assignmentForm.allocationId}
-                                    onChange={(event) => setAssignmentForm((prev) => ({ ...prev, allocationId: event.target.value }))}
-                                    style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
-                                >
-                                    <option value="">All my classes (no specific class)</option>
-                                    {filteredAllocations.map((allocation) => (
-                                        <option key={allocation.id} value={String(allocation.id)}>
-                                            {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            {/* Individual mode — classroom/allocation selector */}
+                            {(assignmentMode === 'individual' || editingAssignment) && (
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                        Classroom / Allocation
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Search class/subject"
+                                        value={allocationSearch}
+                                        onChange={(event) => setAllocationSearch(event.target.value)}
+                                        style={{ width: '100%', marginBottom: '0.45rem', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
+                                    />
+                                    <select
+                                        value={assignmentForm.allocationId}
+                                        onChange={(event) => setAssignmentForm((prev) => ({ ...prev, allocationId: event.target.value }))}
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
+                                    >
+                                        <option value="">All my classes (no specific class)</option>
+                                        {filteredAllocations.map((allocation) => (
+                                            <option key={allocation.id} value={String(allocation.id)}>
+                                                {(allocation.classroom_name || allocation.class || 'Class')} • {(allocation.course_name || allocation.subject || 'Subject')}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* By-grade mode — grade selector */}
+                            {assignmentMode === 'by-grade' && !editingAssignment && (
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>
+                                        Grade
+                                    </label>
+                                    <select
+                                        value={selectedGradeId}
+                                        onChange={(event) => setSelectedGradeId(event.target.value)}
+                                        required
+                                        style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: '0.55rem', padding: '0.55rem 0.65rem', background: 'var(--color-bg-surface)', color: 'var(--color-text-main)' }}
+                                    >
+                                        <option value="">Select grade...</option>
+                                        {gradesData.map((g) => (
+                                            <option key={g.id} value={String(g.id)}>
+                                                {g.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.3rem' }}>
+                                        One assignment will be created per classroom you teach in this grade.
+                                    </p>
+                                </div>
+                            )}
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.55rem' }}>
                                 <div>
@@ -846,11 +963,25 @@ const Assessments = () => {
                                 <button
                                     type="submit"
                                     className="btn-primary"
-                                    disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}
-                                    style={{ opacity: createAssignmentMutation.isPending || updateAssignmentMutation.isPending ? 0.7 : 1 }}
+                                    disabled={
+                                        createAssignmentMutation.isPending ||
+                                        updateAssignmentMutation.isPending ||
+                                        bulkCreateByGradeMutation.isPending
+                                    }
+                                    style={{
+                                        opacity: (
+                                            createAssignmentMutation.isPending ||
+                                            updateAssignmentMutation.isPending ||
+                                            bulkCreateByGradeMutation.isPending
+                                        ) ? 0.7 : 1
+                                    }}
                                 >
                                     <Save size={15} />
-                                    {editingAssignment ? 'Update' : 'Create'}
+                                    {editingAssignment
+                                        ? 'Update'
+                                        : assignmentMode === 'by-grade'
+                                          ? 'Create for All Classes'
+                                          : 'Create'}
                                 </button>
                             </div>
                         </form>
