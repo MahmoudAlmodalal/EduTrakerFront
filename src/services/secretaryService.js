@@ -114,15 +114,24 @@ const secretaryService = {
     },
 
     // Admissions & Students
-    getApplications: async (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
-        return api.get(`/manager/enrollments/${queryParams ? `?${queryParams}` : ''}`);
+    getStudentApplications: async (params = {}) => {
+        const queryParams = new URLSearchParams(params).toString();
+        return api.get(`/secretary/admissions/${queryParams ? `?${queryParams}` : ''}`);
+    },
+    getStudentApplicationDetail: async (applicationId) => {
+        return api.get(`/secretary/admissions/${applicationId}/`);
+    },
+    updateStudentApplicationStatus: async (applicationId, statusValue) => {
+        return api.patch(`/secretary/admissions/${applicationId}/status/`, { status: statusValue });
+    },
+    getApplications: async (params = {}) => {
+        return secretaryService.getStudentApplications(params);
     },
     approveApplication: async (id) => {
-        return api.post(`/manager/enrollments/${id}/activate/`);
+        return secretaryService.updateStudentApplicationStatus(id, 'active');
     },
     rejectApplication: async (id) => {
-        return api.post(`/manager/enrollments/${id}/deactivate/`);
+        return secretaryService.updateStudentApplicationStatus(id, 'rejected');
     },
     createStudent: async (data) => {
         return api.post('/manager/students/create/', data);

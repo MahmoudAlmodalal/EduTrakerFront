@@ -37,11 +37,11 @@ const SchoolManagement = React.lazy(() => import('../pages/WorkstreamManager/Sch
 const SchoolManagerAssignment = React.lazy(() => import('../pages/WorkstreamManager/SchoolManagerAssignment'));
 const WorkstreamSettings = React.lazy(() => import('../pages/WorkstreamManager/WorkstreamSettings'));
 const WorkstreamReports = React.lazy(() => import('../pages/WorkstreamManager/WorkstreamReports'));
+const WorkstreamAcademicYearManagementPage = React.lazy(() => import('../pages/WorkstreamManager/AcademicYearManagementPage'));
 
 // School Manager
 const SchoolDashboard = React.lazy(() => import('../pages/SchoolManager/SchoolDashboard'));
 const GradesManagement = React.lazy(() => import('../pages/SchoolManager/GradesManagement'));
-const AcademicYearManagementPage = React.lazy(() => import('../pages/SchoolManager/AcademicYearManagementPage'));
 const AcademicConfiguration = React.lazy(() => import('../pages/SchoolManager/AcademicConfiguration'));
 const AcademicReports = React.lazy(() => import('../pages/SchoolManager/AcademicReports'));
 const TeacherMonitoring = React.lazy(() => import('../pages/SchoolManager/TeacherMonitoring'));
@@ -52,6 +52,7 @@ const SchoolManagerSettings = React.lazy(() => import('../pages/SchoolManager/Sc
 // Secretary
 const SecretaryDashboard = React.lazy(() => import('../pages/Secretary/SecretaryDashboard'));
 const StudentAdmissions = React.lazy(() => import('../pages/Secretary/StudentAdmissions'));
+const StudentApplicationReview = React.lazy(() => import('../pages/Secretary/StudentApplicationReview'));
 const GuardianLinking = React.lazy(() => import('../pages/Secretary/GuardianLinking'));
 const SecretaryAttendance = React.lazy(() => import('../pages/Secretary/SecretaryAttendance'));
 const SecretaryInfo = React.lazy(() => import('../pages/Secretary/Info/SecretaryInfo'));
@@ -81,6 +82,7 @@ const TeacherContent = React.lazy(() => import('../pages/Teacher/TeacherContent'
 const TeacherCommunication = React.lazy(() => import('../pages/Teacher/TeacherCommunication'));
 const TeacherInfo = React.lazy(() => import('../pages/Teacher/TeacherInfo'));
 const TeacherSettings = React.lazy(() => import('../pages/Teacher/TeacherSettings'));
+const WorkstreamStudentApplication = React.lazy(() => import('../pages/Auth/WorkstreamStudentApplication'));
 
 // Suspense fallback
 const PageLoader = () => (
@@ -118,7 +120,7 @@ const AppRoutes = () => {
                 <Route path="/login/workstream/:workstreamSlug" element={<Login role="WORKSTREAM" />} />
 
                 {/* Workstream Registration */}
-                <Route path="/register/workstream/:workstreamSlug" element={<Register role="WORKSTREAM" />} />
+                <Route path="/register/workstream/:workstreamSlug" element={<WorkstreamStudentApplication />} />
 
                 {/* Password Reset */}
                 <Route path="/password-reset" element={<RequestPasswordReset />} />
@@ -145,6 +147,7 @@ const AppRoutes = () => {
                         <Route path="dashboard" element={<WorkstreamDashboard />} />
                         <Route path="schools" element={<SchoolManagement />} />
                         <Route path="assignments" element={<SchoolManagerAssignment />} />
+                        <Route path="academic-year" element={<WorkstreamAcademicYearManagementPage />} />
                         <Route path="reports" element={<WorkstreamReports />} />
                         <Route path="communication" element={<GeneralCommunication />} />
                         <Route path="settings" element={<WorkstreamSettings />} />
@@ -157,7 +160,7 @@ const AppRoutes = () => {
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<SchoolDashboard />} />
                         <Route path="grades" element={<GradesManagement />} />
-                        <Route path="academic-year" element={<AcademicYearManagementPage />} />
+                        <Route path="academic-year" element={<Navigate to="/school-manager/configuration" replace />} />
                         <Route path="configuration" element={<AcademicConfiguration />} />
                         <Route path="reports" element={<AcademicReports />} />
                         <Route path="teachers" element={<TeacherMonitoring />} />
@@ -174,6 +177,7 @@ const AppRoutes = () => {
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<SecretaryDashboard />} />
                         <Route path="admissions" element={<StudentAdmissions />} />
+                        <Route path="admissions/:applicationId" element={<StudentApplicationReview />} />
                         <Route path="guardians" element={<GuardianLinking />} />
                         <Route path="attendance" element={<SecretaryAttendance />} />
                         <Route path="communication" element={<GeneralCommunication />} />

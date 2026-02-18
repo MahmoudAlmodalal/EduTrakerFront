@@ -191,7 +191,7 @@ const AcademicConfiguration = () => {
                 const [coursesData, teachersData, academicYearsData] = await Promise.all([
                     managerService.getCourses(schoolId, { include_inactive: true }),
                     managerService.getTeachers(),
-                    managerService.getAcademicYears({ school_id: schoolId, include_inactive: true })
+                    managerService.getAcademicYears({ include_inactive: true })
                 ]);
                 setCourses(coursesData.results || coursesData || []);
                 setTeachers(teachersData.results || teachersData || []);
@@ -336,7 +336,7 @@ const AcademicConfiguration = () => {
 // ============================================
 // Academic Year Management Tab
 // ============================================
-export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) => {
+export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId = null, schoolId = null }) => {
     const { showSuccess, showError } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ start_date: '', end_date: '' });
@@ -346,6 +346,10 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
     const [copyPrompt, setCopyPrompt] = useState(null); // { targetYear }
     const [copySourceId, setCopySourceId] = useState('');
     const [copying, setCopying] = useState(false);
+    const parsedWorkStreamId = Number.parseInt(workStreamId, 10);
+    const parsedSchoolId = Number.parseInt(schoolId, 10);
+    const canCreateAcademicYear = Number.isInteger(parsedWorkStreamId) && parsedWorkStreamId > 0;
+    const canCopyStructure = Number.isInteger(parsedSchoolId) && parsedSchoolId > 0;
 
     const filteredAcademicYears = useMemo(() => {
         if (statusFilter === 'active') {
@@ -359,14 +363,14 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
 
     const handleCreate = async (e) => {
         e.preventDefault();
-        if (!schoolId) {
-            showError('Error: School ID not found.');
+        if (!canCreateAcademicYear) {
+            showError('Error: Workstream ID not found.');
             return;
         }
         setSaving(true);
         try {
             const created = await managerService.createAcademicYear({
-                school: parseInt(schoolId),
+                work_stream: parsedWorkStreamId,
                 start_date: formData.start_date,
                 end_date: formData.end_date
             });
@@ -375,7 +379,7 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
             setFormData({ start_date: '', end_date: '' });
             await onUpdated();
             // If other years exist, prompt to copy structure
-            if (academicYears.length > 0 && created?.id) {
+            if (canCopyStructure && academicYears.length > 0 && created?.id) {
                 const latestYear = [...academicYears].sort((a, b) => b.id - a.id)[0];
                 setCopySourceId(String(latestYear.id));
                 setCopyPrompt({ targetYear: created });
@@ -390,13 +394,21 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
     };
 
     const handleCopyStructure = async (targetYearId) => {
+        if (!canCopyStructure) {
+            showError('School selection is required to copy classroom structure.');
+            return;
+        }
         if (!copySourceId) {
             showError('Please select a source year.');
             return;
         }
         setCopying(true);
         try {
-            const result = await managerService.copyAcademicYearStructure(targetYearId, parseInt(copySourceId));
+            const result = await managerService.copyAcademicYearStructure(
+                targetYearId,
+                Number.parseInt(copySourceId, 10),
+                parsedSchoolId
+            );
             showSuccess(`Copied ${result.copied} classroom(s)${result.skipped > 0 ? `, skipped ${result.skipped} (already exist)` : ''}.`);
             setCopyPrompt(null);
             onUpdated();
@@ -444,7 +456,12 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                             <option value="inactive">Inactive</option>
                         </select>
                     </div>
-                    <button className="btn-primary sm-academic-year-create-btn" onClick={() => setIsModalOpen(true)}>
+                    <button
+                        className="btn-primary sm-academic-year-create-btn"
+                        onClick={() => setIsModalOpen(true)}
+                        disabled={!canCreateAcademicYear}
+                        title={!canCreateAcademicYear ? 'Workstream ID is required to create academic years.' : 'Create Academic Year'}
+                    >
                         <Plus size={18} />
                         Create Academic Year
                     </button>
@@ -460,7 +477,12 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                     <p style={{ marginBottom: '1.5rem' }}>
                         Create an academic year to enable teacher assignments and course management.
                     </p>
-                    <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                    <button
+                        className="btn-primary"
+                        onClick={() => setIsModalOpen(true)}
+                        disabled={!canCreateAcademicYear}
+                        title={!canCreateAcademicYear ? 'Workstream ID is required to create academic years.' : 'Create Academic Year'}
+                    >
                         <Plus size={18} />
                         Create First Academic Year
                     </button>
@@ -546,7 +568,7 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
             )}
 
             {/* Copy Structure Prompt */}
-            {copyPrompt && (
+            {copyPrompt && canCopyStructure && (
                 <div className="sm-modal-backdrop">
                     <div className="sm-modal-panel">
                         <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>
@@ -651,7 +673,7 @@ export const GradeManagement = () => {
         const loadInitial = async () => {
             try {
                 const yearsData = await (schoolId
-                    ? managerService.getAcademicYears({ school_id: schoolId, include_inactive: true })
+                    ? managerService.getAcademicYears({ include_inactive: true })
                     : Promise.resolve([]));
                 const years = yearsData.results || yearsData || [];
                 setAcademicYears(years);

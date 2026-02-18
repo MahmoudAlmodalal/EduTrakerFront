@@ -7,7 +7,6 @@ import {
     FileBarChart,
     Users,
     Layers,
-    GraduationCap,
     UserCheck,
     Sparkles,
     MessageSquare,
@@ -71,7 +70,6 @@ const SchoolManagerLayout = () => {
     const navItems = [
         { path: '/school-manager/dashboard', labelKey: 'schoolManager.nav.dashboard', icon: LayoutDashboard },
         { path: '/school-manager/grades', labelKey: 'schoolManager.nav.grades', icon: Layers },
-        { path: '/school-manager/academic-year', labelKey: 'schoolManager.nav.academicYear', icon: GraduationCap },
         { path: '/school-manager/configuration', labelKey: 'schoolManager.nav.configuration', icon: Settings },
         { path: '/school-manager/teachers', labelKey: 'schoolManager.nav.teachers', icon: UserCheck },
         { path: '/school-manager/secretaries', labelKey: 'schoolManager.nav.secretaries', icon: Users },
@@ -313,7 +311,6 @@ const SchoolManagerLayout = () => {
                         allowedRoutePrefixes={[
                             '/school-manager/dashboard',
                             '/school-manager/grades',
-                            '/school-manager/academic-year',
                             '/school-manager/configuration',
                             '/school-manager/reports',
                             '/school-manager/teachers',

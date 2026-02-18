@@ -163,7 +163,7 @@ const Login = ({ role }) => {
                                 to={isPortalLogin ? "/register/portal" : `/register/workstream/${workstreamSlug}`}
                                 className={styles.backLink}
                             >
-                                Create Account
+                                {isPortalLogin ? 'Create Account' : 'New Student Application'}
                             </Link>
                         </div>
                     </form>

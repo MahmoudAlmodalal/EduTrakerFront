@@ -181,8 +181,12 @@ export const useRecordBulkAttendanceMutation = () => {
                 queryClient.invalidateQueries({
                     queryKey: teacherQueryKeys.attendance(firstRecord.course_allocation_id, firstRecord.date)
                 });
+                queryClient.invalidateQueries({
+                    queryKey: teacherQueryKeys.homeroomAttendance(firstRecord.date)
+                });
             } else {
                 queryClient.invalidateQueries({ queryKey: ['teacher', 'attendance'] });
+                queryClient.invalidateQueries({ queryKey: ['teacher', 'homeroom-attendance'] });
             }
 
             queryClient.invalidateQueries({ queryKey: teacherQueryKeys.dashboardStats });

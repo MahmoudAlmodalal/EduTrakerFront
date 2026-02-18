@@ -98,9 +98,37 @@ const TeacherDashboard = () => {
     const schedule = useMemo(() => toList(scheduleData), [scheduleData]);
     const notifications = useMemo(() => toList(notificationsData), [notificationsData]);
     const homeroom = useMemo(() => homeroomData || null, [homeroomData]);
+    const activeSchedule = useMemo(
+        () => schedule.filter((slot) => slot?.status !== 'completed'),
+        [schedule]
+    );
 
-    const homeroomStudentCount = stats.homeroom_classroom?.total_students ?? stats.total_students ?? 0;
-    const homeroomClassroomName = stats.homeroom_classroom?.name ?? null;
+    const homeroomStudentCount = homeroom?.summary?.total
+        ?? stats.homeroom_classroom?.total_students
+        ?? stats.total_students
+        ?? 0;
+    const homeroomClassroomName = homeroom?.classroom?.name ?? stats.homeroom_classroom?.name ?? null;
+    const totalClassesTaught = Number(stats.classes_taught_count ?? stats.classroom_count ?? 0);
+    const activeClassesToday = useMemo(() => {
+        const scheduleCount = Number(activeSchedule.length || 0);
+        const statsCount = Number(stats.active_classes_today ?? 0);
+        if (scheduleCount === 0 && statsCount === 0 && totalClassesTaught > 0) {
+            return totalClassesTaught;
+        }
+        return Math.max(scheduleCount, statsCount);
+    }, [activeSchedule.length, stats.active_classes_today, totalClassesTaught]);
+    const classesTaughtLabel = totalClassesTaught === 1 ? 'class' : 'classes';
+    const homeroomAttendancePercent = useMemo(() => {
+        const total = Number(homeroom?.summary?.total ?? 0);
+        const present = Number(homeroom?.summary?.present ?? 0);
+        const late = Number(homeroom?.summary?.late ?? 0);
+
+        if (total > 0) {
+            return Math.round(((present + late) / total) * 100);
+        }
+
+        return Math.round(Number(stats.average_attendance || 0));
+    }, [homeroom, stats.average_attendance]);
 
     const dashboardCards = useMemo(() => ([
         {
@@ -109,8 +137,8 @@ const TeacherDashboard = () => {
             icon: Users
         },
         {
-            label: 'Active Classes Today',
-            value: schedule.length,
+            label: `Active Classes Today · ${totalClassesTaught} ${classesTaughtLabel} you teach`,
+            value: activeClassesToday,
             icon: GraduationCap
         },
         {
@@ -120,7 +148,7 @@ const TeacherDashboard = () => {
         },
         {
             label: 'Avg Attendance Today (Homeroom)',
-            value: `${Math.round(Number(stats.average_attendance || 0))}%`,
+            value: `${homeroomAttendancePercent}%`,
             icon: CheckCircle2
         },
         {
@@ -128,9 +156,17 @@ const TeacherDashboard = () => {
             value: stats.lesson_plans_this_week ?? 0,
             icon: BookOpen
         }
-    ]), [schedule.length, stats, homeroomStudentCount, homeroomClassroomName]);
+    ]), [
+        activeClassesToday,
+        classesTaughtLabel,
+        homeroomAttendancePercent,
+        homeroomClassroomName,
+        homeroomStudentCount,
+        stats,
+        totalClassesTaught,
+    ]);
 
-    const hasAnyError = hasStatsError || hasScheduleError || hasNotificationsError;
+    const hasAnyError = hasStatsError || hasScheduleError;
 
     const unreadCount = notifications.filter((notification) => !notification.is_read).length;
 
@@ -513,6 +549,10 @@ const TeacherDashboard = () => {
                                 <SkeletonBlock height="72px" />
                                 <SkeletonBlock height="72px" />
                                 <SkeletonBlock height="72px" />
+                            </div>
+                        ) : hasNotificationsError ? (
+                            <div style={{ padding: '1rem', color: '#92400e', background: '#fffbeb' }}>
+                                Unable to load notifications right now.
                             </div>
                         ) : notifications.length === 0 ? (
                             <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>

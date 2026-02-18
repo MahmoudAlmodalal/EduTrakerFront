@@ -63,6 +63,12 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    gap: var(--spacing-3);
+}
+
+.workstreamInfo {
+    min-width: 0;
+    flex: 1;
 }
 
 .cardTitle {
@@ -71,6 +77,19 @@
     color: var(--color-text-main);
     margin: 0;
     letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+}
+
+.locationLabel {
+    margin-top: var(--spacing-2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
 }
 
 .statusBadge {
@@ -89,6 +108,11 @@
     color: var(--color-success-dark);
 }
 
+.statusBadge.inactive {
+    background: color-mix(in srgb, var(--color-danger, #ef4444) 15%, transparent);
+    color: var(--color-danger, #ef4444);
+}
+
 .cardBody {
     padding: 0 var(--spacing-6) var(--spacing-6);
     flex: 1;
@@ -96,7 +120,7 @@
 
 .statsContainer {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--spacing-6);
 }
 
@@ -111,6 +135,22 @@
     transition: all 0.3s ease;
 }
 
+.statHeader {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+    min-width: 0;
+}
+
+.statLabel {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
 .statItem:hover {
     background: var(--color-primary-light);
     border-color: rgba(79, 70, 229, 0.1);
@@ -122,6 +162,8 @@
     font-weight: 800;
     color: var(--color-text-main);
     letter-spacing: -0.03em;
+    line-height: 1.1;
+    word-break: break-word;
 }
 
 .managerSection {
@@ -131,6 +173,22 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-4);
+}
+
+.managerLabel {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    font-weight: 700;
+    margin: 0;
+}
+
+.managerName {
+    margin: 2px 0 0;
+    font-weight: 700;
+    color: var(--color-text-main);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
 }
 
 .managerAvatar {
@@ -144,6 +202,14 @@
     justify-content: center;
     font-weight: 700;
     box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
 }
 
 .cardFooter {
@@ -179,6 +245,10 @@
         grid-template-columns: 1fr;
     }
 
+    .statsContainer {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .header {
         flex-direction: column;
         align-items: stretch;
@@ -186,5 +256,42 @@
 
     .title {
         font-size: 2rem;
+    }
+
+    .cardHeader {
+        flex-wrap: wrap;
+    }
+
+    .statusBadge {
+        margin-left: auto;
+    }
+
+    .cardTitle {
+        font-size: 1.3rem;
+    }
+
+    .statValue {
+        font-size: 1.4rem;
+    }
+}
+
+@media (max-width: 520px) {
+    .card {
+        border-radius: 18px;
+    }
+
+    .cardHeader,
+    .cardBody,
+    .cardFooter {
+        padding-left: var(--spacing-4);
+        padding-right: var(--spacing-4);
+    }
+
+    .statsContainer {
+        grid-template-columns: 1fr;
+    }
+
+    .managerSection {
+        gap: var(--spacing-3);
     }
 }

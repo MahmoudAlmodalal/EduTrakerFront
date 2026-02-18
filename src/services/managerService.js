@@ -271,8 +271,12 @@ const managerService = {
         return res.data !== undefined ? res.data : res;
     },
 
-    copyAcademicYearStructure: async (targetYearId, sourceYearId) => {
-        const res = await api.post(`/academic-years/${targetYearId}/copy-structure/`, { source_year_id: sourceYearId });
+    copyAcademicYearStructure: async (targetYearId, sourceYearId, schoolId = null) => {
+        const payload = { source_year_id: sourceYearId };
+        if (schoolId !== null && schoolId !== undefined) {
+            payload.school_id = schoolId;
+        }
+        const res = await api.post(`/academic-years/${targetYearId}/copy-structure/`, payload);
         return res.data !== undefined ? res.data : res;
     },
 

@@ -65,6 +65,7 @@ const SchoolDashboard = () => {
 
     const dashboardCards = [
         { title: t('school.dashboard.totalStudents') || 'Total Students', value: stats?.total_students ?? 0, icon: Users, color: 'blue', bgColor: '#dbeafe', iconColor: '#2563eb' },
+        { title: t('school.dashboard.pendingStudents') || 'Pending Students', value: stats?.pending_students ?? 0, icon: AlertCircle, color: 'amber', bgColor: '#fef3c7', iconColor: '#d97706' },
         { title: t('activeTeachers') || 'Active Teachers', value: stats?.total_teachers ?? 0, icon: UserCheck, color: 'green', bgColor: '#dcfce7', iconColor: '#16a34a' },
         { title: t('secretaries') || 'Secretaries', value: stats?.total_secretaries ?? 0, icon: Briefcase, color: 'purple', bgColor: '#f3e8ff', iconColor: '#9333ea' },
         { title: t('classrooms') || 'Classrooms', value: stats?.classroom_count ?? 0, icon: GraduationCap, color: 'orange', bgColor: '#ffedd5', iconColor: '#ea580c' },

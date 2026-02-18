@@ -39,7 +39,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         SCHOOL_MANAGER: [
             { path: '/school-manager/dashboard', label: t('schoolManager.nav.dashboard'), icon: LayoutDashboard },
             { path: '/school-manager/grades', label: t('schoolManager.nav.grades'), icon: Calendar },
-            { path: '/school-manager/academic-year', label: t('schoolManager.nav.academicYear'), icon: GraduationCap },
             { path: '/school-manager/configuration', label: t('schoolManager.nav.configuration'), icon: Calendar },
             { path: '/school-manager/teachers', label: t('schoolManager.nav.teachers'), icon: GraduationCap },
             { path: '/school-manager/activity-log', label: t('schoolManager.nav.activityLog'), icon: ClipboardList },

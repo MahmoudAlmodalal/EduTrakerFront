@@ -29,6 +29,26 @@ const authService = {
         return await api.post(url, userData);
     },
 
+    getWorkstreamStudentApplicationContext: async (workstreamSlug) => {
+        return api.get(`/workstreams/${workstreamSlug}/student-applications/context/`);
+    },
+
+    getWorkstreamStudentApplicationGrades: async (workstreamSlug, schoolId) => {
+        return api.get(`/workstreams/${workstreamSlug}/student-applications/grades/?school_id=${schoolId}`);
+    },
+
+    getWorkstreamStudentApplicationStatus: async (workstreamSlug, email) => {
+        return api.get(`/workstreams/${workstreamSlug}/student-applications/status/?email=${encodeURIComponent(email)}`);
+    },
+
+    submitWorkstreamStudentApplication: async (workstreamSlug, formData) => {
+        return api.post(`/workstreams/${workstreamSlug}/student-applications/submit/`, formData, {
+            headers: formData instanceof FormData
+                ? { 'Content-Type': 'multipart/form-data' }
+                : undefined,
+        });
+    },
+
     /**
      * Logout and blacklist refresh token
      * @param {string} refreshToken 

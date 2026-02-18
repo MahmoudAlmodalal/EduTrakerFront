@@ -36,6 +36,17 @@ const resolveNotificationRedirect = (notification = {}) => {
     return resolver(notification);
 };
 
+const sanitizeParams = (params = {}) => Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+);
+
+const toLegacyNotificationParams = (params = {}) => {
+    const allowedKeys = new Set(['is_read', 'notification_type']);
+    return Object.fromEntries(
+        Object.entries(params).filter(([key]) => allowedKeys.has(key))
+    );
+};
+
 const notificationService = {
     /**
      * Fetch all notifications for the current user
@@ -43,7 +54,25 @@ const notificationService = {
      * @returns {Promise<Object>} Paginated notifications
      */
     getNotifications: async (params = {}) => {
-        return await api.get('/notifications/', { params });
+        const normalizedParams = sanitizeParams(params);
+
+        try {
+            return await api.get('/notifications/', { params: normalizedParams });
+        } catch (error) {
+            const status = error?.status || error?.response?.status;
+            const hasNonLegacyParams = Object.keys(normalizedParams).some(
+                (key) => !['is_read', 'notification_type'].includes(key)
+            );
+
+            // Backward compatibility: older backend validation rejected paginator params.
+            if (status === 400 && hasNonLegacyParams) {
+                return api.get('/notifications/', {
+                    params: toLegacyNotificationParams(normalizedParams)
+                });
+            }
+
+            throw error;
+        }
     },
 
     /**

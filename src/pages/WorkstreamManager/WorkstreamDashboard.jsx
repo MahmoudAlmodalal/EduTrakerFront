@@ -55,6 +55,14 @@ const WorkstreamDashboard = () => {
             color: 'blue'
         },
         {
+            title: 'Enrolled Students',
+            value: dashboardData?.enrolled_students?.toLocaleString() || '0',
+            icon: Users,
+            trend: '',
+            trendUp: true,
+            color: 'orange'
+        },
+        {
             title: t('workstream.dashboard.totalTeachers'),
             value: dashboardData?.total_teachers?.toLocaleString() || '0',
             icon: Users,
@@ -64,12 +72,16 @@ const WorkstreamDashboard = () => {
         },
     ];
 
-    // Map backend school data to the expected format
-    // Backend returns: { school_name, student_count, attendance_percentage, ... }
+    // Map backend school data to the expected format.
+    // Score is sourced from backend academic performance when available.
     const schoolPerformance = (dashboardData?.schools || []).map(school => ({
         name: school.school_name,
-        score: Math.round(school.attendance_percentage || 0), // Use attendance as performance score
+        score: school?.academic_performance_score == null
+            ? null
+            : Math.round(Number(school.academic_performance_score)),
         students: school.student_count || 0,
+        enrolledStudents: school.enrolled_student_count || 0,
+        pendingStudents: school.pending_student_count || 0,
         manager: school.manager_name,
         teachers: school.teacher_count || 0,
         classrooms: school.classroom_count || 0
@@ -88,6 +100,7 @@ const WorkstreamDashboard = () => {
             purple: { background: 'linear-gradient(135deg, #ede9fe, #ddd6fe)', color: '#7c3aed' },
             blue: { background: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', color: '#2563eb' },
             indigo: { background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4f46e5' },
+            orange: { background: 'linear-gradient(135deg, #ffedd5, #fed7aa)', color: '#ea580c' },
             green: { background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#059669' }
         };
         return styles[color] || styles.purple;
@@ -134,15 +147,19 @@ const WorkstreamDashboard = () => {
                     <div className="chart-header">
                         <h3 className="chart-title">{t('workstream.dashboard.academicPerformance')}</h3>
                         <p style={{ marginTop: '0.5rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-                            Score represents attendance %. N/A means no attendance records yet.
+                            Score represents average graded marks %. N/A means no graded marks yet.
                         </p>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {schoolPerformance.length > 0 ? schoolPerformance.map((school, index) => {
-                            const score = school.score || 0;
+                            const score = school.score;
                             const name = school.name;
                             const students = school.students;
-                            const hasData = score > 0;
+                            const enrolledStudents = school.enrolledStudents;
+                            const pendingStudents = school.pendingStudents;
+                            const managerName = school.manager || 'Unassigned';
+                            const hasData = Number.isFinite(score);
+                            const numericScore = hasData ? score : 0;
                             return (
                                 <div key={index} style={{
                                     display: 'flex',
@@ -158,21 +175,21 @@ const WorkstreamDashboard = () => {
                                         height: '40px',
                                         borderRadius: '10px',
                                         background: hasData
-                                            ? `linear-gradient(135deg, ${getScoreColor(score)}20, ${getScoreColor(score)}10)`
+                                            ? `linear-gradient(135deg, ${getScoreColor(numericScore)}20, ${getScoreColor(numericScore)}10)`
                                             : 'var(--color-bg-subtle)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: hasData ? getScoreColor(score) : 'var(--color-text-muted)',
+                                        color: hasData ? getScoreColor(numericScore) : 'var(--color-text-muted)',
                                         fontWeight: '700',
                                         fontSize: hasData ? '0.875rem' : '0.625rem'
                                     }}>
-                                        {hasData ? score : 'N/A'}
+                                        {hasData ? numericScore : 'N/A'}
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '4px' }}>{name}</div>
                                         <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                            {students} students {school.manager && `• ${school.manager}`}
+                                            {students} total • {enrolledStudents} enrolled • {pendingStudents} pending • Manager: {managerName}
                                         </div>
                                     </div>
                                     <div style={{ width: '120px' }}>
@@ -183,10 +200,10 @@ const WorkstreamDashboard = () => {
                                             overflow: 'hidden'
                                         }}>
                                             <div style={{
-                                                width: hasData ? `${score}%` : '0%',
+                                                width: hasData ? `${numericScore}%` : '0%',
                                                 height: '100%',
                                                 background: hasData
-                                                    ? `linear-gradient(90deg, ${getScoreColor(score)}, ${getScoreColor(score)}aa)`
+                                                    ? `linear-gradient(90deg, ${getScoreColor(numericScore)}, ${getScoreColor(numericScore)}aa)`
                                                     : 'var(--color-border)',
                                                 borderRadius: '4px',
                                                 transition: 'width 0.5s ease'
@@ -194,7 +211,7 @@ const WorkstreamDashboard = () => {
                                         </div>
                                         {!hasData && (
                                             <div style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                                                No attendance data
+                                                No graded marks
                                             </div>
                                         )}
                                     </div>

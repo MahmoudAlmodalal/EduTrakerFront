@@ -6,7 +6,7 @@ const normalizeStatus = (status = '') => status.toString().trim().toLowerCase();
 const getTone = (status) => {
     const value = normalizeStatus(status);
 
-    if (['active', 'present', 'approved', 'completed', 'success'].includes(value)) {
+    if (['active', 'enrolled', 'present', 'approved', 'completed', 'success'].includes(value)) {
         return 'success';
     }
 
@@ -14,7 +14,7 @@ const getTone = (status) => {
         return 'warning';
     }
 
-    if (['absent', 'inactive', 'rejected', 'failed', 'error', 'suspended'].includes(value)) {
+    if (['absent', 'inactive', 'rejected', 'failed', 'error'].includes(value)) {
         return 'danger';
     }
 

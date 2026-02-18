@@ -25,4 +25,15 @@ export const uniqueById = (items) => {
     });
 };
 
-export const todayIsoDate = () => new Date().toISOString().split('T')[0];
+const pad2 = (value) => String(value).padStart(2, '0');
+
+export const toLocalIsoDate = (input = new Date()) => {
+    const date = input instanceof Date ? input : new Date(input);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+};
+
+export const todayIsoDate = () => toLocalIsoDate(new Date());

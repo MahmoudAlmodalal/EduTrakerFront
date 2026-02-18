@@ -1,16 +1,14 @@
 import React, { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Users, Star, Search, Plus, Mail, UserCheck, Trash2 } from 'lucide-react';
+import { Search, Plus, Mail, UserCheck, Trash2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import managerService from '../../services/managerService';
 import Modal from '../../components/ui/Modal';
-import SearchableSelect from '../../components/ui/SearchableSelect';
 import './SchoolManager.css';
 
 const DEFAULT_PASSWORD = 'Teacher@123';
-const STAR_INDICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const TABLE_ROWS_PER_PAGE = 10;
 const SIDEBAR_COUNT_REFRESH_EVENT = 'school_manager_stats_updated';
 
@@ -66,12 +64,6 @@ const createInitialTeacherForm = () => ({
     specialization: '',
     employment_status: 'full_time',
     hire_date: getTodayISO()
-});
-
-const createInitialEvaluationForm = () => ({
-    reviewee_id: '',
-    rating_score: 5,
-    comments: ''
 });
 
 const getErrorMessage = (error, fallbackMessage) => {
@@ -130,7 +122,6 @@ const TableCard = memo(function TableCard({ left, right, children }) {
 const TeacherMonitoring = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('directory');
 
     const schoolId = user?.school_id
         || user?.school?.id
@@ -138,7 +129,6 @@ const TeacherMonitoring = () => {
     const hasSchoolId = schoolId !== null && schoolId !== undefined && schoolId !== '';
 
     const teachersQueryKey = useMemo(() => ['school-manager', 'teachers', schoolId], [schoolId]);
-    const evaluationsQueryKey = useMemo(() => ['school-manager', 'staff-evaluations', schoolId], [schoolId]);
 
     const {
         data: teachers = [],
@@ -152,24 +142,6 @@ const TeacherMonitoring = () => {
         enabled: hasSchoolId,
         staleTime: 5 * 60 * 1000
     });
-
-    const {
-        data: evaluations = [],
-        isLoading: evaluationsLoading,
-        error: evaluationsError,
-        refetch: refetchEvaluations
-    } = useQuery({
-        queryKey: evaluationsQueryKey,
-        queryFn: () => managerService.getStaffEvaluations({ school_id: schoolId }),
-        select: normalizeList,
-        enabled: hasSchoolId && activeTab === 'performance',
-        staleTime: 5 * 60 * 1000
-    });
-
-    const tabs = useMemo(() => ([
-        { id: 'directory', label: t('school.teachers.directory') || 'Directory', icon: Users },
-        { id: 'performance', label: t('school.teachers.performance') || 'Performance', icon: Star }
-    ]), [t]);
 
     const renderTabContent = () => {
         if (!hasSchoolId) {
@@ -197,58 +169,19 @@ const TeacherMonitoring = () => {
             );
         }
 
-        switch (activeTab) {
-            case 'directory':
-                return (
-                    <TeacherDirectory
-                        teachers={teachers}
-                        schoolId={schoolId}
-                        teachersQueryKey={teachersQueryKey}
-                    />
-                );
-            case 'performance':
-                return (
-                    <PerformanceEvaluation
-                        evaluations={evaluations}
-                        evaluationsLoading={evaluationsLoading}
-                        evaluationsError={evaluationsError}
-                        onRetryEvaluations={refetchEvaluations}
-                        evaluationsQueryKey={evaluationsQueryKey}
-                        teachers={teachers}
-                    />
-                );
-            default:
-                return (
-                    <TeacherDirectory
-                        teachers={teachers}
-                        schoolId={schoolId}
-                        teachersQueryKey={teachersQueryKey}
-                    />
-                );
-        }
+        return (
+            <TeacherDirectory
+                teachers={teachers}
+                schoolId={schoolId}
+                teachersQueryKey={teachersQueryKey}
+            />
+        );
     };
 
     return (
         <div className="management-page teacher-monitoring-page">
             <div className="school-manager-header">
                 <h1 className="school-manager-title">{t('school.teachers.title') || 'Teacher Monitoring'}</h1>
-            </div>
-
-            <div className="teacher-monitoring-tabs">
-                {tabs.map((tab) => {
-                    const Icon = tab.icon;
-                    const isActive = activeTab === tab.id;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`teacher-monitoring-tab ${isActive ? 'active' : ''}`}
-                        >
-                            <Icon size={18} strokeWidth={2} />
-                            {tab.label}
-                        </button>
-                    );
-                })}
             </div>
 
             {renderTabContent()}
@@ -702,240 +635,6 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                         {updateTeacherStatusMutation.isPending ? 'Updating...' : 'Confirm'}
                     </button>
                 </div>
-            </Modal>
-        </TableCard>
-    );
-});
-
-const StarRating = memo(function StarRating({ score }) {
-    const normalizedScore = Number.parseInt(score, 10) || 0;
-
-    return (
-        <div className="eval-stars">
-            {STAR_INDICES.map((starIndex) => {
-                const filled = starIndex <= normalizedScore;
-                return (
-                    <Star
-                        key={starIndex}
-                        size={14}
-                        fill={filled ? '#fbbf24' : 'transparent'}
-                        stroke={filled ? '#fbbf24' : '#d1d5db'}
-                    />
-                );
-            })}
-        </div>
-    );
-});
-
-const PerformanceEvaluation = memo(function PerformanceEvaluation({
-    evaluations,
-    evaluationsLoading,
-    evaluationsError,
-    onRetryEvaluations,
-    evaluationsQueryKey,
-    teachers
-}) {
-    const queryClient = useQueryClient();
-    const { showSuccess, showError, showWarning } = useToast();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState(createInitialEvaluationForm);
-
-    const teacherOptions = useMemo(() => (
-        teachers.map((teacher) => ({
-            value: getTeacherId(teacher),
-            label: teacher.full_name
-        }))
-    ), [teachers]);
-
-    const createEvaluationMutation = useMutation({
-        mutationFn: (payload) => managerService.createStaffEvaluation(payload),
-        onSuccess: (createdEvaluation) => {
-            if (createdEvaluation?.id) {
-                queryClient.setQueryData(evaluationsQueryKey, (current = []) => {
-                    const currentEvaluations = Array.isArray(current) ? current : [];
-                    return [createdEvaluation, ...currentEvaluations];
-                });
-            } else {
-                queryClient.invalidateQueries({ queryKey: evaluationsQueryKey });
-            }
-
-            showSuccess('Evaluation saved.');
-            setIsModalOpen(false);
-            setFormData(createInitialEvaluationForm());
-        },
-        onError: (error) => {
-            showError(getErrorMessage(error, 'Failed to create evaluation.'));
-        }
-    });
-
-    const handleSave = useCallback((event) => {
-        event.preventDefault();
-
-        if (!formData.reviewee_id) {
-            showWarning('Please select a teacher.');
-            return;
-        }
-
-        createEvaluationMutation.mutate({
-            reviewee_id: Number.parseInt(formData.reviewee_id, 10),
-            rating_score: Number.parseInt(formData.rating_score, 10),
-            comments: formData.comments,
-            evaluation_date: getTodayISO()
-        });
-    }, [createEvaluationMutation, formData, showWarning]);
-
-    const handleCloseModal = useCallback(() => {
-        if (createEvaluationMutation.isPending) return;
-        setIsModalOpen(false);
-        setFormData(createInitialEvaluationForm());
-    }, [createEvaluationMutation.isPending]);
-
-    const evaluationRows = useMemo(() => {
-        if (evaluationsLoading) {
-            return (
-                <tr>
-                    <td colSpan="4" className="sm-loading-state">
-                        Loading evaluations...
-                    </td>
-                </tr>
-            );
-        }
-
-        if (evaluationsError) {
-            return (
-                <tr>
-                    <td colSpan="4">
-                        <QueryErrorState
-                            compact
-                            message={getErrorMessage(evaluationsError, 'Unable to load evaluations.')}
-                            onRetry={onRetryEvaluations}
-                        />
-                    </td>
-                </tr>
-            );
-        }
-
-        if (evaluations.length === 0) {
-            return (
-                <tr>
-                    <td colSpan="4" className="sm-empty-state">
-                        No evaluations yet. Click "New Evaluation" to add one.
-                    </td>
-                </tr>
-            );
-        }
-
-        return evaluations.map((evalItem) => (
-            <tr key={evalItem.id}>
-                <td>
-                    <div className="eval-teacher-info">
-                        <div className="eval-avatar">
-                            {(evalItem.reviewee_name || evalItem.reviewee_email)?.charAt(0)?.toUpperCase() || 'T'}
-                        </div>
-                        <span className="eval-name">{evalItem.reviewee_name || evalItem.reviewee_email}</span>
-                    </div>
-                </td>
-                <td>
-                    <div className="eval-rating-wrap">
-                        <StarRating score={evalItem.rating_score} />
-                        <span className={`eval-score ${evalItem.rating_score >= 7 ? 'good' : evalItem.rating_score >= 4 ? 'warn' : 'poor'}`}>
-                            {evalItem.rating_score}/10
-                        </span>
-                    </div>
-                </td>
-                <td className="eval-comments-cell">
-                    <p className="eval-comments">{evalItem.comments || 'No comments'}</p>
-                </td>
-                <td className="sm-muted-cell">
-                    {evalItem.evaluation_date
-                        ? new Date(evalItem.evaluation_date).toLocaleDateString()
-                        : 'N/A'}
-                </td>
-            </tr>
-        ));
-    }, [evaluations, evaluationsError, evaluationsLoading, onRetryEvaluations]);
-
-    return (
-        <TableCard
-            left={<h3 className="chart-title">Performance Evaluations</h3>}
-            right={(
-                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
-                    <Plus size={18} />
-                    New Evaluation
-                </button>
-            )}
-        >
-
-            <div className="sm-table-scroll">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Teacher</th>
-                            <th>Rating</th>
-                            <th>Comments</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>{evaluationRows}</tbody>
-                </table>
-            </div>
-
-            <Modal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                title="New Staff Evaluation"
-            >
-                <form onSubmit={handleSave} className="sm-modal-form">
-                    <div className="sm-form-field">
-                        <label className="sm-form-label">Select Teacher</label>
-                        <SearchableSelect
-                            options={teacherOptions}
-                            value={formData.reviewee_id}
-                            onChange={(value) => setFormData({ ...formData, reviewee_id: value })}
-                            placeholder="Select a teacher..."
-                            searchPlaceholder="Search teachers..."
-                        />
-                    </div>
-                    <div className="sm-form-field">
-                        <label className="sm-form-label">Rating Score (1-10)</label>
-                        <div className="sm-range-row">
-                            <input
-                                type="range"
-                                min="1"
-                                max="10"
-                                value={formData.rating_score}
-                                onChange={(event) => setFormData({ ...formData, rating_score: event.target.value })}
-                                className="sm-range-input"
-                            />
-                            <span className={`sm-range-score ${formData.rating_score >= 7 ? 'good' : formData.rating_score >= 4 ? 'warn' : 'poor'}`}>
-                                {formData.rating_score}
-                            </span>
-                        </div>
-                    </div>
-                    <div className="sm-form-field">
-                        <label className="sm-form-label">Comments</label>
-                        <textarea
-                            required
-                            value={formData.comments}
-                            onChange={(event) => setFormData({ ...formData, comments: event.target.value })}
-                            placeholder="Enter evaluation comments..."
-                            className="sm-form-textarea"
-                        />
-                    </div>
-                    <div className="sm-form-actions">
-                        <button
-                            type="button"
-                            onClick={handleCloseModal}
-                            className="sm-btn-secondary"
-                            disabled={createEvaluationMutation.isPending}
-                        >
-                            Cancel
-                        </button>
-                        <button type="submit" className="btn-primary" disabled={createEvaluationMutation.isPending}>
-                            {createEvaluationMutation.isPending ? 'Saving...' : 'Save Evaluation'}
-                        </button>
-                    </div>
-                </form>
             </Modal>
         </TableCard>
     );

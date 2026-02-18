@@ -4,6 +4,7 @@ import {
     ChevronRight,
     Clock,
     FileText,
+    Hourglass,
     MessageSquare,
     Plus,
     TrendingUp,
@@ -64,6 +65,48 @@ const normalizeAttendanceStatus = (status) => {
     return String(status || '').trim().toLowerCase();
 };
 
+const toSafeNumber = (value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
+const resolveSchoolId = (user) => {
+    if (!user) {
+        return null;
+    }
+
+    const school = user.school;
+    const candidate = user.school_id ?? school?.id ?? school;
+
+    if (candidate === null || candidate === undefined || candidate === '') {
+        return null;
+    }
+
+    if (typeof candidate === 'object') {
+        return null;
+    }
+
+    const normalized = Number.parseInt(String(candidate).trim(), 10);
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+};
+
+const getListCount = (payload) => {
+    const countValue = Number(payload?.count);
+    if (Number.isFinite(countValue)) {
+        return countValue;
+    }
+
+    if (Array.isArray(payload?.results)) {
+        return payload.results.length;
+    }
+
+    if (Array.isArray(payload)) {
+        return payload.length;
+    }
+
+    return 0;
+};
+
 const SecretaryDashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
@@ -71,6 +114,7 @@ const SecretaryDashboard = () => {
 
     const [stats, setStats] = useState({
         totalStudents: 0,
+        pendingStudents: 0,
         unreadMessages: 0,
         absentToday: 0,
         schoolName: '',
@@ -88,27 +132,73 @@ const SecretaryDashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 setLoading(true);
-                const [statsData, applicationsData, yearsData] = await Promise.all([
+                const pendingStudentsParams = {
+                    current_status: 'pending',
+                    page: 1,
+                    page_size: 1,
+                };
+                const schoolId = resolveSchoolId(user);
+                if (schoolId) {
+                    pendingStudentsParams.school_id = schoolId;
+                }
+
+                const [statsResult, applicationsResult, yearsResult, pendingStudentsResult] = await Promise.allSettled([
                     secretaryService.getSecretaryDashboardStats()
                         .catch(() => secretaryService.getDashboardStats()),
-                    secretaryService.getApplications({ page: 1 }),
+                    secretaryService.getApplications({ page: 1, status: 'pending' }),
                     secretaryService.getAcademicYears(),
+                    secretaryService.getStudents(pendingStudentsParams),
                 ]);
 
                 if (!isMounted) {
                     return;
                 }
 
-                const normalizedStats = statsData?.statistics || statsData || {};
+                const applicationsPayload = applicationsResult.status === 'fulfilled'
+                    ? (applicationsResult.value || {})
+                    : null;
+                const pendingApplicationsCount = applicationsPayload ? getListCount(applicationsPayload) : 0;
+                const pendingStudentsCount = pendingStudentsResult.status === 'fulfilled'
+                    ? getListCount(pendingStudentsResult.value || {})
+                    : null;
+
+                if (statsResult.status !== 'fulfilled') {
+                    console.error('Error fetching secretary dashboard stats:', statsResult.reason);
+                }
+                if (pendingStudentsResult.status !== 'fulfilled') {
+                    console.error('Error fetching pending students count:', pendingStudentsResult.reason);
+                }
+                const normalizedStats = statsResult.status === 'fulfilled'
+                    ? (statsResult.value?.statistics || statsResult.value || {})
+                    : {};
+
                 setStats({
-                    totalStudents: normalizedStats.total_students || 0,
-                    unreadMessages: normalizedStats.unread_messages || 0,
-                    absentToday: normalizedStats.absent_today || 0,
+                    totalStudents: toSafeNumber(normalizedStats.total_students),
+                    pendingStudents: toSafeNumber(
+                        pendingStudentsCount
+                        ?? normalizedStats.pending_students
+                        ?? normalizedStats.pending_enrollments
+                        ?? normalizedStats.pending_applications
+                        ?? pendingApplicationsCount
+                    ),
+                    unreadMessages: toSafeNumber(normalizedStats.unread_messages),
+                    absentToday: toSafeNumber(normalizedStats.absent_today),
                     schoolName: normalizedStats.school_name || 'My School',
                 });
 
-                setRecentApplications((applicationsData.results || applicationsData || []).slice(0, 5));
-                setAcademicYears(yearsData.results || yearsData || []);
+                if (applicationsResult.status === 'fulfilled') {
+                    setRecentApplications((applicationsPayload?.results || applicationsPayload || []).slice(0, 5));
+                } else {
+                    console.error('Error fetching recent applications:', applicationsResult.reason);
+                    setRecentApplications([]);
+                }
+
+                if (yearsResult.status === 'fulfilled') {
+                    setAcademicYears(yearsResult.value?.results || yearsResult.value || []);
+                } else {
+                    console.error('Error fetching academic years:', yearsResult.reason);
+                    setAcademicYears([]);
+                }
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);
             } finally {
@@ -123,7 +213,7 @@ const SecretaryDashboard = () => {
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [user]);
 
     const weekRange = useMemo(() => getWeekRange(selectedWeek), [selectedWeek]);
 
@@ -225,6 +315,12 @@ const SecretaryDashboard = () => {
                 color: 'indigo',
             },
             {
+                title: t('secretary.dashboard.pendingStudents') || 'Pending Students',
+                value: stats.pendingStudents.toLocaleString(),
+                icon: Hourglass,
+                color: 'purple',
+            },
+            {
                 title: t('secretary.dashboard.unreadMessages') || 'Unread Messages',
                 value: stats.unreadMessages,
                 icon: MessageSquare,
@@ -245,7 +341,7 @@ const SecretaryDashboard = () => {
                 color: 'rose',
             },
         ];
-    }, [stats.totalStudents, stats.unreadMessages, stats.absentToday, t]);
+    }, [stats.totalStudents, stats.pendingStudents, stats.unreadMessages, stats.absentToday, t]);
 
     const quickAccessButtons = useMemo(() => {
         return [
@@ -372,9 +468,9 @@ const SecretaryDashboard = () => {
                                         onClick={() => handleNavigate('/secretary/admissions')}
                                     >
                                         <div className="sec-activity-item__left">
-                                            <AvatarInitial name={application.student_name || 'Student'} color="indigo" />
+                                            <AvatarInitial name={application.student_name || application.full_name || 'Student'} color="indigo" />
                                             <div>
-                                                <p>{application.student_name}</p>
+                                                <p>{application.student_name || application.full_name || 'Student'}</p>
                                                 <span>Applied for: {application.grade_name || 'N/A'}</span>
                                             </div>
                                         </div>

@@ -1,10 +1,11 @@
 import { api, apiClient } from '../utils/api';
+import { todayIsoDate } from '../utils/helpers';
 
 const sanitizeParams = (filters = {}) => Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
 );
 
-const todayDate = () => new Date().toISOString().split('T')[0];
+const todayDate = () => todayIsoDate();
 
 const teacherService = {
     // Teacher Profile/Settings
@@ -25,7 +26,15 @@ const teacherService = {
 
     // Schedule (ClassSchedule entries – day_of_week + real times)
     getSchedule: async (date = todayDate()) => {
-        return api.get('/teacher/schedule/', { params: { date } });
+        try {
+            return await api.get('/teacher/schedule/', { params: { date } });
+        } catch (error) {
+            // Backward compatibility: some environments may not expose schedule endpoint yet.
+            if ([403, 404, 405].includes(error?.status)) {
+                return [];
+            }
+            throw error;
+        }
     },
     createScheduleSlot: async (data) => {
         return api.post('/teacher/schedule/', data);

@@ -40,6 +40,7 @@ export const roleConfigs = {
             { path: 'dashboard', labelKey: 'workstream.nav.dashboard', icon: 'LayoutDashboard' },
             { path: 'schools', labelKey: 'workstream.nav.schools', icon: 'School' },
             { path: 'assignments', labelKey: 'workstream.nav.assignments', icon: 'UserCheck' },
+            { path: 'academic-year', labelKey: 'workstream.nav.academicYear', icon: 'GraduationCap' },
             { path: 'reports', labelKey: 'workstream.nav.reports', icon: 'BarChart3' },
             { path: 'communication', labelKey: 'workstream.nav.communication', icon: 'MessageSquare' },
             { path: 'settings', labelKey: 'workstream.nav.settings', icon: 'Settings' },
@@ -63,7 +64,6 @@ export const roleConfigs = {
         navigation: [
             { path: 'dashboard', labelKey: 'schoolManager.nav.dashboard', icon: 'LayoutDashboard' },
             { path: 'grades', labelKey: 'schoolManager.nav.grades', icon: 'Layers' },
-            { path: 'academic-year', labelKey: 'schoolManager.nav.academicYear', icon: 'GraduationCap' },
             { path: 'configuration', labelKey: 'schoolManager.nav.configuration', icon: 'Cog' },
             { path: 'teachers', labelKey: 'schoolManager.nav.teachers', icon: 'Users' },
             { path: 'activity-log', labelKey: 'schoolManager.nav.activityLog', icon: 'Activity' },

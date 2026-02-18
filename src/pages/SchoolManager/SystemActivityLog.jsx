@@ -115,49 +115,53 @@ const SystemActivityLog = () => {
             </div>
 
             <div className="management-card">
-                <div className="table-header-actions" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <div className="sm-search-wrap sm-search-control">
-                        <Search size={18} className="sm-search-icon" />
-                        <input
-                            type="text"
-                            placeholder="Search activity logs..."
-                            value={searchTerm}
-                            onChange={handleSearchChange}
-                            className="sm-search-input"
-                        />
+                <div className="table-header-actions activity-log-toolbar">
+                    <div className="activity-log-toolbar-top">
+                        <div className="sm-search-wrap sm-search-control">
+                            <Search size={18} className="sm-search-icon" />
+                            <input
+                                type="text"
+                                placeholder="Search activity logs..."
+                                value={searchTerm}
+                                onChange={handleSearchChange}
+                                className="sm-search-input"
+                            />
+                        </div>
+
+                        <button type="button" className="btn-secondary activity-log-refresh-btn" onClick={() => refetch()}>
+                            <RefreshCw size={16} />
+                            Refresh
+                        </button>
                     </div>
 
-                    <select
-                        className="sm-form-select sm-select-control"
-                        value={userType}
-                        onChange={handleUserTypeChange}
-                    >
-                        <option value="all">All User Types</option>
-                        <option value="manager_school">School Managers</option>
-                        <option value="teacher">Teachers</option>
-                        <option value="secretary">Secretaries</option>
-                        <option value="system">System</option>
-                    </select>
+                    <div className="activity-log-filter-row">
+                        <select
+                            className="sm-form-select sm-select-control"
+                            value={userType}
+                            onChange={handleUserTypeChange}
+                        >
+                            <option value="all">All User Types</option>
+                            <option value="manager_school">School Managers</option>
+                            <option value="teacher">Teachers</option>
+                            <option value="secretary">Secretaries</option>
+                            <option value="system">System</option>
+                        </select>
 
-                    <select
-                        className="sm-form-select sm-select-control"
-                        value={actionType}
-                        onChange={handleActionTypeChange}
-                    >
-                        <option value="all">All Actions</option>
-                        <option value="LOGIN">Login</option>
-                        <option value="LOGOUT">Logout</option>
-                        <option value="CREATE">Create</option>
-                        <option value="UPDATE">Update</option>
-                        <option value="ACTIVATE">Activate</option>
-                        <option value="DEACTIVATE">Deactivate</option>
-                        <option value="DELETE">Delete</option>
-                    </select>
-
-                    <button type="button" className="btn-secondary" onClick={() => refetch()}>
-                        <RefreshCw size={16} />
-                        Refresh
-                    </button>
+                        <select
+                            className="sm-form-select sm-select-control"
+                            value={actionType}
+                            onChange={handleActionTypeChange}
+                        >
+                            <option value="all">All Actions</option>
+                            <option value="LOGIN">Login</option>
+                            <option value="LOGOUT">Logout</option>
+                            <option value="CREATE">Create</option>
+                            <option value="UPDATE">Update</option>
+                            <option value="ACTIVATE">Activate</option>
+                            <option value="DEACTIVATE">Deactivate</option>
+                            <option value="DELETE">Delete</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div className="sm-table-scroll">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Settings, Edit, Trash2, MapPin, Users, School, Layers, ChevronRight } from 'lucide-react';
+import { Plus, Settings, Edit, Trash2, MapPin, Users, School, Layers, ChevronRight, Clock3 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/ui/Toast';
 import Button from '../../components/ui/Button';
@@ -28,6 +28,11 @@ const WorkstreamManagement = () => {
     const [formData, setFormData] = useState({ name: '', quota: '100', managerId: '', location: '', description: '' });
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const formatCount = (value) => {
+        const parsed = Number(value);
+        const safeValue = Number.isFinite(parsed) ? parsed : 0;
+        return new Intl.NumberFormat().format(safeValue);
+    };
 
     const fetchWorkstreams = async () => {
         setLoading(true);
@@ -283,7 +288,7 @@ const WorkstreamManagement = () => {
                                         <h3 className={styles.cardTitle}>{ws.workstream_name}</h3>
                                         <div className={styles.locationLabel}>
                                             <MapPin size={12} />
-                                            <span>{ws.location || 'Not Specified'}</span>
+                                            <span>{ws.location || t('workstreams.card.locationUnspecified')}</span>
                                         </div>
                                     </div>
                                     <span className={`${styles.statusBadge} ${ws.is_active ? styles.active : styles.inactive}`}>
@@ -294,18 +299,25 @@ const WorkstreamManagement = () => {
                                 <div className={styles.cardBody}>
                                     <div className={styles.statsContainer}>
                                         <div className={styles.statItem}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            <div className={styles.statHeader}>
                                                 <School size={14} style={{ color: 'var(--color-primary)' }} />
                                                 <span className={styles.statLabel}>{t('workstreams.card.schools')}</span>
                                             </div>
-                                            <span className={styles.statValue}>{ws.total_schools || 0} Schools</span>
+                                            <span className={styles.statValue}>{formatCount(ws.total_schools)}</span>
                                         </div>
                                         <div className={styles.statItem}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                            <div className={styles.statHeader}>
                                                 <Users size={14} style={{ color: '#8b5cf6' }} />
-                                                <span className={styles.statLabel}>{t('workstreams.card.users')}</span>
+                                                <span className={styles.statLabel}>{t('workstreams.card.allUsers') || t('workstreams.card.users')}</span>
                                             </div>
-                                            <span className={styles.statValue}>{ws.total_users || 0} Users</span>
+                                            <span className={styles.statValue}>{formatCount(ws.total_users)}</span>
+                                        </div>
+                                        <div className={styles.statItem}>
+                                            <div className={styles.statHeader}>
+                                                <Clock3 size={14} style={{ color: 'var(--color-warning, #f59e0b)' }} />
+                                                <span className={styles.statLabel}>{t('workstreams.card.pendingStudents')}</span>
+                                            </div>
+                                            <span className={styles.statValue}>{formatCount(ws.pending_students)}</span>
                                         </div>
                                     </div>
 
@@ -314,8 +326,8 @@ const WorkstreamManagement = () => {
                                             {ws.manager_name?.charAt(0) || '?'}
                                         </div>
                                         <div>
-                                            <p style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700 }}>Manager</p>
-                                            <p className={styles.managerName}>{ws.manager_name || 'Pending'}</p>
+                                            <p className={styles.managerLabel}>{t('workstreams.card.manager')}</p>
+                                            <p className={styles.managerName}>{ws.manager_name || t('workstreams.card.pendingManager')}</p>
                                         </div>
                                         <ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--slate-300)' }} />
                                     </div>
