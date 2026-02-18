@@ -24,21 +24,18 @@ import {
     EmptyState,
     LoadingSpinner,
     PageHeader,
+    SkeletonTable,
     StatCard,
     StatusBadge,
 } from './components';
 import './Secretary.css';
 
-const STUDENT_STATUS_OPTIONS = [
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'suspended', label: 'Suspended' },
-    { value: 'graduated', label: 'Graduated' },
-    { value: 'transferred', label: 'Transferred' },
-    { value: 'expelled', label: 'Expelled' },
-    { value: 'withdrawn', label: 'Withdrawn' },
+const STUDENT_ENROLLMENT_STATUS_OPTIONS = [
     { value: 'rejected', label: 'Rejected' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'suspended', label: 'Suspending' },
+    { value: 'graduated', label: 'Graduated' },
+    { value: 'active', label: 'Active' },
 ];
 
 const GENDER_OPTIONS = [
@@ -52,6 +49,11 @@ const STUDENT_ACTIVITY_FILTER_OPTIONS = [
     { value: '', label: 'All Students' },
     { value: 'active', label: 'Active' },
     { value: 'not_active', label: 'Not Active' },
+];
+
+const APPLICATION_STATUS_FILTER_OPTIONS = [
+    { value: '', label: 'All Enrollment Status' },
+    ...STUDENT_ENROLLMENT_STATUS_OPTIONS,
 ];
 
 const APPLICATIONS_PAGE_SIZE = 10;
@@ -148,7 +150,7 @@ const stringifyApiValue = (value) => {
 };
 
 const getApiErrorMessage = (error, fallbackMessage) => {
-    const apiErrors = error?.response?.data;
+    const apiErrors = error?.response?.data ?? error?.data;
 
     if (typeof apiErrors === 'string' && apiErrors.trim()) {
         return apiErrors.trim();
@@ -232,23 +234,33 @@ const getStudentId = (student) => {
     return String(candidate);
 };
 
+const normalizeEnrollmentStatus = (status) => {
+    const value = String(status || '').trim().toLowerCase();
+    if (value === 'suspending') {
+        return 'suspended';
+    }
+
+    return value;
+};
+
 const resolveSchoolId = (user) => {
     if (!user) {
-        return '';
+        return null;
     }
 
     const school = user.school;
     const candidate = user.school_id ?? school?.id ?? school;
 
     if (candidate === null || candidate === undefined || candidate === '') {
-        return '';
+        return null;
     }
 
     if (typeof candidate === 'object') {
-        return '';
+        return null;
     }
 
-    return String(candidate).trim();
+    const normalized = Number.parseInt(String(candidate).trim(), 10);
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
 };
 
 const getEnrollmentAcademicYearId = (enrollment) => {
@@ -301,12 +313,12 @@ const getClassroomId = (classroom) => {
 };
 
 const resolveStudentStatus = (student) => {
-    const currentStatus = String(student?.current_status || '').trim().toLowerCase();
+    const currentStatus = normalizeEnrollmentStatus(student?.current_status);
     if (currentStatus) {
         return currentStatus;
     }
 
-    const enrollmentStatus = String(student?.enrollment_status || '').trim().toLowerCase();
+    const enrollmentStatus = normalizeEnrollmentStatus(student?.enrollment_status);
     if (enrollmentStatus) {
         return enrollmentStatus;
     }
@@ -337,10 +349,12 @@ const createEmptySchoolStudentStats = () => ({
     totalStudents: 0,
     activeStudents: 0,
     pendingStudents: 0,
+    newApplications: 0,
     assignedStudents: 0,
 });
 
 const ASSIGNED_ENROLLMENT_STATUSES = new Set(['active', 'enrolled']);
+const NEW_APPLICATION_STATUSES = new Set(['pending', 'suspended']);
 
 const calculateSchoolStudentStats = (studentList, assignedStudentIds = null) => {
     return studentList.reduce((stats, student) => {
@@ -353,6 +367,9 @@ const calculateSchoolStudentStats = (studentList, assignedStudentIds = null) => 
         }
         if (status === 'pending') {
             stats.pendingStudents += 1;
+        }
+        if (NEW_APPLICATION_STATUSES.has(status)) {
+            stats.newApplications += 1;
         }
 
         const isAssigned = assignedStudentIds
@@ -390,10 +407,10 @@ const EditStudentStatusModal = memo(function EditStudentStatusModal({
                     <label className="form-label">Enrollment Status</label>
                     <select
                         className="form-select"
-                        value={student.current_status || 'pending'}
+                        value={normalizeEnrollmentStatus(student.current_status || 'pending')}
                         onChange={(event) => onStatusChange(event.target.value)}
                     >
-                        {STUDENT_STATUS_OPTIONS.map((statusOption) => (
+                        {STUDENT_ENROLLMENT_STATUS_OPTIONS.map((statusOption) => (
                             <option key={statusOption.value} value={statusOption.value}>
                                 {statusOption.label}
                             </option>
@@ -477,6 +494,7 @@ const StudentAdmissions = () => {
     const gradeOptionsRequestRef = useRef(0);
     const academicYearsRequestRef = useRef(0);
     const schoolStatsRequestRef = useRef(0);
+    const documentFileInputRef = useRef(null);
 
     const schoolId = useMemo(() => resolveSchoolId(user), [user]);
     const debouncedApplicationSearch = useDebouncedValue(applicationSearch, 350);
@@ -491,7 +509,7 @@ const StudentAdmissions = () => {
                 id: 'applications',
                 label: t('secretary.admissions.newApplications') || 'Applications',
                 icon: FileText,
-                badge: schoolStudentStats.totalStudents,
+                badge: schoolStudentStats.newApplications,
             },
             {
                 id: 'add-student',
@@ -509,7 +527,7 @@ const StudentAdmissions = () => {
                 icon: Upload,
             },
         ];
-    }, [schoolStudentStats.totalStudents, t]);
+    }, [schoolStudentStats.newApplications, t]);
 
     const filteredApplications = applications;
 
@@ -656,7 +674,7 @@ const StudentAdmissions = () => {
 
     const fetchStudentApplications = useCallback(async (
         yearId = '',
-        activityStatus = '',
+        statusFilter = '',
         pageNumber = 1,
         searchFilter = ''
     ) => {
@@ -676,8 +694,8 @@ const StudentAdmissions = () => {
             if (yearId) {
                 params.academic_year_id = yearId;
             }
-            if (activityStatus) {
-                params.activity_status = activityStatus;
+            if (statusFilter) {
+                params.current_status = normalizeEnrollmentStatus(statusFilter);
             }
             const normalizedSearch = searchFilter.trim();
             if (normalizedSearch) {
@@ -1271,6 +1289,9 @@ const StudentAdmissions = () => {
 
             setFeedback('success', 'Document uploaded successfully.');
             setDocumentUpload(createDefaultDocumentUpload());
+            if (documentFileInputRef.current) {
+                documentFileInputRef.current.value = '';
+            }
             setDocumentStudentQuery('');
             setShowDocumentStudentDropdown(false);
             setFilesPage(1);
@@ -1467,7 +1488,7 @@ const StudentAdmissions = () => {
             setIsUpdatingStudent(true);
 
             await secretaryService.updateStudent(studentId, {
-                current_status: (editingStudent.current_status || 'pending').toLowerCase(),
+                current_status: normalizeEnrollmentStatus(editingStudent.current_status || 'pending'),
             });
 
             setFeedback('success', 'Student status updated successfully!');
@@ -1510,7 +1531,7 @@ const StudentAdmissions = () => {
                 return previous;
             }
 
-            return { ...previous, current_status: value };
+            return { ...previous, current_status: normalizeEnrollmentStatus(value) };
         });
     }, []);
 
@@ -1618,7 +1639,7 @@ const StudentAdmissions = () => {
                                         value={applicationActivityFilter}
                                         onChange={(event) => setApplicationActivityFilter(event.target.value)}
                                     >
-                                        {STUDENT_ACTIVITY_FILTER_OPTIONS.map((option) => (
+                                        {APPLICATION_STATUS_FILTER_OPTIONS.map((option) => (
                                             <option key={option.value || 'all'} value={option.value}>
                                                 {option.label}
                                             </option>
@@ -1629,7 +1650,7 @@ const StudentAdmissions = () => {
 
                             <div className="sec-table-wrap">
                                 {isApplicationsLoading ? (
-                                    <LoadingSpinner message="Loading students..." />
+                                    <SkeletonTable rows={5} cols={6} />
                                 ) : (
                                     <div className="sec-table-scroll">
                                         <table className="data-table sec-data-table sec-data-table--applications">
@@ -1885,7 +1906,7 @@ const StudentAdmissions = () => {
                                         value={newStudent.enrollment_status}
                                         onChange={(event) => updateNewStudentField('enrollment_status', event.target.value)}
                                     >
-                                        {STUDENT_STATUS_OPTIONS.map((statusOption) => (
+                                        {STUDENT_ENROLLMENT_STATUS_OPTIONS.map((statusOption) => (
                                             <option key={`enrollment-${statusOption.value}`} value={statusOption.value}>
                                                 {statusOption.label}
                                             </option>
@@ -2172,6 +2193,7 @@ const StudentAdmissions = () => {
                                     <input
                                         id="student-document-upload"
                                         type="file"
+                                        ref={documentFileInputRef}
                                         className="sec-hidden-file-input"
                                         accept=".pdf,.jpg,.jpeg,.png"
                                         onChange={handleDocumentFileChange}
@@ -2264,7 +2286,7 @@ const StudentAdmissions = () => {
                             </div>
 
                             {isFilesLoading ? (
-                                <LoadingSpinner message="Loading files..." />
+                                <SkeletonTable rows={5} cols={5} />
                             ) : (
                                 <div className="sec-table-scroll">
                                     <table className="data-table sec-data-table sec-data-table--files">

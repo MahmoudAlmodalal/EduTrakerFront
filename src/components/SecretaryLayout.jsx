@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
+    Info,
     UserPlus,
     Users,
     FileText,
@@ -12,11 +13,12 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { SecretaryDataProvider } from '../context/SecretaryDataContext';
 import '../pages/WorkstreamManager/Workstream.css';
 
 const SIDEBAR_BREAKPOINT = 1024;
 
-const SecretaryLayout = () => {
+const SecretaryLayoutContent = () => {
     const { t } = useTheme();
     const { logout } = useAuth();
     const navigate = useNavigate();
@@ -48,6 +50,7 @@ const SecretaryLayout = () => {
         { path: '/secretary/guardians', labelKey: 'secretary.nav.guardians', icon: Users },
         { path: '/secretary/attendance', labelKey: 'secretary.nav.attendance', icon: FileText },
         { path: '/secretary/communication', labelKey: 'secretary.nav.communication', icon: FileText },
+        { path: '/secretary/info', labelKey: 'secretary.nav.info', icon: Info },
         { path: '/secretary/settings', labelKey: 'secretary.nav.settings', icon: Settings },
     ];
 
@@ -131,6 +134,14 @@ const SecretaryLayout = () => {
                 <Outlet />
             </main>
         </div>
+    );
+};
+
+const SecretaryLayout = () => {
+    return (
+        <SecretaryDataProvider>
+            <SecretaryLayoutContent />
+        </SecretaryDataProvider>
     );
 };
 

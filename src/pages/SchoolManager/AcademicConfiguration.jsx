@@ -12,7 +12,6 @@ import {
     Building,
     UserCheck,
     Trash2,
-    Copy,
     UserPlus,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
@@ -342,10 +341,21 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ start_date: '', end_date: '' });
     const [saving, setSaving] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('all');
     // Copy-structure state
     const [copyPrompt, setCopyPrompt] = useState(null); // { targetYear }
     const [copySourceId, setCopySourceId] = useState('');
     const [copying, setCopying] = useState(false);
+
+    const filteredAcademicYears = useMemo(() => {
+        if (statusFilter === 'active') {
+            return academicYears.filter((year) => year.is_active);
+        }
+        if (statusFilter === 'inactive') {
+            return academicYears.filter((year) => !year.is_active);
+        }
+        return academicYears;
+    }, [academicYears, statusFilter]);
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -418,10 +428,27 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">Academic Years</h3>
-                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
-                    <Plus size={18} />
-                    Create Academic Year
-                </button>
+                <div className="sm-academic-year-toolbar">
+                    <div className="sm-academic-year-filter">
+                        <label htmlFor="academic-year-status-filter" className="sm-academic-year-filter-label">
+                            Status
+                        </label>
+                        <select
+                            id="academic-year-status-filter"
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value)}
+                            className="sm-academic-year-filter-select"
+                        >
+                            <option value="all">All</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <button className="btn-primary sm-academic-year-create-btn" onClick={() => setIsModalOpen(true)}>
+                        <Plus size={18} />
+                        Create Academic Year
+                    </button>
+                </div>
             </div>
 
             {academicYears.length === 0 ? (
@@ -438,6 +465,12 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                         Create First Academic Year
                     </button>
                 </div>
+            ) : filteredAcademicYears.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    {statusFilter === 'active'
+                        ? 'No active academic years found.'
+                        : 'No inactive academic years found.'}
+                </div>
             ) : (
                 <div className="sm-table-scroll">
                     <table className="data-table">
@@ -447,11 +480,10 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                                 <th>Start Date</th>
                                 <th>End Date</th>
                                 <th>Status</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {academicYears.map((ay) => (
+                            {filteredAcademicYears.map((ay) => (
                                 <tr key={ay.id}>
                                     <td style={{ fontWeight: 600 }}>{ay.academic_year_code}</td>
                                     <td>{ay.start_date}</td>
@@ -465,35 +497,6 @@ export const AcademicYearManagement = ({ academicYears, schoolId, onUpdated }) =
                                         >
                                             {ay.is_active ? 'Active' : 'Inactive'}
                                         </span>
-                                    </td>
-                                    <td>
-                                        {academicYears.length > 1 && (
-                                            <button
-                                                type="button"
-                                                title="Copy classroom structure from another year into this year"
-                                                onClick={() => {
-                                                    const other = [...academicYears].filter(y => y.id !== ay.id).sort((a, b) => b.id - a.id)[0];
-                                                    setCopySourceId(other ? String(other.id) : '');
-                                                    setCopyPrompt({ targetYear: ay });
-                                                }}
-                                                style={{
-                                                    padding: '0.3rem 0.7rem',
-                                                    fontSize: '0.78rem',
-                                                    fontWeight: 600,
-                                                    border: '1px solid var(--color-primary)',
-                                                    borderRadius: '6px',
-                                                    background: 'transparent',
-                                                    color: 'var(--color-primary)',
-                                                    cursor: 'pointer',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                }}
-                                            >
-                                                <Copy size={13} />
-                                                Copy Structure
-                                            </button>
-                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -618,6 +621,11 @@ export const GradeManagement = () => {
     const [editFormData, setEditFormData] = useState({ name: '', numeric_level: '', min_age: '', max_age: '' });
 
     const schoolId = user?.school_id || user?.school?.id || user?.school;
+    const activeAcademicYears = useMemo(
+        () => academicYears.filter((year) => year.is_active),
+        [academicYears]
+    );
+    const hasActiveAcademicYear = activeAcademicYears.length > 0;
 
     const gradeTotalPages = Math.max(1, Math.ceil(grades.length / TABLE_ROWS_PER_PAGE));
     const activeGradePage = Math.min(gradePage, gradeTotalPages);
@@ -627,12 +635,12 @@ export const GradeManagement = () => {
     const fetchGrades = async (yearId) => {
         try {
             const params = { include_inactive: true };
-            if (yearId) {
-                params.academic_year_id = yearId;
-                if (schoolId) params.school_id = schoolId;
-            }
+            if (schoolId) params.school_id = schoolId;
+            if (yearId) params.academic_year_id = yearId;
+
             const data = await managerService.getGrades(params);
-            setGrades(data.results || data || []);
+            const allGrades = data.results || data || [];
+            setGrades(allGrades);
         } catch (error) {
             console.error('Failed to fetch grades:', error);
             setGrades([]);
@@ -647,11 +655,15 @@ export const GradeManagement = () => {
                     : Promise.resolve([]));
                 const years = yearsData.results || yearsData || [];
                 setAcademicYears(years);
-                // Auto-select the active year and fetch grades filtered by it
-                const activeYear = years.find(y => y.is_active);
-                const initialYearId = activeYear ? activeYear.id : null;
-                if (activeYear) setSelectedYearId(String(activeYear.id));
-                await fetchGrades(initialYearId);
+                // Grade management is scoped to active academic year only.
+                const activeYear = years.find((y) => y.is_active);
+                if (!activeYear) {
+                    setSelectedYearId('');
+                    setGrades([]);
+                    return;
+                }
+                setSelectedYearId(String(activeYear.id));
+                await fetchGrades(activeYear.id);
             } catch (error) {
                 console.error('Failed to fetch grades:', error);
                 setGrades([]);
@@ -668,7 +680,12 @@ export const GradeManagement = () => {
             isFirstRender.current = false;
             return;
         }
-        fetchGrades(selectedYearId ? parseInt(selectedYearId, 10) : null);
+        if (!selectedYearId) {
+            setGrades([]);
+            setGradePage(1);
+            return;
+        }
+        fetchGrades(parseInt(selectedYearId, 10));
         setGradePage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedYearId]);
@@ -697,19 +714,36 @@ export const GradeManagement = () => {
 
         setSaving(true);
         try {
-            const createdGrade = await managerService.createGrade({
+            await managerService.createGrade({
                 name: formData.name.trim(),
                 numeric_level: Number.parseInt(formData.numeric_level, 10),
                 min_age: Number.parseInt(formData.min_age, 10),
                 max_age: Number.parseInt(formData.max_age, 10),
+                school_id: schoolId ? Number.parseInt(String(schoolId), 10) : undefined,
+                academic_year_id: selectedYearId ? Number.parseInt(selectedYearId, 10) : undefined,
             });
-            await fetchGrades(selectedYearId ? parseInt(selectedYearId, 10) : null);
+            if (selectedYearId) {
+                await fetchGrades(parseInt(selectedYearId, 10));
+            } else {
+                setGrades([]);
+            }
             showSuccess('Grade created successfully.');
             setIsCreateModalOpen(false);
             resetCreateForm();
         } catch (error) {
             console.error('Failed to create grade:', error);
-            showError(getErrorMessage(error, 'Failed to create grade.'));
+            const errorMessage = getErrorMessage(error, 'Failed to create grade.');
+            if (
+                selectedYearId &&
+                typeof errorMessage === 'string' &&
+                errorMessage.toLowerCase().includes('numeric level already exists')
+            ) {
+                showError(
+                    'This grade level already exists. If it is not shown in this academic year, it likely has 0 classrooms. Add classrooms/courses for this grade in the selected year.'
+                );
+            } else {
+                showError(errorMessage);
+            }
         } finally {
             setSaving(false);
         }
@@ -743,13 +777,17 @@ export const GradeManagement = () => {
 
         setSaving(true);
         try {
-            const updated = await managerService.updateGrade(editingGrade.id, {
+            await managerService.updateGrade(editingGrade.id, {
                 name: editFormData.name.trim(),
                 numeric_level: Number.parseInt(editFormData.numeric_level, 10),
                 min_age: Number.parseInt(editFormData.min_age, 10),
                 max_age: Number.parseInt(editFormData.max_age, 10),
             });
-            await fetchGrades(selectedYearId ? parseInt(selectedYearId, 10) : null);
+            if (selectedYearId) {
+                await fetchGrades(parseInt(selectedYearId, 10));
+            } else {
+                setGrades([]);
+            }
             showSuccess('Grade updated successfully.');
             setIsEditModalOpen(false);
             setEditingGrade(null);
@@ -814,7 +852,12 @@ export const GradeManagement = () => {
         <div className="management-card">
             <div className="table-header-actions">
                 <h3 className="chart-title">Grade Management</h3>
-                <button className="btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                <button
+                    className="btn-primary"
+                    onClick={() => setIsCreateModalOpen(true)}
+                    disabled={!hasActiveAcademicYear}
+                    title={!hasActiveAcademicYear ? 'Activate an academic year first.' : 'Add Grade'}
+                >
                     <Plus size={18} />
                     Add Grade
                 </button>
@@ -824,33 +867,36 @@ export const GradeManagement = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                 <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
                     <Calendar size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
-                    Academic Year:
+                    Active Academic Year:
                 </label>
                 <select
                     value={selectedYearId}
                     onChange={(e) => setSelectedYearId(e.target.value)}
                     className="sm-form-input"
-                    style={{ maxWidth: '220px', padding: '0.4rem 0.6rem' }}
+                    style={{ maxWidth: '260px', padding: '0.4rem 0.6rem' }}
+                    disabled={!hasActiveAcademicYear}
                 >
-                    <option value="">All Years (global grades)</option>
-                    {academicYears.map(ay => (
+                    {!hasActiveAcademicYear && <option value="">No active academic year</option>}
+                    {activeAcademicYears.map((ay) => (
                         <option key={ay.id} value={String(ay.id)}>
-                            {ay.academic_year_code}{ay.is_active ? ' (Active)' : ''}
+                            {ay.academic_year_code} (Active)
                         </option>
                     ))}
                 </select>
-                {selectedYearId && (
+                {hasActiveAcademicYear && selectedYearId && (
                     <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                        Showing grades with classrooms in selected year
+                        Showing grades for the active academic year only
                     </span>
                 )}
             </div>
 
-            {grades.length === 0 ? (
+            {!hasActiveAcademicYear ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    {selectedYearId
-                        ? 'No grades have classrooms in the selected academic year.'
-                        : 'No grades found. Create your first grade.'}
+                    No active academic year found. Please activate one from Academic Year management.
+                </div>
+            ) : grades.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    No grades found for the active academic year.
                 </div>
             ) : (
                 <>
@@ -1108,7 +1154,9 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
 
     const fetchGrades = async () => {
         try {
-            const data = await managerService.getGrades({ include_inactive: false });
+            const params = { include_inactive: false };
+            if (schoolId) params.school_id = schoolId;
+            const data = await managerService.getGrades(params);
             setGrades(data.results || data || []);
         } catch (error) {
             console.error('Failed to fetch grades:', error);
@@ -1229,6 +1277,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                 numeric_level: Number.parseInt(gradeForm.numeric_level, 10),
                 min_age: Number.parseInt(gradeForm.min_age, 10),
                 max_age: Number.parseInt(gradeForm.max_age, 10),
+                school_id: schoolId ? Number.parseInt(String(schoolId), 10) : undefined,
             });
             showSuccess('Grade created successfully.');
             setIsGradeModalOpen(false);
@@ -2002,14 +2051,17 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
     useEffect(() => {
         const fetchGrades = async () => {
             try {
-                const data = await managerService.getGrades();
+                const params = {};
+                if (schoolId) params.school_id = schoolId;
+                if (selectedAcademicYear) params.academic_year_id = selectedAcademicYear;
+                const data = await managerService.getGrades(params);
                 setGrades(data.results || data || []);
             } catch (error) {
                 console.error('Failed to fetch grades:', error);
             }
         };
         fetchGrades();
-    }, []);
+    }, [schoolId, selectedAcademicYear]);
 
     useEffect(() => {
         if (schoolId && selectedAcademicYear) {

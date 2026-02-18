@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { TrendingDown, TrendingUp } from 'lucide-react';
-import { getSecretaryIconColorKey, getSecretaryIconStyle } from '../../../utils/secretaryHelpers';
+import { getSecretaryIconColorKey } from '../../../utils/secretaryHelpers';
 
 const StatCard = memo(function StatCard({
     title,
@@ -10,8 +10,6 @@ const StatCard = memo(function StatCard({
     trend,
     trendUp = true,
 }) {
-    // Resolve color through helper and map to a semantic class.
-    getSecretaryIconStyle(color);
     const toneClass = `sec-icon-tone--${getSecretaryIconColorKey(color)}`;
 
     return (

@@ -390,7 +390,12 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
 
         const hasPasswordInput = Boolean(securityForm.newPassword || securityForm.confirmPassword || securityForm.currentPassword);
 
-        if (securityForm.newPassword || securityForm.confirmPassword) {
+        if (hasPasswordInput) {
+            if (!securityForm.currentPassword || !securityForm.newPassword || !securityForm.confirmPassword) {
+                showError('Please enter current, new, and confirmation passwords.');
+                return;
+            }
+
             if (securityForm.newPassword.length < 8) {
                 showError('New password must be at least 8 characters.');
                 return;
@@ -405,16 +410,14 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
             enable_2fa: securityForm.enable2FA,
         };
 
-        if (securityForm.newPassword) {
+        if (hasPasswordInput) {
+            payload.current_password = securityForm.currentPassword;
             payload.password = securityForm.newPassword;
-        } else if (hasPasswordInput) {
-            showError('Please enter a valid new password.');
-            return;
         }
 
         updateSavingState('security', true);
         try {
-            await settingsService.updateProfileSettings(payload);
+            await settingsService.updateSecuritySettings(payload);
             syncCachedUser({ enable_2fa: securityForm.enable2FA });
             setSecurityForm((prev) => ({
                 ...prev,

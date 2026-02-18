@@ -294,6 +294,8 @@ export const translations = {
         'workstream.assignments.assignBtn': 'Assign Manager',
         'workstream.assignments.updateBtn': 'Update Manager',
         'workstream.assignments.confirmDelete': 'Are you sure you want to remove this manager?',
+        'workstream.assignments.filterByStatus': 'Filter by status',
+        'workstream.assignments.filter.all': 'All',
 
         // Workstream Reports
         'workstream.reports.title': 'Workstream Analytics',
@@ -648,6 +650,7 @@ export const translations = {
 
         // Secretary Navigation
         'secretary.nav.overview': 'Overview',
+        'secretary.nav.info': 'My Info',
         'secretary.nav.admissions': 'Admissions',
         'secretary.nav.guardians': 'Guardians',
         'secretary.nav.attendance': 'Attendance',
@@ -1222,6 +1225,8 @@ export const translations = {
         'workstream.assignments.assignBtn': 'تعيين المدير',
         'workstream.assignments.updateBtn': 'تحديث المدير',
         'workstream.assignments.confirmDelete': 'هل أنت متأكد من إزالة هذا المدير؟',
+        'workstream.assignments.filterByStatus': 'تصفية حسب الحالة',
+        'workstream.assignments.filter.all': 'الكل',
 
         // Workstream Reports
         'workstream.reports.title': 'تحليلات مسار العمل',
@@ -1570,6 +1575,7 @@ export const translations = {
 
         // Secretary Navigation
         'secretary.nav.overview': 'نظرة عامة',
+        'secretary.nav.info': 'معلوماتي',
         'secretary.nav.admissions': 'القبول',
         'secretary.nav.guardians': 'أولياء الأمور',
         'secretary.nav.attendance': 'الحضور',

@@ -23,6 +23,24 @@ import { useCachedApi } from '../hooks/useCachedApi';
 import NotificationDropdown from './shared/NotificationDropdown';
 
 const SIDEBAR_BREAKPOINT = 1024;
+const SIDEBAR_COUNT_REFRESH_EVENT = 'school_manager_stats_updated';
+
+const getCountFromListResponse = (payload) => {
+    const countValue = Number(payload?.count);
+    if (Number.isFinite(countValue)) {
+        return countValue;
+    }
+
+    if (Array.isArray(payload?.results)) {
+        return payload.results.length;
+    }
+
+    if (Array.isArray(payload)) {
+        return payload.length;
+    }
+
+    return null;
+};
 
 const SchoolManagerLayout = () => {
     const { t } = useTheme();
@@ -75,9 +93,10 @@ const SchoolManagerLayout = () => {
 
     // Check if we have a valid token
     const hasValidToken = !!user && !!localStorage.getItem('accessToken');
+    const schoolId = user?.school_id || user?.school?.id || user?.school;
 
     // Fetch dashboard stats for sidebar quick stats (5 minute TTL)
-    const { data: dashboardData } = useCachedApi(
+    const { data: dashboardData, refetch: refetchSidebarStats } = useCachedApi(
         () => managerService.getDashboardStats(),
         {
             enabled: hasValidToken,
@@ -87,7 +106,37 @@ const SchoolManagerLayout = () => {
         }
     );
 
+    // Active teachers count for sidebar: source of truth from teachers API.
+    const { data: activeTeachersData, refetch: refetchActiveTeachersCount } = useCachedApi(
+        () => {
+            const params = {
+                include_inactive: false,
+                page_size: 1
+            };
+            if (schoolId) params.school_id = schoolId;
+            return managerService.getTeachers(params);
+        },
+        {
+            enabled: hasValidToken && !!schoolId,
+            cacheKey: `sidebar_active_teachers_${user?.id}_${schoolId || 'none'}`,
+            ttl: 60 * 1000, // 1 minute
+            dependencies: [user?.id, schoolId]
+        }
+    );
+
+    useEffect(() => {
+        const handleStatsUpdated = () => {
+            refetchSidebarStats();
+            refetchActiveTeachersCount();
+        };
+
+        window.addEventListener(SIDEBAR_COUNT_REFRESH_EVENT, handleStatsUpdated);
+        return () => window.removeEventListener(SIDEBAR_COUNT_REFRESH_EVENT, handleStatsUpdated);
+    }, [refetchSidebarStats, refetchActiveTeachersCount]);
+
     const sidebarStats = dashboardData?.statistics || {};
+    const activeTeachersCount = getCountFromListResponse(activeTeachersData);
+    const teachersSidebarValue = activeTeachersCount ?? sidebarStats.total_teachers ?? '—';
 
     const getInitials = () => {
         if (user?.name) {
@@ -147,7 +196,7 @@ const SchoolManagerLayout = () => {
                         border: '1px solid rgba(79, 70, 229, 0.2)'
                     }}>
                         <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>
-                            {sidebarStats.total_teachers ?? '—'}
+                            {teachersSidebarValue}
                         </div>
                         <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             {t('teachers') || 'Teachers'}

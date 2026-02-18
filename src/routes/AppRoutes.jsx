@@ -54,6 +54,7 @@ const SecretaryDashboard = React.lazy(() => import('../pages/Secretary/Secretary
 const StudentAdmissions = React.lazy(() => import('../pages/Secretary/StudentAdmissions'));
 const GuardianLinking = React.lazy(() => import('../pages/Secretary/GuardianLinking'));
 const SecretaryAttendance = React.lazy(() => import('../pages/Secretary/SecretaryAttendance'));
+const SecretaryInfo = React.lazy(() => import('../pages/Secretary/Info/SecretaryInfo'));
 const SecretarySettings = React.lazy(() => import('../pages/Secretary/SecretarySettings'));
 
 // Student
@@ -176,6 +177,7 @@ const AppRoutes = () => {
                         <Route path="guardians" element={<GuardianLinking />} />
                         <Route path="attendance" element={<SecretaryAttendance />} />
                         <Route path="communication" element={<GeneralCommunication />} />
+                        <Route path="info" element={<SecretaryInfo />} />
                         <Route path="settings" element={<SecretarySettings />} />
                     </Route>
                 </Route>

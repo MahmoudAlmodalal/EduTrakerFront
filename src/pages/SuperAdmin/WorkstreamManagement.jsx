@@ -21,6 +21,8 @@ const WorkstreamManagement = () => {
 
     const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
     const [selectedWorkstream, setSelectedWorkstream] = useState(null);
+    const [configMaxUsers, setConfigMaxUsers] = useState('');
+    const [isSavingConfig, setIsSavingConfig] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [currentWorkstreamId, setCurrentWorkstreamId] = useState(null);
     const [formData, setFormData] = useState({ name: '', quota: '100', managerId: '', location: '', description: '' });
@@ -170,7 +172,31 @@ const WorkstreamManagement = () => {
 
     const openConfigModal = (workstream) => {
         setSelectedWorkstream(workstream);
+        setConfigMaxUsers((workstream?.capacity ?? '').toString());
         setIsConfigModalOpen(true);
+    };
+
+    const handleSaveConfig = async (e) => {
+        e.preventDefault();
+        if (!selectedWorkstream) return;
+
+        const parsedMaxUsers = parseInt(configMaxUsers, 10);
+        if (!Number.isInteger(parsedMaxUsers) || parsedMaxUsers < 1) {
+            showWarning('Max users must be a number greater than or equal to 1.');
+            return;
+        }
+
+        setIsSavingConfig(true);
+        try {
+            await workstreamService.updateWorkstream(selectedWorkstream.id, { capacity: parsedMaxUsers });
+            await fetchWorkstreams();
+            setIsConfigModalOpen(false);
+            showSuccess('Workstream configuration updated successfully.');
+        } catch (err) {
+            showError('Failed to update configuration: ' + err.message);
+        } finally {
+            setIsSavingConfig(false);
+        }
     };
 
     return (
@@ -377,11 +403,17 @@ const WorkstreamManagement = () => {
             </Modal>
 
             <Modal isOpen={isConfigModalOpen} onClose={() => setIsConfigModalOpen(false)} title={`${t('workstreams.config.title')}: ${selectedWorkstream?.workstream_name}`}>
-                <form className={styles.form} onSubmit={(e) => { e.preventDefault(); setIsConfigModalOpen(false); }}>
+                <form className={styles.form} onSubmit={handleSaveConfig}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         <div className={styles.formGroup}>
                             <label>{t('workstreams.config.maxUsers')}</label>
-                            <input type="number" defaultValue="10000" />
+                            <input
+                                type="number"
+                                min="1"
+                                required
+                                value={configMaxUsers}
+                                onChange={(e) => setConfigMaxUsers(e.target.value)}
+                            />
                         </div>
                         <div className={styles.formGroup}>
                             <label>{t('workstreams.config.features')}</label>
@@ -402,8 +434,8 @@ const WorkstreamManagement = () => {
                         </div>
                     </div>
                     <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
-                        <Button variant="outline" onClick={() => setIsConfigModalOpen(false)} type="button">{t('common.cancel')}</Button>
-                        <Button variant="primary" type="submit">{t('common.save')}</Button>
+                        <Button variant="outline" onClick={() => setIsConfigModalOpen(false)} type="button" disabled={isSavingConfig}>{t('common.cancel')}</Button>
+                        <Button variant="primary" type="submit" disabled={isSavingConfig}>{isSavingConfig ? 'Saving...' : t('common.save')}</Button>
                     </div>
                 </form>
             </Modal>

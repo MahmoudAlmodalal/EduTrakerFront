@@ -26,36 +26,37 @@ import './Secretary.css';
 const AttendanceTrendChart = lazy(() => import('./components/AttendanceTrendChart'));
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
-const formatDateParam = (value) => {
+const formatDateParamUTC = (value) => {
     const date = new Date(value);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return date.toISOString().split('T')[0];
 };
 
-const getStartOfWeek = (value) => {
-    const date = new Date(value);
-    date.setHours(0, 0, 0, 0);
-    const day = date.getDay();
+const getStartOfWeekUTC = (value) => {
+    const source = new Date(value);
+    const date = new Date(Date.UTC(
+        source.getUTCFullYear(),
+        source.getUTCMonth(),
+        source.getUTCDate()
+    ));
+    const day = date.getUTCDay();
     const diffToMonday = day === 0 ? -6 : 1 - day;
-    date.setDate(date.getDate() + diffToMonday);
+    date.setUTCDate(date.getUTCDate() + diffToMonday);
     return date;
 };
 
 const getWeekRange = (weekKey = 'current-week') => {
-    const startDate = getStartOfWeek(new Date());
+    const startDate = getStartOfWeekUTC(new Date());
     if (weekKey === 'last-week') {
-        startDate.setDate(startDate.getDate() - 7);
+        startDate.setUTCDate(startDate.getUTCDate() - 7);
     }
 
     const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 4);
+    endDate.setUTCDate(endDate.getUTCDate() + 4);
 
     return {
         startDate,
-        dateFrom: formatDateParam(startDate),
-        dateTo: formatDateParam(endDate),
+        dateFrom: formatDateParamUTC(startDate),
+        dateTo: formatDateParamUTC(endDate),
     };
 };
 
@@ -88,7 +89,8 @@ const SecretaryDashboard = () => {
             try {
                 setLoading(true);
                 const [statsData, applicationsData, yearsData] = await Promise.all([
-                    secretaryService.getDashboardStats(),
+                    secretaryService.getSecretaryDashboardStats()
+                        .catch(() => secretaryService.getDashboardStats()),
                     secretaryService.getApplications({ page: 1 }),
                     secretaryService.getAcademicYears(),
                 ]);
@@ -97,11 +99,12 @@ const SecretaryDashboard = () => {
                     return;
                 }
 
+                const normalizedStats = statsData?.statistics || statsData || {};
                 setStats({
-                    totalStudents: statsData.statistics?.total_students || 0,
-                    unreadMessages: statsData.statistics?.unread_messages || 0,
-                    absentToday: statsData.statistics?.absent_today || 0,
-                    schoolName: statsData.statistics?.school_name || 'My School',
+                    totalStudents: normalizedStats.total_students || 0,
+                    unreadMessages: normalizedStats.unread_messages || 0,
+                    absentToday: normalizedStats.absent_today || 0,
+                    schoolName: normalizedStats.school_name || 'My School',
                 });
 
                 setRecentApplications((applicationsData.results || applicationsData || []).slice(0, 5));
@@ -196,8 +199,8 @@ const SecretaryDashboard = () => {
 
         return WEEKDAY_LABELS.map((label, index) => {
             const dayDate = new Date(weekRange.startDate);
-            dayDate.setDate(dayDate.getDate() + index);
-            const dayKey = formatDateParam(dayDate);
+            dayDate.setUTCDate(dayDate.getUTCDate() + index);
+            const dayKey = formatDateParamUTC(dayDate);
             const studentsForDay = attendanceByDate.get(dayKey);
             const count = studentsForDay
                 ? Array.from(studentsForDay.values()).filter(Boolean).length

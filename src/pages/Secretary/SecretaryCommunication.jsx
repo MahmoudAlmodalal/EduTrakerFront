@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Menu, MessageSquare, Plus, Send, Search } from 'lucide-react';
+import Modal from '../../components/ui/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/ui/Toast';
@@ -26,6 +27,15 @@ const SecretaryCommunication = () => {
     const [notifications, setNotifications] = useState([]);
     const [threadMessages, setThreadMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
+    const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
+    const [composeSearch, setComposeSearch] = useState('');
+    const [composeRecipientId, setComposeRecipientId] = useState('');
+    const [composeSubject, setComposeSubject] = useState('');
+    const [composeBody, setComposeBody] = useState('');
+    const [composeRecipients, setComposeRecipients] = useState([]);
+    const [composeLoadingRecipients, setComposeLoadingRecipients] = useState(false);
+    const [composeSubmitting, setComposeSubmitting] = useState(false);
+    const composeSearchRequestRef = useRef(0);
 
     useEffect(() => {
         if (location.state?.activeTab) {
@@ -33,6 +43,28 @@ const SecretaryCommunication = () => {
             setActiveTab(targetTab);
         }
     }, [location.state]);
+
+    const normalizeListResponse = useCallback((payload) => {
+        if (Array.isArray(payload?.results)) {
+            return payload.results;
+        }
+        if (Array.isArray(payload)) {
+            return payload;
+        }
+        return [];
+    }, []);
+
+    const closeComposeModal = useCallback(() => {
+        composeSearchRequestRef.current += 1;
+        setIsComposeModalOpen(false);
+        setComposeSearch('');
+        setComposeRecipientId('');
+        setComposeSubject('');
+        setComposeBody('');
+        setComposeRecipients([]);
+        setComposeLoadingRecipients(false);
+        setComposeSubmitting(false);
+    }, []);
 
     const fetchData = useCallback(async () => {
         if (!user) {
@@ -47,7 +79,7 @@ const SecretaryCommunication = () => {
                 notificationService.getNotifications(),
             ]);
 
-            const rawMessages = messagesRes.results || messagesRes || [];
+            const rawMessages = normalizeListResponse(messagesRes);
             const mappedMessages = rawMessages.map((message) => {
                 const myReceipt = message.receipts?.find((receipt) => receipt.recipient?.id === user.id);
                 const isSentByMe = message.sender?.id === user.id;
@@ -60,18 +92,60 @@ const SecretaryCommunication = () => {
             });
 
             setMessages(mappedMessages);
-            setNotifications(notificationsRes.results || notificationsRes || []);
+            setNotifications(normalizeListResponse(notificationsRes));
         } catch (error) {
             console.error('Error fetching communication data:', error);
             showError('Failed to load communication data.');
         } finally {
             setLoading(false);
         }
-    }, [showError, user]);
+    }, [normalizeListResponse, showError, user]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData, activeTab]);
+
+    useEffect(() => {
+        if (!isComposeModalOpen) {
+            return;
+        }
+
+        const query = composeSearch.trim();
+        if (query.length < 2) {
+            composeSearchRequestRef.current += 1;
+            setComposeRecipients([]);
+            setComposeLoadingRecipients(false);
+            return;
+        }
+
+        const requestId = composeSearchRequestRef.current + 1;
+        composeSearchRequestRef.current = requestId;
+
+        const timeoutId = setTimeout(async () => {
+            try {
+                setComposeLoadingRecipients(true);
+                const data = await secretaryService.searchMessageRecipients({ search: query });
+                if (composeSearchRequestRef.current !== requestId) {
+                    return;
+                }
+                const recipients = normalizeListResponse(data)
+                    .filter((recipient) => recipient?.id && recipient.id !== user?.id);
+                setComposeRecipients(recipients);
+            } catch (error) {
+                if (composeSearchRequestRef.current !== requestId) {
+                    return;
+                }
+                console.error('Error searching communication recipients:', error);
+                setComposeRecipients([]);
+            } finally {
+                if (composeSearchRequestRef.current === requestId) {
+                    setComposeLoadingRecipients(false);
+                }
+            }
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
+    }, [composeSearch, isComposeModalOpen, normalizeListResponse, user?.id]);
 
     const handleMessageClick = useCallback(async (message) => {
         setSelectedMessage(message);
@@ -163,6 +237,55 @@ const SecretaryCommunication = () => {
         }
     }, [fetchData, newMessage, selectedMessage, showError, showSuccess, user]);
 
+    const handleComposeMessage = useCallback(async (event) => {
+        event.preventDefault();
+
+        const recipientId = Number.parseInt(composeRecipientId, 10);
+        const subject = composeSubject.trim();
+        const body = composeBody.trim();
+
+        if (!Number.isInteger(recipientId) || recipientId <= 0) {
+            showError('Please select a valid recipient.');
+            return;
+        }
+        if (!subject) {
+            showError('Please enter a subject.');
+            return;
+        }
+        if (!body) {
+            showError('Please enter a message body.');
+            return;
+        }
+
+        try {
+            setComposeSubmitting(true);
+            await secretaryService.sendMessage({
+                recipient_ids: [recipientId],
+                subject,
+                body,
+            });
+
+            showSuccess('Message sent successfully.');
+            closeComposeModal();
+            setActiveTab('sent');
+            await fetchData();
+        } catch (error) {
+            console.error('Error composing new message:', error);
+            const message = error?.response?.data?.detail || error?.message || 'Failed to send message.';
+            showError(message);
+        } finally {
+            setComposeSubmitting(false);
+        }
+    }, [
+        closeComposeModal,
+        composeBody,
+        composeRecipientId,
+        composeSubject,
+        fetchData,
+        showError,
+        showSuccess,
+    ]);
+
     const filteredItems = useMemo(() => {
         const search = searchTerm.trim().toLowerCase();
 
@@ -219,7 +342,7 @@ const SecretaryCommunication = () => {
                             <Menu size={18} />
                             Inbox
                         </button>
-                        <button type="button" className="btn-primary">
+                        <button type="button" className="btn-primary" onClick={() => setIsComposeModalOpen(true)}>
                             <Plus size={18} />
                             {t('communication.compose') || 'Compose'}
                         </button>
@@ -398,6 +521,87 @@ const SecretaryCommunication = () => {
                     )}
                 </section>
             </div>
+
+            <Modal
+                isOpen={isComposeModalOpen}
+                onClose={closeComposeModal}
+                title={t('communication.compose') || 'Compose Message'}
+            >
+                <form className="sec-modal-form" onSubmit={handleComposeMessage}>
+                    <div className="form-group">
+                        <label className="form-label">Find Recipient *</label>
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Search by name or email..."
+                            value={composeSearch}
+                            onChange={(event) => {
+                                setComposeSearch(event.target.value);
+                                setComposeRecipientId('');
+                            }}
+                            autoComplete="off"
+                        />
+                        {composeLoadingRecipients ? (
+                            <p className="sec-subtle-text">Searching recipients...</p>
+                        ) : null}
+                        {!composeLoadingRecipients && composeSearch.trim().length >= 2 && composeRecipients.length === 0 ? (
+                            <p className="sec-subtle-text">No recipients found.</p>
+                        ) : null}
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Recipient *</label>
+                        <select
+                            className="form-select"
+                            value={composeRecipientId}
+                            onChange={(event) => setComposeRecipientId(event.target.value)}
+                            required
+                            disabled={composeRecipients.length === 0}
+                        >
+                            <option value="">Select recipient...</option>
+                            {composeRecipients.map((recipient) => (
+                                <option key={recipient.id} value={recipient.id}>
+                                    {recipient.full_name || recipient.email} ({recipient.role || 'user'})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Subject *</label>
+                        <input
+                            type="text"
+                            className="form-input"
+                            value={composeSubject}
+                            onChange={(event) => setComposeSubject(event.target.value)}
+                            placeholder="Enter message subject"
+                            maxLength={255}
+                            required
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Message *</label>
+                        <textarea
+                            className="form-input"
+                            value={composeBody}
+                            onChange={(event) => setComposeBody(event.target.value)}
+                            placeholder="Write your message..."
+                            rows={5}
+                            required
+                        />
+                    </div>
+
+                    <div className="sec-modal-actions">
+                        <button type="button" className="btn-secondary" onClick={closeComposeModal}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn-primary" disabled={composeSubmitting}>
+                            {composeSubmitting ? 'Sending...' : 'Send Message'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };

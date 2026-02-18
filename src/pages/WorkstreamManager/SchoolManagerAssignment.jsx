@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, School, Mail, Trash2, Edit } from 'lucide-react';
+import { UserPlus, Search, School, Mail, Trash2, Edit, CheckCircle } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
@@ -21,6 +21,8 @@ const SchoolManagerAssignment = () => {
     const [schools, setSchools] = useState([]);
     const [newManager, setNewManager] = useState({ full_name: '', email: '', schoolId: '', password: '', isEditing: false, id: null });
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // all | active | inactive
+    const [statusUpdatingId, setStatusUpdatingId] = useState(null);
 
     const notifyWorkstreamStatsUpdated = () => {
         window.dispatchEvent(new CustomEvent('workstream_stats_updated'));
@@ -30,7 +32,7 @@ const SchoolManagerAssignment = () => {
         setLoading(true);
         try {
             const [managersData, schoolsData] = await Promise.all([
-                api.get('/users/?role=manager_school'),
+                api.get('/users/', { params: { role: 'manager_school', page_size: 1000 } }),
                 // Backend: EduTraker/school/urls.py -> path("school/", SchoolListAPIView...)
                 api.get('/school/', { params: { include_inactive: true } })
             ]);
@@ -141,6 +143,22 @@ const SchoolManagerAssignment = () => {
         }
     };
 
+    const handleActivateManager = async (manager) => {
+        if (!manager?.id) return;
+        setStatusUpdatingId(manager.id);
+        try {
+            await api.post(`/users/${manager.id}/activate/`);
+            showSuccess(`"${manager.full_name}" activated successfully.`);
+            await fetchData();
+            notifyWorkstreamStatsUpdated();
+        } catch (error) {
+            console.error('Failed to activate manager:', error);
+            showError(`Error: ${error.message}`);
+        } finally {
+            setStatusUpdatingId(null);
+        }
+    };
+
     const handleEditManager = (id) => {
         const manager = managers.find(m => m.id === id);
         if (manager) {
@@ -158,11 +176,21 @@ const SchoolManagerAssignment = () => {
 
     // Ensure we always work with an array to avoid ".filter is not a function" issues
     const safeManagers = Array.isArray(managers) ? managers : [];
-    const filteredManagers = safeManagers.filter((manager) =>
-        (manager.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (manager.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (manager.school_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-    );
+    const filteredManagers = safeManagers.filter((manager) => {
+        const matchesSearch =
+            (manager.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (manager.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (manager.school_name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+
+        const matchesStatus =
+            statusFilter === 'all'
+                ? true
+                : statusFilter === 'active'
+                ? manager.is_active
+                : !manager.is_active;
+
+        return matchesSearch && matchesStatus;
+    });
 
     if (loading && managers.length === 0) {
         return <div className="workstream-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading...</div>;
@@ -327,6 +355,26 @@ const SchoolManagerAssignment = () => {
                             }}
                         />
                     </div>
+                    <div className="school-management-filter-group">
+                        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                            {t('workstream.assignments.filterByStatus')}
+                        </span>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            style={{
+                                padding: '0.4rem 0.75rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid var(--color-border)',
+                                background: 'white',
+                                fontSize: '0.85rem',
+                            }}
+                        >
+                            <option value="all">{t('workstream.assignments.filter.all')}</option>
+                            <option value="active">{t('common.active')}</option>
+                            <option value="inactive">{t('common.inactive')}</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div className="assignment-table-wrap">
@@ -372,7 +420,7 @@ const SchoolManagerAssignment = () => {
                                     </td>
                                     <td data-label={t('workstream.assignments.table.status')}>
                                         <span className={`status-badge ${manager.is_active ? 'status-active' : 'status-inactive'}`}>
-                                            {manager.is_active ? 'Active' : 'Inactive'}
+                                            {manager.is_active ? t('common.active') : t('common.inactive')}
                                         </span>
                                     </td>
                                     <td className="assignment-actions-cell" data-label={t('workstream.assignments.table.actions')}>
@@ -384,13 +432,31 @@ const SchoolManagerAssignment = () => {
                                             >
                                                 <Edit size={18} />
                                             </button>
-                                            <button
-                                                onClick={() => handleRequestDeleteManager(manager)}
-                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
-                                                title="Deactivate Manager"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            {manager.is_active ? (
+                                                <button
+                                                    onClick={() => handleRequestDeleteManager(manager)}
+                                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: 'var(--color-error)' }}
+                                                    title="Deactivate Manager"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleActivateManager(manager)}
+                                                    disabled={statusUpdatingId === manager.id}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        cursor: statusUpdatingId === manager.id ? 'not-allowed' : 'pointer',
+                                                        padding: '5px',
+                                                        color: 'var(--color-success)',
+                                                        opacity: statusUpdatingId === manager.id ? 0.6 : 1,
+                                                    }}
+                                                    title="Activate Manager"
+                                                >
+                                                    <CheckCircle size={18} />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

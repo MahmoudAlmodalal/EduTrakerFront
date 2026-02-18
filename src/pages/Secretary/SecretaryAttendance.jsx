@@ -15,8 +15,8 @@ import {
     AlertBanner,
     AvatarInitial,
     EmptyState,
-    LoadingSpinner,
     PageHeader,
+    SkeletonTable,
     StatCard,
     StatusBadge,
 } from './components';
@@ -189,7 +189,7 @@ const SecretaryAttendance = () => {
 
                 <div className="sec-table-wrap">
                     {loading ? (
-                        <LoadingSpinner message="Loading attendance records..." />
+                        <SkeletonTable rows={6} cols={7} />
                     ) : (
                         <div className="sec-table-scroll">
                             <table className="data-table sec-data-table">

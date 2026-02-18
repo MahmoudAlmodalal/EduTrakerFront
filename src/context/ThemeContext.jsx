@@ -1,9 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations } from '../utils/translations';
 
-const ThemeContext = createContext();
+const fallbackThemeContext = {
+    theme: 'light',
+    toggleTheme: () => {},
+    language: 'en',
+    changeLanguage: () => {},
+    t: (key) => translations?.en?.[key] || key,
+};
 
-export const useTheme = () => useContext(ThemeContext);
+const ThemeContext = createContext(fallbackThemeContext);
+
+export const useTheme = () => useContext(ThemeContext) || fallbackThemeContext;
 
 export const ThemeProvider = ({ children }) => {
     const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');

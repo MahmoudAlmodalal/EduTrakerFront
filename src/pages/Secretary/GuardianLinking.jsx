@@ -8,9 +8,11 @@ import secretaryService from '../../services/secretaryService';
 import {
     AlertBanner,
     AvatarInitial,
+    ConfirmModal,
     EmptyState,
     LoadingSpinner,
     PageHeader,
+    SkeletonTable,
     StatCard,
     StatusBadge,
 } from './components';
@@ -27,7 +29,7 @@ const DEFAULT_GUARDIAN = {
     full_name: '',
     email: '',
     phone_number: '',
-    password: 'Guardian@123',
+    password: '',
 };
 
 const RELATIONSHIP_OPTIONS = [
@@ -62,7 +64,12 @@ const toList = (payload) => {
 const getEntityId = (record) => record?.user_id ?? record?.id ?? null;
 
 const getStudentIdFromLink = (link) => {
-    return link?.student_id ?? link?.student?.user_id ?? link?.student?.id ?? null;
+    const resolvedId = link?.student_id ?? link?.student?.user_id ?? link?.student?.id ?? null;
+    if (resolvedId === null || resolvedId === undefined || resolvedId === '') {
+        console.warn('Guardian link does not contain a resolvable student identifier.', link);
+        return null;
+    }
+    return resolvedId;
 };
 
 const getStudentName = (student) => {
@@ -88,14 +95,15 @@ const humanize = (value = '') => {
 };
 
 const formatApiError = (error, fallback) => {
-    const responseData = error?.response?.data ?? error?.data ?? null;
+    const responseData = error?.response?.data;
+    const fallbackData = responseData ?? error?.data ?? null;
 
-    if (typeof responseData === 'string' && responseData.trim()) {
-        return responseData.trim();
+    if (typeof fallbackData === 'string' && fallbackData.trim()) {
+        return fallbackData.trim();
     }
 
-    if (responseData && typeof responseData === 'object' && !Array.isArray(responseData)) {
-        const message = Object.entries(responseData)
+    if (fallbackData && typeof fallbackData === 'object' && !Array.isArray(fallbackData)) {
+        const message = Object.entries(fallbackData)
             .map(([key, value]) => {
                 const normalizedValue = Array.isArray(value) ? value.filter(Boolean).join(', ') : value;
                 if (normalizedValue === undefined || normalizedValue === null || normalizedValue === '') {
@@ -176,6 +184,7 @@ const GuardianLinking = () => {
     const [linkSubmitting, setLinkSubmitting] = useState(false);
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [banner, setBanner] = useState({ type: 'error', message: '' });
+    const [confirmAction, setConfirmAction] = useState(null);
 
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -196,6 +205,7 @@ const GuardianLinking = () => {
 
         return () => {
             isMountedRef.current = false;
+            isResettingForSchoolRef.current = false;
             guardiansRequestRef.current += 1;
             summaryRequestRef.current += 1;
             linksRequestRef.current += 1;
@@ -209,6 +219,10 @@ const GuardianLinking = () => {
                 summaryAbortControllerRef.current.abort();
             }
         };
+    }, []);
+
+    const closeConfirmModal = useCallback(() => {
+        setConfirmAction(null);
     }, []);
 
     const setFeedback = useCallback((type, message) => {
@@ -233,6 +247,18 @@ const GuardianLinking = () => {
         size = DEFAULT_PAGE_SIZE,
         forceRefresh = false,
     } = {}) => {
+        if (!schoolId) {
+            guardiansRequestRef.current += 1;
+            setGuardians([]);
+            setGuardiansCount(0);
+            setGuardiansTotalPages(1);
+            setHasNextPage(false);
+            setHasPreviousPage(false);
+            setHasLoadedGuardians(true);
+            setTableLoading(false);
+            return;
+        }
+
         const requestId = guardiansRequestRef.current + 1;
         guardiansRequestRef.current = requestId;
 
@@ -251,6 +277,7 @@ const GuardianLinking = () => {
             const isActive = status === 'inactive' ? false : null;
             const data = await secretaryService.getGuardians({
                 search: normalizedSearch,
+                schoolId,
                 includeInactive,
                 isActive,
                 page,
@@ -305,7 +332,7 @@ const GuardianLinking = () => {
                 setHasLoadedGuardians(true);
             }
         }
-    }, [setFeedback]);
+    }, [schoolId, setFeedback]);
 
     const fetchGuardianSummary = useCallback(async ({ forceRefresh = false, silent = false } = {}) => {
         const requestId = summaryRequestRef.current + 1;
@@ -357,6 +384,20 @@ const GuardianLinking = () => {
     }, [setFeedback]);
 
     const fetchStudents = useCallback(async ({ force = false, silent = false } = {}) => {
+        if (!schoolId) {
+            studentsLoadingRef.current = false;
+            studentsLoadedRef.current = false;
+            studentsRef.current = [];
+            if (isMountedRef.current) {
+                setStudents([]);
+                setStudentsLoaded(false);
+                if (!silent) {
+                    setStudentsLoading(false);
+                }
+            }
+            return [];
+        }
+
         if (studentsLoadingRef.current && !force && silent) {
             return studentsRef.current;
         }
@@ -378,7 +419,7 @@ const GuardianLinking = () => {
             }
 
             const data = await secretaryService.getStudents(
-                {},
+                { school_id: schoolId },
                 { signal: controller.signal, timeout: 8000 },
             );
             const nextStudents = toList(data);
@@ -417,7 +458,7 @@ const GuardianLinking = () => {
                 }
             }
         }
-    }, [setFeedback]);
+    }, [schoolId, setFeedback]);
 
     const fetchGuardianLinks = useCallback(async (guardianId) => {
         if (!guardianId) {
@@ -504,6 +545,12 @@ const GuardianLinking = () => {
         setStatusFilter('active');
         setCurrentPage(1);
         setPageSize(DEFAULT_PAGE_SIZE);
+
+        if (!schoolId) {
+            isResettingForSchoolRef.current = false;
+            return;
+        }
+
         void fetchGuardians({ search: '', status: 'active', page: 1, size: DEFAULT_PAGE_SIZE });
         void fetchGuardianSummary({ forceRefresh: true, silent: true });
         void fetchStudents({ silent: true, force: true });
@@ -658,7 +705,7 @@ const GuardianLinking = () => {
         }
     }, [fetchGuardianLinks, fetchStudents, setFeedback]);
 
-    const handleDeactivateGuardian = useCallback(async (guardian) => {
+    const executeDeactivateGuardian = useCallback(async (guardian) => {
         const guardianId = getEntityId(guardian);
 
         if (!guardianId) {
@@ -667,13 +714,6 @@ const GuardianLinking = () => {
         }
 
         if (guardian.is_active === false) {
-            return;
-        }
-
-        const guardianName = guardian.full_name || `Guardian #${guardianId}`;
-        const confirmed = window.confirm(`Deactivate ${guardianName}?`);
-
-        if (!confirmed) {
             return;
         }
 
@@ -713,7 +753,26 @@ const GuardianLinking = () => {
         }
     }, [closeLinkModal, fetchGuardianSummary, refreshCurrentGuardians, selectedGuardian, setFeedback, summaryLoaded]);
 
-    const handleActivateGuardian = useCallback(async (guardian) => {
+    const handleDeactivateGuardian = useCallback((guardian) => {
+        const guardianId = getEntityId(guardian);
+        if (!guardianId || guardian.is_active === false) {
+            return;
+        }
+
+        const guardianName = guardian.full_name || `Guardian #${guardianId}`;
+        setConfirmAction({
+            title: 'Deactivate Guardian',
+            message: `Deactivate ${guardianName}?`,
+            danger: true,
+            confirmLabel: 'Deactivate',
+            onConfirm: () => {
+                closeConfirmModal();
+                void executeDeactivateGuardian(guardian);
+            },
+        });
+    }, [closeConfirmModal, executeDeactivateGuardian]);
+
+    const executeActivateGuardian = useCallback(async (guardian) => {
         const guardianId = getEntityId(guardian);
 
         if (!guardianId) {
@@ -722,13 +781,6 @@ const GuardianLinking = () => {
         }
 
         if (guardian.is_active !== false) {
-            return;
-        }
-
-        const guardianName = guardian.full_name || `Guardian #${guardianId}`;
-        const confirmed = window.confirm(`Activate ${guardianName}?`);
-
-        if (!confirmed) {
             return;
         }
 
@@ -763,6 +815,24 @@ const GuardianLinking = () => {
             }
         }
     }, [fetchGuardianSummary, refreshCurrentGuardians, setFeedback, summaryLoaded]);
+
+    const handleActivateGuardian = useCallback((guardian) => {
+        const guardianId = getEntityId(guardian);
+        if (!guardianId || guardian.is_active !== false) {
+            return;
+        }
+
+        const guardianName = guardian.full_name || `Guardian #${guardianId}`;
+        setConfirmAction({
+            title: 'Activate Guardian',
+            message: `Activate ${guardianName}?`,
+            confirmLabel: 'Activate',
+            onConfirm: () => {
+                closeConfirmModal();
+                void executeActivateGuardian(guardian);
+            },
+        });
+    }, [closeConfirmModal, executeActivateGuardian]);
 
     const handleLinkFieldChange = useCallback((field, value) => {
         setLinkData((prev) => ({ ...prev, [field]: value }));
@@ -818,19 +888,12 @@ const GuardianLinking = () => {
         setFeedback,
     ]);
 
-    const handleDeactivateLink = useCallback(async (link) => {
+    const executeDeactivateLink = useCallback(async (link) => {
         const guardianId = selectedGuardian?.id;
         const linkId = link?.id;
 
         if (!guardianId || !linkId) {
             setFeedback('error', 'Selected guardian link is invalid.');
-            return;
-        }
-
-        const studentName = link.student_name || 'this student';
-        const confirmed = window.confirm(`Deactivate link with ${studentName}?`);
-
-        if (!confirmed) {
             return;
         }
 
@@ -857,6 +920,25 @@ const GuardianLinking = () => {
             }
         }
     }, [fetchGuardianLinks, refreshCurrentGuardians, selectedGuardian, setFeedback]);
+
+    const handleDeactivateLink = useCallback((link) => {
+        const linkId = link?.id;
+        if (!linkId) {
+            return;
+        }
+
+        const studentName = link.student_name || 'this student';
+        setConfirmAction({
+            title: 'Deactivate Guardian Link',
+            message: `Deactivate link with ${studentName}?`,
+            danger: true,
+            confirmLabel: 'Deactivate',
+            onConfirm: () => {
+                closeConfirmModal();
+                void executeDeactivateLink(link);
+            },
+        });
+    }, [closeConfirmModal, executeDeactivateLink]);
 
     const handleActivateLink = useCallback(async (link) => {
         const guardianId = selectedGuardian?.id;
@@ -1038,7 +1120,7 @@ const GuardianLinking = () => {
 
                 <div className="sec-table-wrap">
                     {showGuardiansInitialLoader ? (
-                        <LoadingSpinner message="Loading guardians..." />
+                        <SkeletonTable rows={Math.min(pageSize, 5)} cols={5} />
                     ) : (
                         <>
                             {tableLoading ? (
@@ -1355,7 +1437,6 @@ const GuardianLinking = () => {
                                 {showGuardianPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
-                        <p className="avatar-hint">Default: Guardian@123</p>
                     </div>
 
                     <div className="sec-modal-actions">
@@ -1368,6 +1449,20 @@ const GuardianLinking = () => {
                     </div>
                 </form>
             </Modal>
+
+            <ConfirmModal
+                isOpen={Boolean(confirmAction)}
+                title={confirmAction?.title || 'Confirm Action'}
+                message={confirmAction?.message || ''}
+                danger={Boolean(confirmAction?.danger)}
+                confirmLabel={confirmAction?.confirmLabel || 'Confirm'}
+                onConfirm={() => {
+                    if (typeof confirmAction?.onConfirm === 'function') {
+                        confirmAction.onConfirm();
+                    }
+                }}
+                onCancel={closeConfirmModal}
+            />
         </div>
     );
 };

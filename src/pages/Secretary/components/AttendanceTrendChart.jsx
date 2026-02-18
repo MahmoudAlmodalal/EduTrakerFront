@@ -8,12 +8,24 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import EmptyState from './EmptyState';
 
 const AttendanceTrendChart = ({ trendData }) => {
+    const normalizedTrendData = Array.isArray(trendData) ? trendData : [];
+    const hasTrendData = normalizedTrendData.some((item) => Number(item?.count) > 0);
+
+    if (!hasTrendData) {
+        return (
+            <div className="sec-chart-body">
+                <EmptyState message="No attendance trend data for the selected week." />
+            </div>
+        );
+    }
+
     return (
         <div className="sec-chart-body">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
-                <AreaChart data={trendData}>
+                <AreaChart data={normalizedTrendData}>
                     <defs>
                         <linearGradient id="secAttendanceTrend" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="var(--sec-primary)" stopOpacity={0.2} />

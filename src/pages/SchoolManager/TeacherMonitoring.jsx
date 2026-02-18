@@ -12,6 +12,7 @@ import './SchoolManager.css';
 const DEFAULT_PASSWORD = 'Teacher@123';
 const STAR_INDICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const TABLE_ROWS_PER_PAGE = 10;
+const SIDEBAR_COUNT_REFRESH_EVENT = 'school_manager_stats_updated';
 
 const normalizeList = (response) => {
     if (Array.isArray(response?.results)) return response.results;
@@ -49,6 +50,12 @@ const prependTeacherToCache = (cachedValue, teacherToAdd) => {
 const getTeacherId = (teacher) => teacher?.user_id || teacher?.id;
 
 const getTeacherName = (teacher) => teacher?.full_name || teacher?.name || 'this teacher';
+
+const notifySidebarStatsUpdated = () => {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(SIDEBAR_COUNT_REFRESH_EVENT));
+    }
+};
 
 const getTodayISO = () => new Date().toISOString().split('T')[0];
 
@@ -298,6 +305,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
             showSuccess('Teacher created successfully.');
             setIsModalOpen(false);
             setFormData(createInitialTeacherForm());
+            notifySidebarStatsUpdated();
         },
         onError: (error) => {
             showError(getErrorMessage(error, 'Failed to create teacher.'));
@@ -332,6 +340,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
         },
         onSuccess: (_response, variables) => {
             showSuccess(variables.nextIsActive ? 'Teacher activated.' : 'Teacher deactivated.');
+            notifySidebarStatsUpdated();
         }
     });
 
@@ -366,6 +375,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                 ))
             ));
             showSuccess(response?.message || 'Teacher status updated.');
+            notifySidebarStatsUpdated();
         }
     });
 

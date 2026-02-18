@@ -94,6 +94,7 @@ export const roleConfigs = {
             { path: 'guardians', labelKey: 'secretary.nav.guardians', icon: 'Users' },
             { path: 'attendance', labelKey: 'secretary.nav.attendance', icon: 'FileText' },
             { path: 'communication', labelKey: 'secretary.nav.communication', icon: 'MessageSquare' },
+            { path: 'info', labelKey: 'secretary.nav.info', icon: 'Info' },
             { path: 'settings', labelKey: 'secretary.nav.settings', icon: 'Settings' },
         ],
         dashboard: {

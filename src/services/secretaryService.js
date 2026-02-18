@@ -88,6 +88,9 @@ const secretaryService = {
     getDashboardStats: async () => {
         return api.get('/statistics/dashboard/');
     },
+    getSecretaryDashboardStats: async () => {
+        return api.get('/secretary/dashboard-stats/');
+    },
 
     getPendingTasks: async () => {
         return api.get('/secretary/tasks/pending/');
@@ -95,6 +98,11 @@ const secretaryService = {
 
     getUpcomingEvents: async () => {
         return api.get('/secretary/events/upcoming/');
+    },
+
+    // Secretary school context (school, classrooms, teachers, students, managers)
+    getSecretaryContext: async () => {
+        return api.get('/secretary/context/');
     },
 
     // Secretary Profile/Settings
@@ -455,11 +463,20 @@ const secretaryService = {
     },
     linkGuardianToStudent: async (guardianId, studentId, data) => {
         const normalizedGuardianId = Number.parseInt(guardianId, 10);
-        const payload = await api.post(`/guardian/guardians/${guardianId}/students/`, {
-            student_id: parseInt(studentId, 10),
+        const normalizedStudentId = Number.parseInt(studentId, 10);
+
+        if (!Number.isInteger(normalizedGuardianId) || normalizedGuardianId <= 0) {
+            throw new Error('Invalid guardian identifier.');
+        }
+        if (!Number.isInteger(normalizedStudentId) || normalizedStudentId <= 0) {
+            throw new Error('Invalid student identifier.');
+        }
+
+        const payload = await api.post(`/guardian/guardians/${normalizedGuardianId}/students/`, {
+            student_id: normalizedStudentId,
             relationship_type: data.relationship_type,
-            is_primary: data.is_primary || false,
-            can_pickup: data.can_pickup !== undefined ? data.can_pickup : true,
+            is_primary: Boolean(data.is_primary),
+            can_pickup: data.can_pickup !== undefined ? Boolean(data.can_pickup) : true,
         });
         clearCacheByPrefix('guardians');
         if (Number.isInteger(normalizedGuardianId) && normalizedGuardianId > 0) {
@@ -528,6 +545,10 @@ const secretaryService = {
     },
     sendMessage: async (data) => {
         return api.post('/user-messages/', data);
+    },
+    searchMessageRecipients: async (params = {}) => {
+        const queryParams = new URLSearchParams(params).toString();
+        return api.get(`/user-messages/search/${queryParams ? `?${queryParams}` : ''}`);
     },
     markMessageRead: async (messageId) => {
         return api.post(`/user-messages/${messageId}/read/`);
