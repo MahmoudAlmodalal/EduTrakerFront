@@ -1,5 +1,41 @@
 import { api } from '../utils/api';
 
+const NOTIFICATION_REDIRECT_MAP = {
+    announcement: (notification) => {
+        const subjectId = notification?.related_object_id;
+        return subjectId
+            ? `/student/subjects/${subjectId}?tab=content`
+            : '/student/subjects';
+    },
+    material_published: (notification) => {
+        const materialId = notification?.related_object_id;
+        return materialId
+            ? `/student/subjects?tab=content&material=${materialId}`
+            : '/student/subjects';
+    },
+    grade_posted: () => '/student/results',
+    assignment_due: (notification) => {
+        const assignmentId = notification?.related_object_id;
+        return assignmentId
+            ? `/student/assignments/${assignmentId}`
+            : '/student/assignments';
+    },
+    default: () => '/student/dashboard'
+};
+
+const resolveNotificationRedirect = (notification = {}) => {
+    const actionUrl = typeof notification?.action_url === 'string'
+        ? notification.action_url.trim()
+        : '';
+    if (actionUrl.startsWith('/')) {
+        return actionUrl;
+    }
+
+    const resolver = NOTIFICATION_REDIRECT_MAP[notification?.notification_type]
+        || NOTIFICATION_REDIRECT_MAP.default;
+    return resolver(notification);
+};
+
 const notificationService = {
     /**
      * Fetch all notifications for the current user
@@ -45,4 +81,5 @@ const notificationService = {
     }
 };
 
+export { NOTIFICATION_REDIRECT_MAP, resolveNotificationRedirect };
 export default notificationService;

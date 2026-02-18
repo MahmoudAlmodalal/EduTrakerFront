@@ -61,7 +61,7 @@ const StudentDashboard = React.lazy(() => import('../pages/Student/Dashboard/Stu
 const StudentSubjects = React.lazy(() => import('../pages/Student/Subjects/StudentSubjects'));
 const StudentAssignments = React.lazy(() => import('../pages/Student/Assignments/StudentAssignments'));
 const StudentResults = React.lazy(() => import('../pages/Student/Results/StudentResults'));
-const StudentAttendance = React.lazy(() => import('../pages/Student/Attendance/StudentAttendance'));
+const StudentInfo = React.lazy(() => import('../pages/Student/Info/StudentInfo'));
 const StudentSettings = React.lazy(() => import('../pages/Student/Settings/StudentSettings'));
 
 // Guardian
@@ -76,6 +76,7 @@ const ClassManagement = React.lazy(() => import('../pages/Teacher/ClassManagemen
 const Assessments = React.lazy(() => import('../pages/Teacher/Assessments'));
 const AssignmentSubmissions = React.lazy(() => import('../pages/Teacher/AssignmentSubmissions'));
 const LessonPlans = React.lazy(() => import('../pages/Teacher/LessonPlans'));
+const TeacherContent = React.lazy(() => import('../pages/Teacher/TeacherContent'));
 const TeacherCommunication = React.lazy(() => import('../pages/Teacher/TeacherCommunication'));
 const TeacherInfo = React.lazy(() => import('../pages/Teacher/TeacherInfo'));
 const TeacherSettings = React.lazy(() => import('../pages/Teacher/TeacherSettings'));
@@ -189,8 +190,8 @@ const AppRoutes = () => {
                         <Route path="assignments" element={<StudentAssignments />} />
                         <Route path="assignments/:id" element={<StudentAssignments />} />
                         <Route path="results" element={<StudentResults />} />
-                        <Route path="attendance" element={<StudentAttendance />} />
                         <Route path="communication" element={<GeneralCommunication />} />
+                        <Route path="info" element={<StudentInfo />} />
                         <Route path="settings" element={<StudentSettings />} />
                     </Route>
                 </Route>
@@ -220,6 +221,7 @@ const AppRoutes = () => {
                         <Route path="assignment" element={<Navigate to="/teacher/assessments" replace />} />
                         <Route path="assignment/new" element={<Navigate to="/teacher/assessments?tab=create" replace />} />
                         <Route path="lesson-plans" element={<LessonPlans />} />
+                        <Route path="content" element={<TeacherContent />} />
                         <Route path="communication" element={<GeneralCommunication />} />
                         <Route path="info" element={<TeacherInfo />} />
                         <Route path="settings" element={<TeacherSettings />} />

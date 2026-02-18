@@ -5,7 +5,7 @@ import {
     BookOpen,
     FileUp,
     GraduationCap,
-    CalendarCheck,
+    Info,
     Settings,
     LogOut,
     Sparkles,
@@ -21,7 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 import { StudentDataProvider, useStudentData } from '../../context/StudentDataContext';
 import './Student.css';
 
-const SIDEBAR_BREAKPOINT = 992;
+const SIDEBAR_BREAKPOINT = 768;
 
 const StudentLayoutContent = () => {
     const { t } = useTheme();
@@ -60,8 +60,8 @@ const StudentLayoutContent = () => {
         { path: '/student/subjects', labelKey: 'student.nav.subjects', icon: BookOpen },
         { path: '/student/assignments', labelKey: 'student.nav.assignments', icon: FileUp },
         { path: '/student/results', labelKey: 'student.nav.results', icon: GraduationCap },
-        { path: '/student/attendance', labelKey: 'student.nav.attendance', icon: CalendarCheck },
         { path: '/student/communication', labelKey: 'student.nav.communication', icon: MessageSquare },
+        { path: '/student/info', labelKey: 'student.nav.info', icon: Info },
         { path: '/student/settings', labelKey: 'student.nav.settings', icon: Settings },
     ];
 

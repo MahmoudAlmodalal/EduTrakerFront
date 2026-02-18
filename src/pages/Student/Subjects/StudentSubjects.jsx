@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     Book,
     Calendar,
     ChevronLeft,
     Download,
+    ExternalLink,
     FileText,
+    Link as LinkIcon,
     MapPin,
     Upload,
     User
@@ -86,6 +88,52 @@ const getFileTypeMeta = (fileType = '') => {
     return { label: 'FILE', color: '#64748b' };
 };
 
+const getMaterialType = (material = {}) => (
+    material?.content_type || (material?.external_link ? 'link' : 'file')
+);
+
+const getMaterialLink = (material = {}) => material?.external_link || material?.file_url || '';
+
+const extractDomain = (url = '') => {
+    try {
+        return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+        return '';
+    }
+};
+
+const extractYouTubeVideoId = (url = '') => {
+    try {
+        const parsed = new URL(url);
+        const host = parsed.hostname.replace(/^www\./, '');
+        if (host === 'youtu.be') {
+            return parsed.pathname.split('/').filter(Boolean)[0] || null;
+        }
+        if (host === 'youtube.com' || host === 'm.youtube.com') {
+            if (parsed.pathname === '/watch') {
+                return parsed.searchParams.get('v');
+            }
+            if (parsed.pathname.startsWith('/shorts/')) {
+                return parsed.pathname.split('/')[2] || null;
+            }
+            if (parsed.pathname.startsWith('/embed/')) {
+                return parsed.pathname.split('/')[2] || null;
+            }
+        }
+        return null;
+    } catch {
+        return null;
+    }
+};
+
+const isRecentMaterial = (createdAt) => {
+    const parsed = new Date(createdAt);
+    if (Number.isNaN(parsed.getTime())) {
+        return false;
+    }
+    return (Date.now() - parsed.getTime()) <= 48 * 60 * 60 * 1000;
+};
+
 const buildAssignmentState = (assignment, now = new Date()) => {
     const dueDate = toDate(assignment?.due_date);
     const dueMs = dueDate?.getTime() ?? null;
@@ -142,12 +190,19 @@ const StudentSubjects = () => {
     const { t } = useTheme();
     const navigate = useNavigate();
     const { courseId } = useParams();
+    const [searchParams] = useSearchParams();
     const { dashboardData, loading, error, refreshData } = useStudentData();
+
+    const materialQueryId = searchParams.get('material');
+    const classroomQueryId = searchParams.get('classroom');
+    const courseQueryId = searchParams.get('course');
+    const queryTab = searchParams.get('tab');
+    const normalizedQueryTab = queryTab === 'materials' ? 'content' : queryTab;
 
     const [subjectCounts, setSubjectCounts] = useState({});
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState('');
-    const [activeTab, setActiveTab] = useState('materials');
+    const [activeTab, setActiveTab] = useState('content');
     const [detailData, setDetailData] = useState({
         materials: [],
         assignments: [],
@@ -282,12 +337,66 @@ const StudentSubjects = () => {
 
     useEffect(() => {
         if (!courseId || !selectedSubject) {
-            setActiveTab('materials');
+            setActiveTab('content');
             setDetailError('');
             return;
         }
         void loadSubjectDetails(selectedSubject);
     }, [courseId, loadSubjectDetails, selectedSubject]);
+
+    useEffect(() => {
+        if (!normalizedQueryTab) {
+            if (materialQueryId) {
+                setActiveTab('content');
+            }
+            return;
+        }
+        if (['content', 'assignments', 'lesson-plans'].includes(normalizedQueryTab)) {
+            setActiveTab(normalizedQueryTab);
+        }
+    }, [materialQueryId, normalizedQueryTab]);
+
+    useEffect(() => {
+        if (courseId || subjects.length === 0 || (!classroomQueryId && !courseQueryId)) {
+            return;
+        }
+        const targetSubject = subjects.find((subject) => {
+            const matchesCourse = courseQueryId
+                ? String(subject.id) === String(courseQueryId)
+                : true;
+            const matchesClassroom = classroomQueryId
+                ? String(subject.classroom_id) === String(classroomQueryId)
+                : true;
+            return matchesCourse && matchesClassroom;
+        }) || (courseQueryId
+            ? subjects.find((subject) => String(subject.id) === String(courseQueryId))
+            : null);
+        if (!targetSubject) {
+            return;
+        }
+
+        const nextParams = new URLSearchParams(searchParams.toString());
+        if (!nextParams.get('tab')) {
+            nextParams.set('tab', 'content');
+        }
+        navigate(`/student/subjects/${targetSubject.id}?${nextParams.toString()}`, { replace: true });
+    }, [classroomQueryId, courseId, courseQueryId, navigate, searchParams, subjects]);
+
+    useEffect(() => {
+        if (!courseId || !materialQueryId || detailLoading || activeTab !== 'content') {
+            return;
+        }
+        const element = document.querySelector(`[data-material-id="${materialQueryId}"]`);
+        if (!element) {
+            return;
+        }
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('subject-material-highlight');
+        const timeoutId = setTimeout(() => {
+            element.classList.remove('subject-material-highlight');
+        }, 1800);
+        return () => clearTimeout(timeoutId);
+    }, [activeTab, courseId, detailData.materials, detailLoading, materialQueryId]);
 
     useEffect(() => {
         if (courseId || subjects.length === 0) {
@@ -445,10 +554,10 @@ const StudentSubjects = () => {
                         <div className="subject-tabs">
                             <button
                                 type="button"
-                                className={activeTab === 'materials' ? 'active' : ''}
-                                onClick={() => setActiveTab('materials')}
+                                className={activeTab === 'content' ? 'active' : ''}
+                                onClick={() => setActiveTab('content')}
                             >
-                                Materials ({detailData.materials.length})
+                                Content ({detailData.materials.length})
                             </button>
                             <button
                                 type="button"
@@ -469,34 +578,82 @@ const StudentSubjects = () => {
                         {detailLoading && <div className="empty-state">Loading subject details...</div>}
                         {!detailLoading && detailError && <div className="empty-state">{detailError}</div>}
 
-                        {!detailLoading && !detailError && activeTab === 'materials' && (
+                        {!detailLoading && !detailError && activeTab === 'content' && (
                             <div className="subject-tab-panel">
                                 {detailData.materials.length === 0 && (
-                                    <div className="empty-state">No materials posted yet for this subject.</div>
+                                    <div className="empty-state">No content posted yet for this subject.</div>
                                 )}
                                 {detailData.materials.map((material) => {
+                                    const materialType = getMaterialType(material);
                                     const fileTypeMeta = getFileTypeMeta(material.file_type || material.file_url);
+                                    const externalLink = getMaterialLink(material);
+                                    const domain = extractDomain(externalLink);
+                                    const videoId = materialType === 'link'
+                                        ? extractYouTubeVideoId(externalLink)
+                                        : null;
                                     return (
-                                        <article key={material.id} className="subject-material-row">
-                                            <div className="subject-material-icon" style={{ color: fileTypeMeta.color }}>
-                                                <FileText size={18} />
-                                                <span>{fileTypeMeta.label}</span>
+                                        <article
+                                            key={material.id}
+                                            className={`subject-material-row ${materialType === 'link' ? 'subject-material-row-link' : ''}`}
+                                            data-material-id={material.id}
+                                        >
+                                            <div className="subject-material-top">
+                                                <div className="subject-material-icon" style={{ color: fileTypeMeta.color }}>
+                                                    {materialType === 'link' ? <LinkIcon size={18} /> : <FileText size={18} />}
+                                                    <span>{materialType === 'link' ? 'LINK' : fileTypeMeta.label}</span>
+                                                </div>
+                                                {isRecentMaterial(material.created_at) && (
+                                                    <span className="subject-material-new-badge">New</span>
+                                                )}
                                             </div>
+
                                             <div className="subject-material-info">
                                                 <h4>{material.title}</h4>
                                                 <p>
                                                     {new Date(material.created_at).toLocaleDateString()} •{' '}
-                                                    {material.file_size ? `${(material.file_size / 1024 / 1024).toFixed(2)} MB` : 'N/A'}
+                                                    {materialType === 'file'
+                                                        ? (material.file_size
+                                                            ? `${(material.file_size / 1024 / 1024).toFixed(2)} MB`
+                                                            : 'N/A')
+                                                        : (domain || 'External Link')}
                                                 </p>
                                             </div>
-                                            <button
-                                                type="button"
-                                                className="student-assign-btn"
-                                                onClick={() => studentService.downloadMaterial(material)}
-                                            >
-                                                <Download size={14} />
-                                                Download
-                                            </button>
+
+                                            {videoId && (
+                                                <button
+                                                    type="button"
+                                                    className="subject-material-thumb"
+                                                    onClick={() => window.open(externalLink, '_blank', 'noopener,noreferrer')}
+                                                >
+                                                    <img
+                                                        src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+                                                        alt="YouTube preview"
+                                                    />
+                                                    <span className="subject-material-thumb-overlay">Open on YouTube</span>
+                                                </button>
+                                            )}
+
+                                            <div className="subject-material-actions">
+                                                {materialType === 'file' ? (
+                                                    <button
+                                                        type="button"
+                                                        className="student-assign-btn"
+                                                        onClick={() => studentService.downloadMaterial(material)}
+                                                    >
+                                                        <Download size={14} />
+                                                        Download
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        className="student-assign-btn"
+                                                        onClick={() => window.open(externalLink, '_blank', 'noopener,noreferrer')}
+                                                    >
+                                                        <ExternalLink size={14} />
+                                                        Open Link
+                                                    </button>
+                                                )}
+                                            </div>
                                         </article>
                                     );
                                 })}
@@ -719,7 +876,7 @@ const StudentSubjects = () => {
             <header className="page-header">
                 <div>
                     <h1 className="page-title">{t('student.subjects.title') || 'My Subjects'}</h1>
-                    <p className="page-subtitle">{t('student.subjects.subtitle') || 'Access your courses, materials, and assignments'}</p>
+                    <p className="page-subtitle">{t('student.subjects.subtitle') || 'Access your courses, content, and assignments'}</p>
                 </div>
             </header>
 
@@ -749,7 +906,7 @@ const StudentSubjects = () => {
                             <p className="subject-card-teacher">{subject.teacher_name}</p>
 
                             <div className="subject-card-badges">
-                                <span><Book size={13} /> {counts.materials ?? 0} Materials</span>
+                                <span><Book size={13} /> {counts.materials ?? 0} Content</span>
                                 <span><Calendar size={13} /> {counts.assignments ?? subject.initialAssignmentCount} Assignments</span>
                                 <span><FileText size={13} /> {counts.lessonPlans ?? 0} Plans</span>
                             </div>

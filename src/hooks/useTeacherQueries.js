@@ -388,6 +388,43 @@ export const useCreateLearningMaterialMutation = () => {
         mutationFn: (payload) => teacherService.createLearningMaterial(payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['teacher', 'learning-materials'] });
+            queryClient.refetchQueries({ queryKey: ['teacher', 'learning-materials'] });
+        }
+    });
+};
+
+export const useUpdateLearningMaterialMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, payload }) => teacherService.updateLearningMaterial(id, payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['teacher', 'learning-materials'] });
+            queryClient.refetchQueries({ queryKey: ['teacher', 'learning-materials'] });
+        }
+    });
+};
+
+export const usePublishLearningMaterialMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id) => teacherService.publishLearningMaterial(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['teacher', 'learning-materials'] });
+            queryClient.refetchQueries({ queryKey: ['teacher', 'learning-materials'] });
+        }
+    });
+};
+
+export const useUnpublishLearningMaterialMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id) => teacherService.unpublishLearningMaterial(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['teacher', 'learning-materials'] });
+            queryClient.refetchQueries({ queryKey: ['teacher', 'learning-materials'] });
         }
     });
 };
@@ -399,6 +436,7 @@ export const useDeleteLearningMaterialMutation = () => {
         mutationFn: (id) => teacherService.deleteLearningMaterial(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['teacher', 'learning-materials'] });
+            queryClient.refetchQueries({ queryKey: ['teacher', 'learning-materials'] });
         }
     });
 };

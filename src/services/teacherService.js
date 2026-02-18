@@ -143,11 +143,22 @@ const teacherService = {
         return api.get('/teacher/learning-materials/', { params: sanitizeParams(filters) });
     },
     createLearningMaterial: async (data) => {
+        const isFormData = data instanceof FormData;
         return api.post('/teacher/learning-materials/', data, {
-            headers: data instanceof FormData
-                ? { 'Content-Type': 'multipart/form-data' }
-                : undefined
+            headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
         });
+    },
+    updateLearningMaterial: async (id, data) => {
+        const isFormData = data instanceof FormData;
+        return api.patch(`/teacher/learning-materials/${id}/`, data, {
+            headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
+        });
+    },
+    publishLearningMaterial: async (id) => {
+        return api.post(`/teacher/learning-materials/${id}/publish/`);
+    },
+    unpublishLearningMaterial: async (id) => {
+        return api.delete(`/teacher/learning-materials/${id}/publish/`);
     },
     deleteLearningMaterial: async (id) => {
         return api.delete(`/teacher/learning-materials/${id}/`);

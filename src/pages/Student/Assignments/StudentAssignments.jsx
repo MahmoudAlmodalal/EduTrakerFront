@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Download, FileUp, Upload, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronDown, ChevronUp, Download, FileUp } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import studentService from '../../../services/studentService';
 import { toList } from '../../../utils/helpers';
@@ -140,86 +140,111 @@ const compareDueDateAsc = (first, second) => {
     return firstDate.getTime() - secondDate.getTime();
 };
 
-const StudentAssignments = () => {
-    const navigate = useNavigate();
-    const { id: routeAssignmentId } = useParams();
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [assignmentsPayload, setAssignmentsPayload] = useState({ results: [], count: 0 });
+const normalizeAssignment = (assignment = {}) => ({
+    ...assignment,
+    course_name: assignment.course_name || assignment.course?.name || assignment.course || 'Course',
+    due_date: assignment.due_date || assignment.dueDate || null,
+    full_mark: assignment.full_mark ?? assignment.fullMark ?? null,
+    description: assignment.description || '',
+    file_url: assignment.file_url || assignment.attachment_file_url || ''
+});
 
+const toToneBadgeClass = (tone) => {
+    if (tone === 'due-today' || tone === 'overdue') {
+        return 'assignment-badge-urgent';
+    }
+    if (tone === 'due-tomorrow' || tone === 'due-soon') {
+        return 'assignment-badge-due-soon';
+    }
+    if (tone === 'closed') {
+        return 'assignment-badge-closed';
+    }
+    if (tone === 'submitted') {
+        return 'assignment-badge-submitted';
+    }
+    return 'assignment-badge-neutral';
+};
+
+const StudentAssignments = () => {
     const [activeTab, setActiveTab] = useState('active');
-    const [selectedAssignment, setSelectedAssignment] = useState(null);
-    const [drawerLoading, setDrawerLoading] = useState(false);
+    const [expandedId, setExpandedId] = useState(null);
+    const [expandedDetail, setExpandedDetail] = useState(null);
+    const [expandLoading, setExpandLoading] = useState(false);
     const [submissionFile, setSubmissionFile] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [timeLeft, setTimeLeft] = useState({ totalMs: null, text: 'No due date' });
 
-    const loadAssignments = useCallback(async () => {
-        setLoading(true);
-        setError('');
+    const {
+        data,
+        isLoading,
+        isError,
+        error,
+        refetch
+    } = useQuery({
+        queryKey: ['student-assignments'],
+        queryFn: () => studentService.getAssignments({
+            ordering: 'due_date',
+            page_size: 20
+        }),
+        staleTime: 2 * 60 * 1000
+    });
+
+    const loadDetail = useCallback(async (assignmentId) => {
+        setExpandLoading(true);
         try {
-            const response = await studentService.getAssignments({
-                ordering: 'due_date',
-                page_size: 20
+            const [detail, submissionSnapshot] = await Promise.all([
+                studentService.getAssignmentDetail(assignmentId),
+                studentService.getAssignmentSubmission(assignmentId)
+            ]);
+
+            const merged = normalizeAssignment({
+                ...detail,
+                ...submissionSnapshot,
+                submission: submissionSnapshot?.submission || detail?.submission,
+                grade: submissionSnapshot?.grade || detail?.grade,
+                is_grade_visible: submissionSnapshot?.is_grade_visible ?? detail?.is_grade_visible,
+                status: submissionSnapshot?.status || detail?.status
             });
-            if (Array.isArray(response)) {
-                setAssignmentsPayload({ results: response, count: response.length });
-            } else {
-                setAssignmentsPayload(response || { results: [], count: 0 });
-            }
-        } catch (loadError) {
-            setError(loadError?.message || 'Failed to load assignments.');
+
+            setExpandedDetail(merged);
+        } catch (detailError) {
+            toast.error(detailError?.message || 'Failed to load assignment details.');
+            setExpandedId(null);
+            setExpandedDetail(null);
         } finally {
-            setLoading(false);
+            setExpandLoading(false);
         }
     }, []);
 
-    const openAssignmentDrawer = useCallback(async (assignmentId) => {
-        if (!assignmentId) {
-            return;
-        }
-
-        setDrawerLoading(true);
-        try {
-            const detail = await studentService.getAssignmentDetail(assignmentId);
-            setSelectedAssignment(detail);
+    const toggleExpand = useCallback(async (assignment) => {
+        const id = assignment.id;
+        if (expandedId === id) {
+            setExpandedId(null);
+            setExpandedDetail(null);
             setSubmissionFile(null);
-        } catch (detailError) {
-            toast.error(detailError?.message || 'Failed to load assignment details.');
-            navigate('/student/assignments', { replace: true });
-        } finally {
-            setDrawerLoading(false);
-        }
-    }, [navigate]);
-
-    useEffect(() => {
-        void loadAssignments();
-    }, [loadAssignments]);
-
-    useEffect(() => {
-        if (routeAssignmentId) {
-            void openAssignmentDrawer(routeAssignmentId);
             return;
         }
-        setSelectedAssignment(null);
+        setExpandedId(id);
+        setExpandedDetail(null);
         setSubmissionFile(null);
-    }, [openAssignmentDrawer, routeAssignmentId]);
+        await loadDetail(id);
+    }, [expandedId, loadDetail]);
 
     useEffect(() => {
-        if (!selectedAssignment?.due_date) {
+        if (!expandedDetail?.due_date) {
             setTimeLeft({ totalMs: null, text: 'No due date' });
             return undefined;
         }
-        setTimeLeft(calculateTimeLeft(selectedAssignment.due_date));
+        setTimeLeft(calculateTimeLeft(expandedDetail.due_date));
         const interval = setInterval(() => {
-            setTimeLeft(calculateTimeLeft(selectedAssignment.due_date));
+            setTimeLeft(calculateTimeLeft(expandedDetail.due_date));
         }, 1000);
         return () => clearInterval(interval);
-    }, [selectedAssignment?.due_date]);
+    }, [expandedDetail?.due_date]);
 
     const assignments = useMemo(
-        () => [...toList(assignmentsPayload)].sort(compareDueDateAsc),
-        [assignmentsPayload]
+        () => toList(data).map(normalizeAssignment).sort(compareDueDateAsc),
+        [data]
     );
 
     const categorized = useMemo(() => {
@@ -244,59 +269,41 @@ const StudentAssignments = () => {
     const pastAssignments = categorized.past;
     const visibleAssignments = activeTab === 'active' ? activeAssignments : pastAssignments;
 
-    const selectedState = useMemo(
-        () => (selectedAssignment ? buildAssignmentState(selectedAssignment, new Date()) : null),
-        [selectedAssignment]
+    const expandedState = useMemo(
+        () => (expandedDetail ? buildAssignmentState(expandedDetail, new Date()) : null),
+        [expandedDetail]
     );
 
-    const closeDrawer = () => {
-        navigate('/student/assignments');
+    const handleRetryFetch = () => {
+        void refetch();
     };
 
     const handleDownloadAssignment = (assignment, event) => {
         event.stopPropagation();
-        if (assignment?.attachment_file_url) {
-            window.open(assignment.attachment_file_url, '_blank', 'noopener,noreferrer');
+        const downloadUrl = assignment?.file_url || assignment?.attachment_file_url;
+        if (downloadUrl) {
+            window.open(downloadUrl, '_blank', 'noopener,noreferrer');
         }
-    };
-
-    const handleOpenAssignment = (assignment) => {
-        navigate(`/student/assignments/${assignment.id}`);
     };
 
     const handleSubmitAssignment = async (event) => {
         event.preventDefault();
-        if (!selectedAssignment?.id || !submissionFile) {
+        if (!expandedId || !submissionFile) {
             toast.error('Please select a file first.');
             return;
         }
-        if (selectedState?.isClosedNoSubmission) {
+        if (expandedState?.isClosedNoSubmission) {
             toast.error('This assignment is closed.');
             return;
         }
 
         try {
             setSubmitting(true);
-            const updatedAssignment = await studentService.submitAssignment(selectedAssignment.id, submissionFile);
+            await studentService.submitAssignment(expandedId, submissionFile);
             toast.success('Homework submitted successfully!');
-
-            setAssignmentsPayload((previous) => {
-                const list = toList(previous);
-                const exists = list.some((item) => item.id === updatedAssignment.id);
-                const nextResults = exists
-                    ? list.map((item) => (item.id === updatedAssignment.id ? updatedAssignment : item))
-                    : [updatedAssignment, ...list];
-                return {
-                    ...previous,
-                    results: nextResults,
-                    count: Number(previous?.count || list.length) + (exists ? 0 : 1)
-                };
-            });
-
-            setSelectedAssignment(updatedAssignment);
             setSubmissionFile(null);
             setActiveTab('past');
-            closeDrawer();
+            await Promise.all([refetch(), loadDetail(expandedId)]);
         } catch (submitError) {
             toast.error(submitError?.message || 'Failed to submit assignment.');
         } finally {
@@ -313,240 +320,278 @@ const StudentAssignments = () => {
                 </div>
             </header>
 
-            <div className="student-assignment-tabs">
+            <div className="student-assignment-tabs tabs-bar">
                 <button
                     type="button"
-                    className={`student-assignment-tab ${activeTab === 'active' ? 'active' : ''}`}
+                    className={`student-assignment-tab ${activeTab === 'active' ? 'active tab-active' : ''}`}
                     onClick={() => setActiveTab('active')}
                 >
                     Active Assignments ({activeAssignments.length})
                 </button>
                 <button
                     type="button"
-                    className={`student-assignment-tab ${activeTab === 'past' ? 'active' : ''}`}
+                    className={`student-assignment-tab ${activeTab === 'past' ? 'active tab-active' : ''}`}
                     onClick={() => setActiveTab('past')}
                 >
                     Past &amp; Graded ({pastAssignments.length})
                 </button>
             </div>
 
+            {isError && (
+                <div className="student-assignment-error-banner" role="alert">
+                    <span>{error?.message || 'Failed to load assignments.'}</span>
+                    <button type="button" onClick={handleRetryFetch}>Retry</button>
+                </div>
+            )}
+
             <div className="student-assignment-list">
-                {loading && <div className="empty-state">Loading assignments...</div>}
-                {!loading && error && <div className="empty-state">{error}</div>}
-                {!loading && !error && visibleAssignments.length === 0 && activeTab === 'active' && (
-                    <div className="student-assignments-empty">
-                        <div className="student-assignments-empty-icon">Books</div>
-                        <p>No assignments right now.</p>
-                        <span>Check back when your teachers post new work!</span>
+                {isLoading && (
+                    <div className="student-assignment-skeleton-grid">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                            <div key={`assignment-skeleton-${index}`} className="student-assignment-skeleton-card" />
+                        ))}
                     </div>
                 )}
-                {!loading && !error && visibleAssignments.length === 0 && activeTab === 'past' && (
-                    <div className="empty-state">No past assignments yet.</div>
+
+                {!isLoading && !isError && visibleAssignments.length === 0 && activeTab === 'active' && (
+                    <div className="student-assignments-empty">
+                        <div className="student-assignments-empty-icon">Books</div>
+                        <p>No active assignments</p>
+                        <span>Check back when your teachers post new work.</span>
+                    </div>
                 )}
 
-                {!loading && !error && visibleAssignments.map((assignment) => {
+                {!isLoading && !isError && visibleAssignments.length === 0 && activeTab === 'past' && (
+                    <div className="empty-state">No past assignments</div>
+                )}
+
+                {!isLoading && !isError && visibleAssignments.map((assignment) => {
                     const state = assignment._state;
+                    const isExpanded = expandedId === assignment.id;
                     return (
-                        <article
-                            key={assignment.id}
-                            className={`student-assignment-card tone-${state.cardTone} ${state.isClosedNoSubmission ? 'is-closed' : ''}`}
-                            onClick={() => handleOpenAssignment(assignment)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                    event.preventDefault();
-                                    handleOpenAssignment(assignment);
-                                }
-                            }}
-                        >
-                            <div className="student-assignment-card-header">
-                                <div className="student-assignment-title-wrap">
-                                    {state.badgeLabel && (
-                                        <span className={`student-assignment-badge tone-${state.cardTone}`}>
-                                            {state.badgeLabel.toUpperCase()}
+                        <React.Fragment key={assignment.id}>
+                            <article
+                                className={`student-assignment-card assignment-card status-${state.cardTone} ${state.isClosedNoSubmission ? 'is-closed' : ''} ${isExpanded ? 'sa-card-expanded' : ''}`}
+                            >
+                                <div className="student-assignment-card-header">
+                                    <div className="student-assignment-title-wrap">
+                                        {state.badgeLabel && (
+                                            <span className={`student-assignment-badge ${toToneBadgeClass(state.cardTone)}`}>
+                                                {state.badgeLabel.toUpperCase()}
+                                            </span>
+                                        )}
+                                        <h3>{assignment.title}</h3>
+                                    </div>
+                                    <div className="student-assignment-due">
+                                        <span>Due: {state.dueLabel}</span>
+                                    </div>
+                                </div>
+
+                                <div className="student-assignment-meta">
+                                    <span>{assignment.course_name || 'Course'}</span>
+                                    <span>{assignment.classroom_name || 'Classroom'}</span>
+                                    <span>Full mark: {assignment.full_mark || '—'}</span>
+                                </div>
+
+                                <div className="student-assignment-status-row">
+                                    <span className="status-text">
+                                        Status: {state.isGraded ? 'Graded' : state.isSubmitted ? 'Submitted' : 'Not Submitted'}
+                                    </span>
+                                    {assignment.is_grade_visible && assignment.grade && (
+                                        <span className="student-assignment-grade-chip">
+                                            Grade: {assignment.grade.score}/{assignment.grade.max_score}
                                         </span>
                                     )}
-                                    <h3>{assignment.title}</h3>
                                 </div>
-                                <div className="student-assignment-due">
-                                    <span>Due: {state.dueLabel}</span>
-                                </div>
-                            </div>
 
-                            <div className="student-assignment-meta">
-                                <span>{assignment.course_name || 'Course'}</span>
-                                <span>{assignment.classroom_name || 'Classroom'}</span>
-                                <span>Full mark: {assignment.full_mark || '—'}</span>
-                            </div>
-
-                            <div className="student-assignment-status-row">
-                                <span className="status-text">
-                                    Status: {state.isGraded ? 'Graded' : state.isSubmitted ? 'Submitted' : 'Not Submitted'}
-                                </span>
-                                {assignment.is_grade_visible && assignment.grade && (
-                                    <span className="student-assignment-grade-chip">
-                                        Grade: {assignment.grade.score}/{assignment.grade.max_score}
-                                    </span>
+                                {state.inGrace && (
+                                    <p className="student-assignment-warning">
+                                        OVERDUE - submit before cutoff.
+                                    </p>
                                 )}
-                            </div>
 
-                            {state.inGrace && (
-                                <p className="student-assignment-warning">
-                                    OVERDUE - submit before cutoff.
-                                </p>
-                            )}
-
-                            <div className="student-assignment-actions">
-                                {assignment.attachment_file_url && (
-                                    <button
-                                        type="button"
-                                        className="student-assign-btn"
-                                        onClick={(event) => handleDownloadAssignment(assignment, event)}
-                                    >
-                                        <Download size={14} />
-                                        Download
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    className="student-assign-btn primary"
-                                    disabled={state.isClosedNoSubmission}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleOpenAssignment(assignment);
-                                    }}
-                                >
-                                    <Upload size={14} />
-                                    {state.isSubmitted ? 'View Submission' : 'Upload Homework'}
-                                </button>
-                            </div>
-                        </article>
-                    );
-                })}
-            </div>
-
-            {routeAssignmentId && (
-                <div className="student-assignment-drawer-overlay" onClick={closeDrawer}>
-                    <aside className="student-assignment-drawer" onClick={(event) => event.stopPropagation()}>
-                        <div className="student-assignment-drawer-header">
-                            <h3>{selectedAssignment?.title || 'Assignment'}</h3>
-                            <button type="button" className="icon-btn" onClick={closeDrawer}>
-                                <X size={14} />
-                            </button>
-                        </div>
-
-                        {drawerLoading && (
-                            <div className="empty-state">Loading assignment details...</div>
-                        )}
-
-                        {!drawerLoading && selectedAssignment && (
-                            <div className="student-assignment-drawer-content">
-                                <section>
-                                    <h4>Description</h4>
-                                    <p>{selectedAssignment.description || 'No description provided.'}</p>
-                                </section>
-
-                                <section className="student-assignment-info-grid">
-                                    <div>
-                                        <strong>Due:</strong>
-                                        <span>{selectedState?.dueDate ? selectedState.dueDate.toLocaleString() : 'No due date'}</span>
-                                    </div>
-                                    <div>
-                                        <strong>Time left:</strong>
-                                        <span
-                                            className={
-                                                timeLeft.totalMs !== null && timeLeft.totalMs < ONE_DAY_MS && timeLeft.totalMs > 0
-                                                    ? `countdown-text ${timeLeft.totalMs < 60 * 60 * 1000 ? 'pulse' : ''}`
-                                                    : ''
-                                            }
-                                        >
-                                            {timeLeft.text}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <strong>Full mark:</strong>
-                                        <span>{selectedAssignment.full_mark || '—'} pts</span>
-                                    </div>
-                                    <div>
-                                        <strong>Teacher:</strong>
-                                        <span>{selectedAssignment.teacher_name || 'Teacher'}</span>
-                                    </div>
-                                    <div>
-                                        <strong>Course:</strong>
-                                        <span>{selectedAssignment.course_name || 'Course'}</span>
-                                    </div>
-                                </section>
-
-                                {selectedAssignment.attachment_file_url && (
-                                    <section>
-                                        <h4>Assignment File</h4>
+                                <div className="student-assignment-actions">
+                                    {(assignment.file_url || assignment.attachment_file_url) && (
                                         <button
                                             type="button"
                                             className="student-assign-btn"
-                                            onClick={() => window.open(selectedAssignment.attachment_file_url, '_blank', 'noopener,noreferrer')}
+                                            onClick={(event) => handleDownloadAssignment(assignment, event)}
                                         >
                                             <Download size={14} />
-                                            Download File
+                                            Download
                                         </button>
-                                    </section>
-                                )}
-
-                                <section>
-                                    <h4>Submit Homework</h4>
-                                    {selectedState?.isClosedNoSubmission && (
-                                        <p className="student-assignment-warning">This assignment is closed. Upload is disabled.</p>
                                     )}
-                                    {selectedState?.inGrace && (
-                                        <p className="student-assignment-warning">
-                                            Overdue: you can still submit during the 24-hour grace period.
-                                        </p>
-                                    )}
-                                    <form onSubmit={handleSubmitAssignment} className="student-assignment-submit-form">
-                                        <input
-                                            type="file"
-                                            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                                            onChange={(event) => setSubmissionFile(event.target.files?.[0] || null)}
-                                            disabled={selectedState?.isClosedNoSubmission}
-                                        />
-                                        <span className="student-assignment-file-hint">Accepted: PDF, DOC, DOCX, images</span>
-                                        <button
-                                            type="submit"
-                                            className="btn-primary"
-                                            disabled={submitting || !submissionFile || selectedState?.isClosedNoSubmission}
-                                        >
-                                            <FileUp size={14} />
-                                            {submitting ? 'Submitting...' : 'Submit'}
-                                        </button>
-                                    </form>
-                                </section>
+                                    <button
+                                        type="button"
+                                        className="student-assign-btn primary"
+                                        disabled={state.isClosedNoSubmission}
+                                        onClick={() => toggleExpand(assignment)}
+                                    >
+                                        {isExpanded
+                                            ? <ChevronUp size={14} />
+                                            : <FileUp size={14} />}
+                                        {state.isSubmitted
+                                            ? (isExpanded ? 'Hide Details' : 'View Submission')
+                                            : (isExpanded ? 'Hide' : 'Upload Homework')}
+                                    </button>
+                                </div>
+                            </article>
 
-                                {selectedAssignment.submission && (
-                                    <section>
-                                        <h4>Your Submission</h4>
-                                        <p>
-                                            {selectedAssignment.submission.submission_file_name || 'Submitted file'} -{' '}
-                                            {selectedAssignment.submission.submitted_at
-                                                ? new Date(selectedAssignment.submission.submitted_at).toLocaleString()
-                                                : 'Date unavailable'}
-                                        </p>
-                                        {selectedAssignment.submission.submission_file_url && (
-                                            <button
-                                                type="button"
-                                                className="student-assign-btn"
-                                                onClick={() => window.open(selectedAssignment.submission.submission_file_url, '_blank', 'noopener,noreferrer')}
-                                            >
-                                                <Download size={14} />
-                                                Download your submission
-                                            </button>
-                                        )}
-                                    </section>
-                                )}
-                            </div>
-                        )}
-                    </aside>
-                </div>
-            )}
+                            {isExpanded && (
+                                <div className="sa-expand-panel">
+                                    {expandLoading && (
+                                        <div className="sa-expand-loading">
+                                            <span className="sa-expand-spinner" />
+                                            Loading details…
+                                        </div>
+                                    )}
+
+                                    {!expandLoading && expandedDetail && (
+                                        <div className="sa-expand-body">
+
+                                            {/* Description */}
+                                            {expandedDetail.description && (
+                                                <div className="sa-section">
+                                                    <p className="sa-section-label">Description</p>
+                                                    <p className="sa-desc">{expandedDetail.description}</p>
+                                                </div>
+                                            )}
+
+                                            {/* Info grid */}
+                                            <div className="sa-info-grid">
+                                                <div className="sa-info-item">
+                                                    <span className="sa-info-label">Due date</span>
+                                                    <span className="sa-info-value">
+                                                        {expandedState?.dueDate
+                                                            ? expandedState.dueDate.toLocaleString()
+                                                            : 'No due date'}
+                                                    </span>
+                                                </div>
+                                                <div className="sa-info-item">
+                                                    <span className="sa-info-label">Time left</span>
+                                                    <span className={`sa-info-value ${
+                                                        timeLeft.totalMs !== null && timeLeft.totalMs < ONE_DAY_MS && timeLeft.totalMs > 0
+                                                            ? `countdown-text ${timeLeft.totalMs < 60 * 60 * 1000 ? 'pulse' : ''}`
+                                                            : ''
+                                                    }`}>
+                                                        {timeLeft.text}
+                                                    </span>
+                                                </div>
+                                                <div className="sa-info-item">
+                                                    <span className="sa-info-label">Full mark</span>
+                                                    <span className="sa-info-value">{expandedDetail.full_mark || '—'} pts</span>
+                                                </div>
+                                                <div className="sa-info-item">
+                                                    <span className="sa-info-label">Teacher</span>
+                                                    <span className="sa-info-value">{expandedDetail.teacher_name || '—'}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Assignment file download */}
+                                            {(expandedDetail.file_url || expandedDetail.attachment_file_url) && (
+                                                <div className="sa-section">
+                                                    <p className="sa-section-label">Assignment File</p>
+                                                    <button
+                                                        type="button"
+                                                        className="student-assign-btn"
+                                                        onClick={() => window.open(
+                                                            expandedDetail.file_url || expandedDetail.attachment_file_url,
+                                                            '_blank',
+                                                            'noopener,noreferrer'
+                                                        )}
+                                                    >
+                                                        <Download size={14} />
+                                                        Download File
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Submit form */}
+                                            <div className="sa-section sa-submit-section">
+                                                <p className="sa-section-label">Submit Homework</p>
+
+                                                {expandedState?.isClosedNoSubmission && (
+                                                    <p className="student-assignment-warning">
+                                                        This assignment is closed. Upload is disabled.
+                                                    </p>
+                                                )}
+                                                {expandedState?.inGrace && (
+                                                    <p className="student-assignment-warning">
+                                                        Overdue — you can still submit during the 24-hour grace period.
+                                                    </p>
+                                                )}
+
+                                                <form onSubmit={handleSubmitAssignment} className="sa-upload-form">
+                                                    <label className={`sa-file-label ${expandedState?.isClosedNoSubmission ? 'sa-file-label--disabled' : ''}`}>
+                                                        <FileUp size={18} />
+                                                        <span>
+                                                            {submissionFile
+                                                                ? submissionFile.name
+                                                                : 'Choose file (PDF, DOC, DOCX, images)'}
+                                                        </span>
+                                                        <input
+                                                            type="file"
+                                                            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                                                            onChange={(event) => setSubmissionFile(event.target.files?.[0] || null)}
+                                                            disabled={expandedState?.isClosedNoSubmission}
+                                                        />
+                                                    </label>
+
+                                                    {submissionFile && (
+                                                        <p className="sa-file-size">
+                                                            {(submissionFile.size / 1024 / 1024).toFixed(2)} MB
+                                                        </p>
+                                                    )}
+
+                                                    <button
+                                                        type="submit"
+                                                        className="btn-primary sa-submit-btn"
+                                                        disabled={submitting || !submissionFile || expandedState?.isClosedNoSubmission}
+                                                    >
+                                                        <FileUp size={14} />
+                                                        {submitting ? 'Submitting…' : 'Submit Homework'}
+                                                    </button>
+                                                </form>
+                                            </div>
+
+                                            {/* Previous submission */}
+                                            {expandedDetail.submission && (
+                                                <div className="sa-section sa-submission-history">
+                                                    <p className="sa-section-label">Your Submission</p>
+                                                    <div className="sa-submission-row">
+                                                        <span className="sa-submission-name">
+                                                            {expandedDetail.submission.submission_file_name || 'Submitted file'}
+                                                        </span>
+                                                        <span className="sa-submission-date">
+                                                            {expandedDetail.submission.submitted_at
+                                                                ? new Date(expandedDetail.submission.submitted_at).toLocaleString()
+                                                                : 'Date unavailable'}
+                                                        </span>
+                                                        {expandedDetail.submission.submission_file_url && (
+                                                            <button
+                                                                type="button"
+                                                                className="student-assign-btn"
+                                                                onClick={() => window.open(
+                                                                    expandedDetail.submission.submission_file_url,
+                                                                    '_blank',
+                                                                    'noopener,noreferrer'
+                                                                )}
+                                                            >
+                                                                <Download size={14} />
+                                                                Download
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </React.Fragment>
+                    );
+                })}
+            </div>
         </div>
     );
 };

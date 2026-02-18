@@ -32,6 +32,11 @@ const studentService = {
         }));
     },
 
+    // Get student school context (school, classroom, teachers, secretaries, guardians)
+    getStudentContext: async () => {
+        return api.get('/student/students/context/');
+    },
+
     // Get student profile
     getProfile: async (studentId) => {
         return api.get(`/manager/students/${studentId}/`);

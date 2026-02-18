@@ -140,7 +140,6 @@ export const roleConfigs = {
             { path: 'dashboard', labelKey: 'student.nav.dashboard', icon: 'LayoutDashboard' },
             { path: 'subjects', labelKey: 'student.nav.subjects', icon: 'BookOpen' },
             { path: 'results', labelKey: 'student.nav.results', icon: 'Award' },
-            { path: 'attendance', labelKey: 'student.nav.attendance', icon: 'Calendar' },
             { path: 'settings', labelKey: 'student.nav.settings', icon: 'Settings' },
         ],
         dashboard: {

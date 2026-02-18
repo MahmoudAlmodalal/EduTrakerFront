@@ -789,6 +789,7 @@ export const translations = {
         'student.nav.results': 'Academic Results',
         'student.nav.attendance': 'Attendance',
         'student.nav.communication': 'Messages',
+        'student.nav.info': 'My Info',
         'student.nav.settings': 'Settings',
 
         // Student Communication
@@ -1707,6 +1708,7 @@ export const translations = {
         'student.nav.results': 'النتائج الأكاديمية',
         'student.nav.attendance': 'الحضور',
         'student.nav.communication': 'الرسائل',
+        'student.nav.info': 'معلوماتي',
         'student.nav.settings': 'الإعدادات',
 
         // Student Communication

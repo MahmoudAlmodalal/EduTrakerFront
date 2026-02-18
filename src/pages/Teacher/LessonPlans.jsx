@@ -398,6 +398,8 @@ const LessonPlans = () => {
         formData.append('course', String(allocation.course_id));
         formData.append('classroom', String(allocation.class_room_id));
         formData.append('academic_year', String(allocation.academic_year_id));
+        formData.append('content_type', 'file');
+        formData.append('is_published', 'true');
         formData.append('file_type', selectedFile.type || selectedFile.name.split('.').pop() || 'file');
         formData.append('file_size', String(selectedFile.size || 0));
         formData.append('file', selectedFile);
