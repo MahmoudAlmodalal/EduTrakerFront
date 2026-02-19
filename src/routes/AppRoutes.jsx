@@ -82,6 +82,7 @@ const TeacherContent = React.lazy(() => import('../pages/Teacher/TeacherContent'
 const TeacherCommunication = React.lazy(() => import('../pages/Teacher/TeacherCommunication'));
 const TeacherInfo = React.lazy(() => import('../pages/Teacher/TeacherInfo'));
 const TeacherSettings = React.lazy(() => import('../pages/Teacher/TeacherSettings'));
+const Gradebook = React.lazy(() => import('../pages/Teacher/Gradebook'));
 const WorkstreamStudentApplication = React.lazy(() => import('../pages/Auth/WorkstreamStudentApplication'));
 
 // Suspense fallback
@@ -228,6 +229,7 @@ const AppRoutes = () => {
                         <Route path="assignment/new" element={<Navigate to="/teacher/assessments?tab=create" replace />} />
                         <Route path="lesson-plans" element={<LessonPlans />} />
                         <Route path="content" element={<TeacherContent />} />
+                        <Route path="gradebook" element={<Gradebook />} />
                         <Route path="communication" element={<GeneralCommunication />} />
                         <Route path="info" element={<TeacherInfo />} />
                         <Route path="settings" element={<TeacherSettings />} />

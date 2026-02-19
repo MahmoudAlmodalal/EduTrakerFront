@@ -24,6 +24,7 @@ export const teacherQueryKeys = {
     communicationUsers: (params = {}) => ['teacher', 'communication-users', params],
     knowledgeGaps: (allocationId, threshold = 50.0) => ['teacher', 'knowledge-gaps', allocationId, threshold],
     grades: () => ['teacher', 'grades'],
+    gradebook: (allocationIds) => ['teacher', 'gradebook', ...[...allocationIds].sort()],
 };
 
 const mapListData = (data, updater) => {
@@ -549,6 +550,14 @@ export const useUpdateTeacherProfileMutation = () => {
         }
     });
 };
+
+export const useTeacherGradebook = (allocationIds = [], options = {}) =>
+    useQuery({
+        queryKey: teacherQueryKeys.gradebook(allocationIds),
+        queryFn: () => teacherService.getGradebook(allocationIds),
+        enabled: allocationIds.length > 0 && (options.enabled ?? true),
+        ...options,
+    });
 
 export const useTeacherKnowledgeGaps = (allocationId, threshold = 50.0, options = {}) =>
     useQuery({

@@ -243,6 +243,13 @@ const teacherService = {
         });
     },
 
+    // Gradebook
+    getGradebook: async (allocationIds) => {
+        return api.get('/teacher/gradebook/', {
+            params: { course_allocation_ids: allocationIds.join(',') }
+        });
+    },
+
     // Homeroom
     getHomeroomAttendanceSummary: async (date) => {
         return api.get('/teacher/homeroom/attendance-summary/', {
