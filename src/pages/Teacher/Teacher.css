@@ -2190,8 +2190,14 @@
     color: #6d28d9;
 }
 
+.tcl-type-text {
+    background: #fef3c7;
+    color: #92400e;
+}
+
 [data-theme="dark"] .tcl-type-file { background: rgba(37,99,235,0.18); color: #93c5fd; }
 [data-theme="dark"] .tcl-type-link { background: rgba(109,40,217,0.18); color: #c4b5fd; }
+[data-theme="dark"] .tcl-type-text { background: rgba(180,83,9,0.2); color: #fcd34d; }
 
 /* title col */
 .tcl-col-title {

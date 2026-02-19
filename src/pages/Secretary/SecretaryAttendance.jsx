@@ -3,13 +3,16 @@ import {
     Calendar,
     CheckCircle,
     Clock,
+    Download,
     Search,
     TrendingUp,
     Users,
+    X,
     XCircle,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import secretaryService from '../../services/secretaryService';
+import reportService from '../../services/reportService';
 import { getAttendanceStatusIcon } from '../../utils/secretaryHelpers';
 import {
     AlertBanner,
@@ -22,6 +25,17 @@ import {
 } from './components';
 import './Secretary.css';
 
+const getStudentName = (student) => {
+    const fallback = [student?.first_name, student?.last_name].filter(Boolean).join(' ');
+    return student?.full_name || fallback || student?.email || 'Student';
+};
+
+const getStudentFilterId = (student) => {
+    const candidate = student?.user_id ?? student?.id;
+    const parsed = Number.parseInt(String(candidate || ''), 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
 const SecretaryAttendance = () => {
     const { t } = useTheme();
 
@@ -32,32 +46,149 @@ const SecretaryAttendance = () => {
     const [statusFilter, setStatusFilter] = useState('');
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [studentQuery, setStudentQuery] = useState('');
+    const [studentResults, setStudentResults] = useState([]);
+    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [studentLoading, setStudentLoading] = useState(false);
     const [error, setError] = useState('');
     const [debouncedFilters, setDebouncedFilters] = useState({
         dateFrom: initialDate,
         dateTo: initialDate,
-        statusFilter: '',
+        studentId: null,
     });
     const attendanceRequestRef = useRef(0);
+    const dropdownRef = useRef(null);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedFilters((previous) => {
+                const selectedStudentId = selectedStudent?.id || null;
                 if (
                     previous.dateFrom === dateFrom
                     && previous.dateTo === dateTo
-                    && previous.statusFilter === statusFilter
+                    && previous.studentId === selectedStudentId
                 ) {
                     return previous;
                 }
 
-                return { dateFrom, dateTo, statusFilter };
+                return {
+                    dateFrom,
+                    dateTo,
+                    studentId: selectedStudentId,
+                };
             });
         }, 350);
 
         return () => clearTimeout(timer);
-    }, [dateFrom, dateTo, statusFilter]);
+    }, [dateFrom, dateTo, selectedStudent]);
+
+    useEffect(() => {
+        const trimmedQuery = studentQuery.trim();
+        const selectedName = (selectedStudent?.name || '').trim().toLowerCase();
+
+        if (!trimmedQuery || trimmedQuery.length < 2) {
+            setStudentResults([]);
+            setShowDropdown(false);
+            setStudentLoading(false);
+            return undefined;
+        }
+
+        if (selectedStudent && trimmedQuery.toLowerCase() === selectedName) {
+            setStudentResults([]);
+            setShowDropdown(false);
+            setStudentLoading(false);
+            return undefined;
+        }
+
+        let isCancelled = false;
+        const timer = setTimeout(async () => {
+            setStudentLoading(true);
+            try {
+                const data = await secretaryService.getStudents({
+                    search: trimmedQuery,
+                    page_size: 10,
+                });
+                if (isCancelled) {
+                    return;
+                }
+
+                const students = Array.isArray(data?.results)
+                    ? data.results
+                    : (Array.isArray(data) ? data : []);
+                setStudentResults(students.slice(0, 10));
+                setShowDropdown(true);
+            } catch {
+                if (!isCancelled) {
+                    setStudentResults([]);
+                    setShowDropdown(true);
+                }
+            } finally {
+                if (!isCancelled) {
+                    setStudentLoading(false);
+                }
+            }
+        }, 300);
+
+        return () => {
+            isCancelled = true;
+            clearTimeout(timer);
+        };
+    }, [studentQuery, selectedStudent]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleStudentQueryChange = useCallback((event) => {
+        const query = event.target.value;
+        setStudentQuery(query);
+        setSearchTerm(query);
+        setShowDropdown(true);
+
+        if (!selectedStudent) {
+            return;
+        }
+
+        const selectedName = (selectedStudent.name || '').trim().toLowerCase();
+        if (query.trim().toLowerCase() !== selectedName) {
+            setSelectedStudent(null);
+        }
+    }, [selectedStudent]);
+
+    const handleStudentSelect = useCallback((student) => {
+        const studentId = getStudentFilterId(student);
+        if (!studentId) {
+            return;
+        }
+
+        const studentName = getStudentName(student);
+        setSelectedStudent({
+            id: studentId,
+            name: studentName,
+            code: student?.student_id || '',
+        });
+        setStudentQuery(studentName);
+        setSearchTerm(studentName);
+        setShowDropdown(false);
+    }, []);
+
+    const clearSelectedStudent = useCallback(() => {
+        setSelectedStudent(null);
+        setStudentQuery('');
+        setSearchTerm('');
+        setStudentResults([]);
+        setShowDropdown(false);
+    }, []);
 
     const fetchAttendance = useCallback(async (filters) => {
         const requestId = attendanceRequestRef.current + 1;
@@ -67,16 +198,25 @@ const SecretaryAttendance = () => {
             setLoading(true);
             setError('');
 
+            if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) {
+                setRecords([]);
+                setError('From Date cannot be after To Date.');
+                return;
+            }
+
             const params = {};
             if (filters.dateFrom) params.date_from = filters.dateFrom;
             if (filters.dateTo) params.date_to = filters.dateTo;
-            if (filters.statusFilter) params.status = filters.statusFilter;
+            if (filters.studentId) params.student_id = filters.studentId;
 
-            const data = await secretaryService.getAttendance(params);
+            const data = await secretaryService.getAllAttendance({
+                ...params,
+                page_size: 100,
+            });
             if (attendanceRequestRef.current !== requestId) {
                 return;
             }
-            setRecords(data.results || data || []);
+            setRecords(Array.isArray(data) ? data : []);
             setError('');
         } catch (err) {
             if (attendanceRequestRef.current !== requestId) {
@@ -109,21 +249,35 @@ const SecretaryAttendance = () => {
         [t]
     );
 
-    const filteredRecords = useMemo(() => {
+    const studentFilteredRecords = useMemo(() => {
         const search = searchTerm.trim().toLowerCase();
 
         if (!search) {
             return records;
         }
 
-        return records.filter((record) => (record.student_name || '').toLowerCase().includes(search));
+        return records.filter((record) => {
+            const studentName = (record.student_name || '').toLowerCase();
+            const studentId = String(record.student_id || '');
+            return studentName.includes(search) || studentId.includes(search);
+        });
     }, [records, searchTerm]);
 
+    const filteredRecords = useMemo(() => {
+        if (!statusFilter) {
+            return studentFilteredRecords;
+        }
+
+        return studentFilteredRecords.filter((record) => record.status === statusFilter);
+    }, [studentFilteredRecords, statusFilter]);
+
     const statCards = useMemo(() => {
-        const totalPresent = records.filter((record) => record.status === 'present').length;
-        const totalAbsent = records.filter((record) => record.status === 'absent').length;
-        const totalLate = records.filter((record) => record.status === 'late').length;
-        const attendanceRate = records.length > 0 ? Math.round((totalPresent / records.length) * 100) : 0;
+        const totalPresent = studentFilteredRecords.filter((record) => record.status === 'present').length;
+        const totalAbsent = studentFilteredRecords.filter((record) => record.status === 'absent').length;
+        const totalLate = studentFilteredRecords.filter((record) => record.status === 'late').length;
+        const attendanceRate = studentFilteredRecords.length > 0
+            ? Math.round((totalPresent / studentFilteredRecords.length) * 100)
+            : 0;
 
         return [
             { title: 'Present', value: totalPresent, icon: CheckCircle, color: 'green' },
@@ -131,13 +285,63 @@ const SecretaryAttendance = () => {
             { title: 'Late', value: totalLate, icon: Clock, color: 'amber' },
             { title: 'Attendance Rate', value: `${attendanceRate}%`, icon: TrendingUp, color: 'indigo' },
         ];
-    }, [records]);
+    }, [studentFilteredRecords]);
+
+    const emptyStateMessage = useMemo(() => {
+        if (searchTerm.trim() || statusFilter || selectedStudent) {
+            return 'No attendance records found for the selected filters.';
+        }
+
+        return 'No attendance records found for this date range.';
+    }, [searchTerm, statusFilter, selectedStudent]);
+
+    const handleExportPdf = useCallback(async () => {
+        if (filteredRecords.length === 0) {
+            setError('No attendance records available to export for the selected filters.');
+            return;
+        }
+
+        try {
+            setIsExportingPdf(true);
+            setError('');
+
+            const exportRows = filteredRecords.map((record) => ({
+                student_name: record.student_name || '',
+                student_id: record.student_id || '',
+                classroom_name: record.classroom_name || '',
+                date: record.date || '',
+                status: getStatusLabel(record.status),
+                note: record.note || '',
+                recorded_by: record.recorded_by_name || '',
+                date_from: dateFrom || '',
+                date_to: dateTo || '',
+            }));
+
+            await reportService.exportReport('pdf', 'secretary_attendance', exportRows);
+        } catch (err) {
+            console.error('Error exporting attendance PDF:', err);
+            setError('Failed to export attendance PDF.');
+        } finally {
+            setIsExportingPdf(false);
+        }
+    }, [filteredRecords, getStatusLabel, dateFrom, dateTo]);
 
     return (
         <div className="secretary-dashboard">
             <PageHeader
                 title={t('secretary.attendance.title') || 'Attendance Management'}
                 subtitle={t('secretary.attendance.subtitle') || 'View and manage student attendance records'}
+                action={(
+                    <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={handleExportPdf}
+                        disabled={isExportingPdf || filteredRecords.length === 0}
+                    >
+                        <Download size={16} />
+                        <span>{isExportingPdf ? 'Exporting...' : 'Export PDF'}</span>
+                    </button>
+                )}
             />
 
             <AlertBanner type="error" message={error} onDismiss={() => setError('')} />
@@ -194,7 +398,7 @@ const SecretaryAttendance = () => {
                         </select>
                     </div>
 
-                    <div className="sec-field sec-field--grow">
+                    <div className="sec-field sec-field--grow" ref={dropdownRef}>
                         <label htmlFor="attendance-search" className="form-label">Search Student</label>
                         <div className="search-wrapper sec-search-wrapper">
                             <Search size={16} className="search-icon" />
@@ -202,11 +406,64 @@ const SecretaryAttendance = () => {
                                 id="attendance-search"
                                 type="text"
                                 className="search-input"
-                                placeholder="Search by student name..."
-                                value={searchTerm}
-                                onChange={(event) => setSearchTerm(event.target.value)}
+                                placeholder="Type at least 2 letters..."
+                                value={studentQuery}
+                                onChange={handleStudentQueryChange}
+                                onFocus={() => {
+                                    const trimmedQuery = studentQuery.trim();
+                                    const selectedName = (selectedStudent?.name || '').trim().toLowerCase();
+                                    if (trimmedQuery.length >= 2 && trimmedQuery.toLowerCase() !== selectedName) {
+                                        setShowDropdown(true);
+                                    }
+                                }}
                             />
                         </div>
+
+                        {showDropdown ? (
+                            <div className="student-search-dropdown">
+                                {studentLoading ? (
+                                    <div className="student-search-option text-muted">Loading students...</div>
+                                ) : studentResults.length > 0 ? (
+                                    studentResults.map((studentOption) => {
+                                        const optionId = getStudentFilterId(studentOption);
+                                        const optionName = getStudentName(studentOption);
+                                        return (
+                                            <button
+                                                key={optionId || `${optionName}-${studentOption?.student_id || ''}`}
+                                                type="button"
+                                                className="student-search-option"
+                                                onClick={() => handleStudentSelect(studentOption)}
+                                            >
+                                                <AvatarInitial name={optionName} size="sm" />
+                                                <span>{optionName}</span>
+                                                <span className="text-muted">
+                                                    {studentOption?.student_id || `#${optionId || '-'}`}
+                                                </span>
+                                            </button>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="student-search-option text-muted">No students found</div>
+                                )}
+                            </div>
+                        ) : null}
+
+                        {selectedStudent ? (
+                            <div className="selected-student-badge">
+                                <AvatarInitial name={selectedStudent.name} size="sm" />
+                                <span>{selectedStudent.name}</span>
+                                {selectedStudent.code ? (
+                                    <span className="text-muted">({selectedStudent.code})</span>
+                                ) : null}
+                                <button
+                                    type="button"
+                                    onClick={clearSelectedStudent}
+                                    aria-label="Clear selected student"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 
@@ -220,7 +477,7 @@ const SecretaryAttendance = () => {
                                     <tr>
                                         <th className="cell-id">ID</th>
                                         <th>{t('secretary.attendance.studentName') || 'Student'}</th>
-                                        <th>Course</th>
+                                        <th>Classroom</th>
                                         <th>Date</th>
                                         <th>{t('secretary.attendance.status') || 'Status'}</th>
                                         <th>Note</th>
@@ -240,7 +497,7 @@ const SecretaryAttendance = () => {
                                                         <span>{record.student_name || '-'}</span>
                                                     </div>
                                                 </td>
-                                                <td>{record.course_name || '-'}</td>
+                                                <td>{record.classroom_name || '-'}</td>
                                                 <td className="cell-muted">{record.date || '-'}</td>
                                                 <td>
                                                     <StatusBadge status={getStatusLabel(record.status)} icon={StatusIcon} />
@@ -256,7 +513,7 @@ const SecretaryAttendance = () => {
                                             <td colSpan="7">
                                                 <EmptyState
                                                     icon={Users}
-                                                    message="No attendance records found for this date range."
+                                                    message={emptyStateMessage}
                                                 />
                                             </td>
                                         </tr>

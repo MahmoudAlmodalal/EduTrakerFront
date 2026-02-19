@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Download, FileUp } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import studentService from '../../../services/studentService';
-import { toList } from '../../../utils/helpers';
+import { resolveBackendFileUrl, toList } from '../../../utils/helpers';
 import '../Student.css';
 
 const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
@@ -146,7 +146,13 @@ const normalizeAssignment = (assignment = {}) => ({
     due_date: assignment.due_date || assignment.dueDate || null,
     full_mark: assignment.full_mark ?? assignment.fullMark ?? null,
     description: assignment.description || '',
-    file_url: assignment.file_url || assignment.attachment_file_url || ''
+    has_attachment: Boolean(
+        assignment.has_attachment
+        || assignment.file_url
+        || assignment.attachment_file_url
+    ),
+    attachment_file_name: assignment.attachment_file_name || null,
+    file_url: resolveBackendFileUrl(assignment.file_url || assignment.attachment_file_url || '')
 });
 
 const toToneBadgeClass = (tone) => {
@@ -278,12 +284,32 @@ const StudentAssignments = () => {
         void refetch();
     };
 
+    const downloadAssignmentAttachment = useCallback(async (assignment) => {
+        if (!assignment?.id) {
+            return;
+        }
+
+        try {
+            await studentService.downloadAssignmentAttachment(
+                assignment.id,
+                assignment.attachment_file_name || assignment.title || 'assignment'
+            );
+        } catch {
+            // Fallback to direct media URL if file-stream endpoint is unavailable.
+            const directUrl = resolveBackendFileUrl(
+                assignment?.file_url || assignment?.attachment_file_url
+            );
+            if (directUrl) {
+                window.open(directUrl, '_blank', 'noopener,noreferrer');
+                return;
+            }
+            toast.error('No assignment file available to download.');
+        }
+    }, []);
+
     const handleDownloadAssignment = (assignment, event) => {
         event.stopPropagation();
-        const downloadUrl = assignment?.file_url || assignment?.attachment_file_url;
-        if (downloadUrl) {
-            window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-        }
+        void downloadAssignmentAttachment(assignment);
     };
 
     const handleSubmitAssignment = async (event) => {
@@ -411,7 +437,7 @@ const StudentAssignments = () => {
                                 )}
 
                                 <div className="student-assignment-actions">
-                                    {(assignment.file_url || assignment.attachment_file_url) && (
+                                    {assignment.has_attachment && (
                                         <button
                                             type="button"
                                             className="student-assign-btn"
@@ -488,17 +514,13 @@ const StudentAssignments = () => {
                                             </div>
 
                                             {/* Assignment file download */}
-                                            {(expandedDetail.file_url || expandedDetail.attachment_file_url) && (
+                                            {expandedDetail.has_attachment && (
                                                 <div className="sa-section">
                                                     <p className="sa-section-label">Assignment File</p>
                                                     <button
                                                         type="button"
                                                         className="student-assign-btn"
-                                                        onClick={() => window.open(
-                                                            expandedDetail.file_url || expandedDetail.attachment_file_url,
-                                                            '_blank',
-                                                            'noopener,noreferrer'
-                                                        )}
+                                                        onClick={() => { void downloadAssignmentAttachment(expandedDetail); }}
                                                     >
                                                         <Download size={14} />
                                                         Download File
@@ -572,7 +594,9 @@ const StudentAssignments = () => {
                                                                 type="button"
                                                                 className="student-assign-btn"
                                                                 onClick={() => window.open(
-                                                                    expandedDetail.submission.submission_file_url,
+                                                                    resolveBackendFileUrl(
+                                                                        expandedDetail.submission.submission_file_url
+                                                                    ),
                                                                     '_blank',
                                                                     'noopener,noreferrer'
                                                                 )}

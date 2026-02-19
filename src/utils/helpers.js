@@ -37,3 +37,33 @@ export const toLocalIsoDate = (input = new Date()) => {
 };
 
 export const todayIsoDate = () => toLocalIsoDate(new Date());
+
+const getBackendOrigin = () => {
+    const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    try {
+        return new URL(rawApiUrl, window.location.origin).origin;
+    } catch {
+        return window.location.origin;
+    }
+};
+
+export const resolveBackendFileUrl = (value) => {
+    if (!value) {
+        return '';
+    }
+
+    try {
+        const parsed = new URL(value, window.location.origin);
+        const backendOrigin = getBackendOrigin();
+        const isMediaPath = parsed.pathname.startsWith('/media/');
+
+        // Media is served by backend (e.g. localhost:8000), not the Vite host.
+        if (isMediaPath && parsed.origin !== backendOrigin) {
+            return `${backendOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+
+        return parsed.toString();
+    } catch {
+        return value;
+    }
+};

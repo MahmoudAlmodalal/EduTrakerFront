@@ -210,7 +210,7 @@ const AcademicConfiguration = () => {
     const fetchCourses = async () => {
         if (!schoolId) return;
         try {
-            const data = await managerService.getCourses(schoolId, { include_inactive: true });
+            const data = await managerService.getCourses(schoolId, { include_inactive: true, forceRefresh: true });
             setCourses(data.results || data || []);
         } catch (error) {
             console.error('Failed to fetch courses:', error);

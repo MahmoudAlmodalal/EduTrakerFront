@@ -9,6 +9,7 @@ const StatCard = memo(function StatCard({
     color = 'indigo',
     trend,
     trendUp = true,
+    description = '',
 }) {
     const toneClass = `sec-icon-tone--${getSecretaryIconColorKey(color)}`;
 
@@ -28,6 +29,7 @@ const StatCard = memo(function StatCard({
                     <span className="sec-stat-trend-label">this month</span>
                 </div>
             ) : null}
+            {description ? <p className="sec-stat-description">{description}</p> : null}
         </article>
     );
 });

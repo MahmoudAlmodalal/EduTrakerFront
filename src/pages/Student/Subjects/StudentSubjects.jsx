@@ -88,9 +88,19 @@ const getFileTypeMeta = (fileType = '') => {
     return { label: 'FILE', color: '#64748b' };
 };
 
-const getMaterialType = (material = {}) => (
-    material?.content_type || (material?.external_link ? 'link' : 'file')
-);
+const getMaterialType = (material = {}) => {
+    const explicitType = String(material?.content_type || '').toLowerCase();
+    if (['file', 'link', 'text'].includes(explicitType)) {
+        return explicitType;
+    }
+    if (material?.external_link) {
+        return 'link';
+    }
+    if (material?.file_url) {
+        return 'file';
+    }
+    return 'text';
+};
 
 const getMaterialLink = (material = {}) => material?.external_link || material?.file_url || '';
 
@@ -591,16 +601,23 @@ const StudentSubjects = () => {
                                     const videoId = materialType === 'link'
                                         ? extractYouTubeVideoId(externalLink)
                                         : null;
+                                    const isFileMaterial = materialType === 'file';
+                                    const isLinkMaterial = materialType === 'link';
+                                    const isTextMaterial = materialType === 'text';
+                                    const materialBadgeLabel = isLinkMaterial
+                                        ? 'LINK'
+                                        : (isTextMaterial ? 'TEXT' : fileTypeMeta.label);
+                                    const materialBadgeColor = isTextMaterial ? '#d97706' : fileTypeMeta.color;
                                     return (
                                         <article
                                             key={material.id}
-                                            className={`subject-material-row ${materialType === 'link' ? 'subject-material-row-link' : ''}`}
+                                            className={`subject-material-row ${isLinkMaterial ? 'subject-material-row-link' : ''} ${isTextMaterial ? 'subject-material-row-text' : ''}`}
                                             data-material-id={material.id}
                                         >
                                             <div className="subject-material-top">
-                                                <div className="subject-material-icon" style={{ color: fileTypeMeta.color }}>
-                                                    {materialType === 'link' ? <LinkIcon size={18} /> : <FileText size={18} />}
-                                                    <span>{materialType === 'link' ? 'LINK' : fileTypeMeta.label}</span>
+                                                <div className="subject-material-icon" style={{ color: materialBadgeColor }}>
+                                                    {isLinkMaterial ? <LinkIcon size={18} /> : isTextMaterial ? <Book size={18} /> : <FileText size={18} />}
+                                                    <span>{materialBadgeLabel}</span>
                                                 </div>
                                                 {isRecentMaterial(material.created_at) && (
                                                     <span className="subject-material-new-badge">New</span>
@@ -611,12 +628,17 @@ const StudentSubjects = () => {
                                                 <h4>{material.title}</h4>
                                                 <p>
                                                     {new Date(material.created_at).toLocaleDateString()} •{' '}
-                                                    {materialType === 'file'
+                                                    {isFileMaterial
                                                         ? (material.file_size
                                                             ? `${(material.file_size / 1024 / 1024).toFixed(2)} MB`
                                                             : 'N/A')
-                                                        : (domain || 'External Link')}
+                                                        : (isLinkMaterial ? (domain || 'External Link') : 'Text content')}
                                                 </p>
+                                                {(material.description || isTextMaterial) && (
+                                                    <p className="subject-material-description">
+                                                        {material.description || 'No description provided.'}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             {videoId && (
@@ -634,7 +656,7 @@ const StudentSubjects = () => {
                                             )}
 
                                             <div className="subject-material-actions">
-                                                {materialType === 'file' ? (
+                                                {isFileMaterial && (
                                                     <button
                                                         type="button"
                                                         className="student-assign-btn"
@@ -643,7 +665,8 @@ const StudentSubjects = () => {
                                                         <Download size={14} />
                                                         Download
                                                     </button>
-                                                ) : (
+                                                )}
+                                                {isLinkMaterial && (
                                                     <button
                                                         type="button"
                                                         className="student-assign-btn"
@@ -652,6 +675,9 @@ const StudentSubjects = () => {
                                                         <ExternalLink size={14} />
                                                         Open Link
                                                     </button>
+                                                )}
+                                                {isTextMaterial && (
+                                                    <span className="subject-material-text-note">Description only</span>
                                                 )}
                                             </div>
                                         </article>

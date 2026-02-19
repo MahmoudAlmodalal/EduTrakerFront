@@ -67,16 +67,11 @@ const ClassManagement = () => {
                     grade_level:    alloc.grade_level || null,
                     is_homeroom:    alloc.is_homeroom === true,
                     subjects:       [],
-                    /* keep one allocation ID for attendance (the homeroom one
-                       is preferred, otherwise the first one)              */
-                    attendance_allocation_id: alloc.id,
                 });
             }
             const entry = map.get(cid);
-            // prefer the homeroom-flag allocation as the attendance source
             if (alloc.is_homeroom) {
                 entry.is_homeroom = true;
-                entry.attendance_allocation_id = alloc.id;
             }
             entry.subjects.push(alloc.course_name || alloc.subject || 'Course');
         });
@@ -97,7 +92,6 @@ const ClassManagement = () => {
     );
 
     const isHomeroomSelected = selectedClassroom?.is_homeroom === true;
-    const attendanceAllocId  = selectedClassroom?.attendance_allocation_id || '';
 
     /* ── fetch students for selected classroom ──────────── */
     const studentFilters = useMemo(() => {
@@ -109,10 +103,10 @@ const ClassManagement = () => {
         useTeacherStudents(studentFilters || {}, { enabled: Boolean(studentFilters) });
     const students = useMemo(() => toList(studentsData), [studentsData]);
 
-    /* ── fetch existing attendance for homeroom alloc ───── */
+    /* ── fetch existing attendance for homeroom classroom ── */
     const { data: attendanceData, isLoading: loadingAttendance } =
-        useTeacherAttendance(attendanceAllocId, attendanceDate, {
-            enabled: Boolean(isHomeroomSelected && attendanceAllocId && attendanceDate),
+        useTeacherAttendance(selectedClassroomId, attendanceDate, {
+            enabled: Boolean(isHomeroomSelected && selectedClassroomId && attendanceDate),
         });
 
     const savedAttendance = useMemo(() => {
@@ -124,7 +118,7 @@ const ClassManagement = () => {
     }, [attendanceData]);
 
     /* ── draft overrides key ────────────────────────────── */
-    const overrideKey  = `${attendanceAllocId}:${attendanceDate}`;
+    const overrideKey  = `${selectedClassroomId}:${attendanceDate}`;
     const currentDraft = overrides[overrideKey] || {};
 
     /* merged rows */
@@ -191,13 +185,13 @@ const ClassManagement = () => {
     const recordMutation = useRecordBulkAttendanceMutation();
 
     const handleSave = useCallback(async () => {
-        if (!attendanceAllocId) return;
+        if (!selectedClassroomId) return;
 
         const records = mergedRows
             .filter((r) => r.status)
             .map((r) => ({
                 student_id: r.sid,
-                course_allocation_id: Number(attendanceAllocId),
+                class_room_id: Number(selectedClassroomId),
                 date: attendanceDate,
                 status: r.status,
             }));
@@ -214,7 +208,7 @@ const ClassManagement = () => {
         } catch (err) {
             toast.error(err?.message || 'Failed to save attendance.');
         }
-    }, [attendanceAllocId, attendanceDate, mergedRows, overrideKey, recordMutation]);
+    }, [selectedClassroomId, attendanceDate, mergedRows, overrideKey, recordMutation]);
 
     /* ── render ──────────────────────────────────────────── */
     const loading = loadingStudents || loadingAttendance;

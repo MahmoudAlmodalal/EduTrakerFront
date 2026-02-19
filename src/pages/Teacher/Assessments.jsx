@@ -37,6 +37,7 @@ const emptyForm = {
     dueDate: '',
     maxMarks: '',
     type: 'assignment',
+    isPublished: true,
     attachmentFile: null,
     existingAttachmentUrl: null
 };
@@ -83,6 +84,10 @@ const getAssignmentStatus = (assignment) => {
         return 'inactive';
     }
 
+    if (!assignment?.is_published) {
+        return 'draft';
+    }
+
     if (assignment?.due_date) {
         const dueDate = new Date(assignment.due_date);
         if (!Number.isNaN(dueDate.getTime()) && dueDate < new Date()) {
@@ -95,6 +100,7 @@ const getAssignmentStatus = (assignment) => {
 
 const statusBadgeStyles = {
     active: { background: '#dcfce7', color: '#166534', label: 'Active' },
+    draft: { background: '#fef3c7', color: '#92400e', label: 'Draft' },
     overdue: { background: '#fee2e2', color: '#991b1b', label: 'Overdue' },
     inactive: { background: '#e2e8f0', color: '#334155', label: 'Inactive' }
 };
@@ -276,6 +282,7 @@ const Assessments = () => {
             dueDate: toDateTimeLocal(assignment.due_date),
             maxMarks: String(assignment.full_mark || ''),
             type: assignment.assignment_type || assignment.exam_type || 'assignment',
+            isPublished: assignment.is_published !== false,
             attachmentFile: null,
             existingAttachmentUrl: assignment.attachment_file_url || null
         });
@@ -310,6 +317,7 @@ const Assessments = () => {
                 formData.append('full_mark', String(Number(fullMark)));
                 formData.append('exam_type', assignmentForm.type);
                 formData.append('assignment_type', assignmentForm.type);
+                formData.append('is_published', String(Boolean(assignmentForm.isPublished)));
                 const dueDateIso = toIsoFromLocal(assignmentForm.dueDate);
                 if (dueDateIso) {
                     formData.append('due_date', dueDateIso);
@@ -331,6 +339,7 @@ const Assessments = () => {
                     full_mark: String(Number(fullMark)),
                     exam_type: assignmentForm.type,
                     assignment_type: assignmentForm.type,
+                    is_published: Boolean(assignmentForm.isPublished),
                 };
                 const dueDateIso = toIsoFromLocal(assignmentForm.dueDate);
                 if (dueDateIso) {
@@ -350,6 +359,7 @@ const Assessments = () => {
                 formData.append('full_mark', String(Number(fullMark)));
                 formData.append('exam_type', assignmentForm.type);
                 formData.append('assignment_type', assignmentForm.type);
+                formData.append('is_published', String(Boolean(assignmentForm.isPublished)));
                 const dueDateIso = toIsoFromLocal(assignmentForm.dueDate);
                 if (dueDateIso) {
                     formData.append('due_date', dueDateIso);
@@ -385,6 +395,24 @@ const Assessments = () => {
             toast.error(error?.message || 'Failed to deactivate assignment.');
         }
     }, [deactivateAssignmentMutation]);
+
+    const handleToggleAssignmentPublish = useCallback(async (assignment) => {
+        try {
+            await updateAssignmentMutation.mutateAsync({
+                id: assignment.id,
+                payload: {
+                    is_published: !assignment.is_published
+                }
+            });
+            toast.success(
+                assignment.is_published
+                    ? 'Assignment hidden from students.'
+                    : 'Assignment published to students.'
+            );
+        } catch (error) {
+            toast.error(error?.message || 'Failed to update assignment visibility.');
+        }
+    }, [updateAssignmentMutation]);
 
     const selectedMarkAllocation = useMemo(() => {
         if (!markingAssignment) {
@@ -590,6 +618,7 @@ const Assessments = () => {
                     >
                         <option value="all">All status</option>
                         <option value="active">Active</option>
+                        <option value="draft">Draft</option>
                         <option value="overdue">Overdue</option>
                         <option value="inactive">Inactive</option>
                     </select>
@@ -674,6 +703,18 @@ const Assessments = () => {
                                                 <button type="button" className="icon-btn" onClick={() => openEditModal(assignment)} title="Edit">
                                                     <Pencil size={14} />
                                                 </button>
+                                                {assignment.is_active !== false && (
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn"
+                                                        onClick={() => handleToggleAssignmentPublish(assignment)}
+                                                        title={assignment.is_published ? 'Hide from students' : 'Publish to students'}
+                                                        style={{ width: 'auto', padding: '0.35rem 0.55rem' }}
+                                                        disabled={updateAssignmentMutation.isPending}
+                                                    >
+                                                        {assignment.is_published ? 'Unpublish' : 'Publish'}
+                                                    </button>
+                                                )}
                                                 <button
                                                     type="button"
                                                     className="icon-btn"
@@ -933,6 +974,26 @@ const Assessments = () => {
                                     </select>
                                 </div>
                             </div>
+
+                            <label
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.55rem',
+                                    fontSize: '0.84rem',
+                                    fontWeight: 600
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(assignmentForm.isPublished)}
+                                    onChange={(event) => setAssignmentForm((prev) => ({
+                                        ...prev,
+                                        isPublished: event.target.checked
+                                    }))}
+                                />
+                                Publish assignment to students now
+                            </label>
 
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600, fontSize: '0.82rem' }}>

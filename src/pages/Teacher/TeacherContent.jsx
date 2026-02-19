@@ -29,6 +29,7 @@ import './Teacher.css';
 const emptyForm = {
     contentType: 'link',
     courseId: '',
+    gradeId: '',
     classroomId: '',
     title: '',
     description: '',
@@ -36,7 +37,7 @@ const emptyForm = {
 };
 
 const getMaterialType = (material) =>
-    material?.content_type || (material?.external_link ? 'link' : 'file');
+    material?.content_type || (material?.external_link ? 'link' : (material?.file_url ? 'file' : 'text'));
 
 const extractDomain = (url = '') => {
     try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
@@ -120,29 +121,57 @@ const TeacherContent = () => {
         return [...map.values()];
     }, [allocations, courseFilter]);
 
-    const modalClassrooms = useMemo(() => {
+    const modalGrades = useMemo(() => {
         const map = new Map();
         allocations
             .filter((a) => !form.courseId || toId(a.course_id) === toId(form.courseId))
+            .forEach((a) => {
+                if (!map.has(a.grade_id)) {
+                    map.set(a.grade_id, { id: a.grade_id, name: a.grade_name || `Grade ${a.grade_id}` });
+                }
+            });
+        return [...map.values()];
+    }, [allocations, form.courseId]);
+
+    const effectiveModalGrade = modalGrades.some((g) => toId(g.id) === toId(form.gradeId))
+        ? form.gradeId
+        : (modalGrades[0] ? toId(modalGrades[0].id) : '');
+
+    const modalClassrooms = useMemo(() => {
+        const map = new Map();
+        allocations
+            .filter((a) =>
+                (!form.courseId || toId(a.course_id) === toId(form.courseId))
+                && (!effectiveModalGrade || toId(a.grade_id) === toId(effectiveModalGrade))
+            )
             .forEach((a) => {
                 if (!map.has(a.class_room_id))
                     map.set(a.class_room_id, { id: a.class_room_id, name: a.classroom_name || `Classroom ${a.class_room_id}` });
             });
         return [...map.values()];
-    }, [allocations, form.courseId]);
+    }, [allocations, effectiveModalGrade, form.courseId]);
 
     const effectiveClassroom = filterClassrooms.some((c) => toId(c.id) === toId(classroomFilter))
         ? classroomFilter : '';
 
-    const modalClassroomValue = form.classroomId === 'all'
+    const allowAllClassroomsTarget = !editingMaterial && Boolean(effectiveModalGrade) && modalClassrooms.length >= 1;
+
+    const modalClassroomValue = form.classroomId === 'all' && allowAllClassroomsTarget
         ? 'all'
         : (modalClassrooms.some((c) => toId(c.id) === toId(form.classroomId))
             ? form.classroomId
             : (modalClassrooms[0] ? toId(modalClassrooms[0].id) : ''));
 
     /* ── helpers ── */
-    const findAllocation = (cId, clId) =>
-        allocations.find((a) => toId(a.course_id) === toId(cId) && toId(a.class_room_id) === toId(clId));
+    const findAllocation = (cId, clId) => {
+        const matches = allocations.filter(
+            (a) => toId(a.course_id) === toId(cId) && toId(a.class_room_id) === toId(clId)
+        );
+        if (!matches.length) {
+            return null;
+        }
+        return matches.find((a) => !effectiveModalGrade || toId(a.grade_id) === toId(effectiveModalGrade)) || matches[0];
+    };
 
     const resolvePublished = (m) =>
         Object.prototype.hasOwnProperty.call(publishOverrides, m.id)
@@ -157,16 +186,26 @@ const TeacherContent = () => {
         const fc = courses[0];
         const fcl = allocations.find((a) => !fc || toId(a.course_id) === toId(fc.id));
         setEditingMaterial(null);
-        setForm({ ...emptyForm, courseId: fc ? toId(fc.id) : '', classroomId: fcl ? toId(fcl.class_room_id) : '' });
+        setForm({
+            ...emptyForm,
+            courseId: fc ? toId(fc.id) : '',
+            gradeId: fcl ? toId(fcl.grade_id) : '',
+            classroomId: fcl ? toId(fcl.class_room_id) : ''
+        });
         setSelectedFile(null);
         setShowModal(true);
     };
 
     const openEdit = (m) => {
+        const matchedAllocation = allocations.find(
+            (a) => toId(a.course_id) === toId(m.course) && toId(a.class_room_id) === toId(m.classroom)
+        );
+
         setEditingMaterial(m);
         setForm({
             contentType: getMaterialType(m),
             courseId: toId(m.course),
+            gradeId: matchedAllocation ? toId(matchedAllocation.grade_id) : '',
             classroomId: toId(m.classroom),
             title: m.title || '',
             description: m.description || '',
@@ -184,16 +223,40 @@ const TeacherContent = () => {
     };
 
     const handleCourseChange = (cId) => {
-        const next = allocations.find((a) => toId(a.course_id) === toId(cId));
-        setForm((p) => ({ ...p, courseId: cId, classroomId: next ? toId(next.class_room_id) : '' }));
+        setForm((p) => {
+            const courseAllocations = allocations.filter((a) => toId(a.course_id) === toId(cId));
+            const sameGrade = courseAllocations.find((a) => toId(a.grade_id) === toId(p.gradeId));
+            const next = sameGrade || courseAllocations[0];
+
+            return {
+                ...p,
+                courseId: cId,
+                gradeId: next ? toId(next.grade_id) : '',
+                classroomId: next ? toId(next.class_room_id) : ''
+            };
+        });
+    };
+
+    const handleGradeChange = (gradeId) => {
+        const next = allocations.find(
+            (a) => toId(a.course_id) === toId(form.courseId) && toId(a.grade_id) === toId(gradeId)
+        );
+
+        setForm((p) => ({
+            ...p,
+            gradeId,
+            classroomId: next ? toId(next.class_room_id) : ''
+        }));
     };
 
     /* ── validation + payload ── */
     const validate = () => {
         if (!form.title.trim()) { toast.error('Title is required.'); return false; }
         if (!form.courseId) { toast.error('Course is required.'); return false; }
+        if (!effectiveModalGrade) { toast.error('Grade is required.'); return false; }
         if (!form.classroomId && !modalClassroomValue) { toast.error('Classroom is required.'); return false; }
         if (form.contentType === 'link' && !form.externalLink.trim()) { toast.error('Please provide a URL.'); return false; }
+        if (form.contentType === 'text' && !form.description.trim()) { toast.error('Description is required for text content.'); return false; }
         if (!editingMaterial && form.contentType === 'file' && !selectedFile) { toast.error('Please choose a file.'); return false; }
         return true;
     };
@@ -211,6 +274,7 @@ const TeacherContent = () => {
             is_published: editingMaterial ? Boolean(editingMaterial.is_published) : false
         };
         if (form.contentType === 'link') return { ...common, external_link: form.externalLink.trim() };
+        if (form.contentType === 'text') return common;
         if (selectedFile) {
             const fd = new FormData();
             Object.entries(common).forEach(([k, v]) => fd.append(k, String(v)));
@@ -227,6 +291,11 @@ const TeacherContent = () => {
             const targetClassrooms = modalClassroomValue === 'all'
                 ? modalClassrooms.map((c) => toId(c.id))
                 : [modalClassroomValue];
+
+            if (!targetClassrooms.length || targetClassrooms.some((id) => !id)) {
+                toast.error('Please select a classroom.');
+                return;
+            }
 
             for (const clId of targetClassrooms) {
                 const payload = buildPayload(clId);
@@ -275,7 +344,12 @@ const TeacherContent = () => {
     };
 
     const handleOpen = async (m) => {
-        if (getMaterialType(m) === 'link') { window.open(m.external_link, '_blank', 'noopener,noreferrer'); return; }
+        const type = getMaterialType(m);
+        if (type === 'text') {
+            toast('This item has description only.');
+            return;
+        }
+        if (type === 'link') { window.open(m.external_link, '_blank', 'noopener,noreferrer'); return; }
         try { await teacherService.downloadMaterial(m); }
         catch (e) { toast.error(e?.message || 'Failed to download.'); }
     };
@@ -295,7 +369,7 @@ const TeacherContent = () => {
                 <div>
                     <h1 className="teacher-title">Course Content</h1>
                     <p className="teacher-subtitle">
-                        Publish links and files for your classrooms — students only see published items.
+                        Publish links, files, or description-only content for your classrooms.
                     </p>
                 </div>
                 <button type="button" className="btn-primary" onClick={openCreate}>
@@ -328,14 +402,14 @@ const TeacherContent = () => {
 
                     {/* Type pills */}
                     <div className="tcf-pill-row">
-                        {['all', 'file', 'link'].map((v) => (
+                        {['all', 'file', 'link', 'text'].map((v) => (
                             <button
                                 key={v}
                                 type="button"
                                 className={`tcf-pill${typeFilter === v ? ' active' : ''}`}
                                 onClick={() => setTypeFilter(v)}
                             >
-                                {v === 'all' ? 'All Types' : v === 'file' ? 'Files' : 'Links'}
+                                {v === 'all' ? 'All Types' : v === 'file' ? 'Files' : v === 'link' ? 'Links' : 'Text'}
                             </button>
                         ))}
                     </div>
@@ -411,15 +485,19 @@ const TeacherContent = () => {
                         {materials.map((m) => {
                             const type = getMaterialType(m);
                             const published = resolvePublished(m);
+                            const typeClass = type === 'link'
+                                ? 'tcl-type-link'
+                                : (type === 'text' ? 'tcl-type-text' : 'tcl-type-file');
+                            const typeLabel = type === 'link'
+                                ? (extractDomain(m.external_link) || 'Link')
+                                : (type === 'text' ? 'Text' : getFileBadge(m));
                             return (
                                 <div key={m.id} className="tcl-row">
                                     {/* type icon */}
                                     <div className="tcl-col-type">
-                                        <span className={`tcl-type-chip ${type === 'link' ? 'tcl-type-link' : 'tcl-type-file'}`}>
-                                            {type === 'link' ? <LinkIcon size={13} /> : <FileText size={13} />}
-                                            {type === 'link'
-                                                ? (extractDomain(m.external_link) || 'Link')
-                                                : getFileBadge(m)}
+                                        <span className={`tcl-type-chip ${typeClass}`}>
+                                            {type === 'link' ? <LinkIcon size={13} /> : type === 'text' ? <BookMarked size={13} /> : <FileText size={13} />}
+                                            {typeLabel}
                                         </span>
                                     </div>
 
@@ -460,14 +538,16 @@ const TeacherContent = () => {
 
                                     {/* actions */}
                                     <div className="tcl-col-actions">
-                                        <button
-                                            type="button"
-                                            className="icon-btn"
-                                            title={type === 'link' ? 'Open link' : 'Download'}
-                                            onClick={() => handleOpen(m)}
-                                        >
-                                            {type === 'link' ? <ExternalLink size={14} /> : <Download size={14} />}
-                                        </button>
+                                        {type !== 'text' && (
+                                            <button
+                                                type="button"
+                                                className="icon-btn"
+                                                title={type === 'link' ? 'Open link' : 'Download'}
+                                                onClick={() => handleOpen(m)}
+                                            >
+                                                {type === 'link' ? <ExternalLink size={14} /> : <Download size={14} />}
+                                            </button>
+                                        )}
                                         <button
                                             type="button"
                                             className="icon-btn"
@@ -531,16 +611,21 @@ const TeacherContent = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                                 <label className="tc-field-label">Content Type</label>
                                 <div className="tc-type-toggle">
-                                    {['link', 'file'].map((t) => (
+                                    {['link', 'file', 'text'].map((t) => (
                                         <button
                                             key={t}
                                             type="button"
                                             className={`tc-type-btn${form.contentType === t ? ' active' : ''}`}
-                                            onClick={() => setForm((p) => ({ ...p, contentType: t }))}
+                                            onClick={() => {
+                                                setForm((p) => ({ ...p, contentType: t }));
+                                                if (t !== 'file') {
+                                                    setSelectedFile(null);
+                                                }
+                                            }}
                                             disabled={Boolean(editingMaterial)}
                                         >
-                                            {t === 'link' ? <LinkIcon size={13} /> : <FileText size={13} />}
-                                            {t === 'link' ? 'Link' : 'File'}
+                                            {t === 'link' ? <LinkIcon size={13} /> : t === 'file' ? <FileText size={13} /> : <BookMarked size={13} />}
+                                            {t === 'link' ? 'Link' : t === 'file' ? 'File' : 'Text'}
                                         </button>
                                     ))}
                                 </div>
@@ -561,6 +646,19 @@ const TeacherContent = () => {
                                 </div>
 
                                 <div className="tc-field">
+                                    <label className="tc-field-label" htmlFor="cm-grade">Grade</label>
+                                    <select
+                                        id="cm-grade"
+                                        className="tc-select"
+                                        value={effectiveModalGrade}
+                                        onChange={(e) => handleGradeChange(e.target.value)}
+                                    >
+                                        <option value="">Select grade</option>
+                                        {modalGrades.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="tc-field tc-field--full">
                                     <label className="tc-field-label" htmlFor="cm-cls">Classroom</label>
                                     <select
                                         id="cm-cls"
@@ -569,8 +667,8 @@ const TeacherContent = () => {
                                         onChange={(e) => setForm((p) => ({ ...p, classroomId: e.target.value }))}
                                     >
                                         <option value="">Select classroom</option>
-                                        {!editingMaterial && modalClassrooms.length > 1 && (
-                                            <option value="all">All classrooms in this grade</option>
+                                        {allowAllClassroomsTarget && (
+                                            <option value="all">All classrooms across this grade</option>
                                         )}
                                         {modalClassrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
@@ -594,7 +692,9 @@ const TeacherContent = () => {
                                         id="cm-desc"
                                         className="tc-select"
                                         rows={3}
-                                        placeholder="Optional description…"
+                                        placeholder={form.contentType === 'text'
+                                            ? 'Required description for text content…'
+                                            : 'Optional description…'}
                                         value={form.description}
                                         onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
                                         style={{ resize: 'vertical', fontFamily: 'inherit' }}

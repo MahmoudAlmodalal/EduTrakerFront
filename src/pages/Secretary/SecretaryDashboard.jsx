@@ -27,6 +27,13 @@ import './Secretary.css';
 
 const AttendanceTrendChart = lazy(() => import('./components/AttendanceTrendChart'));
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const INITIAL_STATS = {
+    totalStudents: 0,
+    pendingStudents: 0,
+    unreadMessages: 0,
+    absentToday: 0,
+    schoolName: '',
+};
 
 const formatDateParamUTC = (value) => {
     const date = new Date(value);
@@ -108,18 +115,96 @@ const getListCount = (payload) => {
     return 0;
 };
 
+const getFirstListItem = (payload) => {
+    if (Array.isArray(payload?.results) && payload.results.length > 0) {
+        return payload.results[0];
+    }
+
+    if (Array.isArray(payload) && payload.length > 0) {
+        return payload[0];
+    }
+
+    return null;
+};
+
+const getPersonName = (value) => {
+    if (!value || typeof value !== 'object') {
+        return '';
+    }
+
+    const directName = String(
+        value.full_name
+        || value.student_name
+        || value.name
+        || ''
+    ).trim();
+
+    if (directName) {
+        return directName;
+    }
+
+    const firstName = String(value.first_name || '').trim();
+    const lastName = String(value.last_name || '').trim();
+    const merged = `${firstName} ${lastName}`.trim();
+    if (merged) {
+        return merged;
+    }
+
+    return String(value.email || '').trim();
+};
+
+const withTimeout = (promise, timeoutMs, timeoutMessage = 'Request timed out.') => {
+    let timeoutId;
+
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+        clearTimeout(timeoutId);
+    });
+};
+
+const getDashboardSnapshotKey = (user) => {
+    const userId = user?.id ?? user?.user_id ?? user?.email ?? 'anonymous';
+    return `secretary_dashboard_snapshot:${String(userId)}`;
+};
+
+const readDashboardSnapshot = (user) => {
+    if (!user || typeof window === 'undefined') {
+        return null;
+    }
+
+    try {
+        const rawValue = window.sessionStorage.getItem(getDashboardSnapshotKey(user));
+        if (!rawValue) {
+            return null;
+        }
+        const parsedValue = JSON.parse(rawValue);
+        return parsedValue && typeof parsedValue === 'object' ? parsedValue : null;
+    } catch {
+        return null;
+    }
+};
+
+const writeDashboardSnapshot = (user, payload) => {
+    if (!user || typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.sessionStorage.setItem(getDashboardSnapshotKey(user), JSON.stringify(payload));
+    } catch {
+        // Ignore storage quota/security errors.
+    }
+};
+
 const SecretaryDashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    const [stats, setStats] = useState({
-        totalStudents: 0,
-        pendingStudents: 0,
-        unreadMessages: 0,
-        absentToday: 0,
-        schoolName: '',
-    });
+    const [stats, setStats] = useState(INITIAL_STATS);
     const [recentApplications, setRecentApplications] = useState([]);
     const [academicYears, setAcademicYears] = useState([]);
     const [selectedWeek, setSelectedWeek] = useState('current-week');
@@ -127,74 +212,125 @@ const SecretaryDashboard = () => {
     const [trendLoading, setTrendLoading] = useState(false);
     const [statsLoading, setStatsLoading] = useState(true);
     const [lastUpdated, setLastUpdated] = useState(null);
+    const [pendingStudentMeta, setPendingStudentMeta] = useState({
+        name: '',
+        source: '',
+    });
     const isMountedRef = useRef(true);
     const initialFetchDoneRef = useRef(false);
+    const hasLoadedStatsRef = useRef(false);
 
     useEffect(() => {
+        // In React StrictMode (dev), effects mount/cleanup/mount once.
+        // Reset on setup so the temporary cleanup does not leave this false forever.
+        isMountedRef.current = true;
         return () => {
             isMountedRef.current = false;
         };
     }, []);
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+
+        const snapshot = readDashboardSnapshot(user);
+        if (!snapshot) {
+            return;
+        }
+
+        const snapshotStats = snapshot?.stats;
+        if (snapshotStats && typeof snapshotStats === 'object') {
+            setStats((previous) => ({ ...previous, ...snapshotStats }));
+            setStatsLoading(false);
+            hasLoadedStatsRef.current = true;
+        }
+
+        if (Array.isArray(snapshot?.recentApplications)) {
+            setRecentApplications(snapshot.recentApplications.slice(0, 5));
+        }
+
+        if (Array.isArray(snapshot?.academicYears)) {
+            setAcademicYears(snapshot.academicYears);
+        }
+
+        if (snapshot?.lastUpdated) {
+            const parsedDate = new Date(snapshot.lastUpdated);
+            if (!Number.isNaN(parsedDate.getTime())) {
+                setLastUpdated(parsedDate);
+            }
+        }
+
+        if (snapshot?.pendingStudentMeta && typeof snapshot.pendingStudentMeta === 'object') {
+            setPendingStudentMeta({
+                name: String(snapshot.pendingStudentMeta.name || ''),
+                source: String(snapshot.pendingStudentMeta.source || ''),
+            });
+        }
+    }, [user?.id, user?.email]);
 
     const fetchDashboardData = useCallback(async ({ forceRefresh = false } = {}) => {
         if (!user) {
             return;
         }
 
-        setStatsLoading(true);
+        setStatsLoading(!hasLoadedStatsRef.current);
 
-        const pendingStudentsParams = {
-            current_status: 'pending',
-            page: 1,
-            page_size: 1,
-        };
         const schoolId = resolveSchoolId(user);
-        if (schoolId) {
-            pendingStudentsParams.school_id = schoolId;
-        }
 
-        let pendingFromPrimarySources = null;
+        let snapshotStats = null;
+        let snapshotApplications = [];
+        let snapshotAcademicYears = [];
+        let snapshotPendingStudentMeta = {
+            name: '',
+            source: '',
+        };
 
         try {
-            const [statsResult, pendingStudentsResult] = await Promise.allSettled([
+            const statsPromise = withTimeout(
                 secretaryService.getSecretaryDashboardStats({ forceRefresh })
                     .catch(() => secretaryService.getDashboardStats()),
-                secretaryService.getStudents(pendingStudentsParams),
-            ]);
+                6000,
+                'Dashboard statistics request timed out.'
+            );
+
+            let normalizedStats = {};
+            try {
+                const statsPayload = await statsPromise;
+                normalizedStats = statsPayload?.statistics || statsPayload || {};
+            } catch (error) {
+                console.error('Error fetching secretary dashboard stats:', error);
+            }
 
             if (!isMountedRef.current) {
                 return;
             }
 
-            const pendingStudentsCount = pendingStudentsResult.status === 'fulfilled'
-                ? getListCount(pendingStudentsResult.value || {})
-                : null;
-
-            if (statsResult.status !== 'fulfilled') {
-                console.error('Error fetching secretary dashboard stats:', statsResult.reason);
-            }
-            if (pendingStudentsResult.status !== 'fulfilled') {
-                console.error('Error fetching pending students count:', pendingStudentsResult.reason);
-            }
-            const normalizedStats = statsResult.status === 'fulfilled'
-                ? (statsResult.value?.statistics || statsResult.value || {})
-                : {};
-
-            pendingFromPrimarySources = (
-                pendingStudentsCount
-                ?? normalizedStats.pending_students
+            const pendingFromStats = (
+                normalizedStats.pending_students
                 ?? normalizedStats.pending_enrollments
                 ?? normalizedStats.pending_applications
             );
 
-            setStats({
+            const nextStats = {
                 totalStudents: toSafeNumber(normalizedStats.total_students),
-                pendingStudents: toSafeNumber(pendingFromPrimarySources),
+                pendingStudents: toSafeNumber(pendingFromStats),
                 unreadMessages: toSafeNumber(normalizedStats.unread_messages),
                 absentToday: toSafeNumber(normalizedStats.absent_today),
                 schoolName: normalizedStats.school_name || 'My School',
-            });
+            };
+            snapshotStats = nextStats;
+            setStats(nextStats);
+            hasLoadedStatsRef.current = true;
             setStatsLoading(false);
+            setPendingStudentMeta({
+                name: '',
+                source: 'secretary/dashboard-stats endpoint',
+            });
+            snapshotPendingStudentMeta = {
+                name: '',
+                source: 'secretary/dashboard-stats endpoint',
+            };
 
             const [applicationsResult, yearsResult] = await Promise.allSettled([
                 secretaryService.getApplications({
@@ -214,13 +350,32 @@ const SecretaryDashboard = () => {
             if (applicationsResult.status === 'fulfilled') {
                 const applicationsPayload = applicationsResult.value || {};
                 const pendingApplicationsCount = getListCount(applicationsPayload);
-                setRecentApplications((applicationsPayload?.results || applicationsPayload || []).slice(0, 5));
+                const applicationList = Array.isArray(applicationsPayload?.results)
+                    ? applicationsPayload.results
+                    : (Array.isArray(applicationsPayload) ? applicationsPayload : []);
+                snapshotApplications = applicationList.slice(0, 5);
+                setRecentApplications(snapshotApplications);
+                const firstPendingApplication = getFirstListItem(applicationsPayload);
+                const pendingApplicationName = getPersonName(firstPendingApplication);
 
-                if (pendingFromPrimarySources === null) {
-                    setStats((previous) => ({
-                        ...previous,
+                setStats((previous) => ({
+                    ...previous,
+                    pendingStudents: toSafeNumber(pendingApplicationsCount),
+                }));
+                setPendingStudentMeta({
+                    name: pendingApplicationName,
+                    source: 'secretary/admissions endpoint',
+                });
+
+                snapshotPendingStudentMeta = {
+                    name: pendingApplicationName,
+                    source: 'secretary/admissions endpoint',
+                };
+                if (snapshotStats) {
+                    snapshotStats = {
+                        ...snapshotStats,
                         pendingStudents: toSafeNumber(pendingApplicationsCount),
-                    }));
+                    };
                 }
             } else {
                 console.error('Error fetching recent applications:', applicationsResult.reason);
@@ -228,7 +383,8 @@ const SecretaryDashboard = () => {
             }
 
             if (yearsResult.status === 'fulfilled') {
-                setAcademicYears(yearsResult.value?.results || yearsResult.value || []);
+                snapshotAcademicYears = yearsResult.value?.results || yearsResult.value || [];
+                setAcademicYears(snapshotAcademicYears);
             } else {
                 console.error('Error fetching academic years:', yearsResult.reason);
                 setAcademicYears([]);
@@ -238,17 +394,32 @@ const SecretaryDashboard = () => {
         } finally {
             if (isMountedRef.current) {
                 setStatsLoading(false);
-                setLastUpdated(new Date());
+                const updatedAt = new Date();
+                setLastUpdated(updatedAt);
+                if (snapshotStats) {
+                    writeDashboardSnapshot(user, {
+                        stats: snapshotStats,
+                        recentApplications: snapshotApplications,
+                        academicYears: snapshotAcademicYears,
+                        pendingStudentMeta: snapshotPendingStudentMeta,
+                        lastUpdated: updatedAt.toISOString(),
+                    });
+                }
             }
         }
     }, [user]);
 
     useEffect(() => {
         initialFetchDoneRef.current = false;
+        hasLoadedStatsRef.current = false;
+        setPendingStudentMeta({
+            name: '',
+            source: '',
+        });
     }, [user?.id, user?.email, user?.role]);
 
     useEffect(() => {
-        const forceRefresh = !initialFetchDoneRef.current;
+        const forceRefresh = false;
         initialFetchDoneRef.current = true;
         fetchDashboardData({ forceRefresh });
     }, [fetchDashboardData]);
@@ -344,6 +515,13 @@ const SecretaryDashboard = () => {
         const attendanceRate = stats.totalStudents > 0
             ? Math.round(((stats.totalStudents - stats.absentToday) / stats.totalStudents) * 100)
             : 0;
+        const pendingCardDescription = stats.pendingStudents > 0
+            ? (
+                pendingStudentMeta.name
+                    ? `Student: ${pendingStudentMeta.name} | Fetched from: ${pendingStudentMeta.source || 'unknown source'}`
+                    : `Fetched from: ${pendingStudentMeta.source || 'unknown source'}`
+            )
+            : 'No pending students';
 
         return [
             {
@@ -359,6 +537,7 @@ const SecretaryDashboard = () => {
                 value: stats.pendingStudents.toLocaleString(),
                 icon: Hourglass,
                 color: 'purple',
+                description: pendingCardDescription,
             },
             {
                 title: t('secretary.dashboard.unreadMessages') || 'Unread Messages',
@@ -381,7 +560,7 @@ const SecretaryDashboard = () => {
                 color: 'rose',
             },
         ];
-    }, [stats.totalStudents, stats.pendingStudents, stats.unreadMessages, stats.absentToday, t]);
+    }, [stats.totalStudents, stats.pendingStudents, stats.unreadMessages, stats.absentToday, pendingStudentMeta.name, pendingStudentMeta.source, t]);
 
     const quickAccessButtons = useMemo(() => {
         return [
@@ -450,6 +629,7 @@ const SecretaryDashboard = () => {
                             value={stat.value}
                             icon={stat.icon}
                             color={stat.color}
+                            description={stat.description}
                             trend={stat.trend}
                             trendUp={stat.trendUp}
                         />

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     BookOpen,
+    Briefcase,
     Building2,
     Check,
     ChevronDown,
@@ -117,6 +118,36 @@ const SecretaryInfo = () => {
 
     const tabPeople = activeTab === 'teachers' ? teachers : managers;
 
+    const guardiansCount = useMemo(() => {
+        const fromDashboard = Number(
+            dashboardData?.total_guardians ?? dashboardData?.active_guardians
+        );
+        if (Number.isFinite(fromDashboard) && fromDashboard >= 0) {
+            return fromDashboard;
+        }
+
+        const uniqueGuardians = new Set();
+        students.forEach((student) => {
+            const guardians = Array.isArray(student?.guardians) ? student.guardians : [];
+            guardians.forEach((guardian) => {
+                const emailKey = String(guardian?.email || '').trim().toLowerCase();
+                if (emailKey) {
+                    uniqueGuardians.add(`email:${emailKey}`);
+                    return;
+                }
+
+                const nameKey = String(guardian?.full_name || '').trim().toLowerCase();
+                const phoneKey = String(guardian?.phone_number || '').trim().toLowerCase();
+                const fallbackKey = `${nameKey}|${phoneKey}`;
+                if (fallbackKey !== '|') {
+                    uniqueGuardians.add(`fallback:${fallbackKey}`);
+                }
+            });
+        });
+
+        return uniqueGuardians.size;
+    }, [dashboardData?.active_guardians, dashboardData?.total_guardians, students]);
+
     const handleCopyStudentEmail = async (email, studentKey) => {
         if (!email) {
             return;
@@ -139,6 +170,14 @@ const SecretaryInfo = () => {
         }, 1400);
     };
 
+    const statItems = [
+        { label: 'Students', value: students.length, icon: <GraduationCap size={18} />, color: 'indigo' },
+        { label: 'Teachers', value: teachers.length, icon: <BookOpen size={18} />, color: 'teal' },
+        { label: 'Guardians', value: guardiansCount, icon: <HeartHandshake size={18} />, color: 'rose' },
+        { label: 'Classrooms', value: classrooms.length, icon: <Building2 size={18} />, color: 'purple' },
+        { label: 'Managers', value: managers.length, icon: <UserCog size={18} />, color: 'amber' },
+    ];
+
     return (
         <div className="teacher-page" style={{ gap: '1.2rem' }}>
             <div>
@@ -147,6 +186,37 @@ const SecretaryInfo = () => {
                     School context, classrooms, and people overview.
                 </p>
             </div>
+
+            {!loading && !ctxLoading && !error && (
+                <div className="sec-info-stats-grid">
+                    {statItems.map((item) => (
+                        <div
+                            key={item.label}
+                            className="sec-info-stat-card"
+                        >
+                            <div className="sec-info-stat-header">
+                                <span className="sec-info-stat-title">{item.label}</span>
+                                <div
+                                    className="sec-info-stat-icon"
+                                    style={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 8,
+                                        background: `var(--color-${item.color}-100, #e0e7ff)`,
+                                        color: `var(--color-${item.color}-600, #4f46e5)`,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    {item.icon}
+                                </div>
+                            </div>
+                            <div className="sec-info-stat-value">{item.value}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <div className="management-card teacher-profile-card">
                 <div className="teacher-profile-card-header">
@@ -213,6 +283,12 @@ const SecretaryInfo = () => {
                                     person={school.manager}
                                     iconNode={<UserCog size={16} />}
                                     variantClass="teacher-leadership-icon-manager"
+                                />
+                                <LeadershipCard
+                                    roleLabel="Workstream Manager"
+                                    person={school.workstream_manager}
+                                    iconNode={<Briefcase size={16} />}
+                                    variantClass="teacher-leadership-icon-workstream"
                                 />
                             </div>
                         </section>

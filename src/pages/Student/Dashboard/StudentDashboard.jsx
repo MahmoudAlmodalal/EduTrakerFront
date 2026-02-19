@@ -134,13 +134,16 @@ const StudentDashboard = () => {
         if (!user?.id) return;
         let cancelled = false;
         setAssignmentLoading(true);
-        studentService.getAssignments({ page_size: assignmentPageSize })
+        studentService.getAssignments({ page_size: 200 })
             .then((res) => {
                 if (cancelled) return;
                 const list = Array.isArray(res?.results) ? res.results
                     : Array.isArray(res) ? res : [];
-                setAssignmentData(list);
-                setAssignmentTotal(res?.count ?? list.length);
+                const pendingAssignments = list.filter(
+                    (assignment) => (assignment?.status || 'not_submitted') === 'not_submitted'
+                );
+                setAssignmentData(pendingAssignments.slice(0, assignmentPageSize));
+                setAssignmentTotal(pendingAssignments.length);
                 setAssignmentLoading(false);
             })
             .catch(() => { if (!cancelled) setAssignmentLoading(false); });
@@ -392,7 +395,7 @@ const StudentDashboard = () => {
                         </h2>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                             {assignmentTotal !== null && (
-                                <span className="card-badge">{assignmentTotal} Total</span>
+                                <span className="card-badge">{assignmentTotal} Pending</span>
                             )}
                             <select
                                 value={assignmentPageSize}
@@ -457,7 +460,7 @@ const StudentDashboard = () => {
                                 </div>
                             );
                         }) : (
-                            <div className="empty-state">No assignments found.</div>
+                            <div className="empty-state">No pending assignments.</div>
                         )}
                     </div>
                 </div>

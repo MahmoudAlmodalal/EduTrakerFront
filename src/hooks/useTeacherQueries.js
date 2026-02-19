@@ -9,7 +9,7 @@ export const teacherQueryKeys = {
     allocations: (date) => ['teacher', 'allocations', date],
     notifications: (params = {}) => ['teacher', 'notifications', params],
     students: (filters = {}) => ['teacher', 'students', filters],
-    attendance: (allocationId, date) => ['teacher', 'attendance', allocationId, date],
+    attendance: (classRoomId, date) => ['teacher', 'attendance', classRoomId, date],
     homeroomAttendance: (date) => ['teacher', 'homeroom-attendance', date],
     assignments: (filters = {}) => ['teacher', 'assignments', filters],
     assignmentDetail: (assignmentId) => ['teacher', 'assignment', assignmentId],
@@ -166,17 +166,17 @@ export const useTeacherStudents = (filters = {}, options = {}) =>
         ...options
     });
 
-export const useTeacherAttendance = (allocationId, date, options = {}) => {
-    const normalizedAllocationId = allocationId ? Number(allocationId) : allocationId;
+export const useTeacherAttendance = (classRoomId, date, options = {}) => {
+    const normalizedId = classRoomId ? Number(classRoomId) : classRoomId;
 
     return useQuery({
-        queryKey: teacherQueryKeys.attendance(normalizedAllocationId, date),
+        queryKey: teacherQueryKeys.attendance(normalizedId, date),
         queryFn: () => teacherService.getAttendance({
-            course_allocation_id: normalizedAllocationId,
+            class_room_id: normalizedId,
             date_from: date,
             date_to: date
         }),
-        enabled: Boolean(normalizedAllocationId && date) && (options.enabled ?? true),
+        enabled: Boolean(normalizedId && date) && (options.enabled ?? true),
         ...options
     });
 };
@@ -197,9 +197,9 @@ export const useRecordBulkAttendanceMutation = () => {
         mutationFn: (records) => teacherService.recordBulkAttendance(records),
         onSuccess: (_result, records = []) => {
             const firstRecord = records[0];
-            if (firstRecord?.course_allocation_id && firstRecord?.date) {
+            if (firstRecord?.class_room_id && firstRecord?.date) {
                 queryClient.invalidateQueries({
-                    queryKey: teacherQueryKeys.attendance(firstRecord.course_allocation_id, firstRecord.date)
+                    queryKey: teacherQueryKeys.attendance(firstRecord.class_room_id, firstRecord.date)
                 });
                 queryClient.invalidateQueries({
                     queryKey: teacherQueryKeys.homeroomAttendance(firstRecord.date)
@@ -341,6 +341,7 @@ export const useRecordTeacherMarkMutation = () => {
         mutationFn: (payload) => teacherService.recordMark(payload),
         onSuccess: (_response, payload) => {
             queryClient.invalidateQueries({ queryKey: teacherQueryKeys.marks(payload.assignment_id) });
+            queryClient.invalidateQueries({ queryKey: teacherQueryKeys.assignmentSubmissions(payload.assignment_id) });
             queryClient.invalidateQueries({ queryKey: teacherQueryKeys.dashboardStats });
         }
     });

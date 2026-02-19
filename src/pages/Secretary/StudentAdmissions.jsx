@@ -289,6 +289,27 @@ const getEnrollmentClassroomId = (enrollment) => {
     return Number(enrollment?.class_room_id ?? enrollment?.class_room?.id ?? enrollment?.class_room);
 };
 
+const getEnrollmentClassroomName = (enrollment) => {
+    const candidate = (
+        enrollment?.classroom_name
+        ?? enrollment?.class_room_name
+        ?? enrollment?.class_room?.classroom_name
+        ?? ''
+    );
+    return String(candidate).trim();
+};
+
+const getEnrollmentGradeId = (enrollment) => {
+    const candidate = (
+        enrollment?.class_room?.grade?.id
+        ?? enrollment?.class_room?.grade_id
+        ?? enrollment?.grade?.id
+        ?? enrollment?.grade_id
+    );
+    const gradeId = Number(candidate);
+    return Number.isInteger(gradeId) && gradeId > 0 ? gradeId : null;
+};
+
 const getEnrollmentStudentId = (enrollment) => {
     const candidate = enrollment?.student_id ?? enrollment?.student?.id ?? enrollment?.student;
     if (candidate === null || candidate === undefined || candidate === '') {
@@ -328,6 +349,25 @@ const getClassroomId = (classroom) => {
     }
 
     return String(candidate);
+};
+
+const getClassroomName = (classroom) => {
+    const candidate = (
+        classroom?.classroom_name
+        ?? classroom?.class_room_name
+        ?? classroom?.name
+        ?? ''
+    );
+    const normalized = String(candidate).trim();
+    if (normalized) {
+        return normalized;
+    }
+
+    const classroomId = Number(classroom?.id ?? classroom?.classroom_id ?? classroom?.class_room_id);
+    if (Number.isInteger(classroomId) && classroomId > 0) {
+        return `Classroom #${classroomId}`;
+    }
+    return 'Selected classroom';
 };
 
 const resolveStudentStatus = (student) => {
@@ -456,6 +496,7 @@ const StudentAdmissions = () => {
     const [selectedAssignmentStudent, setSelectedAssignmentStudent] = useState(null);
     const [availableClassrooms, setAvailableClassrooms] = useState([]);
     const [currentClassroomId, setCurrentClassroomId] = useState(null);
+    const [currentClassroomName, setCurrentClassroomName] = useState('');
     const [applicationYearFilter, setApplicationYearFilter] = useState('');
     const [assignmentAcademicYear, setAssignmentAcademicYear] = useState('');
     const [selectedGradeFilter, setSelectedGradeFilter] = useState('');
@@ -494,6 +535,8 @@ const StudentAdmissions = () => {
     const [isCreatingStudent, setIsCreatingStudent] = useState(false);
     const [isAssigningStudent, setIsAssigningStudent] = useState(false);
     const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+    const [showReassignConfirm, setShowReassignConfirm] = useState(false);
+    const [pendingReassignment, setPendingReassignment] = useState(null);
 
     const applicationsRequestRef = useRef(0);
     const studentsRequestRef = useRef(0);
@@ -1273,6 +1316,9 @@ const StudentAdmissions = () => {
         if (activeTab !== 'class-assignment' || !assignmentAcademicYear || !schoolId) {
             setAvailableClassrooms([]);
             setCurrentClassroomId(null);
+            setCurrentClassroomName('');
+            setShowReassignConfirm(false);
+            setPendingReassignment(null);
         }
     }, [activeTab, assignmentAcademicYear, schoolId]);
 
@@ -1322,6 +1368,9 @@ const StudentAdmissions = () => {
         setSelectedAssignmentStudent(null);
         setAvailableClassrooms([]);
         setCurrentClassroomId(null);
+        setCurrentClassroomName('');
+        setShowReassignConfirm(false);
+        setPendingReassignment(null);
     }, [
         assignmentAcademicYear,
         assignmentActivityFilter,
@@ -1335,6 +1384,9 @@ const StudentAdmissions = () => {
             setSelectedAssignmentStudent(null);
             setAvailableClassrooms([]);
             setCurrentClassroomId(null);
+            setCurrentClassroomName('');
+            setShowReassignConfirm(false);
+            setPendingReassignment(null);
         }
     }, [assignmentAcademicYear, selectedStudent]);
 
@@ -1575,6 +1627,7 @@ const StudentAdmissions = () => {
             setSelectedStudent('');
             setSelectedAssignmentStudent(null);
             setCurrentClassroomId(null);
+            setCurrentClassroomName('');
             setAvailableClassrooms([]);
             return;
         }
@@ -1582,23 +1635,18 @@ const StudentAdmissions = () => {
         setSelectedStudent(String(studentId));
         setSelectedAssignmentStudent(student);
         setCurrentClassroomId(null);
+        setCurrentClassroomName('');
         setAvailableClassrooms([]);
 
         if (!assignmentAcademicYear || !schoolId) {
             return;
         }
 
-        const gradeId = getStudentGradeId(student);
-        if (!gradeId) {
-            return;
-        }
-
         try {
-            const [enrollmentData, roomsData] = await Promise.all([
-                secretaryService.getStudentEnrollments(studentId, { academic_year_id: assignmentAcademicYear }),
-                secretaryService.getClassrooms(schoolId, assignmentAcademicYear, { grade_id: gradeId }),
-            ]);
-
+            const enrollmentData = await secretaryService.getStudentEnrollments(
+                studentId,
+                { academic_year_id: assignmentAcademicYear }
+            );
             const enrollments = normalizeListResponse(enrollmentData);
             const currentEnrollment = enrollments.find((enrollment) => {
                 const enrollmentYearId = getEnrollmentAcademicYearId(enrollment);
@@ -1608,18 +1656,117 @@ const StudentAdmissions = () => {
                     && (enrollmentStatus === 'active' || enrollmentStatus === 'enrolled');
             });
 
-            setCurrentClassroomId(currentEnrollment ? getEnrollmentClassroomId(currentEnrollment) : null);
-            setAvailableClassrooms(normalizeListResponse(roomsData));
+            const currentEnrollmentClassroomId = currentEnrollment
+                ? getEnrollmentClassroomId(currentEnrollment)
+                : null;
+            const currentEnrollmentClassroomName = currentEnrollment
+                ? getEnrollmentClassroomName(currentEnrollment)
+                : '';
+
+            const gradeId = getStudentGradeId(student) ?? getEnrollmentGradeId(currentEnrollment);
+            if (!gradeId) {
+                setCurrentClassroomId(currentEnrollmentClassroomId);
+                setCurrentClassroomName(currentEnrollmentClassroomName);
+                setAvailableClassrooms([]);
+                return;
+            }
+
+            const roomsData = await secretaryService.getClassrooms(
+                schoolId,
+                assignmentAcademicYear,
+                { grade_id: gradeId }
+            );
+            const normalizedRooms = normalizeListResponse(roomsData);
+            const matchedCurrentClassroom = normalizedRooms.find((room) => {
+                const roomId = Number(room?.id ?? room?.classroom_id ?? room?.class_room_id);
+                return Number.isInteger(roomId)
+                    && roomId > 0
+                    && roomId === currentEnrollmentClassroomId;
+            });
+
+            const fallbackClassroomName = matchedCurrentClassroom ? getClassroomName(matchedCurrentClassroom) : '';
+            setCurrentClassroomId(currentEnrollmentClassroomId);
+            setCurrentClassroomName(currentEnrollmentClassroomName || fallbackClassroomName);
+            setAvailableClassrooms(normalizedRooms);
         } catch (error) {
             console.error('Error loading classrooms for selected student:', error);
             setFeedback('error', getApiErrorMessage(error, 'Failed to load grade classrooms.'));
         }
     }, [assignmentAcademicYear, schoolId, setFeedback]);
 
-    const handleAssignToClassroom = useCallback(async (classroomId) => {
+    const executeClassroomAssignment = useCallback(async ({
+        studentId,
+        academicYearId,
+        targetClassroomId,
+        targetClassroomName,
+        isReassignment,
+    }) => {
+        try {
+            setIsAssigningStudent(true);
+            const assignmentPayload = isReassignment
+                ? await secretaryService.reassignStudentClassroom(studentId, {
+                    class_room_id: targetClassroomId,
+                    academic_year_id: academicYearId,
+                })
+                : await secretaryService.assignToClass({
+                    student_id: studentId,
+                    class_room_id: targetClassroomId,
+                    academic_year_id: academicYearId,
+                    status: 'enrolled',
+                });
+
+            const payloadClassroomName = String(
+                assignmentPayload?.class_room_name
+                || assignmentPayload?.classroom_name
+                || ''
+            ).trim();
+            const resolvedClassroomName = payloadClassroomName || targetClassroomName || `Classroom #${targetClassroomId}`;
+
+            setCurrentClassroomId(targetClassroomId);
+            setCurrentClassroomName(resolvedClassroomName);
+            setSelectedAssignmentStudent((previous) => {
+                if (!previous) {
+                    return previous;
+                }
+
+                return {
+                    ...previous,
+                    classroom_name: resolvedClassroomName,
+                };
+            });
+
+            const defaultMessage = isReassignment
+                ? `Student re-assigned to ${resolvedClassroomName}.`
+                : `Student assigned to ${resolvedClassroomName}.`;
+            setFeedback('success', assignmentPayload?.detail || defaultMessage);
+            fetchSchoolStudentStats();
+            fetchAssignmentStudents(
+                assignmentActivityFilter,
+                assignmentPage,
+                selectedGradeFilter,
+                debouncedAssignmentSearch
+            );
+        } catch (error) {
+            console.error('Error assigning student:', error);
+            setFeedback('error', getApiErrorMessage(error, 'Failed to assign student to class.'));
+        } finally {
+            setIsAssigningStudent(false);
+        }
+    }, [
+        assignmentActivityFilter,
+        assignmentPage,
+        debouncedAssignmentSearch,
+        fetchSchoolStudentStats,
+        fetchAssignmentStudents,
+        selectedGradeFilter,
+        setFeedback,
+    ]);
+
+    const handleAssignToClassroom = useCallback((classroomId, classroomName = '') => {
         const studentId = Number(selectedStudent);
         const academicYearId = Number(assignmentAcademicYear);
         const targetClassroomId = Number(classroomId);
+        const targetClassroomName = String(classroomName || '').trim() || `Classroom #${targetClassroomId}`;
 
         if (!Number.isInteger(studentId) || studentId <= 0 || !Number.isInteger(academicYearId) || academicYearId <= 0) {
             setFeedback('error', 'Please select a student and academic year.');
@@ -1636,55 +1783,52 @@ const StudentAdmissions = () => {
 
         const isReassignment = Number.isInteger(currentClassroomId) && currentClassroomId > 0;
         if (isReassignment) {
-            const shouldProceed = window.confirm('This student already has an active classroom. Re-assign now?');
-            if (!shouldProceed) {
-                return;
-            }
+            setPendingReassignment({
+                studentId,
+                academicYearId,
+                targetClassroomId,
+                targetClassroomName,
+                currentClassroomName: currentClassroomName || `Classroom #${currentClassroomId}`,
+            });
+            setShowReassignConfirm(true);
+            return;
         }
 
-        try {
-            setIsAssigningStudent(true);
-            if (isReassignment) {
-                await secretaryService.reassignStudentClassroom(studentId, {
-                    class_room_id: targetClassroomId,
-                    academic_year_id: academicYearId,
-                });
-            } else {
-                await secretaryService.assignToClass({
-                    student_id: studentId,
-                    class_room_id: targetClassroomId,
-                    academic_year_id: academicYearId,
-                    status: 'enrolled',
-                });
-            }
-
-            setCurrentClassroomId(targetClassroomId);
-            setFeedback('success', isReassignment ? 'Student re-assigned successfully.' : 'Student assigned successfully.');
-            fetchSchoolStudentStats();
-            fetchAssignmentStudents(
-                assignmentActivityFilter,
-                assignmentPage,
-                selectedGradeFilter,
-                debouncedAssignmentSearch
-            );
-        } catch (error) {
-            console.error('Error assigning student:', error);
-            setFeedback('error', getApiErrorMessage(error, 'Failed to assign student to class.'));
-        } finally {
-            setIsAssigningStudent(false);
-        }
+        void executeClassroomAssignment({
+            studentId,
+            academicYearId,
+            targetClassroomId,
+            targetClassroomName,
+            isReassignment: false,
+        });
     }, [
         assignmentAcademicYear,
-        assignmentActivityFilter,
-        assignmentPage,
         currentClassroomId,
-        debouncedAssignmentSearch,
-        fetchSchoolStudentStats,
-        fetchAssignmentStudents,
-        selectedGradeFilter,
+        currentClassroomName,
+        executeClassroomAssignment,
         selectedStudent,
         setFeedback,
     ]);
+
+    const cancelReassignment = useCallback(() => {
+        setShowReassignConfirm(false);
+        setPendingReassignment(null);
+    }, []);
+
+    const confirmReassignment = useCallback(async () => {
+        if (!pendingReassignment) {
+            setShowReassignConfirm(false);
+            return;
+        }
+
+        const reassignment = pendingReassignment;
+        setShowReassignConfirm(false);
+        setPendingReassignment(null);
+        await executeClassroomAssignment({
+            ...reassignment,
+            isReassignment: true,
+        });
+    }, [executeClassroomAssignment, pendingReassignment]);
 
     const updateNewStudentField = useCallback((field, value) => {
         setNewStudent((previous) => ({ ...previous, [field]: value }));
@@ -1784,7 +1928,7 @@ const StudentAdmissions = () => {
                                 {isApplicationsLoading && applications.length === 0 ? (
                                     <SkeletonTable rows={5} cols={6} />
                                 ) : (
-                                    <div className="sec-table-scroll">
+                                    <div className={`sec-table-scroll${isApplicationsLoading ? ' sec-table-scroll--loading' : ''}`}>
                                         <table className="data-table sec-data-table sec-data-table--applications">
                                             <thead>
                                                 <tr>
@@ -2272,7 +2416,7 @@ const StudentAdmissions = () => {
                             </div>
                         </div>
 
-                        <div className="sec-assignment-content">
+                        <div className={`sec-assignment-content${isStudentsLoading && students.length > 0 ? ' sec-content--loading' : ''}`}>
                             {!assignmentAcademicYear ? (
                                 <EmptyState
                                     icon={AlertCircle}
@@ -2300,6 +2444,9 @@ const StudentAdmissions = () => {
                                                             setSelectedAssignmentStudent(null);
                                                             setAvailableClassrooms([]);
                                                             setCurrentClassroomId(null);
+                                                            setCurrentClassroomName('');
+                                                            setShowReassignConfirm(false);
+                                                            setPendingReassignment(null);
                                                             return;
                                                         }
                                                         handleSelectStudentForAssignment(student);
@@ -2339,8 +2486,17 @@ const StudentAdmissions = () => {
                                                 </span>
                                             </div>
                                             <p className="sec-subtle-text">
-                                                {getStudentName(selectedAssignmentStudent)} | Current classroom: {selectedAssignmentStudent?.classroom_name || 'Unassigned'}
+                                                {getStudentName(selectedAssignmentStudent)}
+                                                {' | '}
+                                                Current classroom:
+                                                {' '}
+                                                {currentClassroomName || (currentClassroomId ? `Classroom #${currentClassroomId}` : 'Unassigned')}
                                             </p>
+                                            {currentClassroomId ? (
+                                                <p className="sec-reassign-hint">
+                                                    Selecting another classroom will reassign this student.
+                                                </p>
+                                            ) : null}
                                             {availableClassrooms.length === 0 ? (
                                                 <EmptyState
                                                     icon={GraduationCap}
@@ -2355,7 +2511,7 @@ const StudentAdmissions = () => {
                                                         }
 
                                                         const isCurrent = currentClassroomId === roomId;
-                                                        const roomName = room.classroom_name || `Classroom #${roomId}`;
+                                                        const roomName = getClassroomName(room);
                                                         const studentCount = room.student_count ?? 0;
                                                         const capacity = room.capacity ?? '∞';
 
@@ -2364,7 +2520,7 @@ const StudentAdmissions = () => {
                                                                 key={roomId}
                                                                 type="button"
                                                                 className={`classroom-assign-card ${isCurrent ? 'classroom-assign-card--current' : ''}`}
-                                                                onClick={() => handleAssignToClassroom(roomId)}
+                                                                onClick={() => handleAssignToClassroom(roomId, roomName)}
                                                                 disabled={isAssigningStudent}
                                                             >
                                                                 <div className="classroom-assign-name">{roomName}</div>
@@ -2453,7 +2609,7 @@ const StudentAdmissions = () => {
                         {isFilesLoading && files.length === 0 ? (
                             <SkeletonTable rows={6} cols={7} />
                         ) : (
-                            <div className="sec-table-scroll">
+                            <div className={`sec-table-scroll${isFilesLoading ? ' sec-table-scroll--loading' : ''}`}>
                                 <table className="data-table sec-data-table sec-data-table--files-wide">
                                     <thead>
                                         <tr>
@@ -2695,6 +2851,21 @@ const StudentAdmissions = () => {
                         </div>
                     </div>
                 ) : null}
+
+                <ConfirmModal
+                    isOpen={showReassignConfirm}
+                    title="Confirm Re-assignment"
+                    message={(
+                        `Re-assign ${getStudentName(selectedAssignmentStudent)} `
+                        + `from ${pendingReassignment?.currentClassroomName || 'the current classroom'} `
+                        + `to ${pendingReassignment?.targetClassroomName || 'the selected classroom'}?`
+                    )}
+                    confirmLabel={isAssigningStudent ? 'Re-assigning...' : 'Re-assign'}
+                    cancelLabel="Cancel"
+                    confirmDisabled={isAssigningStudent}
+                    onCancel={cancelReassignment}
+                    onConfirm={confirmReassignment}
+                />
 
                 <ConfirmModal
                     isOpen={showDeleteDocConfirm}

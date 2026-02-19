@@ -67,6 +67,26 @@ const clearCacheByPrefix = (prefix) => {
     }
 };
 
+const clearSessionStorageByPrefix = (prefix) => {
+    if (typeof window === 'undefined' || !window.sessionStorage) {
+        return;
+    }
+
+    try {
+        const keysToRemove = [];
+        for (let index = 0; index < window.sessionStorage.length; index += 1) {
+            const key = window.sessionStorage.key(index);
+            if (key && key.startsWith(prefix)) {
+                keysToRemove.push(key);
+            }
+        }
+
+        keysToRemove.forEach((key) => window.sessionStorage.removeItem(key));
+    } catch {
+        // Ignore storage security/quota errors.
+    }
+};
+
 const shouldRetryListRequest = (error) => {
     if (!error) {
         return false;
@@ -118,14 +138,24 @@ const secretaryService = {
             }
         }
 
-        let data;
-        try {
-            data = await api.get('/secretary/dashboard-stats/');
-        } catch {
-            data = await api.get('/statistics/dashboard/');
-        }
-        setCachedValue(cacheKey, data, DASHBOARD_STATS_CACHE_TTL);
-        return data;
+        const inFlight = inFlightRequests.get(cacheKey);
+        if (inFlight) return inFlight;
+
+        const request = (async () => {
+            try {
+                return await api.get('/secretary/dashboard-stats/');
+            } catch {
+                return await api.get('/statistics/dashboard/');
+            }
+        })().then((data) => {
+            setCachedValue(cacheKey, data, DASHBOARD_STATS_CACHE_TTL);
+            return data;
+        }).finally(() => {
+            inFlightRequests.delete(cacheKey);
+        });
+
+        inFlightRequests.set(cacheKey, request);
+        return request;
     },
 
     getPendingTasks: async () => {
@@ -178,6 +208,7 @@ const secretaryService = {
         const result = await api.patch(`/secretary/admissions/${applicationId}/status/`, { status: statusValue });
         clearCacheByPrefix('secretary_dashboard_stats');
         clearCacheByPrefix('student_applications');
+        clearSessionStorageByPrefix('secretary_dashboard_snapshot:');
         return result;
     },
     getApplications: async (params = {}) => {
@@ -197,6 +228,7 @@ const secretaryService = {
         });
         clearCacheByPrefix('secretary_dashboard_stats');
         clearCacheByPrefix('student_applications');
+        clearSessionStorageByPrefix('secretary_dashboard_snapshot:');
         return payload;
     },
     getStudents: async (params = {}, config = {}) => {
@@ -270,12 +302,14 @@ const secretaryService = {
         clearCacheByPrefix('secretary_dashboard_stats');
         clearCacheByPrefix('student_applications');
         clearCacheByPrefix('attendance');
+        clearSessionStorageByPrefix('secretary_dashboard_snapshot:');
         return payload;
     },
     reassignStudentClassroom: async (studentId, data) => {
         const payload = await api.post(`/secretary/students/${studentId}/reassign-classroom/`, data);
         clearCacheByPrefix('secretary_dashboard_stats');
         clearCacheByPrefix('attendance');
+        clearSessionStorageByPrefix('secretary_dashboard_snapshot:');
         return payload;
     },
     getStudentEnrollments: async (studentId, params = {}) => {
@@ -608,23 +642,42 @@ const secretaryService = {
         setCachedValue(cacheKey, data, ATTENDANCE_CACHE_TTL);
         return data;
     },
-    getAllAttendance: async (params = {}) => {
-        const queryParams = new URLSearchParams({
-            ...params,
-            page: String(params.page || 1),
-            page_size: String(params.page_size || 200),
-        }).toString();
-        const payload = await api.get(`/teacher/attendance/${queryParams ? `?${queryParams}` : ''}`);
+    getAllAttendance: async (params = {}, config = {}) => {
+        const normalizedParams = { ...(params || {}) };
+        let page = Number.parseInt(String(normalizedParams.page || 1), 10);
+        if (!Number.isInteger(page) || page <= 0) {
+            page = 1;
+        }
+        delete normalizedParams.page;
 
-        if (Array.isArray(payload?.results)) {
-            return payload.results;
+        const requestedPageSize = Number.parseInt(String(normalizedParams.page_size || 100), 10);
+        const pageSize = Number.isInteger(requestedPageSize) && requestedPageSize > 0
+            ? Math.min(requestedPageSize, 100)
+            : 100;
+        normalizedParams.page_size = String(pageSize);
+
+        const allAttendance = [];
+
+        while (page !== null) {
+            const queryParams = new URLSearchParams({
+                ...normalizedParams,
+                page: String(page),
+            }).toString();
+            const payload = await api.get(`/teacher/attendance/${queryParams ? `?${queryParams}` : ''}`, config);
+
+            if (Array.isArray(payload?.results)) {
+                allAttendance.push(...payload.results);
+                page = resolveNextPage(payload.next);
+                continue;
+            }
+
+            if (Array.isArray(payload)) {
+                allAttendance.push(...payload);
+            }
+            break;
         }
 
-        if (Array.isArray(payload)) {
-            return payload;
-        }
-
-        return [];
+        return allAttendance;
     },
 
     // Communication

@@ -1,5 +1,19 @@
 import { api } from '../utils/api';
 
+const _cache = new Map();
+const _COURSES_TTL = 3 * 60 * 1000; // 3 minutes
+
+const _getCached = (key) => {
+    const entry = _cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) { _cache.delete(key); return null; }
+    return entry.value;
+};
+const _setCached = (key, value, ttl) => _cache.set(key, { value, expiresAt: Date.now() + ttl });
+const _clearByPrefix = (prefix) => {
+    for (const k of _cache.keys()) { if (k.startsWith(prefix)) _cache.delete(k); }
+};
+
 /**
  * Service for School Manager specialized administrative actions.
  * All endpoints match the Django REST backend URL structure.
@@ -144,27 +158,39 @@ const managerService = {
     // Backend: /api/school/<schoolId>/courses/
     // ============================================
     getCourses: async (schoolId, params = {}) => {
-        const res = await api.get(`/school/${schoolId}/courses/`, { params: { page_size: 1000, ...params } });
-        return res.data !== undefined ? res.data : res;
+        const { forceRefresh, ...queryParams } = params;
+        const cacheKey = `manager_courses:${schoolId}:${JSON.stringify(queryParams)}`;
+        if (!forceRefresh) {
+            const cached = _getCached(cacheKey);
+            if (cached) return cached;
+        }
+        const res = await api.get(`/school/${schoolId}/courses/`, { params: { page_size: 1000, ...queryParams } });
+        const data = res.data !== undefined ? res.data : res;
+        _setCached(cacheKey, data, _COURSES_TTL);
+        return data;
     },
 
     createCourse: async (schoolId, data) => {
         const res = await api.post(`/school/${schoolId}/courses/create/`, data);
+        _clearByPrefix(`manager_courses:${schoolId}`);
         return res.data !== undefined ? res.data : res;
     },
 
     updateCourse: async (schoolId, courseId, data) => {
         const res = await api.patch(`/school/${schoolId}/courses/${courseId}/`, data);
+        _clearByPrefix(`manager_courses:${schoolId}`);
         return res.data !== undefined ? res.data : res;
     },
 
     deactivateCourse: async (schoolId, courseId) => {
         const res = await api.post(`/school/${schoolId}/courses/${courseId}/deactivate/`);
+        _clearByPrefix(`manager_courses:${schoolId}`);
         return res.data !== undefined ? res.data : res;
     },
 
     activateCourse: async (schoolId, courseId) => {
         const res = await api.post(`/school/${schoolId}/courses/${courseId}/activate/`);
+        _clearByPrefix(`manager_courses:${schoolId}`);
         return res.data !== undefined ? res.data : res;
     },
 

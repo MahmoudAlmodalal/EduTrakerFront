@@ -82,6 +82,21 @@ const studentService = {
     getAssignmentSubmission: async (assignmentId) => {
         return api.get(`/student/assignments/${assignmentId}/submission/`);
     },
+    downloadAssignmentAttachment: async (assignmentId, suggestedFileName = 'assignment') => {
+        const blob = await apiClient.get(
+            `/student/assignments/${assignmentId}/download/`,
+            { responseType: 'blob' }
+        );
+
+        const blobUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        anchor.download = suggestedFileName || 'assignment';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(blobUrl);
+    },
 
     // Get marks/results
     getMarks: async (studentId) => {
