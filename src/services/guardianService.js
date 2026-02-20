@@ -38,7 +38,7 @@ const guardianService = {
     },
 
     // Get student attendance
-    getAttendance: async (studentId, config = {}) => {
+    getStudentAttendance: async (studentId, config = {}) => {
         return requestWithContext(
             () => api.get(`/teacher/attendance/?student_id=${studentId}`, config),
             'load attendance'
@@ -46,11 +46,20 @@ const guardianService = {
     },
 
     // Get marks/results
-    getMarks: async (studentId, config = {}) => {
+    getStudentMarks: async (studentId, config = {}) => {
         return requestWithContext(
             () => api.get(`/teacher/marks/?student_id=${studentId}`, config),
             'load marks'
         );
+    },
+
+    // Backward compatibility aliases
+    getAttendance: async (studentId, config = {}) => {
+        return guardianService.getStudentAttendance(studentId, config);
+    },
+
+    getMarks: async (studentId, config = {}) => {
+        return guardianService.getStudentMarks(studentId, config);
     },
 
     // Get messages

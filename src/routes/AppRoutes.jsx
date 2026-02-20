@@ -68,7 +68,7 @@ const StudentSettings = React.lazy(() => import('../pages/Student/Settings/Stude
 
 // Guardian
 const GuardianDashboard = React.lazy(() => import('../pages/Guardian/GuardianDashboard'));
-const ChildrenMonitoring = React.lazy(() => import('../pages/Guardian/ChildrenMonitoring'));
+const StudentMonitoringPage = React.lazy(() => import('../pages/Guardian/monitoring/StudentMonitoringPage'));
 const GuardianInfo = React.lazy(() => import('../pages/Guardian/GuardianInfo'));
 const GuardianSettings = React.lazy(() => import('../pages/Guardian/GuardianSettings'));
 
@@ -208,7 +208,7 @@ const AppRoutes = () => {
                     <Route path="/guardian" element={<GuardianLayout />}>
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<GuardianDashboard />} />
-                        <Route path="monitoring" element={<ChildrenMonitoring />} />
+                        <Route path="monitoring" element={<StudentMonitoringPage />} />
                         <Route path="communication" element={<GeneralCommunication />} />
                         <Route path="info" element={<GuardianInfo />} />
                         <Route path="settings" element={<GuardianSettings />} />
