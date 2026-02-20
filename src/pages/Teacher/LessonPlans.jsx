@@ -213,7 +213,7 @@ const LessonPlans = () => {
     const {
         data: lessonPlansData,
         isLoading: loadingLessonPlans
-    } = useTeacherLessonPlans();
+    } = useTeacherLessonPlans({ page_size: 200 });
 
     const {
         data: materialsData,

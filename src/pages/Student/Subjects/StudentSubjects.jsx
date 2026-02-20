@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     Book,
     Calendar,
+    ChevronDown,
     ChevronLeft,
     Download,
     ExternalLink,
@@ -189,6 +190,30 @@ const buildAssignmentState = (assignment, now = new Date()) => {
     return { tone, isClosedNoSubmission, inGrace };
 };
 
+const parseLessonPlanContent = (content = '') => {
+    const normalizedContent = String(content || '').trim();
+    if (!normalizedContent) {
+        return { activities: '', notes: '' };
+    }
+
+    const notesSeparatorPattern = /\n\s*\nNotes:\s*\n?/i;
+    const notesSeparatorMatch = normalizedContent.match(notesSeparatorPattern);
+    const activitiesSource = normalizedContent.replace(/^Activities:\s*\n?/i, '');
+
+    if (!notesSeparatorMatch) {
+        return { activities: activitiesSource.trim(), notes: '' };
+    }
+
+    const separatorIndex = normalizedContent.search(notesSeparatorPattern);
+    const activitiesPart = normalizedContent.slice(0, separatorIndex).replace(/^Activities:\s*\n?/i, '').trim();
+    const notesPart = normalizedContent
+        .slice(separatorIndex)
+        .replace(notesSeparatorPattern, '')
+        .trim();
+
+    return { activities: activitiesPart, notes: notesPart };
+};
+
 const toCount = (payload) => {
     if (typeof payload?.count === 'number') {
         return payload.count;
@@ -224,6 +249,7 @@ const StudentSubjects = () => {
     const [submissionFile, setSubmissionFile] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [timeLeft, setTimeLeft] = useState({ totalMs: null, text: 'No due date' });
+    const [expandedPlanId, setExpandedPlanId] = useState(null);
 
     const subjects = useMemo(() => {
         const courseData = dashboardData?.courses?.courses || [];
@@ -286,7 +312,7 @@ const StudentSubjects = () => {
                 studentService.getLessonPlans({
                     course: subject.id,
                     classroom: subject.classroom_id,
-                    ordering: '-date_planned',
+                    ordering: '-created_at',
                     page_size: 100
                 }),
                 subject.course_allocation_id
@@ -308,7 +334,21 @@ const StudentSubjects = () => {
             ).sort(compareDueDateAsc);
 
             const lessonPlans = toList(lessonPlansData)
-                .sort((first, second) => new Date(second.date_planned).getTime() - new Date(first.date_planned).getTime());
+                .sort((first, second) => {
+                    const secondCreatedAt = toDate(second?.created_at)?.getTime() ?? 0;
+                    const firstCreatedAt = toDate(first?.created_at)?.getTime() ?? 0;
+                    if (secondCreatedAt !== firstCreatedAt) {
+                        return secondCreatedAt - firstCreatedAt;
+                    }
+
+                    const secondDatePlanned = toDate(second?.date_planned)?.getTime() ?? 0;
+                    const firstDatePlanned = toDate(first?.date_planned)?.getTime() ?? 0;
+                    if (secondDatePlanned !== firstDatePlanned) {
+                        return secondDatePlanned - firstDatePlanned;
+                    }
+
+                    return Number(second?.id || 0) - Number(first?.id || 0);
+                });
 
             const teacher = {
                 name: teacherData?.teacher_name || subject.teacher_name,
@@ -349,10 +389,22 @@ const StudentSubjects = () => {
         if (!courseId || !selectedSubject) {
             setActiveTab('content');
             setDetailError('');
+            setExpandedPlanId(null);
             return;
         }
         void loadSubjectDetails(selectedSubject);
     }, [courseId, loadSubjectDetails, selectedSubject]);
+
+    useEffect(() => {
+        if (expandedPlanId === null) {
+            return;
+        }
+
+        const hasExpandedPlan = detailData.lessonPlans.some((plan) => Number(plan.id) === Number(expandedPlanId));
+        if (!hasExpandedPlan) {
+            setExpandedPlanId(null);
+        }
+    }, [detailData.lessonPlans, expandedPlanId]);
 
     useEffect(() => {
         if (!normalizedQueryTab) {
@@ -486,6 +538,12 @@ const StudentSubjects = () => {
             toast.error(loadError?.message || 'Failed to load assignment details.');
         }
     };
+
+    const toggleLessonPlan = useCallback((lessonPlanId) => {
+        setExpandedPlanId((previous) => (
+            Number(previous) === Number(lessonPlanId) ? null : lessonPlanId
+        ));
+    }, []);
 
     const handleSubmitAssignment = async (event) => {
         event.preventDefault();
@@ -762,17 +820,70 @@ const StudentSubjects = () => {
                                 {detailData.lessonPlans.length === 0 && (
                                     <div className="empty-state">No lesson plans published for this subject.</div>
                                 )}
-                                {detailData.lessonPlans.map((plan) => (
-                                    <article key={plan.id} className="subject-lesson-plan-card">
-                                        <div className="subject-lesson-plan-head">
-                                            <h4>{plan.title}</h4>
-                                            <span>{new Date(plan.date_planned).toLocaleDateString()}</span>
-                                        </div>
-                                        <p className="subject-lesson-plan-objectives">
-                                            {plan.objectives || plan.content || 'No objectives provided.'}
-                                        </p>
-                                    </article>
-                                ))}
+                                {detailData.lessonPlans.map((plan) => {
+                                    const isExpanded = Number(expandedPlanId) === Number(plan.id);
+                                    const parsedContent = parseLessonPlanContent(plan.content || '');
+                                    const activitiesText = parsedContent.activities || plan.content || 'No activities or content provided.';
+                                    const objectivesText = plan.objectives || 'No objectives provided.';
+                                    const planDate = plan.date_planned ? new Date(plan.date_planned).toLocaleDateString() : 'No date';
+                                    const teacherName = plan.teacher_name || teacher.name || selectedSubject.teacher_name;
+
+                                    return (
+                                        <article
+                                            key={plan.id}
+                                            className={`subject-lesson-plan-card ${isExpanded ? 'expanded' : ''}`}
+                                            onClick={() => toggleLessonPlan(plan.id)}
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(event) => {
+                                                if (event.key === 'Enter' || event.key === ' ') {
+                                                    event.preventDefault();
+                                                    toggleLessonPlan(plan.id);
+                                                }
+                                            }}
+                                        >
+                                            <div className="subject-lesson-plan-head">
+                                                <div className="subject-lesson-plan-title-wrap">
+                                                    <h4>{plan.title}</h4>
+                                                    <span>{planDate}</span>
+                                                </div>
+                                                <ChevronDown
+                                                    size={18}
+                                                    className={`subject-lesson-plan-chevron ${isExpanded ? 'rotated' : ''}`}
+                                                />
+                                            </div>
+
+                                            <p className={`subject-lesson-plan-objectives ${isExpanded ? 'expanded' : ''}`}>
+                                                {isExpanded ? `Objectives: ${objectivesText}` : objectivesText}
+                                            </p>
+
+                                            {isExpanded && (
+                                                <div className="subject-lesson-plan-detail">
+                                                    <div className="subject-lesson-plan-detail-block">
+                                                        <h5>Activities / Content</h5>
+                                                        <p>{activitiesText}</p>
+                                                    </div>
+                                                    {parsedContent.notes && (
+                                                        <div className="subject-lesson-plan-detail-block">
+                                                            <h5>Notes</h5>
+                                                            <p>{parsedContent.notes}</p>
+                                                        </div>
+                                                    )}
+                                                    {plan.resources_needed && (
+                                                        <div className="subject-lesson-plan-detail-block">
+                                                            <h5>Resources Needed</h5>
+                                                            <p>{plan.resources_needed}</p>
+                                                        </div>
+                                                    )}
+                                                    <div className="subject-lesson-plan-detail-block">
+                                                        <h5>Teacher</h5>
+                                                        <p>{teacherName || 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </article>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

@@ -3684,13 +3684,31 @@
     border-radius: 12px;
     padding: 0.75rem;
     background: var(--color-bg-body, #f8fafc);
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.subject-lesson-plan-card:hover {
+    border-color: rgba(var(--color-primary-rgb, 8, 145, 178), 0.5);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.subject-lesson-plan-card.expanded {
+    border-color: var(--color-primary, #0891b2);
+    background: #ffffff;
 }
 
 .subject-lesson-plan-head {
     display: flex;
     justify-content: space-between;
     gap: 0.6rem;
-    align-items: center;
+    align-items: flex-start;
+}
+
+.subject-lesson-plan-title-wrap {
+    min-width: 0;
+    display: grid;
+    gap: 0.2rem;
 }
 
 .subject-lesson-plan-head h4 {
@@ -3704,6 +3722,16 @@
     font-size: 0.8rem;
 }
 
+.subject-lesson-plan-chevron {
+    color: var(--color-text-muted, #64748b);
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.subject-lesson-plan-chevron.rotated {
+    transform: rotate(180deg);
+}
+
 .subject-lesson-plan-objectives {
     margin: 0.45rem 0 0 !important;
     display: -webkit-box;
@@ -3711,6 +3739,37 @@
     -webkit-line-clamp: 2;
     overflow: hidden;
     color: var(--color-text-muted, #64748b);
+    line-height: 1.45;
+}
+
+.subject-lesson-plan-objectives.expanded {
+    display: block;
+    -webkit-box-orient: initial;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+}
+
+.subject-lesson-plan-detail {
+    margin-top: 0.7rem;
+    padding-top: 0.7rem;
+    border-top: 1px dashed var(--color-border, #e2e8f0);
+    display: grid;
+    gap: 0.6rem;
+}
+
+.subject-lesson-plan-detail-block h5 {
+    margin: 0;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--color-text-muted, #64748b);
+}
+
+.subject-lesson-plan-detail-block p {
+    margin: 0.2rem 0 0;
+    color: var(--color-text-main, #0f172a);
+    white-space: pre-wrap;
+    line-height: 1.5;
 }
 
 .subject-teacher-card {
@@ -3906,13 +3965,36 @@
     border-color: #2d3748;
 }
 
+[data-theme="dark"] .subject-lesson-plan-card:hover {
+    border-color: #0891b2;
+    box-shadow: 0 8px 22px rgba(2, 6, 23, 0.5);
+}
+
+[data-theme="dark"] .subject-lesson-plan-card.expanded {
+    background: #0b1220;
+    border-color: #0891b2;
+}
+
 [data-theme="dark"] .subject-lesson-plan-head h4 {
     color: #f1f5f9;
 }
 
 [data-theme="dark"] .subject-lesson-plan-head span,
-[data-theme="dark"] .subject-lesson-plan-objectives {
+[data-theme="dark"] .subject-lesson-plan-objectives,
+[data-theme="dark"] .subject-lesson-plan-chevron {
     color: #94a3b8;
+}
+
+[data-theme="dark"] .subject-lesson-plan-detail {
+    border-top-color: #2d3748;
+}
+
+[data-theme="dark"] .subject-lesson-plan-detail-block h5 {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .subject-lesson-plan-detail-block p {
+    color: #e2e8f0;
 }
 
 [data-theme="dark"] .subject-teacher-card {
