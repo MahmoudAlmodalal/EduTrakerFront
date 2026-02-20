@@ -716,6 +716,41 @@
     transform: translateY(-1px);
 }
 
+.broadcastModeTabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-2);
+    padding: 4px;
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    background: var(--color-bg-hover);
+}
+
+.broadcastModeBtn {
+    border: none;
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.broadcastModeBtnActive {
+    color: var(--color-primary);
+    background: var(--color-bg-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.broadcastHint {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
 .searchResults {
     position: absolute;
     top: 100%;

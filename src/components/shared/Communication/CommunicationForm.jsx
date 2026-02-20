@@ -19,10 +19,13 @@ const CommunicationForm = ({
     const { t } = useTheme();
     const { showSuccess, showError, showWarning } = useToast();
     const MIN_RECIPIENT_SEARCH_CHARS = 1;
+    const isSuperAdmin = role === 'super_admin';
     const [recipientSearchTerm, setRecipientSearchTerm] = useState('');
     const [recipientSearchResults, setRecipientSearchResults] = useState([]);
     const [_isSearchingUsers, setIsSearchingUsers] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [composeMode, setComposeMode] = useState('direct');
+    const [broadcastScope, setBroadcastScope] = useState('all_users');
     const [formData, setFormData] = useState({
         recipient_id: initialRecipient?.id || null,
         recipient_name: initialRecipient?.full_name || initialRecipient?.email || '',
@@ -38,6 +41,7 @@ const CommunicationForm = ({
     const recipientSearchPlaceholder = allowedRoles
         ? 'Search secretaries, teachers, school manager...'
         : t('communication.searchPlaceholder');
+    const isBroadcast = isSuperAdmin && !isReply && composeMode === 'broadcast';
 
     const handleUserSearch = async (term) => {
         setRecipientSearchTerm(term);
@@ -99,49 +103,78 @@ const CommunicationForm = ({
         setRecipientSearchResults([]);
     };
 
+    const handleComposeModeChange = (nextMode) => {
+        setComposeMode(nextMode);
+        if (nextMode === 'broadcast') {
+            setRecipientSearchTerm('');
+            setRecipientSearchResults([]);
+            setFormData((prev) => ({
+                ...prev,
+                recipient_id: null,
+                recipient_name: ''
+            }));
+        }
+    };
+
     const handleSend = async () => {
         if (!formData.body.trim()) {
             showWarning(t('communication.emptyMessage') || 'Please write a message before sending.');
             return;
         }
 
-        // For School Manager and Student compose flow, force recipient selection from scoped search.
-        if (!formData.recipient_id && requiresScopedRecipient) {
-            showError(t('communication.noRecipient') || 'Please select a recipient from the list.');
-            return;
-        }
-
-        // Determine recipient payload (fallback to email only for non-school-manager roles).
-        let recipientPayload = {};
-        if (formData.recipient_id) {
-            recipientPayload = { recipient_ids: [formData.recipient_id] };
-        } else {
-            const emailInput = (recipientSearchTerm.trim() || formData.recipient_name || '').trim();
-            if (!emailInput) {
-                showError(t('communication.noRecipient') || 'Please select or type a recipient email.');
+        if (!isBroadcast) {
+            // For School Manager and Student compose flow, force recipient selection from scoped search.
+            if (!formData.recipient_id && requiresScopedRecipient) {
+                showError(t('communication.noRecipient') || 'Please select a recipient from the list.');
                 return;
             }
-            recipientPayload = { recipient_emails: [emailInput] };
+
+            // Determine recipient payload (fallback to email only for non-school-manager roles).
+            if (!formData.recipient_id) {
+                const emailInput = (recipientSearchTerm.trim() || formData.recipient_name || '').trim();
+                if (!emailInput) {
+                    showError(t('communication.noRecipient') || 'Please select or type a recipient email.');
+                    return;
+                }
+            }
         }
 
         try {
             setIsSending(true);
-            const basePayload = {
-                subject: formData.subject || t('communication.noSubject'),
-                body: formData.body,
-                ...(isReply && {
-                    thread_id: parentMessage.thread_id,
-                    parent_message: parentMessage.id
-                })
-            };
+            if (isBroadcast) {
+                await api.post('/user-messages/broadcast/', {
+                    scope: broadcastScope,
+                    subject: formData.subject || t('communication.noSubject'),
+                    body: formData.body
+                });
+            } else {
+                let recipientPayload = {};
+                if (formData.recipient_id) {
+                    recipientPayload = { recipient_ids: [formData.recipient_id] };
+                } else {
+                    const emailInput = (recipientSearchTerm.trim() || formData.recipient_name || '').trim();
+                    recipientPayload = { recipient_emails: [emailInput] };
+                }
 
-            const payload = { ...basePayload, ...recipientPayload };
+                const basePayload = {
+                    subject: formData.subject || t('communication.noSubject'),
+                    body: formData.body,
+                    ...(isReply && {
+                        thread_id: parentMessage.thread_id,
+                        parent_message: parentMessage.id
+                    })
+                };
 
-            await api.post('/user-messages/', payload);
+                const payload = { ...basePayload, ...recipientPayload };
+                await api.post('/user-messages/', payload);
+            }
+
             showSuccess(
-                isReply
-                    ? (t('communication.replySent') || 'Reply sent successfully.')
-                    : (t('communication.messageSent') || 'Message sent successfully.')
+                isBroadcast
+                    ? (t('communication.broadcastSent') || 'Broadcast sent successfully.')
+                    : (isReply
+                        ? (t('communication.replySent') || 'Reply sent successfully.')
+                        : (t('communication.messageSent') || 'Message sent successfully.'))
             );
 
             // Clear form body if it was a success
@@ -163,7 +196,46 @@ const CommunicationForm = ({
     return (
         <div className={styles.formContainer}>
             <div className={isReply ? styles.replyForm : styles.modalBody}>
-                {!isReply && (
+                {isSuperAdmin && !isReply && (
+                    <div className={styles.formGroup}>
+                        <label>{t('communication.deliveryMode') || 'Delivery mode'}</label>
+                        <div className={styles.broadcastModeTabs}>
+                            <button
+                                type="button"
+                                className={`${styles.broadcastModeBtn} ${composeMode === 'direct' ? styles.broadcastModeBtnActive : ''}`}
+                                onClick={() => handleComposeModeChange('direct')}
+                            >
+                                {t('communication.directMessage') || 'Direct message'}
+                            </button>
+                            <button
+                                type="button"
+                                className={`${styles.broadcastModeBtn} ${composeMode === 'broadcast' ? styles.broadcastModeBtnActive : ''}`}
+                                onClick={() => handleComposeModeChange('broadcast')}
+                            >
+                                {t('communication.broadcastMessage') || 'Broadcast'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {isBroadcast && (
+                    <div className={styles.formGroup}>
+                        <label>{t('communication.broadcastAudience') || 'Broadcast audience'}</label>
+                        <select
+                            className={styles.input}
+                            value={broadcastScope}
+                            onChange={(e) => setBroadcastScope(e.target.value)}
+                        >
+                            <option value="all_users">{t('communication.audienceAllUsers') || 'All users'}</option>
+                            <option value="all_workstream_managers">{t('communication.audienceWorkstreamManagers') || 'All workstream managers'}</option>
+                        </select>
+                        <p className={styles.broadcastHint}>
+                            {t('communication.broadcastHint') || 'This sends one message to each user in the selected audience.'}
+                        </p>
+                    </div>
+                )}
+
+                {!isReply && !isBroadcast && (
                     <div className={styles.formGroup}>
                         <label>{t('communication.recipient')}</label>
                         {formData.recipient_name ? (
@@ -248,7 +320,11 @@ const CommunicationForm = ({
                     variant="primary"
                     onClick={handleSend}
                     icon={Send}
-                    disabled={isSending || !formData.body.trim() || (!isReply && !formData.recipient_id && requiresScopedRecipient)}
+                    disabled={
+                        isSending
+                        || !formData.body.trim()
+                        || (!isReply && !isBroadcast && !formData.recipient_id && requiresScopedRecipient)
+                    }
                 >
                     {t('communication.send')}
                 </Button>

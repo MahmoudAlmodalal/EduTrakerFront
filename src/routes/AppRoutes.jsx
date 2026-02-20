@@ -135,7 +135,7 @@ const AppRoutes = () => {
                         <Route path="workstreams" element={<WorkstreamManagement />} />
                         <Route path="reports" element={<AnalyticsReports />} />
                         <Route path="settings" element={<SystemSettings />} />
-                        <Route path="communication" element={<TeacherCommunication />} />
+                        <Route path="communication" element={<GeneralCommunication />} />
                         <Route path="support" element={<SupportHelpdesk />} />
                         <Route path="activity" element={<ActivityLog />} />
                     </Route>

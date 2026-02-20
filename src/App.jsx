@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import AppRoutes from './routes/AppRoutes';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 import NetworkStatusBar from './components/NetworkStatusBar';
+import DailyBroadcastPopup from './components/shared/Broadcast/DailyBroadcastPopup';
 
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -38,6 +39,7 @@ function App() {
                         <ToastProvider>
                             <NetworkStatusBar />
                             <AppRoutes />
+                            <DailyBroadcastPopup />
                             <Toaster
                                 position="top-right"
                                 toastOptions={{
