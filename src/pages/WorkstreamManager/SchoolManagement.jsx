@@ -179,13 +179,13 @@ const SchoolManagement = () => {
     return (
         <div className="workstream-dashboard">
             <div className="workstream-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="school-management-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workstream-title">{t('workstream.schools.title')}</h1>
                         <p className="workstream-subtitle">{t('workstream.schools.subtitle')}</p>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <button className="btn-secondary" onClick={handleActivateAll} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'white', border: '1px solid #e2e8f0', padding: '0.5rem 1rem', borderRadius: '0.375rem', cursor: 'pointer' }}>
+                    <div className="school-management-header-actions">
+                        <button className="workstream-activate-all-btn" onClick={handleActivateAll}>
                             <CheckCircle size={18} />
                             {t('workstream.schools.activateAll')}
                         </button>
@@ -246,7 +246,8 @@ const SchoolManagement = () => {
                                     padding: '0.5rem 1rem',
                                     borderRadius: '0.375rem',
                                     border: '1px solid var(--color-border)',
-                                    background: 'white',
+                                    background: 'var(--color-bg-surface)',
+                                    color: 'var(--color-text-main)',
                                     cursor: 'pointer'
                                 }}
                             >

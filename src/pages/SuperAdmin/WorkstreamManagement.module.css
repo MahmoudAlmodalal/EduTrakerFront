@@ -240,6 +240,195 @@
     border-color: var(--color-primary);
 }
 
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-6);
+}
+
+.modalIntro {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-4);
+    padding: var(--spacing-4);
+    border: 1px solid var(--color-primary-subtle);
+    background: linear-gradient(140deg,
+            color-mix(in srgb, var(--color-primary) 12%, transparent),
+            color-mix(in srgb, var(--color-secondary, #0ea5e9) 6%, transparent));
+    border-radius: 16px;
+}
+
+.modalIntroIcon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary);
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-primary-subtle);
+    box-shadow: var(--shadow-xs);
+    flex-shrink: 0;
+}
+
+.modalIntroTitle {
+    margin: 0 0 4px;
+    color: var(--color-text-main);
+    font-size: 0.9375rem;
+    font-weight: 700;
+}
+
+.modalIntroDescription {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.formGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-4);
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.formGroupFull {
+    grid-column: 1 / -1;
+}
+
+.formGroup label,
+.label {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+}
+
+.labelRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+}
+
+.requiredTag,
+.optionalTag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    padding: 3px 8px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.requiredTag {
+    background: var(--color-primary-light);
+    color: var(--color-primary-dark);
+}
+
+.optionalTag {
+    background: var(--color-bg-hover);
+    color: var(--color-text-muted);
+}
+
+.input,
+.textarea {
+    width: 100%;
+    padding: 0.9rem 0.95rem;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-bg-surface);
+    color: var(--color-text-main);
+    font-size: var(--font-size-sm);
+    transition: all 0.2s ease;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+    color: var(--color-text-muted);
+}
+
+.input:hover,
+.textarea:hover {
+    border-color: var(--color-border-dark);
+}
+
+.input:focus,
+.textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 4px var(--color-primary-light);
+}
+
+.input:disabled,
+.textarea:disabled {
+    cursor: not-allowed;
+    opacity: 0.75;
+    background-color: var(--color-bg-hover);
+}
+
+.textarea {
+    min-height: 100px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.fieldHint {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.quotaInputWrap {
+    position: relative;
+}
+
+.quotaInputWrap .input {
+    padding-inline-end: 4.6rem;
+}
+
+.quotaBadge {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 10px;
+    transform: translateY(-50%);
+    border-radius: var(--radius-full);
+    padding: 4px 10px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--color-primary-light);
+    color: var(--color-primary-dark);
+    pointer-events: none;
+}
+
+.formActions {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--spacing-5);
+    margin-top: var(--spacing-1);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-3);
+}
+
+.submitButton {
+    min-width: 190px;
+}
+
 @media (max-width: 768px) {
     .grid {
         grid-template-columns: 1fr;
@@ -273,6 +462,18 @@
     .statValue {
         font-size: 1.4rem;
     }
+
+    .formGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .formGroupFull {
+        grid-column: auto;
+    }
+
+    .submitButton {
+        min-width: 0;
+    }
 }
 
 @media (max-width: 520px) {
@@ -293,5 +494,19 @@
 
     .managerSection {
         gap: var(--spacing-3);
+    }
+
+    .modalIntro {
+        padding: var(--spacing-3);
+        border-radius: 14px;
+    }
+
+    .formActions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .formActions>* {
+        width: 100%;
     }
 }

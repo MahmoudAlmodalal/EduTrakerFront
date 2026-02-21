@@ -230,7 +230,8 @@ const SchoolManagerAssignment = () => {
                                     padding: '0.5rem 1rem',
                                     borderRadius: '0.375rem',
                                     border: '1px solid var(--color-border)',
-                                    background: 'white',
+                                    background: 'var(--color-bg-surface)',
+                                    color: 'var(--color-text-main)',
                                     cursor: 'pointer'
                                 }}
                             >

@@ -7,20 +7,17 @@ import {
     LineChart, Line, PieChart, Pie, Cell
 } from 'recharts';
 import styles from './Dashboard.module.css';
-import { api } from '../../utils/api';
 import ActivityChart from '../../components/charts/ActivityChart';
 import reportService from '../../services/reportService';
-import secretaryService from '../../services/secretaryService';
-import notificationService from '../../services/notificationService';
 
-const StatCard = ({ title, value, change, icon: Icon, color, isNotification }) => {
+const StatCard = ({ title, value, change, icon: Icon, color, hideChange }) => {
     return (
         <div className={styles.statCard}>
             <div className={styles.statHeader}>
                 <div className={`${styles.iconWrapper} ${styles[color]}`}>
-                    {typeof Icon === 'string' && Icon === 'Bell' ? <Bell size={24} /> : <Icon size={24} />}
+                    <Icon size={24} />
                 </div>
-                {!isNotification && (
+                {!hideChange && (
                     <div className={change >= 0 ? styles.changePositive : styles.changeNegative}>
                         {change >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                         <span>{Math.abs(change)}%</span>
@@ -39,7 +36,6 @@ const Dashboard = () => {
     const { t } = useTheme();
     const { user } = useAuth();
     const [statsData, setStatsData] = useState(null);
-    const [unreadNotifications, setUnreadNotifications] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -51,19 +47,12 @@ const Dashboard = () => {
             try {
                 setLoading(true);
 
-                const [statsRes, unreadRes] = await Promise.all([
-                    reportService.getDashboardStats().catch(err => {
-                        console.warn('Failed to fetch stats:', err);
-                        return { statistics: {}, recent_activity: [], activity_chart: [] };
-                    }),
-                    notificationService.getUnreadCount().catch(err => {
-                        console.warn('Failed to fetch unread count:', err);
-                        return { unread_count: 0 };
-                    })
-                ]);
+                const statsRes = await reportService.getDashboardStats().catch(err => {
+                    console.warn('Failed to fetch stats:', err);
+                    return { statistics: {}, recent_activity: [], activity_chart: [] };
+                });
 
                 setStatsData(statsRes.statistics || {});
-                setUnreadNotifications(unreadRes.unread_count || 0);
                 setActivities(statsRes.recent_activity || []);
                 setChartData(statsRes.activity_chart || []);
 
@@ -142,6 +131,11 @@ const Dashboard = () => {
         return timeStr;
     };
 
+    const formatStatNumber = (value) => {
+        const parsed = Number(value ?? 0);
+        return Number.isFinite(parsed) ? parsed.toLocaleString() : '0';
+    };
+
     // Map Backend Stats to UI
     const stats = [
         {
@@ -160,17 +154,17 @@ const Dashboard = () => {
         },
         {
             title: t('dashboard.stats.users'),
-            value: loading ? '...' : (statsData?.total_users || '0').toLocaleString(),
+            value: loading ? '...' : formatStatNumber(statsData?.total_active_users ?? statsData?.total_users),
             change: statsData?.users_change || 0,
             icon: Users,
             color: 'purple'
         },
         {
-            title: t('dashboard.stats.notifications'),
-            value: loading ? '...' : unreadNotifications,
-            icon: 'Bell',
+            title: t('dashboard.stats.inactiveUsers') || 'Total Inactive Users',
+            value: loading ? '...' : formatStatNumber(statsData?.total_inactive_users),
+            icon: Users,
             color: 'orange',
-            isNotification: true
+            hideChange: true,
         },
     ];
 

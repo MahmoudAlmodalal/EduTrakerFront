@@ -14,6 +14,7 @@ const WorkstreamManagement = () => {
     const { t } = useTheme();
     const { showSuccess, showError, showWarning } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSavingWorkstream, setIsSavingWorkstream] = useState(false);
     const [workstreams, setWorkstreams] = useState([]);
     const [managers, setManagers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -85,7 +86,8 @@ const WorkstreamManagement = () => {
     const handleCreateWorkstream = async (e) => {
         e.preventDefault();
         const parsedQuota = parseInt(formData.quota, 10);
-        const normalizedName = formData.name.trim().toLowerCase();
+        const trimmedName = formData.name.trim();
+        const normalizedName = trimmedName.toLowerCase();
         const hasLocalDuplicate = workstreams.some((ws) => {
             if (isEditing && ws.id === currentWorkstreamId) return false;
             return (ws.workstream_name || '').trim().toLowerCase() === normalizedName;
@@ -102,13 +104,14 @@ const WorkstreamManagement = () => {
         }
 
         const payload = {
-            workstream_name: formData.name,
+            workstream_name: trimmedName,
             user_capacity: parsedQuota,
             manager_id: formData.managerId ? parseInt(formData.managerId) : null,
             description: formData.description || '',
             location: formData.location || '',
         };
 
+        setIsSavingWorkstream(true);
         try {
             if (isEditing) {
                 await workstreamService.updateWorkstream(currentWorkstreamId, payload);
@@ -126,6 +129,8 @@ const WorkstreamManagement = () => {
                 return;
             }
             showError('Operation failed: ' + err.message);
+        } finally {
+            setIsSavingWorkstream(false);
         }
     };
 
@@ -360,48 +365,80 @@ const WorkstreamManagement = () => {
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? t('workstreams.modal.editTitle') : t('workstreams.modal.createTitle')}>
                 <form className={styles.form} onSubmit={handleCreateWorkstream}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div className={styles.modalIntro}>
+                        <div className={styles.modalIntroIcon}>
+                            <Layers size={18} />
+                        </div>
+                        <div>
+                            <p className={styles.modalIntroTitle}>
+                                {isEditing ? t('workstreams.modal.helperEdit') : t('workstreams.modal.helperCreate')}
+                            </p>
+                            <p className={styles.modalIntroDescription}>{t('workstreams.form.helpDescription')}</p>
+                        </div>
+                    </div>
+
+                    <div className={styles.formGrid}>
                         <div className={styles.formGroup}>
-                            <label>{t('workstreams.form.name')}</label>
+                            <div className={styles.labelRow}>
+                                <label htmlFor="workstream-name" className={styles.label}>{t('workstreams.form.name')}</label>
+                                <span className={styles.requiredTag}>{t('workstreams.form.required')}</span>
+                            </div>
                             <input
+                                id="workstream-name"
+                                className={styles.input}
                                 type="text"
                                 placeholder={t('workstreams.form.namePlaceholder')}
                                 required
                                 value={formData.name}
+                                disabled={isSavingWorkstream}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             />
+                            <p className={styles.fieldHint}>{t('workstreams.form.helpName')}</p>
                         </div>
+
                         <div className={styles.formGroup}>
-                            <label>{t('workstreams.form.location')}</label>
+                            <div className={styles.labelRow}>
+                                <label htmlFor="workstream-location" className={styles.label}>{t('workstreams.form.location')}</label>
+                                <span className={styles.optionalTag}>{t('workstreams.form.optional')}</span>
+                            </div>
                             <input
+                                id="workstream-location"
+                                className={styles.input}
                                 type="text"
                                 placeholder={t('workstreams.form.locationPlaceholder')}
                                 value={formData.location}
+                                disabled={isSavingWorkstream}
                                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                             />
                         </div>
+
                         <div className={styles.formGroup}>
-                            <label>{t('workstreams.form.description')}</label>
-                            <textarea
-                                placeholder={t('workstreams.form.descriptionPlaceholder')}
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                style={{ minHeight: '80px', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)' }}
-                            />
+                            <div className={styles.labelRow}>
+                                <label htmlFor="workstream-quota" className={styles.label}>{t('workstreams.form.quota')}</label>
+                                <span className={styles.requiredTag}>{t('workstreams.form.required')}</span>
+                            </div>
+                            <div className={styles.quotaInputWrap}>
+                                <input
+                                    id="workstream-quota"
+                                    className={styles.input}
+                                    type="number"
+                                    required
+                                    min="1"
+                                    placeholder={t('workstreams.form.quotaPlaceholder')}
+                                    value={formData.quota}
+                                    disabled={isSavingWorkstream}
+                                    onChange={(e) => setFormData({ ...formData, quota: e.target.value })}
+                                />
+                                <span className={styles.quotaBadge}>{t('workstreams.form.quotaUnit')}</span>
+                            </div>
+                            <p className={styles.fieldHint}>{t('workstreams.form.helpQuota')}</p>
                         </div>
+
                         <div className={styles.formGroup}>
-                            <label>{t('workstreams.form.quota')}</label>
-                            <input
-                                type="number"
-                                required
-                                min="1"
-                                placeholder={t('workstreams.form.quotaPlaceholder')}
-                                value={formData.quota}
-                                onChange={(e) => setFormData({ ...formData, quota: e.target.value })}
-                            />
-                        </div>
-                        <div className={styles.formGroup}>
-                            <label>{t('workstreams.form.assignManager')}</label>
+                            <div className={styles.labelRow}>
+                                <label className={styles.label}>{t('workstreams.form.assignManager')}</label>
+                                <span className={styles.optionalTag}>{t('workstreams.form.optional')}</span>
+                            </div>
                             <SearchableSelect
                                 options={managers.map(m => ({ value: m.id, label: m.full_name }))}
                                 value={formData.managerId}
@@ -409,12 +446,35 @@ const WorkstreamManagement = () => {
                                 placeholder={t('workstreams.form.selectManager')}
                                 searchPlaceholder={t('users.searchPlaceholder')}
                                 onSearch={handleManagerSearch}
+                                disabled={isSavingWorkstream}
                             />
+                            <p className={styles.fieldHint}>{t('workstreams.form.helpManager')}</p>
+                        </div>
+
+                        <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
+                            <div className={styles.labelRow}>
+                                <label htmlFor="workstream-description" className={styles.label}>{t('workstreams.form.description')}</label>
+                                <span className={styles.optionalTag}>{t('workstreams.form.optional')}</span>
+                            </div>
+                            <textarea
+                                id="workstream-description"
+                                className={styles.textarea}
+                                placeholder={t('workstreams.form.descriptionPlaceholder')}
+                                value={formData.description}
+                                disabled={isSavingWorkstream}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            />
+                            <p className={styles.fieldHint}>{t('workstreams.form.helpDescription')}</p>
                         </div>
                     </div>
-                    <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
-                        <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">{t('common.cancel')}</Button>
-                        <Button variant="primary" type="submit">{isEditing ? t('common.save') : t('workstreams.create')}</Button>
+
+                    <div className={styles.formActions}>
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button" disabled={isSavingWorkstream}>
+                            {t('common.cancel')}
+                        </Button>
+                        <Button variant="primary" type="submit" disabled={isSavingWorkstream} className={styles.submitButton}>
+                            {isSavingWorkstream ? t('workstreams.saving') : (isEditing ? t('common.save') : t('workstreams.create'))}
+                        </Button>
                     </div>
                 </form>
             </Modal>
@@ -450,7 +510,7 @@ const WorkstreamManagement = () => {
                             </div>
                         </div>
                     </div>
-                    <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
+                    <div className={styles.formActions}>
                         <Button variant="outline" onClick={() => setIsConfigModalOpen(false)} type="button" disabled={isSavingConfig}>{t('common.cancel')}</Button>
                         <Button variant="primary" type="submit" disabled={isSavingConfig}>{isSavingConfig ? t('workstreams.savingConfig') : t('common.save')}</Button>
                     </div>

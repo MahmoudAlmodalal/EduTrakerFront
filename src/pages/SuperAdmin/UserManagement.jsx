@@ -71,6 +71,10 @@ const UserManagement = () => {
     };
 
     const validateWorkstreamCapacity = async (workstreamId) => {
+        if (formData.role === 'manager_workstream') {
+            return { allowed: true };
+        }
+
         const selectedWorkstream = workstreams.find((ws) => parseWorkstreamId(ws.id) === workstreamId);
         const capacity = resolveWorkstreamCapacity(selectedWorkstream);
 
@@ -95,7 +99,7 @@ const UserManagement = () => {
     const fetchUsers = async (page = 1, search = '', role = '', workstream = '', status = '') => {
         setLoading(true);
         try {
-            let url = `/users/?page=${page}`;
+            let url = `/users/?page=${page}&include_inactive=true`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (role) url += `&role=${role}`;
             if (workstream) url += `&work_stream=${workstream}`;
@@ -257,6 +261,7 @@ const UserManagement = () => {
         setCurrentUserId(null);
         setCurrentUserWorkstreamId(null);
         setCurrentUserIsActive(false);
+        setIsSubmitting(false);
         setFormData({ name: '', email: '', workstreamId: '', role: 'manager_workstream', password: '' });
     };
 
@@ -264,6 +269,7 @@ const UserManagement = () => {
         try {
             let url = `/users/export/`;
             const params = [];
+            params.push('include_inactive=true');
             if (searchTerm) params.push(`search=${encodeURIComponent(searchTerm)}`);
             if (roleFilter) params.push(`role=${roleFilter}`);
             if (workstreamFilter) params.push(`work_stream=${workstreamFilter}`);
@@ -494,44 +500,88 @@ const UserManagement = () => {
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? t('users.modal.editTitle') : t('users.modal.createTitle')}>
                 <form className={styles.form} onSubmit={handleCreateUser}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div className={styles.modalIntro}>
+                        <div className={styles.modalIntroIcon}>
+                            <UserPlus size={18} />
+                        </div>
+                        <div>
+                            <p className={styles.modalIntroTitle}>
+                                {isEditing ? t('users.modal.helperEdit') : t('users.modal.helperCreate')}
+                            </p>
+                            <p className={styles.modalIntroDescription}>{t('users.form.helpGeneral')}</p>
+                        </div>
+                    </div>
+
+                    <div className={styles.formGrid}>
                         <div className={styles.formGroup}>
-                            <label>{t('users.form.fullName')}</label>
+                            <div className={styles.labelRow}>
+                                <label htmlFor="manager-full-name" className={styles.label}>{t('users.form.fullName')}</label>
+                                <span className={styles.requiredTag}>{t('users.form.required')}</span>
+                            </div>
                             <input
+                                id="manager-full-name"
+                                className={styles.input}
                                 type="text"
                                 placeholder={t('users.form.enterName')}
                                 required
                                 value={formData.name}
+                                disabled={isSubmitting}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             />
+                            <p className={styles.fieldHint}>{t('users.form.helpName')}</p>
                         </div>
+
                         <div className={styles.formGroup}>
-                            <label>{t('users.form.email')}</label>
+                            <div className={styles.labelRow}>
+                                <label htmlFor="manager-email" className={styles.label}>{t('users.form.email')}</label>
+                                <span className={styles.requiredTag}>{t('users.form.required')}</span>
+                            </div>
                             <input
+                                id="manager-email"
+                                className={styles.input}
                                 type="email"
                                 placeholder={t('users.form.enterEmail')}
                                 required
                                 value={formData.email}
+                                disabled={isSubmitting}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             />
+                            <p className={styles.fieldHint}>{t('users.form.helpEmail')}</p>
                         </div>
-                        {!isEditing && (
-                            <div className={styles.formGroup}>
-                                <label>{t('users.form.password')}</label>
-                                <input
-                                    type="password"
-                                    placeholder={t('users.form.passwordPlaceholder')}
-                                    required
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                />
-                            </div>
-                        )}
+
                         <div className={styles.formGroup}>
-                            <label>{t('users.form.role')}</label>
+                            <div className={styles.labelRow}>
+                                <label htmlFor="manager-password" className={styles.label}>{t('users.form.password')}</label>
+                                <span className={isEditing ? styles.optionalTag : styles.requiredTag}>
+                                    {isEditing ? t('users.form.optional') : t('users.form.required')}
+                                </span>
+                            </div>
+                            <input
+                                id="manager-password"
+                                className={styles.input}
+                                type="password"
+                                placeholder={isEditing ? t('users.form.passwordEditPlaceholder') : t('users.form.passwordPlaceholder')}
+                                required={!isEditing}
+                                value={formData.password}
+                                disabled={isSubmitting}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            />
+                            <p className={styles.fieldHint}>
+                                {isEditing ? t('users.form.helpPasswordEdit') : t('users.form.helpPasswordCreate')}
+                            </p>
+                        </div>
+
+                        <div className={styles.formGroup}>
+                            <div className={styles.labelRow}>
+                                <label htmlFor="manager-role" className={styles.label}>{t('users.form.role')}</label>
+                                <span className={styles.requiredTag}>{t('users.form.required')}</span>
+                            </div>
                             <select
+                                id="manager-role"
+                                className={styles.select}
                                 required
                                 value={formData.role}
+                                disabled={isSubmitting}
                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                             >
                                 <option value="admin">{t('auth.role.superAdmin')}</option>
@@ -542,9 +592,14 @@ const UserManagement = () => {
                                 <option value="student">{t('auth.role.student')}</option>
                                 <option value="guest">Guest</option>
                             </select>
+                            <p className={styles.fieldHint}>{t('users.form.helpRole')}</p>
                         </div>
+
                         <div className={styles.formGroup}>
-                            <label>{t('users.form.assignWorkstream')}</label>
+                            <div className={styles.labelRow}>
+                                <label className={styles.label}>{t('users.form.assignWorkstream')}</label>
+                                <span className={styles.optionalTag}>{t('users.form.optional')}</span>
+                            </div>
                             <SearchableSelect
                                 options={workstreams.map(ws => ({ value: ws.id, label: ws.workstream_name }))}
                                 value={formData.workstreamId}
@@ -552,11 +607,16 @@ const UserManagement = () => {
                                 placeholder={t('workstreams.form.noWorkstream')}
                                 searchPlaceholder={t('workstreams.searchPlaceholder')}
                                 onSearch={handleWorkstreamSearch}
+                                disabled={isSubmitting}
                             />
+                            <p className={styles.fieldHint}>{t('users.form.helpWorkstream')}</p>
                         </div>
                     </div>
-                    <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>
-                        <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">{t('common.cancel')}</Button>
+
+                    <div className={styles.formActions}>
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button" disabled={isSubmitting}>
+                            {t('common.cancel')}
+                        </Button>
                         <Button variant="primary" type="submit" disabled={isSubmitting}>
                             {isSubmitting ? t('users.saving') : (isEditing ? t('users.update') : t('common.create'))}
                         </Button>
