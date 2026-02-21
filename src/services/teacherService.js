@@ -126,6 +126,14 @@ const teacherService = {
         return api.post('/teacher/attendance/record/', data);
     },
 
+    // Behavior
+    getBehavior: async (filters = {}) => {
+        return api.get('/teacher/behavior/', { params: sanitizeParams(filters) });
+    },
+    recordBehavior: async (data) => {
+        return api.post('/teacher/behavior/record/', data);
+    },
+
     // Marks / Grading
     getMarks: async (filters = {}) => {
         return api.get('/teacher/marks/', { params: sanitizeParams(filters) });

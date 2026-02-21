@@ -17,8 +17,8 @@ const NOTIFICATION_REDIRECT_MAP = {
     assignment_due: (notification) => {
         const assignmentId = notification?.related_object_id;
         return assignmentId
-            ? `/student/assignments/${assignmentId}`
-            : '/student/assignments';
+            ? `/student/subjects?tab=assignments&assignment=${assignmentId}`
+            : '/student/subjects?tab=assignments';
     },
     default: () => '/student/dashboard'
 };

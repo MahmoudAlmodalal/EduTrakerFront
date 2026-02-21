@@ -11,8 +11,6 @@ import {
     FileText,
     MessageCircle,
     RefreshCw,
-    Target,
-    TrendingUp,
     User
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
@@ -42,20 +40,95 @@ const getInitials = (fullName = '') => {
     return `${tokens[0][0]}${tokens[1][0]}`.toUpperCase();
 };
 
-const notifConfig = {
-    grade_posted: { icon: Award, bg: '#dcfce7', color: '#166534', label: 'Grade' },
-    assignment_due: { icon: Clock, bg: '#fef3c7', color: '#92400e', label: 'Due Soon' },
-    attendance_marked: { icon: Calendar, bg: '#dbeafe', color: '#1e40af', label: 'Attendance' },
-    announcement: { icon: BookOpen, bg: '#ede9fe', color: '#6d28d9', label: 'Content' },
-    material_published: { icon: FileText, bg: '#cffafe', color: '#155e75', label: 'Material' },
-    message_received: { icon: MessageCircle, bg: '#fce7f3', color: '#9d174d', label: 'Message' },
-    system: { icon: Bell, bg: '#f1f5f9', color: '#475569', label: 'System' }
+const TODAY_ATTENDANCE_STATUS = {
+    PRESENT: 'present',
+    ABSENT: 'absent',
+    NOT_RECORDED: 'not_recorded'
 };
 
-const getNotifConfig = (type) => notifConfig[type] || notifConfig.system;
+const toLocalIsoDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const normalizeAttendanceStatus = (status = '') => String(status).trim().toLowerCase();
+
+const resolveTodayAttendanceStatus = (records = []) => {
+    if (!Array.isArray(records) || records.length === 0) {
+        return TODAY_ATTENDANCE_STATUS.NOT_RECORDED;
+    }
+
+    const statuses = records.map((record) => normalizeAttendanceStatus(record?.status));
+    if (statuses.includes('absent')) {
+        return TODAY_ATTENDANCE_STATUS.ABSENT;
+    }
+
+    if (statuses.some((status) => ['present', 'late', 'excused'].includes(status))) {
+        return TODAY_ATTENDANCE_STATUS.PRESENT;
+    }
+
+    return TODAY_ATTENDANCE_STATUS.NOT_RECORDED;
+};
+
+const notifConfig = {
+    grade_posted: {
+        icon: Award,
+        label: 'Grade',
+        light: { bg: '#dcfce7', color: '#166534', rowBg: 'rgba(220, 252, 231, 0.65)' },
+        dark: { bg: 'rgba(34, 197, 94, 0.2)', color: '#86efac', rowBg: 'rgba(34, 197, 94, 0.14)' }
+    },
+    assignment_due: {
+        icon: Clock,
+        label: 'Assessment',
+        light: { bg: '#fef3c7', color: '#92400e', rowBg: 'rgba(254, 243, 199, 0.65)' },
+        dark: { bg: 'rgba(245, 158, 11, 0.2)', color: '#fcd34d', rowBg: 'rgba(245, 158, 11, 0.14)' }
+    },
+    attendance_marked: {
+        icon: Calendar,
+        label: 'Attendance',
+        light: { bg: '#dbeafe', color: '#1e40af', rowBg: 'rgba(219, 234, 254, 0.65)' },
+        dark: { bg: 'rgba(59, 130, 246, 0.2)', color: '#93c5fd', rowBg: 'rgba(59, 130, 246, 0.14)' }
+    },
+    announcement: {
+        icon: BookOpen,
+        label: 'Content',
+        light: { bg: '#ede9fe', color: '#6d28d9', rowBg: 'rgba(237, 233, 254, 0.65)' },
+        dark: { bg: 'rgba(139, 92, 246, 0.2)', color: '#c4b5fd', rowBg: 'rgba(139, 92, 246, 0.14)' }
+    },
+    material_published: {
+        icon: FileText,
+        label: 'Material',
+        light: { bg: '#cffafe', color: '#155e75', rowBg: 'rgba(207, 250, 254, 0.65)' },
+        dark: { bg: 'rgba(6, 182, 212, 0.2)', color: '#67e8f9', rowBg: 'rgba(6, 182, 212, 0.14)' }
+    },
+    message_received: {
+        icon: MessageCircle,
+        label: 'Message',
+        light: { bg: '#fce7f3', color: '#9d174d', rowBg: 'rgba(252, 231, 243, 0.65)' },
+        dark: { bg: 'rgba(236, 72, 153, 0.2)', color: '#f9a8d4', rowBg: 'rgba(236, 72, 153, 0.14)' }
+    },
+    system: {
+        icon: Bell,
+        label: 'System',
+        light: { bg: '#f1f5f9', color: '#475569', rowBg: 'rgba(241, 245, 249, 0.65)' },
+        dark: { bg: 'rgba(100, 116, 139, 0.25)', color: '#cbd5e1', rowBg: 'rgba(100, 116, 139, 0.14)' }
+    }
+};
+
+const getNotifConfig = (type, isDarkTheme = false) => {
+    const config = notifConfig[type] || notifConfig.system;
+    return {
+        icon: config.icon,
+        label: config.label,
+        ...(isDarkTheme ? config.dark : config.light)
+    };
+};
 
 const StudentDashboard = () => {
-    const { t } = useTheme();
+    const { t, theme } = useTheme();
     const { user } = useAuth();
     const navigate = useNavigate();
     const {
@@ -74,6 +147,8 @@ const StudentDashboard = () => {
     const [assignmentData, setAssignmentData] = useState([]);
     const [assignmentTotal, setAssignmentTotal] = useState(null);
     const [assignmentLoading, setAssignmentLoading] = useState(true);
+    const [todayAttendanceStatus, setTodayAttendanceStatus] = useState(TODAY_ATTENDANCE_STATUS.NOT_RECORDED);
+    const [todayAttendanceLoading, setTodayAttendanceLoading] = useState(true);
 
     const dashboardErrorText = resolveText(
         t('student.dashboard.error'),
@@ -150,6 +225,55 @@ const StudentDashboard = () => {
         return () => { cancelled = true; };
     }, [user?.id, assignmentPageSize]);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!user?.id) {
+            setTodayAttendanceStatus(TODAY_ATTENDANCE_STATUS.NOT_RECORDED);
+            setTodayAttendanceLoading(false);
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        setTodayAttendanceLoading(true);
+        const todayIso = toLocalIsoDate();
+
+        studentService.getAttendance(null, {
+            params: {
+                date_from: todayIso,
+                date_to: todayIso,
+                page_size: 200
+            }
+        })
+            .then((response) => {
+                if (cancelled) {
+                    return;
+                }
+                const records = Array.isArray(response?.results)
+                    ? response.results
+                    : Array.isArray(response)
+                        ? response
+                        : [];
+                setTodayAttendanceStatus(resolveTodayAttendanceStatus(records));
+            })
+            .catch((err) => {
+                console.error('Failed to fetch today attendance:', err);
+                if (!cancelled) {
+                    setTodayAttendanceStatus(TODAY_ATTENDANCE_STATUS.NOT_RECORDED);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setTodayAttendanceLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.id]);
+
     const handleRetryDashboard = async () => {
         await refreshData();
     };
@@ -157,6 +281,25 @@ const StudentDashboard = () => {
     const openNotifications = () => {
         navigate('/student/communication', { state: { activeTab: 'notifications' } });
     };
+
+    const openAssignmentInSubjects = useCallback((assignment = {}) => {
+        const params = new URLSearchParams();
+        params.set('tab', 'assignments');
+
+        if (assignment.assignmentId) {
+            params.set('assignment', String(assignment.assignmentId));
+        }
+
+        if (assignment.courseId) {
+            params.set('course', String(assignment.courseId));
+        }
+
+        if (assignment.classroomId) {
+            params.set('classroom', String(assignment.classroomId));
+        }
+
+        navigate(`/student/subjects?${params.toString()}`);
+    }, [navigate]);
 
     const decrementUnreadPreview = () => {
         setUnreadCount((previous) => {
@@ -244,28 +387,24 @@ const StudentDashboard = () => {
         );
     }
 
-    const { profile, grades, attendance, classmates } = dashboardData || {};
+    const { profile } = dashboardData || {};
 
     const assignments = assignmentData.map((a, index) => {
         const pct = a.grade?.percentage != null
             ? Math.round(parseFloat(a.grade.percentage))
             : null;
         return {
-            id: a.id || index,
+            id: a.id || `pending-${index}`,
+            assignmentId: a.id || null,
             title: a.title || 'Assignment',
             subject: a.course_name || 'Subject',
             due: a.due_date ? new Date(a.due_date).toLocaleDateString() : 'N/A',
             status: a.status || 'not_submitted',
             progress: pct,
+            courseId: a.course_id || null,
+            classroomId: a.classroom_id || null,
         };
     });
-
-    const stats = {
-        attendance: attendance?.attendance_rate || 0,
-        gpa: grades?.overall_average ? (grades.overall_average / 25).toFixed(2) : '0.00',
-        completedTasks: grades?.graded_assignments || 0,
-        rank: classmates?.rank || `Top ${classmates?.active_classmates || 'N/A'}`
-    };
 
     const classroomName = profile?.current_classroom?.classroom_name || 'No classroom';
     const gradeName = profile?.current_grade?.grade_name || profile?.current_classroom?.grade_name || 'Grade N/A';
@@ -280,6 +419,14 @@ const StudentDashboard = () => {
     };
 
     const hasUnreadNotifications = unreadCount > 0;
+    const isDarkTheme = theme === 'dark';
+    const todayAttendanceUi = todayAttendanceLoading
+        ? { label: 'Checking...', tone: 'pending' }
+        : todayAttendanceStatus === TODAY_ATTENDANCE_STATUS.ABSENT
+            ? { label: 'Absent', tone: 'absent' }
+            : todayAttendanceStatus === TODAY_ATTENDANCE_STATUS.PRESENT
+                ? { label: 'Present', tone: 'present' }
+                : { label: 'Not recorded yet', tone: 'pending' };
     const noNotificationsText = resolveText(
         t('communication.noNotifications'),
         'communication.noNotifications',
@@ -302,40 +449,11 @@ const StudentDashboard = () => {
                         type="button"
                         onClick={openNotifications}
                         aria-label="View notifications"
-                        style={{
-                            position: 'relative',
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '12px',
-                            border: '1px solid #fecaca',
-                            background: '#fef2f2',
-                            color: '#ef4444',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer'
-                        }}
+                        className="dashboard-notification-btn"
                     >
                         <Bell size={20} />
                         {unreadCount > 0 && (
-                            <span
-                                style={{
-                                    position: 'absolute',
-                                    top: '-6px',
-                                    right: '-6px',
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 700,
-                                    minWidth: '18px',
-                                    height: '18px',
-                                    borderRadius: '999px',
-                                    padding: '0 4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}
-                            >
+                            <span className="dashboard-notification-badge">
                                 {unreadCount > 99 ? '99+' : unreadCount}
                             </span>
                         )}
@@ -347,44 +465,41 @@ const StudentDashboard = () => {
                 </div>
             </header>
 
-            <div className="stat-cards-row">
-                <div className="stat-card-premium">
-                    <div className="stat-card-icon">
-                        <Calendar size={24} />
-                    </div>
-                    <div className="stat-card-content">
-                        <h3>{stats.attendance}%</h3>
-                        <p>{t('student.dashboard.attendance') || 'Attendance'}</p>
-                    </div>
+            <section className="dashboard-classroom-summary" aria-label="Current classroom details">
+                <div className="dashboard-classroom-summary-header">
+                    <h2>Classroom Snapshot</h2>
+                    <p>Your current class details</p>
                 </div>
-                <div className="stat-card-premium">
-                    <div className="stat-card-icon" style={{ background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' }}>
-                        <Award size={24} />
-                    </div>
-                    <div className="stat-card-content">
-                        <h3>{stats.gpa}</h3>
-                        <p>Current GPA</p>
-                    </div>
+                <div className="dashboard-classroom-summary-grid">
+                    <article className="dashboard-classroom-summary-item">
+                        <span className="summary-item-icon classroom">
+                            <Building2 size={16} />
+                        </span>
+                        <div>
+                            <h3>Classroom</h3>
+                            <p>{classroomName}</p>
+                        </div>
+                    </article>
+                    <article className="dashboard-classroom-summary-item">
+                        <span className="summary-item-icon grade">
+                            <Award size={16} />
+                        </span>
+                        <div>
+                            <h3>Grade</h3>
+                            <p>{gradeName}</p>
+                        </div>
+                    </article>
+                    <article className="dashboard-classroom-summary-item">
+                        <span className="summary-item-icon teacher">
+                            <User size={16} />
+                        </span>
+                        <div>
+                            <h3>Homeroom Teacher</h3>
+                            <p>{profileCard.homeroomTeacher}</p>
+                        </div>
+                    </article>
                 </div>
-                <div className="stat-card-premium">
-                    <div className="stat-card-icon" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' }}>
-                        <Target size={24} />
-                    </div>
-                    <div className="stat-card-content">
-                        <h3>{stats.completedTasks}</h3>
-                        <p>Tasks Done</p>
-                    </div>
-                </div>
-                <div className="stat-card-premium">
-                    <div className="stat-card-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)' }}>
-                        <TrendingUp size={24} />
-                    </div>
-                    <div className="stat-card-content">
-                        <h3>{stats.rank}</h3>
-                        <p>Class Rank</p>
-                    </div>
-                </div>
-            </div>
+            </section>
 
             <div className="student-dashboard-grid dashboard-grid">
                 <div className="dashboard-card card-full-width">
@@ -427,15 +542,34 @@ const StudentDashboard = () => {
                                 </div>
                             ))
                         ) : assignments.length > 0 ? assignments.map((assignment) => {
-                            const statusColors = {
-                                submitted: { bg: '#dcfce7', color: '#166534', label: 'Submitted' },
-                                graded:    { bg: '#dbeafe', color: '#1e40af', label: 'Graded' },
-                                late:      { bg: '#fef3c7', color: '#92400e', label: 'Late' },
-                                not_submitted: { bg: '#f1f5f9', color: '#64748b', label: 'Pending' },
-                            };
+                            const statusColors = isDarkTheme
+                                ? {
+                                    submitted: { bg: 'rgba(34, 197, 94, 0.2)', color: '#86efac', label: 'Submitted' },
+                                    graded: { bg: 'rgba(59, 130, 246, 0.2)', color: '#93c5fd', label: 'Graded' },
+                                    late: { bg: 'rgba(245, 158, 11, 0.2)', color: '#fcd34d', label: 'Late' },
+                                    not_submitted: { bg: 'rgba(100, 116, 139, 0.22)', color: '#cbd5e1', label: 'Pending' },
+                                }
+                                : {
+                                    submitted: { bg: '#dcfce7', color: '#166534', label: 'Submitted' },
+                                    graded: { bg: '#dbeafe', color: '#1e40af', label: 'Graded' },
+                                    late: { bg: '#fef3c7', color: '#92400e', label: 'Late' },
+                                    not_submitted: { bg: '#f1f5f9', color: '#64748b', label: 'Pending' },
+                                };
                             const sc = statusColors[assignment.status] || statusColors.not_submitted;
                             return (
-                                <div key={assignment.id} className="assignment-item">
+                                <div
+                                    key={assignment.id}
+                                    className="assignment-item assignment-item-clickable"
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => openAssignmentInSubjects(assignment)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter' || event.key === ' ') {
+                                            event.preventDefault();
+                                            openAssignmentInSubjects(assignment);
+                                        }
+                                    }}
+                                >
                                     <div className="assignment-header">
                                         <div className="assignment-title">{assignment.title}</div>
                                         <span style={{
@@ -449,6 +583,7 @@ const StudentDashboard = () => {
                                         <span>{assignment.subject}</span>
                                         <span className="assignment-due">{assignment.due}</span>
                                     </div>
+                                    <div className="assignment-link-hint">Open in subject</div>
                                     {assignment.progress != null && (
                                         <div className="assignment-progress">
                                             <div className="progress-bar">
@@ -488,14 +623,11 @@ const StudentDashboard = () => {
                         </div>
                     </div>
 
-                    <div className="student-profile-badges">
-                        <span className="student-profile-badge gpa">
-                            <Award size={13} />
-                            GPA: {stats.gpa}
-                        </span>
-                        <span className="student-profile-badge attendance">
+                    <div className="student-today-attendance">
+                        <span className="student-today-attendance-label">Today Attendance</span>
+                        <span className={`student-today-attendance-status ${todayAttendanceUi.tone}`}>
                             <Calendar size={13} />
-                            Att: {stats.attendance}%
+                            {todayAttendanceUi.label}
                         </span>
                     </div>
                 </div>
@@ -581,7 +713,7 @@ const StudentDashboard = () => {
                         )}
 
                         {!notifLoading && notifications.map((notification) => {
-                            const config = getNotifConfig(notification.notification_type);
+                            const config = getNotifConfig(notification.notification_type, isDarkTheme);
                             const Icon = config.icon;
                             return (
                                 <div
@@ -600,7 +732,7 @@ const StudentDashboard = () => {
                                         borderBottom: '1px solid var(--color-border)',
                                         display: 'flex',
                                         gap: '0.9rem',
-                                        backgroundColor: `${config.bg}66`,
+                                        backgroundColor: config.rowBg,
                                         position: 'relative',
                                         transition: 'all 0.2s ease',
                                         cursor: 'pointer'

@@ -1135,6 +1135,220 @@
     min-width: 0;
 }
 
+.teacher-behavior-card {
+    margin-top: 1rem;
+}
+
+.teacher-behavior-head {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--teacher-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.teacher-behavior-section-head h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--teacher-text-main);
+}
+
+.teacher-behavior-section-head p {
+    margin: 0.2rem 0 0;
+    color: var(--teacher-text-muted);
+    font-size: 0.82rem;
+}
+
+.teacher-behavior-tabs {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--teacher-border);
+}
+
+.teacher-behavior-tab {
+    border: none;
+    background: transparent;
+    color: var(--teacher-text-muted);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.teacher-behavior-tab:hover {
+    color: var(--teacher-text-main);
+}
+
+.teacher-behavior-tab.active {
+    background: var(--teacher-surface);
+    color: var(--teacher-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.teacher-behavior-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.2rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.teacher-behavior-form,
+.teacher-behavior-panel {
+    padding: 1rem 1.25rem;
+}
+
+.teacher-behavior-form {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.teacher-behavior-form-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.teacher-behavior-field {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.teacher-behavior-label {
+    font-size: 0.82rem;
+    color: var(--teacher-text-muted);
+}
+
+.teacher-behavior-control,
+.teacher-behavior-textarea {
+    width: 100%;
+    border: 1px solid var(--teacher-border);
+    border-radius: 10px;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.86rem;
+    background: var(--teacher-surface);
+    color: var(--teacher-text-main);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.teacher-behavior-control:focus,
+.teacher-behavior-textarea:focus {
+    outline: none;
+    border-color: var(--teacher-primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
+
+.teacher-behavior-textarea {
+    resize: vertical;
+}
+
+.teacher-behavior-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 0.2rem;
+}
+
+.teacher-behavior-state {
+    font-size: 0.88rem;
+    color: var(--teacher-text-muted);
+    border: 1px dashed var(--teacher-border);
+    border-radius: 10px;
+    padding: 0.85rem;
+    background: rgba(148, 163, 184, 0.08);
+}
+
+.teacher-behavior-state.error {
+    color: #b91c1c;
+    border-color: rgba(239, 68, 68, 0.28);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.teacher-behavior-table-wrap {
+    overflow-x: auto;
+}
+
+.teacher-behavior-table {
+    width: 100%;
+    min-width: 620px;
+    border-collapse: collapse;
+}
+
+.teacher-behavior-table th {
+    text-align: left;
+    padding: 0.6rem;
+    font-size: 0.78rem;
+    color: var(--teacher-text-muted);
+    border-bottom: 1px solid var(--teacher-border);
+}
+
+.teacher-behavior-table td {
+    padding: 0.7rem 0.6rem;
+    border-bottom: 1px solid var(--teacher-border);
+    color: var(--teacher-text-main);
+    font-size: 0.88rem;
+}
+
+.teacher-behavior-table tr:last-child td {
+    border-bottom: none;
+}
+
+.teacher-behavior-type {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.teacher-behavior-type.positive {
+    color: #166534;
+    background: #dcfce7;
+}
+
+.teacher-behavior-type.negative {
+    color: #991b1b;
+    background: #fee2e2;
+}
+
+.teacher-behavior-locked {
+    padding: 1.1rem 1.25rem;
+    color: #b45309;
+    background: #fef3c7;
+    border-top: 1px solid #fcd34d;
+    font-size: 0.88rem;
+}
+
+@media (max-width: 768px) {
+    .teacher-behavior-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .teacher-behavior-tabs {
+        width: 100%;
+    }
+
+    .teacher-behavior-tab {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
 .teacher-stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

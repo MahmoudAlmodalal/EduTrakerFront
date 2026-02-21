@@ -14,12 +14,13 @@ const SecretaryDataContext = createContext(null);
 
 export const SecretaryDataProvider = ({ children }) => {
     const { user } = useAuth();
+    const userId = user?.id ?? user?.user_id ?? null;
     const [dashboardData, setDashboardData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const loadDashboardData = useCallback(async () => {
-        if (!user?.id) {
+    const loadDashboardData = useCallback(async ({ forceRefresh = false } = {}) => {
+        if (!userId) {
             setDashboardData(null);
             setError(null);
             setLoading(false);
@@ -30,7 +31,7 @@ export const SecretaryDataProvider = ({ children }) => {
         setError(null);
 
         try {
-            const response = await secretaryService.getSecretaryDashboardStats()
+            const response = await secretaryService.getSecretaryDashboardStats({ forceRefresh })
                 .catch(() => secretaryService.getDashboardStats());
             const stats = response?.statistics || response || null;
             setDashboardData(stats);
@@ -41,10 +42,10 @@ export const SecretaryDataProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    }, [user?.id]);
+    }, [userId]);
 
     useEffect(() => {
-        if (!user?.id) {
+        if (!userId) {
             setDashboardData(null);
             setError(null);
             setLoading(false);
@@ -52,7 +53,7 @@ export const SecretaryDataProvider = ({ children }) => {
         }
 
         void loadDashboardData();
-    }, [loadDashboardData, user?.id]);
+    }, [loadDashboardData, userId]);
 
     const value = useMemo(() => ({
         dashboardData,

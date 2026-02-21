@@ -2,13 +2,9 @@ import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useStat
 import {
     Calendar as CalendarIcon,
     ChevronRight,
-    Clock,
     FileText,
     Hourglass,
     MessageSquare,
-    Plus,
-    RefreshCw,
-    TrendingUp,
     UserPlus,
     Users,
 } from 'lucide-react';
@@ -16,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import secretaryService from '../../services/secretaryService';
+import NotificationDropdown from '../../components/shared/NotificationDropdown';
 import {
     AvatarInitial,
     EmptyState,
@@ -31,7 +28,7 @@ const INITIAL_STATS = {
     totalStudents: 0,
     pendingStudents: 0,
     unreadMessages: 0,
-    absentToday: 0,
+    activeGuardians: 0,
     schoolName: '',
 };
 
@@ -212,7 +209,7 @@ const SecretaryDashboard = () => {
     const [trendLoading, setTrendLoading] = useState(false);
     const [statsLoading, setStatsLoading] = useState(true);
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [pendingStudentMeta, setPendingStudentMeta] = useState({
+    const [_pendingStudentMeta, setPendingStudentMeta] = useState({
         name: '',
         source: '',
     });
@@ -316,7 +313,7 @@ const SecretaryDashboard = () => {
                 totalStudents: toSafeNumber(normalizedStats.total_students),
                 pendingStudents: toSafeNumber(pendingFromStats),
                 unreadMessages: toSafeNumber(normalizedStats.unread_messages),
-                absentToday: toSafeNumber(normalizedStats.absent_today),
+                activeGuardians: toSafeNumber(normalizedStats.active_guardians),
                 schoolName: normalizedStats.school_name || 'My School',
             };
             snapshotStats = nextStats;
@@ -332,7 +329,7 @@ const SecretaryDashboard = () => {
                 source: 'secretary/dashboard-stats endpoint',
             };
 
-            const [applicationsResult, yearsResult] = await Promise.allSettled([
+            const [applicationsResult, yearsResult, unreadMessagesResult, guardianSummaryResult] = await Promise.allSettled([
                 secretaryService.getApplications({
                     page: 1,
                     status: 'pending',
@@ -341,6 +338,8 @@ const SecretaryDashboard = () => {
                 secretaryService.getAcademicYears(
                     schoolId ? { school_id: schoolId } : {}
                 ),
+                secretaryService.getUnreadMessageCount(),
+                secretaryService.getGuardianSummary({ forceRefresh }),
             ]);
 
             if (!isMountedRef.current) {
@@ -389,6 +388,44 @@ const SecretaryDashboard = () => {
                 console.error('Error fetching academic years:', yearsResult.reason);
                 setAcademicYears([]);
             }
+
+            if (unreadMessagesResult.status === 'fulfilled') {
+                const unreadPayload = unreadMessagesResult.value || {};
+                const unreadMessages = toSafeNumber(
+                    unreadPayload.unread_count ?? unreadPayload.unread_messages
+                );
+                setStats((previous) => ({
+                    ...previous,
+                    unreadMessages,
+                }));
+
+                if (snapshotStats) {
+                    snapshotStats = {
+                        ...snapshotStats,
+                        unreadMessages,
+                    };
+                }
+            } else {
+                console.error('Error fetching unread message count:', unreadMessagesResult.reason);
+            }
+
+            if (guardianSummaryResult.status === 'fulfilled') {
+                const guardianSummaryPayload = guardianSummaryResult.value || {};
+                const activeGuardians = toSafeNumber(guardianSummaryPayload.active_guardians);
+                setStats((previous) => ({
+                    ...previous,
+                    activeGuardians,
+                }));
+
+                if (snapshotStats) {
+                    snapshotStats = {
+                        ...snapshotStats,
+                        activeGuardians,
+                    };
+                }
+            } else {
+                console.error('Error fetching guardian summary:', guardianSummaryResult.reason);
+            }
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
         } finally {
@@ -432,12 +469,11 @@ const SecretaryDashboard = () => {
         const fetchAttendanceTrend = async () => {
             try {
                 setTrendLoading(true);
-                const attendancePayload = await secretaryService.getAttendance({
+                const records = await secretaryService.getAllAttendance({
                     date_from: weekRange.dateFrom,
                     date_to: weekRange.dateTo,
-                    page_size: 200,
+                    page_size: 100,
                 });
-                const records = attendancePayload?.results || attendancePayload || [];
 
                 if (!isMounted) {
                     return;
@@ -488,7 +524,10 @@ const SecretaryDashboard = () => {
             if (!status) {
                 return;
             }
-            const attended = status !== 'absent';
+            if (status !== 'present' && status !== 'absent') {
+                return;
+            }
+            const attended = status === 'present';
 
             if (!attendanceByDate.has(dayKey)) {
                 attendanceByDate.set(dayKey, new Map());
@@ -512,16 +551,7 @@ const SecretaryDashboard = () => {
     }, [weekRange.startDate, weeklyAttendanceRecords]);
 
     const statCards = useMemo(() => {
-        const attendanceRate = stats.totalStudents > 0
-            ? Math.round(((stats.totalStudents - stats.absentToday) / stats.totalStudents) * 100)
-            : 0;
-        const pendingCardDescription = stats.pendingStudents > 0
-            ? (
-                pendingStudentMeta.name
-                    ? `Student: ${pendingStudentMeta.name} | Fetched from: ${pendingStudentMeta.source || 'unknown source'}`
-                    : `Fetched from: ${pendingStudentMeta.source || 'unknown source'}`
-            )
-            : 'No pending students';
+        const activeGuardiansTitle = t('secretary.guardians.active');
 
         return [
             {
@@ -537,7 +567,14 @@ const SecretaryDashboard = () => {
                 value: stats.pendingStudents.toLocaleString(),
                 icon: Hourglass,
                 color: 'purple',
-                description: pendingCardDescription,
+            },
+            {
+                title: activeGuardiansTitle && activeGuardiansTitle !== 'secretary.guardians.active'
+                    ? activeGuardiansTitle
+                    : 'Active Guardians',
+                value: stats.activeGuardians.toLocaleString(),
+                icon: Users,
+                color: 'green',
             },
             {
                 title: t('secretary.dashboard.unreadMessages') || 'Unread Messages',
@@ -545,22 +582,8 @@ const SecretaryDashboard = () => {
                 icon: MessageSquare,
                 color: 'amber',
             },
-            {
-                title: t('secretary.dashboard.attendanceRate') || t('student.attendance.attendanceRate') || 'Attendance Rate',
-                value: `${attendanceRate}%`,
-                icon: TrendingUp,
-                trend: '+2.3%',
-                trendUp: true,
-                color: 'green',
-            },
-            {
-                title: t('secretary.dashboard.absentToday') || 'Absent Today',
-                value: stats.absentToday,
-                icon: Clock,
-                color: 'rose',
-            },
         ];
-    }, [stats.totalStudents, stats.pendingStudents, stats.unreadMessages, stats.absentToday, pendingStudentMeta.name, pendingStudentMeta.source, t]);
+    }, [stats.totalStudents, stats.pendingStudents, stats.unreadMessages, stats.activeGuardians, t]);
 
     const quickAccessButtons = useMemo(() => {
         return [
@@ -585,22 +608,22 @@ const SecretaryDashboard = () => {
 
         return (
             <div className="sec-header-actions">
-                <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => fetchDashboardData({ forceRefresh: true })}
-                >
-                    <RefreshCw size={16} />
-                    Refresh
-                </button>
-                <button className="btn-primary" onClick={() => handleNavigate('/secretary/admissions')}>
-                    <Plus size={18} />
-                    New Admission
-                </button>
+                <NotificationDropdown
+                    communicationPath="/secretary/communication"
+                    allowedRoutePrefixes={[
+                        '/secretary/dashboard',
+                        '/secretary/admissions',
+                        '/secretary/guardians',
+                        '/secretary/attendance',
+                        '/secretary/communication',
+                        '/secretary/info',
+                        '/secretary/settings',
+                    ]}
+                />
                 <span className="sec-header-updated">Updated {updatedLabel}</span>
             </div>
         );
-    }, [fetchDashboardData, handleNavigate, lastUpdated]);
+    }, [lastUpdated]);
 
     const firstName = user?.displayName?.split(' ')[0] || user?.full_name?.split(' ')[0] || 'Secretary';
 
@@ -614,7 +637,7 @@ const SecretaryDashboard = () => {
 
             <section className="sec-stats-grid">
                 {statsLoading ? (
-                    Array.from({ length: 5 }).map((_, index) => (
+                    Array.from({ length: 4 }).map((_, index) => (
                         <article key={`sec-stat-skeleton-${index}`} className="stat-card sec-stat-card sec-stat-skeleton">
                             <div className="sec-stat-skeleton-line"></div>
                             <div className="sec-stat-skeleton-value"></div>

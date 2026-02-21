@@ -11,7 +11,6 @@ import {
     Sparkles,
     Bell,
     MessageSquare,
-    RefreshCw,
     Menu,
     X,
     ChevronLeft
@@ -19,14 +18,48 @@ import {
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { StudentDataProvider, useStudentData } from '../../context/StudentDataContext';
+import studentService from '../../services/studentService';
 import './Student.css';
 
 const SIDEBAR_BREAKPOINT = 768;
+const TODAY_ATTENDANCE_STATUS = {
+    PRESENT: 'present',
+    ABSENT: 'absent',
+    NOT_RECORDED: 'not_recorded'
+};
+
+const toLocalIsoDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const normalizeAttendanceStatus = (status = '') => String(status).trim().toLowerCase();
+
+const resolveTodayAttendanceStatus = (records = []) => {
+    if (!Array.isArray(records) || records.length === 0) {
+        return TODAY_ATTENDANCE_STATUS.NOT_RECORDED;
+    }
+
+    const statuses = records.map((record) => normalizeAttendanceStatus(record?.status));
+    if (statuses.includes('absent')) {
+        return TODAY_ATTENDANCE_STATUS.ABSENT;
+    }
+
+    if (statuses.some((status) => ['present', 'late', 'excused'].includes(status))) {
+        return TODAY_ATTENDANCE_STATUS.PRESENT;
+    }
+
+    return TODAY_ATTENDANCE_STATUS.NOT_RECORDED;
+};
 
 const StudentLayoutContent = () => {
     const { t } = useTheme();
     const { user, logout } = useAuth();
     const { dashboardData, loading } = useStudentData();
+    const [todayAttendanceStatus, setTodayAttendanceStatus] = useState(TODAY_ATTENDANCE_STATUS.NOT_RECORDED);
 
     // Initialize sidebar state based on screen width
     const [isSidebarOpen, setIsSidebarOpen] = useState(
@@ -47,13 +80,53 @@ const StudentLayoutContent = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const stats = {
-        attendance: `${dashboardData?.attendance?.attendance_rate || 0}%`,
-        gpa: dashboardData?.grades?.overall_average
-            ? (dashboardData.grades.overall_average / 25).toFixed(1)
-            : '0.0',
-        classroom: `${dashboardData?.profile?.current_classroom?.classroom_name || ''} • ${dashboardData?.profile?.current_classroom?.grade_name || ''}`
-    };
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!user?.id) {
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        const todayIso = toLocalIsoDate();
+
+        studentService.getAttendance(null, {
+            params: {
+                date_from: todayIso,
+                date_to: todayIso,
+                page_size: 200
+            }
+        })
+            .then((response) => {
+                if (cancelled) {
+                    return;
+                }
+                const records = Array.isArray(response?.results)
+                    ? response.results
+                    : Array.isArray(response)
+                        ? response
+                        : [];
+                setTodayAttendanceStatus(resolveTodayAttendanceStatus(records));
+            })
+            .catch((err) => {
+                console.error('Failed to fetch today attendance:', err);
+                if (!cancelled) {
+                    setTodayAttendanceStatus(TODAY_ATTENDANCE_STATUS.NOT_RECORDED);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.id]);
+
+    const classroomText = `${dashboardData?.profile?.current_classroom?.classroom_name || ''} • ${dashboardData?.profile?.current_classroom?.grade_name || ''}`;
+    const todayAttendanceUi = todayAttendanceStatus === TODAY_ATTENDANCE_STATUS.ABSENT
+        ? { label: 'Absent', tone: 'absent' }
+        : todayAttendanceStatus === TODAY_ATTENDANCE_STATUS.PRESENT
+            ? { label: 'Present', tone: 'present' }
+            : { label: 'Not recorded', tone: 'pending' };
 
     const navItems = [
         { path: '/student/dashboard', labelKey: 'student.nav.dashboard', icon: LayoutDashboard },
@@ -121,19 +194,10 @@ const StudentLayoutContent = () => {
 
                 <div className="student-sidebar-footer">
                     <div className="student-quick-stats">
-                        <div className="student-stat-mini">
-                            <span className="student-stat-value">
-                                {loading ? <RefreshCw className="animate-spin" size={14} /> : stats.attendance}
-                            </span>
-                            <span className="student-stat-label">Attendance</span>
-                        </div>
-                        <div className="student-stat-divider"></div>
-                        <div className="student-stat-mini">
-                            <span className="student-stat-value">
-                                {loading ? <RefreshCw className="animate-spin" size={14} /> : stats.gpa}
-                            </span>
-                            <span className="student-stat-label">GPA</span>
-                        </div>
+                        <span className="student-stat-label">Today Attendance</span>
+                        <span className={`student-attendance-status ${todayAttendanceUi.tone}`}>
+                            {todayAttendanceUi.label}
+                        </span>
                     </div>
 
                     <button className="student-logout-btn" onClick={logout}>
@@ -147,7 +211,7 @@ const StudentLayoutContent = () => {
                         </div>
                         <div className="student-profile-info">
                             <span className="student-profile-name">{user?.full_name || 'Student'}</span>
-                            <span className="student-profile-class">{loading ? 'Loading...' : stats.classroom}</span>
+                            <span className="student-profile-class">{loading ? 'Loading...' : classroomText}</span>
                         </div>
                         <button className="student-notification-btn">
                             <Bell size={16} />

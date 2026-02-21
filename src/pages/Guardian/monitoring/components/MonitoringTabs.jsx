@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { AlertTriangle, ClipboardList, GraduationCap, UserCheck } from 'lucide-react';
 import AcademicOverviewTab from './tabs/AcademicOverviewTab';
-import { useStudentMarks } from '../hooks/useStudentMarks';
+import { useStudentAssessments } from '../hooks/useStudentAssessments';
 import { useStudentAttendance } from '../hooks/useStudentAttendance';
+import { useStudentBehavior } from '../hooks/useStudentBehavior';
 import { formatDate } from '../utils/monitoringUtils';
 
 const TAB_OPTIONS = [
@@ -21,12 +22,34 @@ const formatStatusLabel = (status) => {
     return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
 
+const formatSubmissionStatusLabel = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    if (['submitted', 'late', 'graded', 'pending'].includes(normalized)) {
+        return 'Submitted';
+    }
+    if (normalized === 'not_submitted') {
+        return 'Not Submitted';
+    }
+    return '--';
+};
+
+const getSubmissionStatusClassName = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    if (['submitted', 'late', 'graded', 'pending'].includes(normalized)) {
+        return 'submitted';
+    }
+    if (normalized === 'not_submitted') {
+        return 'not_submitted';
+    }
+    return 'pending';
+};
+
 const AssessmentsListTab = ({ studentId }) => {
     const {
-        data: marks = [],
+        data: assessments = [],
         isLoading,
         error,
-    } = useStudentMarks(studentId);
+    } = useStudentAssessments(studentId);
 
     if (isLoading) {
         return <div className="guardian-card monitoring-empty-state">Loading assessments...</div>;
@@ -46,27 +69,36 @@ const AssessmentsListTab = ({ studentId }) => {
                 <thead>
                     <tr>
                         <th>Subject</th>
+                        <th>Assessment</th>
                         <th>Type</th>
-                        <th>Date</th>
-                        <th>Score</th>
+                        <th>Due Date</th>
+                        <th>Full Mark</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {marks.map((entry) => (
+                    {assessments.map((entry) => {
+                        const submissionStatus = entry.student_submission_status || entry.status;
+                        return (
                         <tr key={entry.id}>
-                            <td>{entry.course_name}</td>
-                            <td>{entry.assessment_type}</td>
-                            <td>{formatDate(entry.date_recorded)}</td>
+                            <td>{entry.course_name || '--'}</td>
+                            <td>{entry.title || '--'}</td>
+                            <td>{entry.exam_type_display || entry.assignment_type || entry.exam_type || '--'}</td>
+                            <td>{formatDate(entry.due_date)}</td>
                             <td>
-                                <span className="score-badge">
-                                    {entry.marks_obtained}/{entry.max_marks}
+                                <span className="score-badge">{entry.full_mark ?? '--'}</span>
+                            </td>
+                            <td>
+                                <span className={`status-badge ${getSubmissionStatusClassName(submissionStatus)}`}>
+                                    {formatSubmissionStatusLabel(submissionStatus)}
                                 </span>
                             </td>
                         </tr>
-                    ))}
-                    {marks.length === 0 && (
+                        );
+                    })}
+                    {assessments.length === 0 && (
                         <tr>
-                            <td colSpan="4" className="text-center py-4">No assessment data found.</td>
+                            <td colSpan="6" className="text-center py-4">No published assessments found.</td>
                         </tr>
                     )}
                 </tbody>
@@ -127,27 +159,57 @@ const AttendanceListTab = ({ studentId }) => {
     );
 };
 
-const BehaviorTab = () => {
-    const behavior = useMemo(
-        () => [
-            { id: 1, date: '2023-10-01', type: 'positive', comment: 'Helped a classmate with their work.' },
-            { id: 2, date: '2023-09-25', type: 'negative', comment: 'Talking during class session.' },
-        ],
-        []
-    );
+const BehaviorTab = ({ studentId }) => {
+    const {
+        data: behavior = [],
+        isLoading,
+        isFetching,
+        error,
+        refetch,
+    } = useStudentBehavior(studentId, { autoRefresh: true });
+
+    if (isLoading) {
+        return <div className="guardian-card monitoring-empty-state">Loading behavior notes...</div>;
+    }
+
+    if (error) {
+        return (
+            <div className="guardian-card monitoring-empty-state monitoring-empty-state-error">
+                {error.message || 'Failed to load behavior notes.'}
+            </div>
+        );
+    }
+
+    if (behavior.length === 0) {
+        return (
+            <div className="guardian-card monitoring-empty-state">
+                No behavior notes found for this student.
+            </div>
+        );
+    }
 
     return (
         <div className="guardian-card behavior-tab-card">
+            <div className="behavior-tab-actions">
+                <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => refetch()}
+                    disabled={isFetching}
+                >
+                    {isFetching ? 'Refreshing...' : 'Refresh'}
+                </button>
+            </div>
             <div className="behavior-list">
                 {behavior.map((entry) => (
                     <div key={entry.id} className="behavior-list-item">
                         <div className="behavior-list-meta">
-                            <span>{formatDate(entry.date)}</span>
+                            <span>{formatDate(entry.date_recorded || entry.date)}</span>
                             <span className={`status-badge ${entry.type}`}>
                                 {entry.type === 'positive' ? 'Positive' : 'Negative'}
                             </span>
                         </div>
-                        <p className="behavior-list-comment">{entry.comment}</p>
+                        <p className="behavior-list-comment">{entry.message || entry.comment || '--'}</p>
                     </div>
                 ))}
             </div>
@@ -178,7 +240,7 @@ const MonitoringTabs = ({ activeTab, onTabChange, studentId }) => {
             {activeTab === 'academic' && <AcademicOverviewTab studentId={studentId} />}
             {activeTab === 'assessments' && <AssessmentsListTab studentId={studentId} />}
             {activeTab === 'attendance' && <AttendanceListTab studentId={studentId} />}
-            {activeTab === 'behavior' && <BehaviorTab />}
+            {activeTab === 'behavior' && <BehaviorTab studentId={studentId} />}
         </>
     );
 };

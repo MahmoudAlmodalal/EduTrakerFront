@@ -167,8 +167,17 @@ const secretaryService = {
     },
 
     // Secretary school context (school, classrooms, teachers, students, managers)
-    getSecretaryContext: async () => {
-        return api.get('/secretary/context/');
+    getSecretaryContext: async ({ forceRefresh = false, signal } = {}) => {
+        const queryParams = new URLSearchParams();
+        if (forceRefresh) {
+            queryParams.set('_ts', String(Date.now()));
+        }
+
+        const queryString = queryParams.toString();
+        const endpoint = `/secretary/context/${queryString ? `?${queryString}` : ''}`;
+        const config = signal ? { signal } : undefined;
+
+        return api.get(endpoint, config);
     },
 
     // Secretary Profile/Settings
@@ -683,6 +692,9 @@ const secretaryService = {
     // Communication
     getMessages: async () => {
         return api.get('/user-messages/');
+    },
+    getUnreadMessageCount: async () => {
+        return api.get('/user-messages/unread-count/');
     },
     getMessageThread: async (threadId) => {
         return api.get(`/user-messages/threads/${threadId}/`);

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { getRoleConfig, getBasePath } from '../config/roleConfig';
 import authService from '../services/authService';
 import { sessionCache } from '../utils/sessionCache';
@@ -55,6 +56,7 @@ const normalizeUser = (rawUser) => {
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+    const queryClient = useQueryClient();
     const [user, setUser] = useState(() => {
         const savedUser = localStorage.getItem('user');
         if (!savedUser) {
@@ -178,6 +180,10 @@ export const AuthProvider = ({ children }) => {
     const login = useCallback((authData, type = 'PORTAL', wsId = null) => {
         const { user: backendUser, tokens } = authData;
 
+        // Start each authenticated session with a clean client-side data cache.
+        queryClient.clear();
+        sessionCache.clear();
+
         // 1. Store tokens and metadata
         localStorage.setItem('accessToken', tokens.access);
         localStorage.setItem('refreshToken', tokens.refresh);
@@ -206,7 +212,7 @@ export const AuthProvider = ({ children }) => {
         // 5. Redirect to the role's base path
         const basePath = getBasePath(userData?.role);
         navigate(basePath);
-    }, [navigate]);
+    }, [navigate, queryClient]);
 
     const logout = useCallback(async () => {
         const refreshToken = localStorage.getItem('refreshToken');
@@ -236,6 +242,7 @@ export const AuthProvider = ({ children }) => {
 
         // 2. Clear session cache and manager
         sessionCache.clear();
+        queryClient.clear();
         SessionManager.clearSession();
 
         // 3. Reset React state
@@ -255,7 +262,7 @@ export const AuthProvider = ({ children }) => {
                 console.warn('Backend logout failed, local cleanup already complete', e);
             }
         }
-    }, [navigate]);
+    }, [navigate, queryClient]);
 
     const isAuthenticated = !!user;
 

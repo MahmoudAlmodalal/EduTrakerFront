@@ -187,7 +187,7 @@ const buildAssignmentState = (assignment, now = new Date()) => {
         }
     }
 
-    return { tone, isClosedNoSubmission, inGrace };
+    return { tone, isClosedNoSubmission, inGrace, isSubmitted };
 };
 
 const parseLessonPlanContent = (content = '') => {
@@ -229,6 +229,7 @@ const StudentSubjects = () => {
     const { dashboardData, loading, error, refreshData } = useStudentData();
 
     const materialQueryId = searchParams.get('material');
+    const assignmentQueryId = searchParams.get('assignment');
     const classroomQueryId = searchParams.get('classroom');
     const courseQueryId = searchParams.get('course');
     const queryTab = searchParams.get('tab');
@@ -275,10 +276,27 @@ const StudentSubjects = () => {
         }));
     }, [dashboardData?.courses?.courses, dashboardData?.grades?.marks]);
 
-    const selectedSubject = useMemo(
-        () => subjects.find((subject) => String(subject.id) === String(courseId)),
-        [courseId, subjects]
-    );
+    const selectedSubject = useMemo(() => {
+        if (!courseId) {
+            return null;
+        }
+
+        const sameCourseSubjects = subjects.filter((subject) => String(subject.id) === String(courseId));
+        if (sameCourseSubjects.length === 0) {
+            return null;
+        }
+
+        if (classroomQueryId) {
+            const classMatchedSubject = sameCourseSubjects.find(
+                (subject) => String(subject.classroom_id) === String(classroomQueryId)
+            );
+            if (classMatchedSubject) {
+                return classMatchedSubject;
+            }
+        }
+
+        return sameCourseSubjects[0];
+    }, [classroomQueryId, courseId, subjects]);
 
     const subjectKey = useCallback((subject) => `${subject.id}:${subject.classroom_id}`, []);
 
@@ -410,13 +428,15 @@ const StudentSubjects = () => {
         if (!normalizedQueryTab) {
             if (materialQueryId) {
                 setActiveTab('content');
+            } else if (assignmentQueryId) {
+                setActiveTab('assignments');
             }
             return;
         }
         if (['content', 'assignments', 'lesson-plans'].includes(normalizedQueryTab)) {
             setActiveTab(normalizedQueryTab);
         }
-    }, [materialQueryId, normalizedQueryTab]);
+    }, [assignmentQueryId, materialQueryId, normalizedQueryTab]);
 
     useEffect(() => {
         if (courseId || subjects.length === 0 || (!classroomQueryId && !courseQueryId)) {
@@ -439,10 +459,10 @@ const StudentSubjects = () => {
 
         const nextParams = new URLSearchParams(searchParams.toString());
         if (!nextParams.get('tab')) {
-            nextParams.set('tab', 'content');
+            nextParams.set('tab', assignmentQueryId ? 'assignments' : 'content');
         }
         navigate(`/student/subjects/${targetSubject.id}?${nextParams.toString()}`, { replace: true });
-    }, [classroomQueryId, courseId, courseQueryId, navigate, searchParams, subjects]);
+    }, [assignmentQueryId, classroomQueryId, courseId, courseQueryId, navigate, searchParams, subjects]);
 
     useEffect(() => {
         if (!courseId || !materialQueryId || detailLoading || activeTab !== 'content') {
@@ -459,6 +479,22 @@ const StudentSubjects = () => {
         }, 1800);
         return () => clearTimeout(timeoutId);
     }, [activeTab, courseId, detailData.materials, detailLoading, materialQueryId]);
+
+    useEffect(() => {
+        if (!courseId || !assignmentQueryId || detailLoading || activeTab !== 'assignments') {
+            return;
+        }
+        const element = document.querySelector(`[data-assignment-id="${assignmentQueryId}"]`);
+        if (!element) {
+            return;
+        }
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('student-assignment-highlight');
+        const timeoutId = setTimeout(() => {
+            element.classList.remove('student-assignment-highlight');
+        }, 1800);
+        return () => clearTimeout(timeoutId);
+    }, [activeTab, assignmentQueryId, courseId, detailData.assignments, detailLoading]);
 
     useEffect(() => {
         if (courseId || subjects.length === 0) {
@@ -553,6 +589,10 @@ const StudentSubjects = () => {
         }
 
         const state = buildAssignmentState(selectedAssignment, new Date());
+        if (state.isSubmitted) {
+            toast.error('Already submitted. Resubmission is not allowed.');
+            return;
+        }
         if (state.isClosedNoSubmission) {
             toast.error('This assignment is closed.');
             return;
@@ -571,6 +611,23 @@ const StudentSubjects = () => {
             }));
             toast.success('Homework submitted successfully!');
         } catch (submitError) {
+            if (submitError?.data?.code === 'already_submitted') {
+                toast.error('Already submitted. Resubmission is not allowed.');
+                try {
+                    const latest = await studentService.getAssignmentDetail(selectedAssignment.id);
+                    setSelectedAssignment(latest);
+                    setSubmissionFile(null);
+                    setDetailData((previous) => ({
+                        ...previous,
+                        assignments: previous.assignments.map((item) => (
+                            item.id === latest.id ? latest : item
+                        ))
+                    }));
+                } catch {
+                    // no-op: original error toast above is enough
+                }
+                return;
+            }
             toast.error(submitError?.message || 'Failed to submit assignment.');
         } finally {
             setSubmitting(false);
@@ -598,6 +655,9 @@ const StudentSubjects = () => {
 
     if (courseId && selectedSubject) {
         const teacher = detailData.teacher || { name: selectedSubject.teacher_name };
+        const selectedAssignmentState = selectedAssignment
+            ? buildAssignmentState(selectedAssignment, new Date())
+            : null;
 
         return (
             <div className="student-subject-detail-page">
@@ -755,6 +815,7 @@ const StudentSubjects = () => {
                                         <article
                                             key={assignment.id}
                                             className={`student-assignment-card tone-${state.tone}`}
+                                            data-assignment-id={assignment.id}
                                             onClick={() => openAssignmentDrawer(assignment.id)}
                                             role="button"
                                             tabIndex={0}
@@ -806,7 +867,11 @@ const StudentSubjects = () => {
                                                     }}
                                                 >
                                                     <Upload size={14} />
-                                                    {state.isClosedNoSubmission ? 'Closed' : 'Open'}
+                                                    {state.isClosedNoSubmission
+                                                        ? 'Closed'
+                                                        : state.isSubmitted
+                                                            ? 'Submitted'
+                                                            : 'Open'}
                                                 </button>
                                             </div>
                                         </article>
@@ -966,17 +1031,40 @@ const StudentSubjects = () => {
 
                                 <section>
                                     <h4>Submit Homework</h4>
-                                    <form onSubmit={handleSubmitAssignment} className="student-assignment-submit-form">
-                                        <input
-                                            type="file"
-                                            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                                            onChange={(event) => setSubmissionFile(event.target.files?.[0] || null)}
-                                        />
-                                        <button type="submit" className="btn-primary" disabled={submitting || !submissionFile}>
-                                            <Upload size={14} />
-                                            {submitting ? 'Submitting...' : 'Submit'}
-                                        </button>
-                                    </form>
+                                    {selectedAssignmentState?.isSubmitted ? (
+                                        <p className="student-assignment-submitted-note">
+                                            Submitted. Resubmission is not allowed.
+                                        </p>
+                                    ) : (
+                                        <>
+                                            {selectedAssignmentState?.isClosedNoSubmission && (
+                                                <p className="student-assignment-warning">
+                                                    This assignment is closed. Upload is disabled.
+                                                </p>
+                                            )}
+                                            {selectedAssignmentState?.inGrace && (
+                                                <p className="student-assignment-warning">
+                                                    Overdue — you can still submit during the 24-hour grace period.
+                                                </p>
+                                            )}
+                                            <form onSubmit={handleSubmitAssignment} className="student-assignment-submit-form">
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                                                    onChange={(event) => setSubmissionFile(event.target.files?.[0] || null)}
+                                                    disabled={selectedAssignmentState?.isClosedNoSubmission}
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    className="btn-primary"
+                                                    disabled={submitting || !submissionFile || selectedAssignmentState?.isClosedNoSubmission}
+                                                >
+                                                    <Upload size={14} />
+                                                    {submitting ? 'Submitting...' : 'Submit'}
+                                                </button>
+                                            </form>
+                                        </>
+                                    )}
                                 </section>
 
                                 {selectedAssignment.submission && (

@@ -8,7 +8,7 @@ import {
     FileText,
     Settings,
     LogOut,
-    Shield,
+    Sparkles,
     Menu
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
@@ -20,7 +20,7 @@ const SIDEBAR_BREAKPOINT = 1024;
 
 const SecretaryLayoutContent = () => {
     const { t } = useTheme();
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [isMobile, setIsMobile] = useState(
         typeof window !== 'undefined' ? window.innerWidth <= SIDEBAR_BREAKPOINT : false
@@ -59,6 +59,15 @@ const SecretaryLayoutContent = () => {
         navigate('/login');
     };
 
+    const fullName = user?.full_name || user?.name || user?.displayName || 'Secretary';
+    const roleLabel = t('auth.role.secretary') || 'Secretary';
+    const initials = fullName
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('') || 'SE';
+
     return (
         <div className={`workstream-layout ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
             {isMobile && isSidebarOpen && (
@@ -76,7 +85,7 @@ const SecretaryLayoutContent = () => {
                     title="Open Sidebar"
                 >
                     <div className="workstream-logo-icon">
-                        <Shield size={24} />
+                        <Sparkles size={24} />
                     </div>
                 </button>
             )}
@@ -85,7 +94,7 @@ const SecretaryLayoutContent = () => {
             <aside className={`workstream-sidebar ${!isSidebarOpen ? 'collapsed' : ''}`}>
                 <div className="workstream-brand">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                        <Shield size={32} />
+                        <Sparkles size={28} />
                         <span>{t('app.name') || 'EduTraker'}</span>
                     </div>
                     <button
@@ -117,10 +126,74 @@ const SecretaryLayoutContent = () => {
                     ))}
                 </nav>
 
-                <div style={{ marginTop: 'auto' }}>
+                <div
+                    style={{
+                        marginTop: 'auto',
+                        paddingTop: '20px',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.06)'
+                    }}
+                >
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '12px',
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(255, 255, 255, 0.05)'
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: '42px',
+                                height: '42px',
+                                background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
+                                borderRadius: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontWeight: '700',
+                                fontSize: '0.875rem',
+                                boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                                flexShrink: 0
+                            }}
+                        >
+                            {initials}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                                style={{
+                                    fontSize: '0.875rem',
+                                    fontWeight: '600',
+                                    color: 'white',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                }}
+                            >
+                                {fullName}
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: '0.6875rem',
+                                    color: 'rgba(148, 163, 184, 0.8)',
+                                    textTransform: 'capitalize',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                }}
+                            >
+                                {roleLabel}
+                            </div>
+                        </div>
+
+                    </div>
+
                     <button
                         className="workstream-nav-item"
-                        style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                        style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', marginTop: '12px' }}
                         onClick={handleLogout}
                     >
                         <LogOut size={20} />

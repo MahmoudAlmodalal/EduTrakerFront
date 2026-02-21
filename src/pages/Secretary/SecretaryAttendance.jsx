@@ -11,6 +11,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import secretaryService from '../../services/secretaryService';
 import reportService from '../../services/reportService';
 import { getAttendanceStatusIcon } from '../../utils/secretaryHelpers';
@@ -36,8 +37,16 @@ const getStudentFilterId = (student) => {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
+const normalizeSearchText = (value = '') => (
+    String(value)
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, ' ')
+);
+
 const SecretaryAttendance = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
 
     const initialDate = new Date().toISOString().split('T')[0];
 
@@ -60,7 +69,23 @@ const SecretaryAttendance = () => {
         studentId: null,
     });
     const attendanceRequestRef = useRef(0);
+    const studentSearchRequestRef = useRef(0);
     const dropdownRef = useRef(null);
+    const schoolId = useMemo(() => {
+        const candidate = user?.school_id ?? user?.school?.id ?? user?.school;
+        const parsed = Number.parseInt(String(candidate || ''), 10);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    }, [user?.school, user?.school_id]);
+
+    const normalizeListResponse = useCallback((payload) => {
+        if (Array.isArray(payload?.results)) {
+            return payload.results;
+        }
+        if (Array.isArray(payload)) {
+            return payload;
+        }
+        return [];
+    }, []);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -87,56 +112,60 @@ const SecretaryAttendance = () => {
 
     useEffect(() => {
         const trimmedQuery = studentQuery.trim();
-        const selectedName = (selectedStudent?.name || '').trim().toLowerCase();
+        const selectedName = (selectedStudent?.name || '').trim();
 
-        if (!trimmedQuery || trimmedQuery.length < 2) {
+        if (!trimmedQuery) {
+            studentSearchRequestRef.current += 1;
             setStudentResults([]);
             setShowDropdown(false);
             setStudentLoading(false);
-            return undefined;
+            return;
         }
 
-        if (selectedStudent && trimmedQuery.toLowerCase() === selectedName) {
+        if (selectedStudent && normalizeSearchText(trimmedQuery) === normalizeSearchText(selectedName)) {
+            studentSearchRequestRef.current += 1;
             setStudentResults([]);
             setShowDropdown(false);
             setStudentLoading(false);
-            return undefined;
+            return;
         }
 
-        let isCancelled = false;
-        const timer = setTimeout(async () => {
-            setStudentLoading(true);
+        const requestId = studentSearchRequestRef.current + 1;
+        studentSearchRequestRef.current = requestId;
+
+        const timeoutId = setTimeout(async () => {
             try {
+                setStudentLoading(true);
                 const data = await secretaryService.getStudents({
+                    ...(schoolId ? { school_id: schoolId } : {}),
                     search: trimmedQuery,
                     page_size: 10,
                 });
-                if (isCancelled) {
+
+                if (studentSearchRequestRef.current !== requestId) {
                     return;
                 }
 
-                const students = Array.isArray(data?.results)
-                    ? data.results
-                    : (Array.isArray(data) ? data : []);
-                setStudentResults(students.slice(0, 10));
+                const matchedStudents = normalizeListResponse(data)
+                    .filter((student) => Boolean(getStudentFilterId(student)))
+                    .slice(0, 10);
+                setStudentResults(matchedStudents);
                 setShowDropdown(true);
-            } catch {
-                if (!isCancelled) {
-                    setStudentResults([]);
-                    setShowDropdown(true);
+            } catch (searchError) {
+                if (studentSearchRequestRef.current !== requestId) {
+                    return;
                 }
+                console.error('Error searching attendance students:', searchError);
+                setStudentResults([]);
             } finally {
-                if (!isCancelled) {
+                if (studentSearchRequestRef.current === requestId) {
                     setStudentLoading(false);
                 }
             }
         }, 300);
 
-        return () => {
-            isCancelled = true;
-            clearTimeout(timer);
-        };
-    }, [studentQuery, selectedStudent]);
+        return () => clearTimeout(timeoutId);
+    }, [normalizeListResponse, schoolId, selectedStudent, studentQuery]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -159,8 +188,8 @@ const SecretaryAttendance = () => {
             return;
         }
 
-        const selectedName = (selectedStudent.name || '').trim().toLowerCase();
-        if (query.trim().toLowerCase() !== selectedName) {
+        const selectedName = normalizeSearchText(selectedStudent.name || '');
+        if (normalizeSearchText(query) !== selectedName) {
             setSelectedStudent(null);
         }
     }, [selectedStudent]);
@@ -250,16 +279,16 @@ const SecretaryAttendance = () => {
     );
 
     const studentFilteredRecords = useMemo(() => {
-        const search = searchTerm.trim().toLowerCase();
+        const search = normalizeSearchText(searchTerm);
 
         if (!search) {
             return records;
         }
 
         return records.filter((record) => {
-            const studentName = (record.student_name || '').toLowerCase();
-            const studentId = String(record.student_id || '');
-            return studentName.includes(search) || studentId.includes(search);
+            const studentName = normalizeSearchText(record.student_name || '');
+            const studentCode = normalizeSearchText(record.student_id || '');
+            return studentName.includes(search) || studentCode.includes(search);
         });
     }, [records, searchTerm]);
 
@@ -307,14 +336,11 @@ const SecretaryAttendance = () => {
 
             const exportRows = filteredRecords.map((record) => ({
                 student_name: record.student_name || '',
-                student_id: record.student_id || '',
                 classroom_name: record.classroom_name || '',
                 date: record.date || '',
                 status: getStatusLabel(record.status),
                 note: record.note || '',
                 recorded_by: record.recorded_by_name || '',
-                date_from: dateFrom || '',
-                date_to: dateTo || '',
             }));
 
             await reportService.exportReport('pdf', 'secretary_attendance', exportRows);
@@ -324,7 +350,7 @@ const SecretaryAttendance = () => {
         } finally {
             setIsExportingPdf(false);
         }
-    }, [filteredRecords, getStatusLabel, dateFrom, dateTo]);
+    }, [filteredRecords, getStatusLabel]);
 
     return (
         <div className="secretary-dashboard">
@@ -398,7 +424,7 @@ const SecretaryAttendance = () => {
                         </select>
                     </div>
 
-                    <div className="sec-field sec-field--grow" ref={dropdownRef}>
+                    <div className="sec-field sec-field--grow sec-attendance-search-field" ref={dropdownRef}>
                         <label htmlFor="attendance-search" className="form-label">Search Student</label>
                         <div className="search-wrapper sec-search-wrapper">
                             <Search size={16} className="search-icon" />
@@ -406,13 +432,13 @@ const SecretaryAttendance = () => {
                                 id="attendance-search"
                                 type="text"
                                 className="search-input"
-                                placeholder="Type at least 2 letters..."
+                                placeholder="Type first letter(s) of student name..."
                                 value={studentQuery}
                                 onChange={handleStudentQueryChange}
                                 onFocus={() => {
                                     const trimmedQuery = studentQuery.trim();
-                                    const selectedName = (selectedStudent?.name || '').trim().toLowerCase();
-                                    if (trimmedQuery.length >= 2 && trimmedQuery.toLowerCase() !== selectedName) {
+                                    const selectedName = normalizeSearchText(selectedStudent?.name || '');
+                                    if (trimmedQuery.length >= 1 && normalizeSearchText(trimmedQuery) !== selectedName) {
                                         setShowDropdown(true);
                                     }
                                 }}

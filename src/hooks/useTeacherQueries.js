@@ -11,6 +11,7 @@ export const teacherQueryKeys = {
     students: (filters = {}) => ['teacher', 'students', filters],
     attendance: (classRoomId, date) => ['teacher', 'attendance', classRoomId, date],
     homeroomAttendance: (date) => ['teacher', 'homeroom-attendance', date],
+    behavior: (filters = {}) => ['teacher', 'behavior', filters],
     assignments: (filters = {}) => ['teacher', 'assignments', filters],
     assignmentDetail: (assignmentId) => ['teacher', 'assignment', assignmentId],
     assignmentSubmissions: (assignmentId) => ['teacher', 'assignment-submissions', assignmentId],
@@ -212,6 +213,24 @@ export const useRecordBulkAttendanceMutation = () => {
 
             queryClient.invalidateQueries({ queryKey: teacherQueryKeys.dashboardStats });
             queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+        }
+    });
+};
+
+export const useTeacherBehavior = (filters = {}, options = {}) =>
+    useQuery({
+        queryKey: teacherQueryKeys.behavior(filters),
+        queryFn: () => teacherService.getBehavior(filters),
+        ...options
+    });
+
+export const useRecordTeacherBehaviorMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (payload) => teacherService.recordBehavior(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['teacher', 'behavior'] });
         }
     });
 };

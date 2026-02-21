@@ -70,7 +70,8 @@ const LeadershipCard = ({ roleLabel, person, iconNode, variantClass }) => {
 
 const SecretaryInfo = () => {
     const { user } = useAuth();
-    const { dashboardData, loading: ctxLoading } = useSecretaryData();
+    const { dashboardData, loading: ctxLoading, refreshData } = useSecretaryData();
+    const userId = user?.id ?? user?.user_id ?? null;
     const [ctx, setCtx] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -80,24 +81,52 @@ const SecretaryInfo = () => {
     const [copiedStudentKey, setCopiedStudentKey] = useState(null);
 
     useEffect(() => {
+        if (!userId) {
+            setCtx(null);
+            setLoading(false);
+            setError(null);
+            return;
+        }
+
         let cancelled = false;
-        setLoading(true);
-        setError(null);
-        secretaryService.getSecretaryContext()
-            .then((data) => {
+        const controller = new AbortController();
+
+        const loadContext = async () => {
+            setLoading(true);
+            setError(null);
+
+            void refreshData({ forceRefresh: true });
+
+            try {
+                const data = await secretaryService.getSecretaryContext({
+                    forceRefresh: true,
+                    signal: controller.signal,
+                });
+
                 if (!cancelled) {
                     setCtx(data);
-                    setLoading(false);
                 }
-            })
-            .catch((err) => {
-                if (!cancelled) {
+            } catch (err) {
+                const wasCanceled = err?.code === 'ERR_CANCELED'
+                    || err?.name === 'CanceledError'
+                    || err?.name === 'AbortError';
+                if (!cancelled && !wasCanceled) {
                     setError(err?.message || 'Failed to load');
+                }
+            } finally {
+                if (!cancelled) {
                     setLoading(false);
                 }
-            });
-        return () => { cancelled = true; };
-    }, []);
+            }
+        };
+
+        void loadContext();
+
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, [refreshData, userId]);
 
     const profile = {
         secretary_name: dashboardData?.profile?.full_name

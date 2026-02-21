@@ -1,33 +1,59 @@
 import React, { useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { useStudentMarks } from '../hooks/useStudentMarks';
 import { useStudentAttendance } from '../hooks/useStudentAttendance';
-import { useAttendanceStats } from '../hooks/useAttendanceStats';
-import { formatDate, formatPercentage, getGpaColor } from '../utils/monitoringUtils';
-import GpaProgressBar from './shared/GpaProgressBar';
+import { todayIsoDate } from '../../../../utils/helpers';
 
-const calculateOverallGpa = (marks = []) => {
-    if (!Array.isArray(marks) || marks.length === 0) {
-        return null;
+const toText = (value, fallback = 'Not assigned yet') => {
+    const normalized = typeof value === 'string' ? value.trim() : value;
+    return normalized ? normalized : fallback;
+};
+
+const normalizeAttendanceStatus = (status) => String(status || '').toLowerCase().trim();
+
+const resolveTodayAttendance = ({ attendance = [], classroomName = '' }) => {
+    const today = todayIsoDate();
+    const classroomNormalized = String(classroomName || '').trim().toLowerCase();
+
+    const todayRecords = attendance.filter((entry) => {
+        const dateValue = String(entry?.date || '').slice(0, 10);
+        return dateValue === today;
+    });
+
+    if (todayRecords.length === 0) {
+        return { label: 'Not recorded yet', tone: 'pending' };
     }
 
-    const percentages = marks
-        .map((mark) => {
-            const obtained = Number(mark?.marks_obtained);
-            const max = Number(mark?.max_marks);
-            if (!Number.isFinite(obtained) || !Number.isFinite(max) || max <= 0) {
-                return null;
-            }
-            return (obtained / max) * 100;
-        })
-        .filter((value) => Number.isFinite(value));
+    const matchingClassroomRecords = classroomNormalized
+        ? todayRecords.filter(
+            (entry) => String(entry?.classroom_name || '').trim().toLowerCase() === classroomNormalized
+        )
+        : [];
+    const records = matchingClassroomRecords.length > 0 ? matchingClassroomRecords : todayRecords;
+    const statuses = records.map((entry) => normalizeAttendanceStatus(entry?.status));
 
-    if (percentages.length === 0) {
-        return null;
+    if (statuses.some((status) => ['present', 'late', 'excused'].includes(status))) {
+        return { label: 'Present', tone: 'present' };
     }
 
-    const sum = percentages.reduce((total, value) => total + value, 0);
-    return sum / percentages.length;
+    if (statuses.every((status) => status === 'absent')) {
+        return { label: 'Absent', tone: 'absent' };
+    }
+
+    const primaryStatus = statuses[0];
+    if (!primaryStatus) {
+        return { label: 'Not recorded yet', tone: 'pending' };
+    }
+
+    return {
+        label: primaryStatus.charAt(0).toUpperCase() + primaryStatus.slice(1),
+        tone: 'pending',
+    };
+};
+
+const ATTENDANCE_STATUS_COLOR = {
+    present: '#16a34a',
+    absent: '#dc2626',
+    pending: '#64748b',
 };
 
 const StatItem = ({ label, value, loading = false, accentColor }) => {
@@ -49,95 +75,61 @@ const StatItem = ({ label, value, loading = false, accentColor }) => {
 
 const StudentOverviewCard = ({ studentId, student }) => {
     const {
-        data: marks = [],
-        isLoading: marksLoading,
-        error: marksError,
-    } = useStudentMarks(studentId);
-
-    const {
         data: attendance = [],
         isLoading: attendanceLoading,
         error: attendanceError,
     } = useStudentAttendance(studentId);
 
-    const attendanceStats = useAttendanceStats(attendance);
+    const studentName = toText(student?.student_name, 'Student');
+    const classroomName = toText(student?.classroom_name);
+    const homeroomTeacherName = toText(student?.homeroom_teacher_name);
 
-    const overallGpa = useMemo(() => calculateOverallGpa(marks), [marks]);
-
-    const latestDate = useMemo(() => {
-        const allDates = [
-            ...marks.map((entry) => entry?.date_recorded).filter(Boolean),
-            ...attendance.map((entry) => entry?.date).filter(Boolean),
-        ];
-
-        if (allDates.length === 0) {
-            return null;
-        }
-
-        const latestTimestamp = allDates.reduce((max, value) => {
-            const currentTime = new Date(value).getTime();
-            if (Number.isNaN(currentTime)) {
-                return max;
-            }
-            return Math.max(max, currentTime);
-        }, 0);
-
-        return latestTimestamp > 0 ? latestTimestamp : null;
-    }, [attendance, marks]);
-
-    const gpaColor = getGpaColor(overallGpa);
-    const hasError = Boolean(marksError || attendanceError);
+    const todayAttendance = useMemo(
+        () => resolveTodayAttendance({ attendance, classroomName }),
+        [attendance, classroomName]
+    );
+    const hasError = Boolean(attendanceError);
 
     return (
         <div className="guardian-card student-overview-card">
             <div className="student-overview-header">
                 <div>
                     <h2 className="student-overview-name">
-                        {student?.student_name || 'Student Overview'}
+                        {studentName}
                     </h2>
                     <p className="student-overview-meta">
-                        {student?.grade || student?.grade_name || student?.class_name || student?.classroom_name || 'Academic snapshot'}
+                        Student classroom & attendance summary
                     </p>
                 </div>
-                {latestDate && (
-                    <div className="student-overview-updated">
-                        Last updated: {formatDate(latestDate)}
-                    </div>
-                )}
             </div>
 
             {hasError && (
                 <div className="monitoring-inline-error">
                     <AlertCircle size={16} />
-                    <span>{(marksError || attendanceError)?.message || 'Failed to load student summary.'}</span>
+                    <span>{attendanceError?.message || 'Failed to load student summary.'}</span>
                 </div>
             )}
 
             <div className="student-overview-stats">
                 <StatItem
-                    label="Overall GPA"
-                    value={formatPercentage(overallGpa)}
-                    loading={marksLoading}
-                    accentColor={gpaColor}
+                    label="Student Name"
+                    value={studentName}
                 />
                 <StatItem
-                    label="Attendance Rate"
-                    value={formatPercentage(attendanceStats.rate)}
+                    label="Classroom"
+                    value={classroomName}
+                />
+                <StatItem
+                    label="Homeroom Teacher"
+                    value={homeroomTeacherName}
+                />
+                <StatItem
+                    label="Today's Attendance"
+                    value={todayAttendance.label}
                     loading={attendanceLoading}
-                />
-                <StatItem
-                    label="Absent Days"
-                    value={attendanceStats.absent}
-                    loading={attendanceLoading}
-                />
-                <StatItem
-                    label="Assessments"
-                    value={marks.length}
-                    loading={marksLoading}
+                    accentColor={ATTENDANCE_STATUS_COLOR[todayAttendance.tone]}
                 />
             </div>
-
-            <GpaProgressBar value={overallGpa || 0} color={gpaColor} showLabel />
         </div>
     );
 };

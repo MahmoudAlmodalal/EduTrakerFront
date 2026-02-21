@@ -54,6 +54,12 @@ const STUDENT_ACTIVITY_FILTER_OPTIONS = [
     { value: 'not_active', label: 'Not Active' },
 ];
 
+const ASSIGNMENT_CLASSROOM_FILTER_OPTIONS = [
+    { value: '', label: 'All' },
+    { value: 'assigned', label: 'Assigned' },
+    { value: 'not_assigned', label: 'Not Assigned' },
+];
+
 const APPLICATION_STATUS_FILTER_OPTIONS = [
     { value: 'pending', label: 'Pending' },
     { value: 'enrolled', label: 'Enrolled' },
@@ -335,22 +341,6 @@ const getStudentGradeId = (student) => {
     return gradeId;
 };
 
-const getClassroomId = (classroom) => {
-    const candidate = (
-        classroom?.id
-        ?? classroom?.classroom_id
-        ?? classroom?.class_room_id
-        ?? classroom?.class_room?.id
-        ?? classroom?.class_room
-    );
-
-    if (candidate === null || candidate === undefined || candidate === '') {
-        return null;
-    }
-
-    return String(candidate);
-};
-
 const getClassroomName = (classroom) => {
     const candidate = (
         classroom?.classroom_name
@@ -435,6 +425,18 @@ const hasAssignedClassroom = (student) => {
     );
 };
 
+const getStudentClassroomName = (student) => {
+    const candidate = (
+        student?.classroom_name
+        ?? student?.classroom?.classroom_name
+        ?? student?.class_room_name
+        ?? student?.class_room?.classroom_name
+        ?? ''
+    );
+
+    return String(candidate).trim();
+};
+
 const createEmptySchoolStudentStats = () => ({
     totalStudents: 0,
     activeStudents: 0,
@@ -504,12 +506,14 @@ const StudentAdmissions = () => {
     const [assignmentSearch, setAssignmentSearch] = useState('');
     const [applicationActivityFilter, setApplicationActivityFilter] = useState('pending');
     const [assignmentActivityFilter, setAssignmentActivityFilter] = useState('');
+    const [assignmentClassroomFilter, setAssignmentClassroomFilter] = useState('');
     const [applicationsPage, setApplicationsPage] = useState(1);
     const [assignmentPage, setAssignmentPage] = useState(1);
     const [filesPage, setFilesPage] = useState(1);
     const [applicationsPagination, setApplicationsPagination] = useState(createEmptyPaginationState);
     const [assignmentPagination, setAssignmentPagination] = useState(createEmptyPaginationState);
     const [filesPagination, setFilesPagination] = useState(createEmptyPaginationState);
+    const [assignmentClassroomMap, setAssignmentClassroomMap] = useState({});
     const [schoolStudentStats, setSchoolStudentStats] = useState(createEmptySchoolStudentStats);
     const [schoolClassroomsTotal, setSchoolClassroomsTotal] = useState(0);
 
@@ -547,6 +551,7 @@ const StudentAdmissions = () => {
     const academicYearsRequestRef = useRef(0);
     const schoolStatsRequestRef = useRef(0);
     const schoolClassroomsRequestRef = useRef(0);
+    const assignmentClassroomMapRequestRef = useRef(0);
     const documentFileInputRef = useRef(null);
     const birthCertificateInputRef = useRef(null);
 
@@ -620,15 +625,36 @@ const StudentAdmissions = () => {
     const assignmentStudents = useMemo(() => {
         const selectedGradeId = Number(selectedGradeFilter);
         const hasGradeFilter = Number.isInteger(selectedGradeId) && selectedGradeId > 0;
+        const normalizedClassroomFilter = String(assignmentClassroomFilter || '').trim().toLowerCase();
 
-        const filteredStudents = hasGradeFilter
-            ? students.filter((student) => getStudentGradeId(student) === selectedGradeId)
-            : students;
+        const filteredStudents = students.filter((student) => {
+            if (hasGradeFilter && getStudentGradeId(student) !== selectedGradeId) {
+                return false;
+            }
+
+            if (!normalizedClassroomFilter) {
+                return true;
+            }
+
+            const studentId = getStudentId(student);
+            const classroomMeta = studentId ? assignmentClassroomMap[studentId] : null;
+            const isAssigned = classroomMeta && typeof classroomMeta.isAssigned === 'boolean'
+                ? classroomMeta.isAssigned
+                : hasAssignedClassroom(student);
+
+            if (normalizedClassroomFilter === 'assigned') {
+                return isAssigned;
+            }
+            if (normalizedClassroomFilter === 'not_assigned') {
+                return !isAssigned;
+            }
+            return true;
+        });
 
         return [...filteredStudents].sort((leftStudent, rightStudent) => {
             return getStudentName(leftStudent).localeCompare(getStudentName(rightStudent));
         });
-    }, [selectedGradeFilter, students]);
+    }, [assignmentClassroomFilter, assignmentClassroomMap, selectedGradeFilter, students]);
 
     const selectedAssignmentGradeLabel = useMemo(() => {
         if (!selectedAssignmentStudent) {
@@ -687,13 +713,13 @@ const StudentAdmissions = () => {
     const statCards = useMemo(() => {
         const totalStudents = schoolStudentStats.totalStudents;
         const activeStudents = schoolStudentStats.activeStudents;
-        const pendingStudents = schoolStudentStats.pendingStudents;
+        const pendingApplications = schoolStudentStats.newApplications;
         const totalClassrooms = schoolClassroomsTotal;
 
         return [
             { title: 'Total Students', value: totalStudents, icon: Users, color: 'indigo' },
             { title: 'Active', value: activeStudents, icon: CheckCircle, color: 'green' },
-            { title: 'Pending', value: pendingStudents, icon: Clock, color: 'amber' },
+            { title: 'Pending', value: pendingApplications, icon: Clock, color: 'amber' },
             { title: 'Total Classrooms', value: totalClassrooms, icon: GraduationCap, color: 'blue' },
         ];
     }, [schoolClassroomsTotal, schoolStudentStats]);
@@ -1197,6 +1223,7 @@ const StudentAdmissions = () => {
         academicYearsRequestRef.current += 1;
         schoolStatsRequestRef.current += 1;
         schoolClassroomsRequestRef.current += 1;
+        assignmentClassroomMapRequestRef.current += 1;
 
         setApplications([]);
         setStudents([]);
@@ -1225,6 +1252,7 @@ const StudentAdmissions = () => {
         setDocumentToDelete(null);
         setApplicationActivityFilter('pending');
         setAssignmentActivityFilter('');
+        setAssignmentClassroomFilter('');
         setGradeQuery('');
         setShowGradeDropdown(false);
         setShowDocumentStudentDropdown(false);
@@ -1239,6 +1267,7 @@ const StudentAdmissions = () => {
         setApplicationsPagination(createEmptyPaginationState());
         setAssignmentPagination(createEmptyPaginationState());
         setFilesPagination(createEmptyPaginationState());
+        setAssignmentClassroomMap({});
         setSchoolStudentStats(createEmptySchoolStudentStats());
         setSchoolClassroomsTotal(0);
     }, [schoolId]);
@@ -1257,7 +1286,7 @@ const StudentAdmissions = () => {
 
     useEffect(() => {
         setAssignmentPage(1);
-    }, [assignmentAcademicYear, assignmentActivityFilter, assignmentSearch, selectedGradeFilter]);
+    }, [assignmentAcademicYear, assignmentActivityFilter, assignmentClassroomFilter, assignmentSearch, selectedGradeFilter]);
 
     useEffect(() => {
         setFilesPage(1);
@@ -1343,6 +1372,95 @@ const StudentAdmissions = () => {
     ]);
 
     useEffect(() => {
+        if (activeTab !== 'class-assignment' || !assignmentAcademicYear) {
+            assignmentClassroomMapRequestRef.current += 1;
+            setAssignmentClassroomMap({});
+            return;
+        }
+
+        const studentsWithIds = students
+            .map((student) => {
+                const studentId = Number(student?.user_id ?? student?.id);
+                if (!Number.isInteger(studentId) || studentId <= 0) {
+                    return null;
+                }
+                return { student, studentId };
+            })
+            .filter(Boolean);
+
+        if (studentsWithIds.length === 0) {
+            assignmentClassroomMapRequestRef.current += 1;
+            setAssignmentClassroomMap({});
+            return;
+        }
+
+        const requestId = assignmentClassroomMapRequestRef.current + 1;
+        assignmentClassroomMapRequestRef.current = requestId;
+        const selectedYearId = Number(assignmentAcademicYear);
+
+        const loadClassroomAssignments = async () => {
+            const enrollmentResults = await Promise.allSettled(
+                studentsWithIds.map(({ studentId }) => {
+                    return secretaryService.getStudentEnrollments(
+                        studentId,
+                        { academic_year_id: assignmentAcademicYear }
+                    );
+                })
+            );
+
+            if (assignmentClassroomMapRequestRef.current !== requestId) {
+                return;
+            }
+
+            const nextMap = {};
+            studentsWithIds.forEach(({ student, studentId }, index) => {
+                const studentKey = String(studentId);
+                const result = enrollmentResults[index];
+
+                if (result.status !== 'fulfilled') {
+                    const fallbackClassroomName = getStudentClassroomName(student);
+                    nextMap[studentKey] = {
+                        isAssigned: hasAssignedClassroom(student),
+                        classroomId: null,
+                        classroomName: fallbackClassroomName,
+                    };
+                    return;
+                }
+
+                const enrollments = normalizeListResponse(result.value);
+                const currentEnrollment = enrollments.find((enrollment) => {
+                    const enrollmentYearId = getEnrollmentAcademicYearId(enrollment);
+                    const enrollmentStatus = String(enrollment?.status || '').trim().toLowerCase();
+                    return enrollmentYearId === selectedYearId
+                        && enrollment?.is_active !== false
+                        && (enrollmentStatus === 'active' || enrollmentStatus === 'enrolled');
+                });
+
+                const classroomId = currentEnrollment
+                    ? getEnrollmentClassroomId(currentEnrollment)
+                    : null;
+                const normalizedClassroomId = Number.isInteger(classroomId) && classroomId > 0
+                    ? classroomId
+                    : null;
+                const classroomName = currentEnrollment
+                    ? getEnrollmentClassroomName(currentEnrollment)
+                    : '';
+
+                nextMap[studentKey] = {
+                    isAssigned: Boolean(normalizedClassroomId),
+                    classroomId: normalizedClassroomId,
+                    classroomName: classroomName
+                        || (normalizedClassroomId ? `Classroom #${normalizedClassroomId}` : ''),
+                };
+            });
+
+            setAssignmentClassroomMap(nextMap);
+        };
+
+        void loadClassroomAssignments();
+    }, [activeTab, assignmentAcademicYear, students]);
+
+    useEffect(() => {
         if (activeTab !== 'files') {
             return;
         }
@@ -1374,6 +1492,7 @@ const StudentAdmissions = () => {
     }, [
         assignmentAcademicYear,
         assignmentActivityFilter,
+        assignmentClassroomFilter,
         assignmentPage,
         assignmentSearch,
         selectedGradeFilter,
@@ -1721,9 +1840,30 @@ const StudentAdmissions = () => {
                 || ''
             ).trim();
             const resolvedClassroomName = payloadClassroomName || targetClassroomName || `Classroom #${targetClassroomId}`;
+            const studentKey = String(studentId);
 
             setCurrentClassroomId(targetClassroomId);
             setCurrentClassroomName(resolvedClassroomName);
+            setAssignmentClassroomMap((previous) => ({
+                ...previous,
+                [studentKey]: {
+                    isAssigned: true,
+                    classroomId: targetClassroomId,
+                    classroomName: resolvedClassroomName,
+                },
+            }));
+            setStudents((previous) => {
+                return previous.map((student) => {
+                    const mappedStudentId = getStudentId(student);
+                    if (mappedStudentId !== studentKey) {
+                        return student;
+                    }
+                    return {
+                        ...student,
+                        classroom_name: resolvedClassroomName,
+                    };
+                });
+            });
             setSelectedAssignmentStudent((previous) => {
                 if (!previous) {
                     return previous;
@@ -2400,6 +2540,22 @@ const StudentAdmissions = () => {
                             </div>
 
                             <div className="sec-field sec-field--compact">
+                                <label className="form-label">Assignment</label>
+                                <select
+                                    className="form-select"
+                                    value={assignmentClassroomFilter}
+                                    onChange={(event) => setAssignmentClassroomFilter(event.target.value)}
+                                    disabled={!assignmentAcademicYear}
+                                >
+                                    {ASSIGNMENT_CLASSROOM_FILTER_OPTIONS.map((option) => (
+                                        <option key={option.value || 'all'} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="sec-field sec-field--compact">
                                 <label htmlFor="assignment-search" className="form-label">Search Student</label>
                                 <div className="search-wrapper sec-search-wrapper">
                                     <Search size={16} className="search-icon" />
@@ -2432,6 +2588,12 @@ const StudentAdmissions = () => {
                                         {assignmentStudents.map((student) => {
                                             const studentId = (student.user_id || student.id)?.toString();
                                             const isSelected = selectedStudent === studentId;
+                                            const assignmentMeta = studentId ? assignmentClassroomMap[studentId] : null;
+                                            const isAssignedToClassroom = assignmentMeta && typeof assignmentMeta.isAssigned === 'boolean'
+                                                ? assignmentMeta.isAssigned
+                                                : hasAssignedClassroom(student);
+                                            const classroomName = assignmentMeta?.classroomName || getStudentClassroomName(student);
+                                            const classroomLabel = classroomName || (isAssignedToClassroom ? 'Assigned' : 'Unassigned');
 
                                             return (
                                                 <button
@@ -2471,6 +2633,7 @@ const StudentAdmissions = () => {
                                                     <div className="sec-student-card-meta">
                                                         <span>ID: #{studentId}</span>
                                                         {student.current_grade?.name ? <span>{student.current_grade.name}</span> : null}
+                                                        <span>Classroom: {classroomLabel}</span>
                                                     </div>
                                                 </button>
                                             );

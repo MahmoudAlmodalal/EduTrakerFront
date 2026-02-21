@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, Check, Home, Lock, Search, TriangleAlert, Users, X } from 'lucide-react';
+import { BookOpen, Check, ClipboardList, Home, Lock, Search, TriangleAlert, UserPlus, Users, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
 import {
     useRecordBulkAttendanceMutation,
+    useRecordTeacherBehaviorMutation,
     useTeacherAllocations,
     useTeacherAttendance,
+    useTeacherBehavior,
     useTeacherStudents,
 } from '../../hooks/useTeacherQueries';
 import { toList, todayIsoDate } from '../../utils/helpers';
@@ -19,6 +21,23 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_MAP = Object.fromEntries(STATUS_OPTIONS.map((s) => [s.value, s]));
+const BEHAVIOR_TYPE_OPTIONS = [
+    { value: 'positive', label: 'Positive', color: '#166534', bg: '#dcfce7' },
+    { value: 'negative', label: 'Negative', color: '#991b1b', bg: '#fee2e2' },
+];
+
+const formatDateTime = (value) => {
+    if (!value) {
+        return '--';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return '--';
+    }
+
+    return parsed.toLocaleString();
+};
 
 /* ─── Avatar initials ──────────────────────────────────── */
 const Initials = ({ name }) => {
@@ -47,6 +66,12 @@ const ClassManagement = () => {
     const [searchText, setSearchText]         = useState('');
     const [statusFilter, setStatusFilter]     = useState('all');
     const [overrides, setOverrides]           = useState({});
+    const [behaviorTab, setBehaviorTab]       = useState('add-note');
+    const [behaviorForm, setBehaviorForm]     = useState({
+        studentId: '',
+        behaviorType: 'positive',
+        message: '',
+    });
 
     /* ── fetch all allocations ──────────────────────────── */
     const { data: allocationsData, isLoading: loadingAllocations } = useTeacherAllocations();
@@ -102,6 +127,43 @@ const ClassManagement = () => {
     const { data: studentsData, isLoading: loadingStudents } =
         useTeacherStudents(studentFilters || {}, { enabled: Boolean(studentFilters) });
     const students = useMemo(() => toList(studentsData), [studentsData]);
+
+    const selectedBehaviorStudentId = useMemo(() => {
+        const selectedExists = students.some((student) => (
+            String(student.user_id ?? student.id) === String(behaviorForm.studentId)
+        ));
+        if (selectedExists) {
+            return String(behaviorForm.studentId);
+        }
+
+        const firstStudentId = students[0]?.user_id ?? students[0]?.id;
+        return firstStudentId ? String(firstStudentId) : '';
+    }, [behaviorForm.studentId, students]);
+
+    const behaviorFilters = useMemo(() => {
+        if (!selectedClassroomId || !isHomeroomSelected) {
+            return null;
+        }
+
+        return {
+            class_room_id: selectedClassroomId,
+            page_size: 50,
+        };
+    }, [isHomeroomSelected, selectedClassroomId]);
+
+    const {
+        data: behaviorData,
+        isLoading: loadingBehavior,
+        error: behaviorError,
+    } = useTeacherBehavior(behaviorFilters || {}, {
+        enabled: Boolean(behaviorFilters),
+    });
+
+    const behaviorRecords = useMemo(() => toList(behaviorData), [behaviorData]);
+    const recentBehavior = useMemo(
+        () => [...behaviorRecords].sort((a, b) => new Date(b.date_recorded) - new Date(a.date_recorded)),
+        [behaviorRecords],
+    );
 
     /* ── fetch existing attendance for homeroom classroom ── */
     const { data: attendanceData, isLoading: loadingAttendance } =
@@ -183,6 +245,7 @@ const ClassManagement = () => {
     }, [filteredRows, overrideKey]);
 
     const recordMutation = useRecordBulkAttendanceMutation();
+    const recordBehaviorMutation = useRecordTeacherBehaviorMutation();
 
     const handleSave = useCallback(async () => {
         if (!selectedClassroomId) return;
@@ -209,6 +272,45 @@ const ClassManagement = () => {
             toast.error(err?.message || 'Failed to save attendance.');
         }
     }, [selectedClassroomId, attendanceDate, mergedRows, overrideKey, recordMutation]);
+
+    const handleBehaviorFormChange = useCallback((field, value) => {
+        setBehaviorForm((prev) => ({ ...prev, [field]: value }));
+    }, []);
+
+    const handleBehaviorSubmit = useCallback(async (event) => {
+        event.preventDefault();
+
+        if (!isHomeroomSelected || !selectedClassroomId) {
+            toast.error('Behavior logging is only available for your homeroom classroom.');
+            return;
+        }
+
+        if (!selectedBehaviorStudentId) {
+            toast.error('Please select a student.');
+            return;
+        }
+
+        const message = behaviorForm.message.trim();
+        if (!message) {
+            toast.error('Please write a behavior note message.');
+            return;
+        }
+
+        try {
+            await recordBehaviorMutation.mutateAsync({
+                student_id: Number(selectedBehaviorStudentId),
+                class_room_id: Number(selectedClassroomId),
+                behavior_type: behaviorForm.behaviorType,
+                message,
+            });
+
+            setBehaviorForm((prev) => ({ ...prev, message: '' }));
+            setBehaviorTab('recent-notes');
+            toast.success('Behavior note recorded.');
+        } catch (error) {
+            toast.error(error?.message || 'Failed to record behavior note.');
+        }
+    }, [behaviorForm, isHomeroomSelected, recordBehaviorMutation, selectedBehaviorStudentId, selectedClassroomId]);
 
     /* ── render ──────────────────────────────────────────── */
     const loading = loadingStudents || loadingAttendance;
@@ -575,6 +677,155 @@ const ClassManagement = () => {
                         )}
                     </div>
                 )
+            )}
+
+            {selectedClassroom && (
+                <section className="management-card teacher-behavior-card">
+                    <div className="teacher-behavior-head">
+                        <div className="teacher-behavior-section-head">
+                            <h3>Behavior Log — {selectedClassroom.classroom_name}</h3>
+                            <p>Record positive or negative classroom behavior notes.</p>
+                        </div>
+
+                        {isHomeroomSelected && (
+                            <div className="teacher-behavior-tabs" role="tablist" aria-label="Behavior log tabs">
+                                <button
+                                    type="button"
+                                    className={`teacher-behavior-tab ${behaviorTab === 'add-note' ? 'active' : ''}`}
+                                    onClick={() => setBehaviorTab('add-note')}
+                                    aria-pressed={behaviorTab === 'add-note'}
+                                >
+                                    <UserPlus size={16} />
+                                    <span>Add Note</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`teacher-behavior-tab ${behaviorTab === 'recent-notes' ? 'active' : ''}`}
+                                    onClick={() => setBehaviorTab('recent-notes')}
+                                    aria-pressed={behaviorTab === 'recent-notes'}
+                                >
+                                    <ClipboardList size={16} />
+                                    <span>Recent Notes</span>
+                                    <span className="teacher-behavior-tab-badge">{recentBehavior.length}</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {isHomeroomSelected ? (
+                        behaviorTab === 'add-note' ? (
+                            <form onSubmit={handleBehaviorSubmit} className="teacher-behavior-form">
+                                <div className="teacher-behavior-form-grid">
+                                    <div className="teacher-behavior-field">
+                                        <label className="teacher-behavior-label">Student</label>
+                                        <select
+                                            className="teacher-behavior-control"
+                                            value={selectedBehaviorStudentId}
+                                            onChange={(event) => handleBehaviorFormChange('studentId', event.target.value)}
+                                        >
+                                            {students.length === 0 && <option value="">No students available</option>}
+                                            {students.map((student) => {
+                                                const sid = student.user_id ?? student.id;
+                                                return (
+                                                    <option key={sid} value={sid}>
+                                                        {student.full_name || `Student ${sid}`}
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </div>
+
+                                    <div className="teacher-behavior-field">
+                                        <label className="teacher-behavior-label">Type</label>
+                                        <select
+                                            className="teacher-behavior-control"
+                                            value={behaviorForm.behaviorType}
+                                            onChange={(event) => handleBehaviorFormChange('behaviorType', event.target.value)}
+                                        >
+                                            {BEHAVIOR_TYPE_OPTIONS.map((option) => (
+                                                <option key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="teacher-behavior-field">
+                                    <label className="teacher-behavior-label">Message</label>
+                                    <textarea
+                                        className="teacher-behavior-textarea"
+                                        value={behaviorForm.message}
+                                        onChange={(event) => handleBehaviorFormChange('message', event.target.value)}
+                                        placeholder="Write the behavior note..."
+                                        rows={3}
+                                    />
+                                </div>
+
+                                <div className="teacher-behavior-actions">
+                                    <button
+                                        type="submit"
+                                        className="btn-primary"
+                                        disabled={recordBehaviorMutation.isPending || students.length === 0}
+                                        style={{ opacity: recordBehaviorMutation.isPending ? 0.7 : 1 }}
+                                    >
+                                        {recordBehaviorMutation.isPending ? 'Saving…' : 'Record Note'}
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <div className="teacher-behavior-panel">
+                                {loadingBehavior ? (
+                                    <div className="teacher-behavior-state">Loading behavior notes...</div>
+                                ) : behaviorError ? (
+                                    <div className="teacher-behavior-state error">
+                                        {behaviorError.message || 'Failed to load behavior notes.'}
+                                    </div>
+                                ) : recentBehavior.length === 0 ? (
+                                    <div className="teacher-behavior-state empty">
+                                        No behavior notes recorded yet for this classroom.
+                                    </div>
+                                ) : (
+                                    <div className="teacher-behavior-table-wrap">
+                                        <table className="teacher-behavior-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Student</th>
+                                                    <th>Type</th>
+                                                    <th>Message</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {recentBehavior.map((note) => {
+                                                    const behaviorType = String(note.type || note.behavior_type || '').toLowerCase();
+                                                    const option = BEHAVIOR_TYPE_OPTIONS.find((entry) => entry.value === behaviorType);
+
+                                                    return (
+                                                        <tr key={note.id}>
+                                                            <td>{formatDateTime(note.date_recorded)}</td>
+                                                            <td>{note.student_name || '--'}</td>
+                                                            <td>
+                                                                <span className={`teacher-behavior-type ${behaviorType}`}>
+                                                                    {option?.label || 'Unknown'}
+                                                                </span>
+                                                            </td>
+                                                            <td>{note.message || '--'}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    ) : (
+                        <div className="teacher-behavior-locked">
+                            Behavior logging is locked for this class. Select your homeroom classroom to add notes.
+                        </div>
+                    )}
+                </section>
             )}
         </div>
     );

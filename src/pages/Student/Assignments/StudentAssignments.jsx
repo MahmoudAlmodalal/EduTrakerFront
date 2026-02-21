@@ -318,6 +318,10 @@ const StudentAssignments = () => {
             toast.error('Please select a file first.');
             return;
         }
+        if (expandedState?.isSubmitted) {
+            toast.error('Already submitted. Resubmission is not allowed.');
+            return;
+        }
         if (expandedState?.isClosedNoSubmission) {
             toast.error('This assignment is closed.');
             return;
@@ -331,6 +335,13 @@ const StudentAssignments = () => {
             setActiveTab('past');
             await Promise.all([refetch(), loadDetail(expandedId)]);
         } catch (submitError) {
+            if (submitError?.data?.code === 'already_submitted') {
+                toast.error('Already submitted. Resubmission is not allowed.');
+                setSubmissionFile(null);
+                setActiveTab('past');
+                await Promise.all([refetch(), loadDetail(expandedId)]);
+                return;
+            }
             toast.error(submitError?.message || 'Failed to submit assignment.');
         } finally {
             setSubmitting(false);
@@ -532,48 +543,56 @@ const StudentAssignments = () => {
                                             <div className="sa-section sa-submit-section">
                                                 <p className="sa-section-label">Submit Homework</p>
 
-                                                {expandedState?.isClosedNoSubmission && (
-                                                    <p className="student-assignment-warning">
-                                                        This assignment is closed. Upload is disabled.
+                                                {expandedState?.isSubmitted ? (
+                                                    <p className="student-assignment-submitted-note">
+                                                        Submitted. Resubmission is not allowed.
                                                     </p>
+                                                ) : (
+                                                    <>
+                                                        {expandedState?.isClosedNoSubmission && (
+                                                            <p className="student-assignment-warning">
+                                                                This assignment is closed. Upload is disabled.
+                                                            </p>
+                                                        )}
+                                                        {expandedState?.inGrace && (
+                                                            <p className="student-assignment-warning">
+                                                                Overdue — you can still submit during the 24-hour grace period.
+                                                            </p>
+                                                        )}
+
+                                                        <form onSubmit={handleSubmitAssignment} className="sa-upload-form">
+                                                            <label className={`sa-file-label ${expandedState?.isClosedNoSubmission ? 'sa-file-label--disabled' : ''}`}>
+                                                                <FileUp size={18} />
+                                                                <span>
+                                                                    {submissionFile
+                                                                        ? submissionFile.name
+                                                                        : 'Choose file (PDF, DOC, DOCX, images)'}
+                                                                </span>
+                                                                <input
+                                                                    type="file"
+                                                                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                                                                    onChange={(event) => setSubmissionFile(event.target.files?.[0] || null)}
+                                                                    disabled={expandedState?.isClosedNoSubmission}
+                                                                />
+                                                            </label>
+
+                                                            {submissionFile && (
+                                                                <p className="sa-file-size">
+                                                                    {(submissionFile.size / 1024 / 1024).toFixed(2)} MB
+                                                                </p>
+                                                            )}
+
+                                                            <button
+                                                                type="submit"
+                                                                className="btn-primary sa-submit-btn"
+                                                                disabled={submitting || !submissionFile || expandedState?.isClosedNoSubmission}
+                                                            >
+                                                                <FileUp size={14} />
+                                                                {submitting ? 'Submitting…' : 'Submit Homework'}
+                                                            </button>
+                                                        </form>
+                                                    </>
                                                 )}
-                                                {expandedState?.inGrace && (
-                                                    <p className="student-assignment-warning">
-                                                        Overdue — you can still submit during the 24-hour grace period.
-                                                    </p>
-                                                )}
-
-                                                <form onSubmit={handleSubmitAssignment} className="sa-upload-form">
-                                                    <label className={`sa-file-label ${expandedState?.isClosedNoSubmission ? 'sa-file-label--disabled' : ''}`}>
-                                                        <FileUp size={18} />
-                                                        <span>
-                                                            {submissionFile
-                                                                ? submissionFile.name
-                                                                : 'Choose file (PDF, DOC, DOCX, images)'}
-                                                        </span>
-                                                        <input
-                                                            type="file"
-                                                            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                                                            onChange={(event) => setSubmissionFile(event.target.files?.[0] || null)}
-                                                            disabled={expandedState?.isClosedNoSubmission}
-                                                        />
-                                                    </label>
-
-                                                    {submissionFile && (
-                                                        <p className="sa-file-size">
-                                                            {(submissionFile.size / 1024 / 1024).toFixed(2)} MB
-                                                        </p>
-                                                    )}
-
-                                                    <button
-                                                        type="submit"
-                                                        className="btn-primary sa-submit-btn"
-                                                        disabled={submitting || !submissionFile || expandedState?.isClosedNoSubmission}
-                                                    >
-                                                        <FileUp size={14} />
-                                                        {submitting ? 'Submitting…' : 'Submit Homework'}
-                                                    </button>
-                                                </form>
                                             </div>
 
                                             {/* Previous submission */}

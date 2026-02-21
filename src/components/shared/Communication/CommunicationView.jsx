@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Plus, MessageSquare, ChevronLeft } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Plus, MessageSquare, ChevronLeft, ExternalLink } from 'lucide-react';
 import Button from '../../ui/Button';
 import styles from './Communication.module.css';
 import CommunicationList from './CommunicationList';
@@ -9,13 +9,14 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../ui/Toast';
 import { api } from '../../../utils/api';
-import notificationService from '../../../services/notificationService';
+import notificationService, { resolveNotificationRedirect } from '../../../services/notificationService';
 
 const CommunicationView = ({ role = 'user', allowedRoles = null }) => {
     const { t } = useTheme();
     const { user } = useAuth();
     const { showSuccess, showError } = useToast();
     const location = useLocation();
+    const navigate = useNavigate();
 
     const [activeTab, setActiveTab] = useState(
         location.state?.activeTab === 'notifications' ? 'notifications' : 'messages'
@@ -211,6 +212,18 @@ const CommunicationView = ({ role = 'user', allowedRoles = null }) => {
         }
     };
 
+    const handleOpenNotificationTarget = async (notification) => {
+        if (!notification || role !== 'student') {
+            return;
+        }
+
+        if (!notification.is_read) {
+            await handleMarkNotificationRead(notification.id);
+        }
+
+        navigate(resolveNotificationRedirect(notification));
+    };
+
     const handleMarkAllNotificationsRead = async () => {
         try {
             await notificationService.markAllAsRead();
@@ -306,6 +319,16 @@ const CommunicationView = ({ role = 'user', allowedRoles = null }) => {
                                 {activeTab === 'notifications' ? (
                                     <div className={styles.notificationContent}>
                                         <p>{selectedItem.message || selectedItem.content}</p>
+                                        {role === 'student' && (
+                                            <button
+                                                type="button"
+                                                className={styles.notificationActionBtn}
+                                                onClick={() => handleOpenNotificationTarget(selectedItem)}
+                                            >
+                                                <ExternalLink size={15} />
+                                                Open related page
+                                            </button>
+                                        )}
                                     </div>
                                 ) : loadingThread ? (
                                     <div className={styles.threadLoading}>{t('common.loading')}</div>

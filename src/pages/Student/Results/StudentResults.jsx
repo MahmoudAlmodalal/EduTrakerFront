@@ -1,13 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import {
-    Award,
     TrendingUp,
     TrendingDown,
-    BarChart2,
     ChevronDown,
-    Star,
-    Target,
-    Medal,
     Minus,
     RefreshCw,
     AlertCircle,
@@ -126,13 +121,6 @@ const StudentResults = () => {
         return '#ef4444';
     };
 
-    const overallStats = {
-        gpa: (resultsData.overallAverage / 25).toFixed(2),
-        rank: 'N/A',
-        totalAssessments: resultsData.gradedAssignments,
-        successRate: resultsData.overallAverage
-    };
-
     return (
         <div className="student-results">
             <header className="page-header">
@@ -141,61 +129,6 @@ const StudentResults = () => {
                     <p className="page-subtitle">{t('student.results.subtitle') || 'Track your grades and performance across all subjects'}</p>
                 </div>
             </header>
-
-            <div className="results-stats-grid">
-                <div className="result-stat-card gpa-card">
-                    <div className="result-stat-icon" style={{ background: 'linear-gradient(135deg, #10b981, #34d399)' }}>
-                        <Award size={28} />
-                    </div>
-                    <div className="result-stat-content">
-                        <span className="result-stat-value">{overallStats.gpa}</span>
-                        <span className="result-stat-label">{t('student.results.currentGPA') || 'Current GPA'}</span>
-                    </div>
-                    <div className="gpa-ring">
-                        <svg viewBox="0 0 36 36">
-                            <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none" stroke="#e0f2fe" strokeWidth="3"
-                            />
-                            <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round"
-                                strokeDasharray={`${(overallStats.gpa / 4) * 100}, 100`}
-                            />
-                        </svg>
-                    </div>
-                </div>
-
-                <div className="result-stat-card">
-                    <div className="result-stat-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)' }}>
-                        <Medal size={28} />
-                    </div>
-                    <div className="result-stat-content">
-                        <span className="result-stat-value">{overallStats.rank}</span>
-                        <span className="result-stat-label">{t('student.results.classRanking') || 'Class Rank'}</span>
-                    </div>
-                </div>
-
-                <div className="result-stat-card">
-                    <div className="result-stat-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' }}>
-                        <BarChart2 size={28} />
-                    </div>
-                    <div className="result-stat-content">
-                        <span className="result-stat-value">{overallStats.totalAssessments}</span>
-                        <span className="result-stat-label">Graded Tasks</span>
-                    </div>
-                </div>
-
-                <div className="result-stat-card">
-                    <div className="result-stat-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #fbbf24)' }}>
-                        <Target size={28} />
-                    </div>
-                    <div className="result-stat-content">
-                        <span className="result-stat-value">{overallStats.successRate}%</span>
-                        <span className="result-stat-label">Average Score</span>
-                    </div>
-                </div>
-            </div>
 
             <div className="results-list">
                 {groupedResults.length > 0 ? (
