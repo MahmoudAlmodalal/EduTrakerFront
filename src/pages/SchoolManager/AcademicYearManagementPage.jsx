@@ -42,7 +42,7 @@ const AcademicYearManagementPage = () => {
     return (
         <div className="academic-config-page">
             <div className="school-manager-header" style={{ marginBottom: '1.5rem' }}>
-                <h1 className="school-manager-title">{t('school.academicYear.title') || 'Academic Year'}</h1>
+                <h1 className="school-manager-title">{t('academicYear.title') || 'Academic Year'}</h1>
             </div>
 
             {!schoolId ? (

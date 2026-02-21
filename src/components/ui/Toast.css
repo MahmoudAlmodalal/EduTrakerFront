@@ -1,12 +1,17 @@
 .toast-container {
     position: fixed;
-    top: 80px;
-    right: 20px;
-    z-index: var(--z-modal, 11000);
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99999;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 12px;
     pointer-events: none;
+    width: 100%;
+    max-width: 500px;
+    padding: 0 16px;
 }
 
 .toast {
@@ -30,22 +35,24 @@
 
 @keyframes slideIn {
     from {
-        transform: translateX(100%);
+        transform: translateY(-100%);
         opacity: 0;
     }
+
     to {
-        transform: translateX(0);
+        transform: translateY(0);
         opacity: 1;
     }
 }
 
 @keyframes slideOut {
     from {
-        transform: translateX(0);
+        transform: translateY(0);
         opacity: 1;
     }
+
     to {
-        transform: translateX(100%);
+        transform: translateY(-100%);
         opacity: 0;
     }
 }

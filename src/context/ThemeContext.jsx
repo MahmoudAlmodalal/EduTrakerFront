@@ -3,9 +3,9 @@ import { translations } from '../utils/translations';
 
 const fallbackThemeContext = {
     theme: 'light',
-    toggleTheme: () => {},
+    toggleTheme: () => { },
     language: 'en',
-    changeLanguage: () => {},
+    changeLanguage: () => { },
     t: (key) => translations?.en?.[key] || key,
 };
 
@@ -14,18 +14,18 @@ const ThemeContext = createContext(fallbackThemeContext);
 export const useTheme = () => useContext(ThemeContext) || fallbackThemeContext;
 
 export const ThemeProvider = ({ children }) => {
-    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-    const [language, setLanguage] = useState(localStorage.getItem('language') || 'en');
+    const [theme, setTheme] = useState(sessionStorage.getItem('theme') || 'light');
+    const [language, setLanguage] = useState(sessionStorage.getItem('language') || 'en');
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
+        sessionStorage.setItem('theme', theme);
     }, [theme]);
 
     useEffect(() => {
         document.documentElement.setAttribute('dir', language === 'ar' ? 'rtl' : 'ltr');
         document.documentElement.setAttribute('lang', language);
-        localStorage.setItem('language', language);
+        sessionStorage.setItem('language', language);
     }, [language]);
 
     const toggleTheme = () => {
@@ -36,12 +36,20 @@ export const ThemeProvider = ({ children }) => {
         setLanguage(lang);
     };
 
-    const t = (key) => {
+    const t = (key, replacements = {}) => {
         if (!translations[language]) {
             console.warn(`Translation language '${language}' not found.`);
             return key;
         }
-        return translations[language][key] || key;
+        let text = translations[language][key] || key;
+
+        if (replacements && typeof replacements === 'object') {
+            Object.entries(replacements).forEach(([k, v]) => {
+                text = text.replace(`{${k}}`, v);
+            });
+        }
+
+        return text;
     };
 
     return (

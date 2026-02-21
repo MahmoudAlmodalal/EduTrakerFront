@@ -13,7 +13,7 @@ const NotificationDropdown = ({ communicationPath, allowedRoutePrefixes }) => {
     const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
 
-    const hasValidToken = !!user && !!localStorage.getItem('accessToken');
+    const hasValidToken = !!user && !!sessionStorage.getItem('accessToken');
 
     const {
         data: unreadData,

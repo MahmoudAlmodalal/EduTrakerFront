@@ -22,9 +22,9 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
 
     const resolveLoginPath = React.useCallback(() => {
         const portalType =
-            localStorage.getItem('portalType') || localStorage.getItem('lastPortalType');
+            sessionStorage.getItem('portalType') || sessionStorage.getItem('lastPortalType');
         const workstreamSlug =
-            localStorage.getItem('workstreamId') || localStorage.getItem('lastWorkstreamId');
+            sessionStorage.getItem('workstreamId') || sessionStorage.getItem('lastWorkstreamId');
 
         const isWorkstreamPath = location.pathname.startsWith('/workstream');
         const shouldUseWorkstreamLogin =

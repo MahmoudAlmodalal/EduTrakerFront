@@ -38,7 +38,7 @@ const SecretaryMonitoring = () => {
         } catch (err) {
             console.error('Error fetching secretaries:', err);
             setSecretaries([]);
-            showError('Failed to load secretaries.');
+            showError(t('school.secretaries.error.load') || 'Failed to load secretaries.');
         } finally {
             setLoading(false);
         }
@@ -109,7 +109,7 @@ const SecretaryMonitoring = () => {
         setError('');
 
         if (!formData.full_name || !formData.email) {
-            setError('Name and email are required.');
+            setError(t('school.secretaries.error.nameEmailRequired') || 'Name and email are required.');
             return;
         }
 
@@ -125,10 +125,10 @@ const SecretaryMonitoring = () => {
                     updatePayload.password = formData.password;
                 }
                 await managerService.updateSecretary(editId, updatePayload);
-                showSuccess('Secretary updated successfully.');
+                showSuccess(t('school.secretaries.success.updated') || 'Secretary updated successfully.');
             } else {
                 if (!formData.password) {
-                    setError('Password is required for new secretary.');
+                    setError(t('school.secretaries.error.passwordRequired') || 'Password is required for new secretary.');
                     return;
                 }
                 const createPayload = {
@@ -140,7 +140,7 @@ const SecretaryMonitoring = () => {
                     hire_date: formData.hire_date || undefined
                 };
                 await managerService.createSecretary(createPayload);
-                showSuccess('Secretary created successfully.');
+                showSuccess(t('school.secretaries.success.created') || 'Secretary created successfully.');
             }
             setShowModal(false);
             resetForm();
@@ -153,7 +153,7 @@ const SecretaryMonitoring = () => {
                     : Object.values(errData).flat().join('. ');
                 setError(messages);
             } else {
-                setError(err.message || 'Failed to save secretary.');
+                setError(err.message || (t('school.secretaries.error.save') || 'Failed to save secretary.'));
             }
         }
     };
@@ -165,15 +165,15 @@ const SecretaryMonitoring = () => {
         try {
             if (isActive) {
                 await managerService.deactivateSecretary(id);
-                showSuccess('Secretary deactivated successfully.');
+                showSuccess(t('school.secretaries.success.deactivated') || 'Secretary deactivated successfully.');
             } else {
                 await managerService.activateSecretary(id);
-                showSuccess('Secretary activated successfully.');
+                showSuccess(t('school.secretaries.success.activated') || 'Secretary activated successfully.');
             }
             await fetchSecretaries();
         } catch (err) {
             console.error('Error toggling secretary status:', err);
-            showError(isActive ? 'Failed to deactivate secretary.' : 'Failed to activate secretary.');
+            showError(isActive ? (t('school.secretaries.error.deactivate') || 'Failed to deactivate secretary.') : (t('school.secretaries.error.activate') || 'Failed to activate secretary.'));
         } finally {
             setTogglingId(null);
         }
@@ -192,7 +192,7 @@ const SecretaryMonitoring = () => {
                         <Search size={18} className="sm-search-control-icon" />
                         <input
                             type="text"
-                            placeholder={t('common.search') || 'Search secretaries...'}
+                            placeholder={t('common.search') || 'Search...'}
                             value={searchTerm}
                             onChange={(e) => {
                                 setSearchTerm(e.target.value);
@@ -217,18 +217,18 @@ const SecretaryMonitoring = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Secretary</th>
-                                    <th>School</th>
-                                    <th>Department</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th>{t('school.secretaries.secretary') || 'Secretary'}</th>
+                                    <th>{t('school.secretaries.school') || 'School'}</th>
+                                    <th>{t('school.secretaries.department') || 'Department'}</th>
+                                    <th>{t('school.secretaries.status') || 'Status'}</th>
+                                    <th>{t('school.secretaries.actions') || 'Actions'}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredSecretaries.length === 0 ? (
                                     <tr>
                                         <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                            No secretaries found.
+                                            {t('school.secretaries.noSecretaries') || 'No secretaries found.'}
                                         </td>
                                     </tr>
                                 ) : (
@@ -258,13 +258,13 @@ const SecretaryMonitoring = () => {
                                                     </div>
                                                 </td>
                                                 <td style={{ color: sec.school_name ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
-                                                    {sec.school_name || 'Not assigned'}
+                                                    {sec.school_name || (t('school.secretaries.notAssigned') || 'Not assigned')}
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         <Briefcase size={14} color="var(--color-text-muted)" />
                                                         <span style={{ color: sec.department ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
-                                                            {sec.department || 'Not assigned'}
+                                                            {sec.department || (t('school.secretaries.notAssigned') || 'Not assigned')}
                                                         </span>
                                                     </div>
                                                 </td>
@@ -274,9 +274,9 @@ const SecretaryMonitoring = () => {
                                                         className={`status-badge ${isActive ? 'status-active active' : 'status-inactive inactive'} status-toggle-btn`}
                                                         onClick={() => handleToggleStatus(sec)}
                                                         disabled={togglingId === id}
-                                                        title={isActive ? 'Click to deactivate' : 'Click to activate'}
+                                                        title={isActive ? (t('common.deactivate') || 'Click to deactivate') : (t('common.activate') || 'Click to activate')}
                                                     >
-                                                        {isActive ? 'Active' : 'Inactive'}
+                                                        {isActive ? (t('status.active') || 'Active') : (t('status.inactive') || 'Inactive')}
                                                     </button>
                                                 </td>
                                                 <td>
@@ -302,9 +302,11 @@ const SecretaryMonitoring = () => {
                 {!loading && filteredSecretaries.length > 0 ? (
                     <div className="sm-table-pagination">
                         <span className="sm-table-pagination-summary">
-                            Showing {(currentPage - 1) * TABLE_ROWS_PER_PAGE + 1}
-                            -
-                            {Math.min(currentPage * TABLE_ROWS_PER_PAGE, filteredSecretaries.length)} of {filteredSecretaries.length}
+                            {t('common.showingOf', {
+                                start: (currentPage - 1) * TABLE_ROWS_PER_PAGE + 1,
+                                end: Math.min(currentPage * TABLE_ROWS_PER_PAGE, filteredSecretaries.length),
+                                total: filteredSecretaries.length
+                            })}
                         </span>
                         <div className="sm-table-pagination-controls">
                             <button
@@ -313,10 +315,10 @@ const SecretaryMonitoring = () => {
                                 onClick={() => setPage(Math.max(1, currentPage - 1))}
                                 disabled={currentPage <= 1}
                             >
-                                Previous
+                                {t('common.previous') || 'Previous'}
                             </button>
                             <span className="sm-table-pagination-page">
-                                Page {currentPage} of {totalPages}
+                                {t('common.pageOf', { current: currentPage, total: totalPages })}
                             </span>
                             <button
                                 type="button"
@@ -324,7 +326,7 @@ const SecretaryMonitoring = () => {
                                 onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
                                 disabled={currentPage >= totalPages}
                             >
-                                Next
+                                {t('common.next') || 'Next'}
                             </button>
                         </div>
                     </div>
@@ -335,7 +337,7 @@ const SecretaryMonitoring = () => {
             <Modal
                 isOpen={showModal}
                 onClose={() => { setShowModal(false); resetForm(); }}
-                title={isEditing ? 'Edit Secretary' : 'Add New Secretary'}
+                title={isEditing ? (t('school.secretaries.form.editTitle') || 'Edit Secretary') : (t('school.secretaries.form.addTitle') || 'Add New Secretary')}
             >
                 {error && (
                     <div style={{
@@ -349,7 +351,7 @@ const SecretaryMonitoring = () => {
                 <form onSubmit={handleSave} style={{ display: 'grid', gap: '1rem' }}>
                     <div>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                            Full Name *
+                            {t('school.secretaries.form.fullName') || 'Full Name'} *
                         </label>
                         <input
                             type="text"
@@ -357,12 +359,12 @@ const SecretaryMonitoring = () => {
                             value={formData.full_name}
                             onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                             style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                            placeholder="Enter full name"
+                            placeholder={t('school.secretaries.form.fullNamePlaceholder') || "Enter full name"}
                         />
                     </div>
                     <div>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                            Email *
+                            {t('school.secretaries.form.email') || 'Email'} *
                         </label>
                         <input
                             type="email"
@@ -370,12 +372,12 @@ const SecretaryMonitoring = () => {
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                            placeholder="secretary@example.com"
+                            placeholder={t('school.secretaries.form.emailPlaceholder') || "secretary@example.com"}
                         />
                     </div>
                     <div>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                            Password {!isEditing && '*'}
+                            {t('school.secretaries.form.password') || 'Password'} {!isEditing && '*'}
                         </label>
                         <input
                             type="password"
@@ -383,24 +385,24 @@ const SecretaryMonitoring = () => {
                             value={formData.password}
                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                             style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                            placeholder={isEditing ? 'Leave blank to keep current' : 'Enter password'}
+                            placeholder={isEditing ? (t('school.secretaries.form.passwordHint') || 'Leave blank to keep current') : (t('school.secretaries.form.passwordPlaceholder') || 'Enter password')}
                         />
                     </div>
                     <div>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                            Department
+                            {t('school.secretaries.form.department') || 'Department'}
                         </label>
                         <input
                             type="text"
                             value={formData.department}
                             onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                             style={{ width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--color-border)' }}
-                            placeholder="e.g. Administration, Finance, Records"
+                            placeholder={t('school.secretaries.form.departmentPlaceholder') || "e.g. Administration, Finance, Records"}
                         />
                     </div>
                     <div>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                            Hire Date
+                            {t('school.secretaries.form.hireDate') || 'Hire Date'}
                         </label>
                         <input
                             type="date"
@@ -418,10 +420,10 @@ const SecretaryMonitoring = () => {
                                 border: '1px solid var(--color-border)', background: 'white', cursor: 'pointer'
                             }}
                         >
-                            Cancel
+                            {t('common.cancel') || 'Cancel'}
                         </button>
                         <button type="submit" className="btn-primary">
-                            {isEditing ? 'Update Secretary' : 'Create Secretary'}
+                            {isEditing ? (t('school.secretaries.form.updateBtn') || 'Update Secretary') : (t('school.secretaries.form.createBtn') || 'Create Secretary')}
                         </button>
                     </div>
                 </form>

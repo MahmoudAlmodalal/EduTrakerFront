@@ -40,11 +40,7 @@ const RELATIONSHIP_OPTIONS = [
     { value: 'other', label: 'Other' },
 ];
 
-const GUARDIAN_STATUS_OPTIONS = [
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
-    { value: 'all', label: 'All' },
-];
+const GUARDIAN_STATUS_VALUES = ['active', 'inactive', 'all'];
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0];
@@ -606,17 +602,28 @@ const GuardianLinking = () => {
         const activeGuardians = summaryLoaded
             ? guardianSummary.active_guardians
             : statusFilter === 'active'
-            ? guardiansCount
-            : guardians.filter((guardian) => guardian.is_active !== false).length;
+                ? guardiansCount
+                : guardians.filter((guardian) => guardian.is_active !== false).length;
         const totalGuardians = summaryLoaded ? guardianSummary.total_guardians : guardiansCount;
         const studentValue = studentsLoaded ? students.length : '...';
 
         return [
-            { title: 'Total Guardians', value: totalGuardians, icon: Users, color: 'indigo' },
-            { title: 'Active Guardians', value: activeGuardians, icon: Users, color: 'green' },
-            { title: 'Students', value: studentValue, icon: Users, color: 'blue' },
+            { title: t('secretary.guardians.totalGuardians') || 'Total Guardians', value: totalGuardians, icon: Users, color: 'indigo' },
+            { title: t('secretary.guardians.active') || 'Active Guardians', value: activeGuardians, icon: Users, color: 'green' },
+            { title: t('secretary.guardians.students') || 'Students', value: studentValue, icon: Users, color: 'blue' },
         ];
-    }, [guardians, guardiansCount, guardianSummary.active_guardians, guardianSummary.total_guardians, statusFilter, students.length, studentsLoaded, summaryLoaded]);
+    }, [guardians, guardiansCount, guardianSummary.active_guardians, guardianSummary.total_guardians, statusFilter, students.length, studentsLoaded, summaryLoaded, t]);
+
+    const guardianStatusOptions = useMemo(() => (
+        GUARDIAN_STATUS_VALUES.map((value) => ({
+            value,
+            label: value === 'active'
+                ? (t('common.active') || 'Active')
+                : value === 'inactive'
+                    ? (t('common.inactive') || 'Inactive')
+                    : (t('common.all') || 'All'),
+        }))
+    ), [t]);
 
     const handleSearchChange = useCallback((event) => {
         setSearchTerm(event.target.value);
@@ -1044,7 +1051,7 @@ const GuardianLinking = () => {
                 action={(
                     <button className="btn-primary" type="button" onClick={() => setIsCreateModalOpen(true)}>
                         <UserPlus size={18} />
-                        Add Guardian
+                        {t('secretary.guardians.addGuardian') || 'Add Guardian'}
                     </button>
                 )}
             />
@@ -1070,7 +1077,7 @@ const GuardianLinking = () => {
             <section className="management-card">
                 <div className="sec-filter-bar">
                     <div className="sec-field sec-field--grow">
-                        <label htmlFor="guardian-search" className="form-label">Search Guardians</label>
+                        <label htmlFor="guardian-search" className="form-label">{t('secretary.guardians.searchLabel') || 'Search Guardians'}</label>
                         <div className="search-wrapper sec-search-wrapper">
                             <Search size={16} className="search-icon" />
                             <input
@@ -1085,7 +1092,7 @@ const GuardianLinking = () => {
                         </div>
                     </div>
                     <div className="sec-field sec-field--compact">
-                        <label htmlFor="guardian-status-filter" className="form-label">Status</label>
+                        <label htmlFor="guardian-status-filter" className="form-label">{t('secretary.guardians.status') || 'Status'}</label>
                         <select
                             id="guardian-status-filter"
                             className="form-select"
@@ -1093,13 +1100,13 @@ const GuardianLinking = () => {
                             onChange={handleStatusFilterChange}
                             disabled={tableLoading}
                         >
-                            {GUARDIAN_STATUS_OPTIONS.map((option) => (
+                            {guardianStatusOptions.map((option) => (
                                 <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                         </select>
                     </div>
                     <div className="sec-field sec-field--compact">
-                        <label htmlFor="guardian-page-size" className="form-label">Rows</label>
+                        <label htmlFor="guardian-page-size" className="form-label">{t('secretary.guardians.rows') || 'Rows'}</label>
                         <select
                             id="guardian-page-size"
                             className="form-select"
@@ -1114,7 +1121,9 @@ const GuardianLinking = () => {
                     </div>
                     <button className="btn-primary" type="button" onClick={handleSearchSubmit} disabled={tableLoading}>
                         <Search size={16} />
-                        {tableLoading && hasLoadedGuardians ? 'Loading...' : 'Search'}
+                        {tableLoading && hasLoadedGuardians
+                            ? (t('common.loading') || 'Loading...')
+                            : (t('secretary.guardians.searchButton') || 'Search')}
                     </button>
                 </div>
 
@@ -1127,12 +1136,12 @@ const GuardianLinking = () => {
                                 <p className="sec-subtle-text">Refreshing guardians...</p>
                             ) : null}
                             <div className="sec-table-scroll">
-                                <table className="data-table sec-data-table">
+                                <table className="data-table sec-data-table sec-data-table--guardians">
                                     <thead>
                                         <tr>
-                                            <th className="cell-id">ID</th>
+                                            <th className="cell-id">{t('secretary.guardians.id') || 'ID'}</th>
                                             <th>{t('secretary.guardians.guardianName') || 'Guardian'}</th>
-                                            <th>Contact</th>
+                                            <th>{t('secretary.guardians.contact') || 'Contact'}</th>
                                             <th>{t('secretary.guardians.status') || 'Status'}</th>
                                             <th>{t('secretary.guardians.actions') || 'Actions'}</th>
                                         </tr>
@@ -1200,7 +1209,7 @@ const GuardianLinking = () => {
                                         {filteredGuardians.length === 0 ? (
                                             <tr>
                                                 <td colSpan="5">
-                                                    <EmptyState icon={Users} message="No guardians found." />
+                                                    <EmptyState icon={Users} message={t('secretary.guardians.noGuardiansFound') || 'No guardians found.'} />
                                                 </td>
                                             </tr>
                                         ) : null}
@@ -1377,15 +1386,15 @@ const GuardianLinking = () => {
             <Modal
                 isOpen={isCreateModalOpen}
                 onClose={closeCreateModal}
-                title="Create New Guardian"
+                title={t('secretary.guardians.createModal.title') || 'Create New Guardian'}
             >
                 <form className="sec-modal-form" onSubmit={handleCreateGuardian}>
                     <div className="form-group">
-                        <label className="form-label">Full Name *</label>
+                        <label className="form-label">{t('secretary.guardians.createModal.fullName') || 'Full Name *'}</label>
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="Enter guardian's full name"
+                            placeholder={t('secretary.guardians.createModal.fullNamePlaceholder') || "Enter guardian's full name"}
                             value={newGuardian.full_name}
                             onChange={(event) => handleCreateGuardianField('full_name', event.target.value)}
                             required
@@ -1393,11 +1402,11 @@ const GuardianLinking = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Email *</label>
+                        <label className="form-label">{t('secretary.guardians.createModal.email') || 'Email *'}</label>
                         <input
                             type="email"
                             className="form-input"
-                            placeholder="guardian@example.com"
+                            placeholder={t('secretary.guardians.createModal.emailPlaceholder') || 'guardian@example.com'}
                             value={newGuardian.email}
                             onChange={(event) => handleCreateGuardianField('email', event.target.value)}
                             required
@@ -1405,11 +1414,11 @@ const GuardianLinking = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Phone Number *</label>
+                        <label className="form-label">{t('secretary.guardians.createModal.phoneNumber') || 'Phone Number *'}</label>
                         <input
                             type="tel"
                             className="form-input"
-                            placeholder="+1 (555) 000-0000"
+                            placeholder={t('secretary.guardians.createModal.phoneNumberPlaceholder') || '+1 (555) 000-0000'}
                             value={newGuardian.phone_number}
                             onChange={(event) => handleCreateGuardianField('phone_number', event.target.value)}
                             required
@@ -1417,7 +1426,7 @@ const GuardianLinking = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Password *</label>
+                        <label className="form-label">{t('secretary.guardians.createModal.password') || 'Password *'}</label>
                         <div className="sec-password-field">
                             <input
                                 type={showGuardianPassword ? 'text' : 'password'}
@@ -1441,10 +1450,12 @@ const GuardianLinking = () => {
 
                     <div className="sec-modal-actions">
                         <button type="button" className="btn-secondary" onClick={closeCreateModal}>
-                            Cancel
+                            {t('common.cancel') || 'Cancel'}
                         </button>
                         <button type="submit" className="btn-primary" disabled={createSubmitting}>
-                            {createSubmitting ? 'Creating...' : 'Create Guardian'}
+                            {createSubmitting
+                                ? (t('secretary.guardians.createModal.creating') || 'Creating...')
+                                : (t('secretary.guardians.createModal.submit') || 'Create Guardian')}
                         </button>
                     </div>
                 </form>

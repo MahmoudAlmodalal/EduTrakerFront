@@ -16,7 +16,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     const [searchQuery, setSearchQuery] = useState('');
 
     // Check if we have a valid token
-    const hasValidToken = !!user && !!localStorage.getItem('accessToken');
+    const hasValidToken = !!user && !!sessionStorage.getItem('accessToken');
 
     // Fetch notifications with caching (5 minute TTL)
     const {

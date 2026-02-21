@@ -54,14 +54,15 @@ const getDefaultIcon = (status) => {
     return MinusCircle;
 };
 
-const StatusBadge = memo(function StatusBadge({ status, icon: Icon }) {
+const StatusBadge = memo(function StatusBadge({ status, icon: Icon, label }) {
     const tone = getTone(status);
     const resolvedIcon = Icon || getDefaultIcon(status);
+    const displayLabel = label || getLabel(status);
 
     return (
         <span className={`sec-status-badge sec-status-badge--${tone}`}>
             {resolvedIcon ? React.createElement(resolvedIcon, { size: 14 }) : null}
-            {getLabel(status)}
+            {displayLabel}
         </span>
     );
 });

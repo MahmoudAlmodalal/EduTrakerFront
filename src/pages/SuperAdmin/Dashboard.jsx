@@ -83,6 +83,65 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
+    const renderActivityDescription = (activity) => {
+        const desc = activity.description || '';
+
+        // Handle Export Pattern
+        const exportMatch = desc.match(/Exported (.*) report as (.*)/i);
+        if (exportMatch) {
+            return t('activity.patterns.exportedReport', {
+                report: exportMatch[1],
+                format: exportMatch[2]
+            });
+        }
+
+        if (desc.startsWith('Updated user:')) {
+            const name = desc.replace('Updated user:', '').trim();
+            return t('activity.patterns.updatedUser', { name });
+        }
+        if (desc.startsWith('Created Workstream Manager:')) {
+            const name = desc.replace('Created Workstream Manager:', '').trim();
+            return t('activity.patterns.createdWSManager', { name });
+        }
+
+        // Handle Login Pattern (with optional "User " prefix)
+        if (desc.toLowerCase().endsWith('logged in')) {
+            const email = desc.replace(/User\s+/i, '').replace(/logged in/i, '').trim();
+            return t('activity.patterns.loggedIn', { email });
+        }
+
+        return activity.description?.replace(/^User\s+/i, '').replace(/user\s+/gi, '') || t(activity.message) || t(activity.title);
+    };
+
+    const renderActorName = (actor) => {
+        if (actor === 'Super User' || actor === 'الادمن') return t('activity.actor.superUser');
+        return actor?.replace(/^User\s+/i, '') || t('dashboard.source.system');
+    };
+
+    const renderRelativeTime = (timeStr) => {
+        if (!timeStr) return t('dashboard.activity.justNow');
+
+        // X hours, Y minutes ago
+        const hrMinMatch = timeStr.match(/(\d+)\s+hour[s]?,\s+(\d+)\s+minute[s]?\s+ago/i);
+        if (hrMinMatch) {
+            return t('activity.time.hoursMinutesAgo', { hours: hrMinMatch[1], minutes: hrMinMatch[2] });
+        }
+
+        // X minutes ago
+        const minMatch = timeStr.match(/(\d+)\s+minute[s]?\s+ago/i);
+        if (minMatch) {
+            return t('activity.time.minutesAgo', { count: minMatch[1] });
+        }
+
+        // X hours ago
+        const hrMatch = timeStr.match(/(\d+)\s+hour[s]?\s+ago/i);
+        if (hrMatch) {
+            return t('activity.time.hoursAgo', { count: hrMatch[1] });
+        }
+
+        return timeStr;
+    };
+
     // Map Backend Stats to UI
     const stats = [
         {
@@ -139,8 +198,8 @@ const Dashboard = () => {
         <div className={styles.container}>
             <div className={styles.header}>
                 <div>
-                    <h1 className={styles.pageTitle}>Good morning, {user?.displayName || user?.email || 'Admin'}</h1>
-                    <p className={styles.subtitle}>Here's what's happening across EduTraker today.</p>
+                    <h1 className={styles.pageTitle}>{t('dashboard.greeting')}, {user?.displayName || user?.email || 'Admin'}</h1>
+                    <p className={styles.subtitle}>{t('dashboard.subtitle')}</p>
                 </div>
             </div>
 
@@ -156,7 +215,7 @@ const Dashboard = () => {
                         data={chartData}
                         loading={loading}
                         title={t('dashboard.charts.activity')}
-                        subtitle="User log-in frequency over the past 7 days"
+                        subtitle={t('dashboard.activity.subtitle')}
                     />
                 </div>
 
@@ -164,29 +223,29 @@ const Dashboard = () => {
                     <h2 className={styles.cardTitle}>{t('dashboard.activity.title')}</h2>
                     <div className={styles.activityList}>
                         {loading ? (
-                            <div className={styles.loadingPulse}>Fetching updates...</div>
+                            <div className={styles.loadingPulse}>{t('dashboard.fetching')}</div>
                         ) : !Array.isArray(activities) || activities.length === 0 ? (
-                            <div className={styles.emptyActivity}>No recent activity</div>
+                            <div className={styles.emptyActivity}>{t('dashboard.noActivity')}</div>
                         ) : (
                             activities.slice(0, 5).map((activity, index) => (
                                 <div key={activity.id || index} className={styles.activityItem}>
                                     <div className={styles.activityIcon}>
                                         {activity.action_type === 'create' && <UserPlus size={16} />}
                                         {activity.action_type === 'update' && <ActivityIcon size={16} />}
-                                        {activity.action_type === 'delete' && <ShieldCheck size={16} />}
+                                        {(activity.action_type === 'delete' || activity.action_type === 'EXPORT') && <ShieldCheck size={16} />}
                                         {!activity.action_type && (activity.type === 'alert' ? <ShieldCheck size={16} /> : <Bell size={16} />)}
                                     </div>
                                     <div className={styles.activityContent}>
                                         <p className={styles.activityText}>
-                                            {activity.description?.replace(/^User\s+/i, '').replace(/user\s+/gi, '') || t(activity.message) || t(activity.title)}
+                                            {renderActivityDescription(activity)}
                                         </p>
                                         <div className={styles.activityMeta}>
                                             <span className={styles.activityUser}>
-                                                {activity.actor_name?.replace(/^User\s+/i, '') || 'System'}
+                                                {renderActorName(activity.actor_name)}
                                             </span>
                                             <span className={styles.activitySeparator}>•</span>
                                             <span className={styles.activityTime}>
-                                                {activity.created_at_human || t('dashboard.activity.justNow') || 'Just now'}
+                                                {renderRelativeTime(activity.created_at_human)}
                                             </span>
                                         </div>
                                     </div>

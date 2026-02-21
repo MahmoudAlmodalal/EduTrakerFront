@@ -84,6 +84,7 @@ const WorkstreamManagement = () => {
 
     const handleCreateWorkstream = async (e) => {
         e.preventDefault();
+        const parsedQuota = parseInt(formData.quota, 10);
         const normalizedName = formData.name.trim().toLowerCase();
         const hasLocalDuplicate = workstreams.some((ws) => {
             if (isEditing && ws.id === currentWorkstreamId) return false;
@@ -91,13 +92,18 @@ const WorkstreamManagement = () => {
         });
 
         if (hasLocalDuplicate) {
-            showWarning(`Workstream name "${formData.name.trim()}" already exists. Try a different name.`, 4500);
+            showWarning(t('workstreams.warning.duplicateName'), 4500);
+            return;
+        }
+
+        if (!Number.isInteger(parsedQuota) || parsedQuota < 1) {
+            showWarning(t('workstreams.config.error.maxUsers'));
             return;
         }
 
         const payload = {
             workstream_name: formData.name,
-            capacity: parseInt(formData.quota),
+            user_capacity: parsedQuota,
             manager_id: formData.managerId ? parseInt(formData.managerId) : null,
             description: formData.description || '',
             location: formData.location || '',
@@ -113,10 +119,10 @@ const WorkstreamManagement = () => {
             await fetchWorkstreams();
             setIsModalOpen(false);
             resetForm();
-            showSuccess(isEditing ? 'Workstream updated successfully.' : 'Workstream created successfully.');
+            showSuccess(isEditing ? t('workstreams.success.updated') : t('workstreams.success.created'));
         } catch (err) {
             if (isDuplicateNameError(err)) {
-                showWarning(`Workstream name "${formData.name.trim()}" already exists. Try a different name.`, 4500);
+                showWarning(t('workstreams.warning.duplicateName'), 4500);
                 return;
             }
             showError('Operation failed: ' + err.message);
@@ -124,8 +130,7 @@ const WorkstreamManagement = () => {
     };
 
     const handleToggleStatus = async (id, currentStatus) => {
-        const action = currentStatus ? 'deactivate' : 'activate';
-        if (!window.confirm(`Are you sure you want to ${action} this workstream?`)) return;
+        if (!window.confirm(t('workstreams.confirm.toggle'))) return;
 
         try {
             if (currentStatus) {
@@ -134,7 +139,7 @@ const WorkstreamManagement = () => {
                 await workstreamService.updateWorkstream(id, { is_active: true });
             }
             await fetchWorkstreams();
-            showSuccess(`Workstream ${currentStatus ? 'deactivated' : 'activated'} successfully.`);
+            showSuccess(currentStatus ? t('workstreams.success.deactivated') : t('workstreams.success.activated'));
         } catch (err) {
             showError('Status update failed: ' + err.message);
         }
@@ -145,7 +150,7 @@ const WorkstreamManagement = () => {
         setCurrentWorkstreamId(ws.id);
         setFormData({
             name: ws.workstream_name,
-            quota: ws.capacity.toString(),
+            quota: String(ws.user_capacity ?? ws.capacity ?? 100),
             managerId: ws.manager_id ? ws.manager_id.toString() : '',
             location: ws.location || '',
             description: ws.description || ''
@@ -177,7 +182,7 @@ const WorkstreamManagement = () => {
 
     const openConfigModal = (workstream) => {
         setSelectedWorkstream(workstream);
-        setConfigMaxUsers((workstream?.capacity ?? '').toString());
+        setConfigMaxUsers((workstream?.user_capacity ?? workstream?.capacity ?? '').toString());
         setIsConfigModalOpen(true);
     };
 
@@ -187,16 +192,16 @@ const WorkstreamManagement = () => {
 
         const parsedMaxUsers = parseInt(configMaxUsers, 10);
         if (!Number.isInteger(parsedMaxUsers) || parsedMaxUsers < 1) {
-            showWarning('Max users must be a number greater than or equal to 1.');
+            showWarning(t('workstreams.config.error.maxUsers'));
             return;
         }
 
         setIsSavingConfig(true);
         try {
-            await workstreamService.updateWorkstream(selectedWorkstream.id, { capacity: parsedMaxUsers });
+            await workstreamService.updateWorkstream(selectedWorkstream.id, { user_capacity: parsedMaxUsers });
             await fetchWorkstreams();
             setIsConfigModalOpen(false);
-            showSuccess('Workstream configuration updated successfully.');
+            showSuccess(t('workstreams.config.success'));
         } catch (err) {
             showError('Failed to update configuration: ' + err.message);
         } finally {
@@ -209,7 +214,7 @@ const WorkstreamManagement = () => {
             <div className={styles.header}>
                 <div className={styles.titleSection}>
                     <h1 className={styles.title}>{t('workstreams.title')}</h1>
-                    <p className={styles.subtitle}>Configure and monitor regional workstreams and their infrastructure.</p>
+                    <p className={styles.subtitle}>{t('workstreams.subtitle')}</p>
                 </div>
                 <Button variant="primary" icon={Plus} onClick={openCreateModal}>
                     {t('workstreams.create')}
@@ -221,7 +226,7 @@ const WorkstreamManagement = () => {
                 <div style={{ flex: 1, minWidth: '200px' }}>
                     <input
                         type="text"
-                        placeholder="Search workstreams..."
+                        placeholder={t('workstreams.searchPlaceholder')}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{
@@ -246,19 +251,19 @@ const WorkstreamManagement = () => {
                         cursor: 'pointer'
                     }}
                 >
-                    <option value="all">All Status</option>
-                    <option value="active">Active Only</option>
-                    <option value="inactive">Inactive Only</option>
+                    <option value="all">{t('users.filter.allStatus')}</option>
+                    <option value="active">{t('workstreams.filter.active')}</option>
+                    <option value="inactive">{t('workstreams.filter.inactive')}</option>
                 </select>
             </div>
 
             {loading ? (
-                <div style={{ textAlign: 'center', padding: '3rem' }}>Loading workstreams...</div>
+                <div style={{ textAlign: 'center', padding: '3rem' }}>{t('workstreams.loading')}</div>
             ) : (
                 <>
                     {/* Analytics Section */}
                     <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: 'var(--color-bg-surface)', borderRadius: '12px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--color-text-primary)' }}>User Distribution by Workstream</h3>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--color-text-primary)' }}>{t('workstreams.analytics.userDistribution')}</h3>
                         <div style={{ width: '100%', height: 300 }}>
                             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
                                 <BarChart
@@ -273,8 +278,8 @@ const WorkstreamManagement = () => {
                                         itemStyle={{ color: 'var(--color-text-primary)' }}
                                     />
                                     <Legend />
-                                    <Bar dataKey="total_users" name="Total Users" fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={40} />
-                                    <Bar dataKey="capacity" name="Capacity" fill="var(--slate-300)" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Bar dataKey="total_users" name={t('workstreams.analytics.totalUsers')} fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Bar dataKey="user_capacity" name={t('workstreams.analytics.capacity')} fill="var(--slate-300)" radius={[4, 4, 0, 0]} barSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -335,15 +340,15 @@ const WorkstreamManagement = () => {
 
                                 <div className={styles.cardFooter}>
                                     <div className={styles.actions}>
-                                        <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title="Configuration"><Settings size={18} /></button>
-                                        <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title="Edit"><Edit size={18} /></button>
+                                        <button className={styles.actionBtn} onClick={() => openConfigModal(ws)} title={t('workstreams.config.title')}><Settings size={18} /></button>
+                                        <button className={styles.actionBtn} onClick={() => handleEditWorkstream(ws)} title={t('common.edit')}><Edit size={18} /></button>
                                         <button
                                             className={`${styles.actionBtn} ${styles.danger}`}
-                                            title={ws.is_active ? "Deactivate" : "Activate"}
+                                            title={ws.is_active ? t('common.deactivate') : t('common.activate')}
                                             onClick={() => handleToggleStatus(ws.id, ws.is_active)}
                                             style={{ backgroundColor: ws.is_active ? undefined : 'var(--color-success)', color: ws.is_active ? undefined : 'white' }}
                                         >
-                                            {ws.is_active ? <Trash2 size={18} /> : <div style={{ fontWeight: 'bold', fontSize: '12px' }}>ACTIVATE</div>}
+                                            {ws.is_active ? <Trash2 size={18} /> : <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{t('common.activate')}</div>}
                                         </button>
                                     </div>
                                 </div>
@@ -367,18 +372,18 @@ const WorkstreamManagement = () => {
                             />
                         </div>
                         <div className={styles.formGroup}>
-                            <label>Regional Location</label>
+                            <label>{t('workstreams.form.location')}</label>
                             <input
                                 type="text"
-                                placeholder="e.g. Gaza City, Center"
+                                placeholder={t('workstreams.form.locationPlaceholder')}
                                 value={formData.location}
                                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                             />
                         </div>
                         <div className={styles.formGroup}>
-                            <label>Description (Optional)</label>
+                            <label>{t('workstreams.form.description')}</label>
                             <textarea
-                                placeholder="Workstream description"
+                                placeholder={t('workstreams.form.descriptionPlaceholder')}
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 style={{ minHeight: '80px', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface)' }}
@@ -390,7 +395,7 @@ const WorkstreamManagement = () => {
                                 type="number"
                                 required
                                 min="1"
-                                placeholder="Enter school quota"
+                                placeholder={t('workstreams.form.quotaPlaceholder')}
                                 value={formData.quota}
                                 onChange={(e) => setFormData({ ...formData, quota: e.target.value })}
                             />
@@ -402,7 +407,7 @@ const WorkstreamManagement = () => {
                                 value={formData.managerId}
                                 onChange={(val) => setFormData({ ...formData, managerId: val })}
                                 placeholder={t('workstreams.form.selectManager')}
-                                searchPlaceholder="Search managers..."
+                                searchPlaceholder={t('users.searchPlaceholder')}
                                 onSearch={handleManagerSearch}
                             />
                         </div>
@@ -440,14 +445,14 @@ const WorkstreamManagement = () => {
                                 </label>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                                     <input type="checkbox" />
-                                    <span>Multi-school Analytics</span>
+                                    <span>{t('workstreams.config.multiSchoolAnalytics')}</span>
                                 </label>
                             </div>
                         </div>
                     </div>
                     <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
                         <Button variant="outline" onClick={() => setIsConfigModalOpen(false)} type="button" disabled={isSavingConfig}>{t('common.cancel')}</Button>
-                        <Button variant="primary" type="submit" disabled={isSavingConfig}>{isSavingConfig ? 'Saving...' : t('common.save')}</Button>
+                        <Button variant="primary" type="submit" disabled={isSavingConfig}>{isSavingConfig ? t('workstreams.savingConfig') : t('common.save')}</Button>
                     </div>
                 </form>
             </Modal>

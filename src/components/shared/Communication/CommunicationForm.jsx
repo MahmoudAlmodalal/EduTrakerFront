@@ -123,19 +123,10 @@ const CommunicationForm = ({
         }
 
         if (!isBroadcast) {
-            // For School Manager and Student compose flow, force recipient selection from scoped search.
-            if (!formData.recipient_id && requiresScopedRecipient) {
-                showError(t('communication.noRecipient') || 'Please select a recipient from the list.');
+            // Strictly require recipient_id for all non-broadcast flows.
+            if (!formData.recipient_id && !isReply) {
+                showError(t('communication.noRecipientSelected') || 'Please select a recipient from the search results.');
                 return;
-            }
-
-            // Determine recipient payload (fallback to email only for non-school-manager roles).
-            if (!formData.recipient_id) {
-                const emailInput = (recipientSearchTerm.trim() || formData.recipient_name || '').trim();
-                if (!emailInput) {
-                    showError(t('communication.noRecipient') || 'Please select or type a recipient email.');
-                    return;
-                }
             }
         }
 
@@ -268,9 +259,7 @@ const CommunicationForm = ({
                                                 <div className={styles.searchResultItem} style={{ opacity: 0.7, cursor: 'default' }}>
                                                     <div className={styles.resultName}>{t('communication.noResults') || 'No users found'}</div>
                                                     <div className={styles.resultEmail}>
-                                                        {requiresScopedRecipient
-                                                            ? (t('communication.recipientRequired') || 'Choose a recipient from available users.')
-                                                            : (t('communication.typeEmailHint') || 'Type a full email and click Send')}
+                                                        {t('communication.mustSelectFromList') || 'Please select a user from the results list.'}
                                                     </div>
                                                 </div>
                                             )}
@@ -323,7 +312,7 @@ const CommunicationForm = ({
                     disabled={
                         isSending
                         || !formData.body.trim()
-                        || (!isReply && !isBroadcast && !formData.recipient_id && requiresScopedRecipient)
+                        || (!isReply && !isBroadcast && !formData.recipient_id)
                     }
                 >
                     {t('communication.send')}

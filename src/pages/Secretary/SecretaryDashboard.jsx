@@ -587,12 +587,36 @@ const SecretaryDashboard = () => {
 
     const quickAccessButtons = useMemo(() => {
         return [
-            { icon: UserPlus, label: 'Student Registry', sub: 'Manage all students', link: '/secretary/admissions' },
-            { icon: CalendarIcon, label: 'Attendance Log', sub: 'Daily reports', link: '/secretary/attendance' },
-            { icon: MessageSquare, label: 'Parent Broadcast', sub: 'Send updates', link: '/secretary/communication' },
-            { icon: FileText, label: 'Enrollment Center', sub: 'Process apps', link: '/secretary/admissions' },
+            {
+                id: 'student-registry',
+                icon: UserPlus,
+                label: t('secretary.dashboard.quick.studentRegistry'),
+                sub: t('secretary.dashboard.quick.studentRegistrySub'),
+                link: '/secretary/admissions',
+            },
+            {
+                id: 'attendance-log',
+                icon: CalendarIcon,
+                label: t('secretary.dashboard.quick.attendanceLog'),
+                sub: t('secretary.dashboard.quick.attendanceLogSub'),
+                link: '/secretary/attendance',
+            },
+            {
+                id: 'parent-broadcast',
+                icon: MessageSquare,
+                label: t('secretary.dashboard.quick.parentBroadcast'),
+                sub: t('secretary.dashboard.quick.parentBroadcastSub'),
+                link: '/secretary/communication',
+            },
+            {
+                id: 'enrollment-center',
+                icon: FileText,
+                label: t('secretary.dashboard.quick.enrollmentCenter'),
+                sub: t('secretary.dashboard.quick.enrollmentCenterSub'),
+                link: '/secretary/admissions',
+            },
         ];
-    }, []);
+    }, [t]);
 
     const handleNavigate = useCallback(
         (path) => {
@@ -605,6 +629,8 @@ const SecretaryDashboard = () => {
         const updatedLabel = lastUpdated
             ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
             : 'N/A';
+
+        const updatedText = t('secretary.dashboard.updated', { time: updatedLabel });
 
         return (
             <div className="sec-header-actions">
@@ -620,18 +646,24 @@ const SecretaryDashboard = () => {
                         '/secretary/settings',
                     ]}
                 />
-                <span className="sec-header-updated">Updated {updatedLabel}</span>
+                <span className="sec-header-updated">{updatedText}</span>
             </div>
         );
-    }, [lastUpdated]);
+    }, [lastUpdated, t]);
 
-    const firstName = user?.displayName?.split(' ')[0] || user?.full_name?.split(' ')[0] || 'Secretary';
+    const firstName = user?.displayName?.split(' ')[0]
+        || user?.full_name?.split(' ')[0]
+        || t('auth.role.secretary');
+
+    const selectedWeekLabel = selectedWeek === 'last-week'
+        ? t('secretary.dashboard.weekLabel.previous')
+        : t('secretary.dashboard.weekLabel.current');
 
     return (
         <div className="secretary-dashboard">
             <PageHeader
-                title={`Welcome back, ${firstName}!`}
-                subtitle={`${stats.schoolName} - Secretary Control Panel`}
+                title={t('secretary.dashboard.welcomeBack', { name: firstName })}
+                subtitle={t('secretary.dashboard.controlPanel', { school: stats.schoolName })}
                 action={headerAction}
             />
 
@@ -664,11 +696,9 @@ const SecretaryDashboard = () => {
                 <article className="sec-card sec-chart-card">
                     <div className="sec-chart-header">
                         <div>
-                            <h3>Weekly Attendance Trend</h3>
+                            <h3>{t('secretary.dashboard.weeklyAttendanceTrend')}</h3>
                             <p>
-                                Student attendance tracking for the
-                                {' '}
-                                {selectedWeek === 'last-week' ? 'previous week' : 'current week'}
+                                {t('secretary.dashboard.attendanceTracking', { week: selectedWeekLabel })}
                             </p>
                         </div>
                         <select
@@ -676,14 +706,14 @@ const SecretaryDashboard = () => {
                             value={selectedWeek}
                             onChange={(event) => setSelectedWeek(event.target.value)}
                         >
-                            <option value="current-week">Current Week</option>
-                            <option value="last-week">Last Week</option>
+                            <option value="current-week">{t('secretary.dashboard.currentWeek')}</option>
+                            <option value="last-week">{t('secretary.dashboard.lastWeek')}</option>
                         </select>
                     </div>
                     {trendLoading ? (
-                        <LoadingSpinner message="Loading attendance trend..." />
+                        <LoadingSpinner message={t('secretary.dashboard.loadingAttendanceTrend')} />
                     ) : (
-                        <Suspense fallback={<LoadingSpinner message="Loading chart..." />}>
+                        <Suspense fallback={<LoadingSpinner message={t('secretary.dashboard.loadingChart')} />}>
                             <AttendanceTrendChart trendData={trendData} />
                         </Suspense>
                     )}
@@ -691,16 +721,16 @@ const SecretaryDashboard = () => {
 
                 <aside className="sec-dashboard-sidebar">
                     <article className="sec-session-card">
-                        <div className="sec-session-card__head">Current Session</div>
+                        <div className="sec-session-card__head">{t('secretary.dashboard.currentSession')}</div>
                         <h3>{currentYear?.academic_year_code || '---'}</h3>
-                        <span className="sec-session-badge">Active</span>
+                        <span className="sec-session-badge">{t('common.status.active')}</span>
                         <div className="sec-session-meta">
                             <div>
-                                <span>Start Date</span>
+                                <span>{t('secretary.dashboard.startDate')}</span>
                                 <strong>{currentYear?.start_date || '---'}</strong>
                             </div>
                             <div>
-                                <span>End Date</span>
+                                <span>{t('secretary.dashboard.endDate')}</span>
                                 <strong>{currentYear?.end_date || '---'}</strong>
                             </div>
                         </div>
@@ -709,13 +739,13 @@ const SecretaryDashboard = () => {
 
                     <article className="widget-card sec-card">
                         <div className="widget-header">
-                            <h3>Recent Activity</h3>
+                            <h3>{t('secretary.dashboard.recentActivity')}</h3>
                             <button
                                 type="button"
                                 className="view-all-btn"
                                 onClick={() => handleNavigate('/secretary/admissions')}
                             >
-                                View All
+                                {t('secretary.dashboard.viewAll')}
                             </button>
                         </div>
                         <div className="sec-activity-list">
@@ -728,17 +758,20 @@ const SecretaryDashboard = () => {
                                         onClick={() => handleNavigate('/secretary/admissions')}
                                     >
                                         <div className="sec-activity-item__left">
-                                            <AvatarInitial name={application.student_name || application.full_name || 'Student'} color="indigo" />
+                                            <AvatarInitial
+                                                name={application.student_name || application.full_name || t('secretary.dashboard.studentFallback')}
+                                                color="indigo"
+                                            />
                                             <div>
-                                                <p>{application.student_name || application.full_name || 'Student'}</p>
-                                                <span>Applied for: {application.grade_name || 'N/A'}</span>
+                                                <p>{application.student_name || application.full_name || t('secretary.dashboard.studentFallback')}</p>
+                                                <span>{t('secretary.dashboard.appliedFor', { grade: application.grade_name || 'N/A' })}</span>
                                             </div>
                                         </div>
                                         <ChevronRight size={18} />
                                     </button>
                                 ))
                             ) : (
-                                <EmptyState message="No recent activity" />
+                                <EmptyState message={t('dashboard.noActivity')} />
                             )}
                         </div>
                     </article>
@@ -746,11 +779,11 @@ const SecretaryDashboard = () => {
             </section>
 
             <section className="sec-section">
-                <h3>Quick Access</h3>
+                <h3>{t('secretary.dashboard.quickAccess')}</h3>
                 <div className="sec-quick-grid">
                     {quickAccessButtons.map((button) => (
                         <button
-                            key={button.label}
+                            key={button.id}
                             type="button"
                             className="sec-quick-card"
                             onClick={() => handleNavigate(button.link)}

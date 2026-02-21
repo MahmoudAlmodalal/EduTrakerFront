@@ -27,7 +27,7 @@ const DailyBroadcastPopup = () => {
         if (!user?.id) {
             return null;
         }
-        const accessToken = localStorage.getItem('accessToken') || 'no-token';
+        const accessToken = sessionStorage.getItem('accessToken') || 'no-token';
         return `daily_broadcast_seen_${user.id}_${accessToken}`;
     }, [user?.id]);
 

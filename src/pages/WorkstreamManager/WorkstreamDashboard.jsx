@@ -33,6 +33,9 @@ const WorkstreamDashboard = () => {
                 setDashboardData(nextStatistics);
                 lastDashboardSignatureRef.current = nextSignature;
                 setLastUpdated(new Date());
+
+                // Signal layout to refresh sidebar stats if they share the same source
+                window.dispatchEvent(new CustomEvent('workstream_stats_updated'));
             }
         } catch (error) {
             console.error('Failed to fetch dashboard data:', error);
@@ -82,7 +85,7 @@ const WorkstreamDashboard = () => {
             color: 'blue'
         },
         {
-            title: 'Enrolled Students',
+            title: t('workstream.dashboard.enrolledStudents'),
             value: dashboardData?.enrolled_students?.toLocaleString() || '0',
             icon: Users,
             trend: '',
@@ -139,7 +142,7 @@ const WorkstreamDashboard = () => {
 
     const lastUpdatedLabel = lastUpdated
         ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        : 'N/A';
+        : t('workstream.dashboard.notAvailable');
 
     return (
         <div className="workstream-dashboard">
@@ -147,7 +150,7 @@ const WorkstreamDashboard = () => {
             <div className="workstream-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <div>
-                        <h1 className="workstream-title">Welcome back, {user?.displayName?.split(' ')[0] || user?.name?.split(' ')[0] || 'Manager'}! 👋</h1>
+                        <h1 className="workstream-title">{t('workstream.dashboard.welcomeBack', { name: user?.displayName?.split(' ')[0] || user?.name?.split(' ')[0] || 'Manager' })}! 👋</h1>
                         <p className="workstream-subtitle">{t('workstream.dashboard.subtitle')}</p>
                     </div>
                     <div className="workstream-refresh-meta">
@@ -155,13 +158,13 @@ const WorkstreamDashboard = () => {
                             type="button"
                             className="workstream-refresh-btn"
                             onClick={() => fetchDashboardData({ showSkeletonRows: true })}
-                            title="Refresh dashboard"
-                            aria-label="Refresh dashboard"
+                            title={t('workstream.dashboard.refresh')}
+                            aria-label={t('workstream.dashboard.refresh')}
                         >
                             <RefreshCw size={16} />
                         </button>
                         <span className="workstream-last-updated">
-                            Updated {lastUpdatedLabel}
+                            {t('workstream.dashboard.updated', { time: lastUpdatedLabel })}
                         </span>
                     </div>
                 </div>
@@ -196,7 +199,7 @@ const WorkstreamDashboard = () => {
                     <div className="chart-header">
                         <h3 className="chart-title">{t('workstream.dashboard.academicPerformance')}</h3>
                         <p style={{ marginTop: '0.5rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-                            Score represents average graded marks %. N/A means no graded marks yet.
+                            {t('workstream.dashboard.scoreDesc')}
                         </p>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -215,7 +218,7 @@ const WorkstreamDashboard = () => {
                             const students = school.students;
                             const enrolledStudents = school.enrolledStudents;
                             const pendingStudents = school.pendingStudents;
-                            const managerName = school.manager || 'Unassigned';
+                            const managerName = school.manager || t('workstream.dashboard.stats.unassigned');
                             const hasData = Number.isFinite(score);
                             const numericScore = hasData ? score : 0;
                             return (
@@ -242,12 +245,12 @@ const WorkstreamDashboard = () => {
                                         fontWeight: '700',
                                         fontSize: hasData ? '0.875rem' : '0.625rem'
                                     }}>
-                                        {hasData ? numericScore : 'N/A'}
+                                        {hasData ? numericScore : t('workstream.dashboard.notAvailable')}
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '4px' }}>{name}</div>
                                         <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                            {students} total • {enrolledStudents} enrolled • {pendingStudents} pending • Manager: {managerName}
+                                            {students} {t('workstream.dashboard.stats.total')} • {enrolledStudents} {t('workstream.dashboard.stats.enrolled')} • {pendingStudents} {t('workstream.dashboard.stats.pending')} • {t('workstream.dashboard.stats.manager')}: {managerName}
                                         </div>
                                     </div>
                                     <div style={{ width: '120px' }}>
@@ -269,13 +272,13 @@ const WorkstreamDashboard = () => {
                                         </div>
                                         {!hasData && (
                                             <div style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                                                No graded marks
+                                                {t('workstream.dashboard.noGradedMarks')}
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             );
-                        }) : <div style={{ padding: '20px', color: 'var(--color-text-muted)' }}>No school data available</div>}
+                        }) : <div style={{ padding: '20px', color: 'var(--color-text-muted)' }}>{t('workstream.dashboard.noSchoolData')}</div>}
                     </div>
                 </div>
             </div>
@@ -312,41 +315,41 @@ const EnrollmentTrendsChart = () => {
             <div className="chart-header">
                 <h3 className="chart-title">{t('workstream.dashboard.enrollmentTrends')}</h3>
             </div>
-            {loading ? <div style={{ padding: '20px' }}>Loading trends...</div> : (
+            {loading ? <div style={{ padding: '20px' }}>{t('workstream.dashboard.loadingTrends')}</div> : (
                 <>
                     {data.length === 0 ? (
                         <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Calendar size={32} style={{ opacity: 0.6, marginBottom: '8px' }} />
                             <div style={{ fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '4px' }}>
-                                No enrollment data yet
+                                {t('workstream.dashboard.noEnrollmentData')}
                             </div>
                             <div style={{ fontSize: '0.875rem' }}>
-                                Students will appear here once enrolled.
+                                {t('workstream.dashboard.studentsAppearOnceEnrolled')}
                             </div>
                         </div>
                     ) : (
-                    <div className="css-chart-container" style={{ height: '180px' }}>
-                        {data.map((item, index) => {
-                            const enrollment = item.enrollment || 0;
-                            return (
-                                <div key={item.month || index} className="css-bar-group">
-                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
-                                        <div
-                                            className="css-bar"
-                                            style={{ height: `${(enrollment / maxEnrollment) * 160}px`, width: '28px' }}
-                                            data-value={enrollment}
-                                        ></div>
+                        <div className="css-chart-container" style={{ height: '180px' }}>
+                            {data.map((item, index) => {
+                                const enrollment = item.enrollment || 0;
+                                return (
+                                    <div key={item.month || index} className="css-bar-group">
+                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
+                                            <div
+                                                className="css-bar"
+                                                style={{ height: `${(enrollment / maxEnrollment) * 160}px`, width: '28px' }}
+                                                data-value={enrollment}
+                                            ></div>
+                                        </div>
+                                        <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', marginTop: '8px' }}>{item.month}</span>
                                     </div>
-                                    <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', marginTop: '8px' }}>{item.month}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
                     )}
                     <div className="chart-legend">
                         <div className="legend-item">
                             <div className="legend-color" style={{ background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)' }}></div>
-                            <span>New Enrollments</span>
+                            <span>{t('workstream.dashboard.newEnrollments')}</span>
                         </div>
                     </div>
                 </>

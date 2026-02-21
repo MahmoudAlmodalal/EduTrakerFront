@@ -28,6 +28,68 @@ const ActivityLog = () => {
         }
     };
 
+    const renderActivityDescription = (activity) => {
+        const desc = activity.description || '';
+
+        // Handle Export Pattern
+        const exportMatch = desc.match(/Exported (.*) report as (.*)/i);
+        if (exportMatch) {
+            return t('activity.patterns.exportedReport', {
+                report: exportMatch[1],
+                format: exportMatch[2]
+            });
+        }
+
+        if (desc.startsWith('Updated user:')) {
+            const name = desc.replace('Updated user:', '').trim();
+            return t('activity.patterns.updatedUser', { name });
+        }
+        if (desc.startsWith('Created Workstream Manager:')) {
+            const name = desc.replace('Created Workstream Manager:', '').trim();
+            return t('activity.patterns.createdWSManager', { name });
+        }
+
+        // Handle Login Pattern
+        if (desc.toLowerCase().endsWith('logged in')) {
+            const email = desc.replace(/User\s+/i, '').replace(/logged in/i, '').trim();
+            return t('activity.patterns.loggedIn', { email });
+        }
+
+        return activity.description || t(activity.action_type);
+    };
+
+    const renderActorName = (actor) => {
+        if (actor === 'Super User' || actor === 'الادمن') return t('activity.actor.superUser');
+        return actor;
+    };
+
+    const renderActionType = (action) => {
+        const key = `activity.action.${action?.toLowerCase()}`;
+        const translated = t(key);
+        return translated === key ? action : translated;
+    };
+
+    const renderRelativeTime = (timeStr) => {
+        if (!timeStr) return t('dashboard.activity.justNow');
+
+        const hrMinMatch = timeStr.match(/(\d+)\s+hour[s]?,\s+(\d+)\s+minute[s]?\s+ago/i);
+        if (hrMinMatch) {
+            return t('activity.time.hoursMinutesAgo', { hours: hrMinMatch[1], minutes: hrMinMatch[2] });
+        }
+
+        const minMatch = timeStr.match(/(\d+)\s+minute[s]?\s+ago/i);
+        if (minMatch) {
+            return t('activity.time.minutesAgo', { count: minMatch[1] });
+        }
+
+        const hrMatch = timeStr.match(/(\d+)\s+hour[s]?\s+ago/i);
+        if (hrMatch) {
+            return t('activity.time.hoursAgo', { count: hrMatch[1] });
+        }
+
+        return timeStr;
+    };
+
     useEffect(() => {
         fetchLogs(page);
     }, [page]);
@@ -36,7 +98,7 @@ const ActivityLog = () => {
         <div className={styles.container}>
             <header className={styles.header}>
                 <h1 className={styles.title}>{t('activity.title')}</h1>
-                <p className={styles.subtitle}>Monitor all administrative actions and system events</p>
+                <p className={styles.subtitle}>{t('activity.subtitle')}</p>
             </header>
 
             <div className={styles.tableCard}>
@@ -74,7 +136,7 @@ const ActivityLog = () => {
                             {loading ? (
                                 <tr>
                                     <td colSpan="4" style={{ textAlign: 'center', padding: '3rem' }}>
-                                        <div className={styles.loadingPulse}>Fetching system logs...</div>
+                                        <div className={styles.loadingPulse}>{t('activity.loading')}</div>
                                     </td>
                                 </tr>
                             ) : logs.length > 0 ? (
@@ -83,25 +145,25 @@ const ActivityLog = () => {
                                         <td className={styles.timestamp}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 <Clock size={14} opacity={0.6} />
-                                                {log.created_at_human}
+                                                {renderRelativeTime(log.created_at_human)}
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={styles.actionText}>{log.action_type}</span>
+                                            <span className={styles.actionText}>{renderActionType(log.action_type)}</span>
                                         </td>
                                         <td>
                                             <div className={styles.userCell}>
                                                 <UserIcon size={14} className={styles.userIcon} />
-                                                {log.actor_name}
+                                                {renderActorName(log.actor_name)}
                                             </div>
                                         </td>
-                                        <td className={styles.detailsCell}>{log.description}</td>
+                                        <td className={styles.detailsCell}>{renderActivityDescription(log)}</td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
                                     <td colSpan="4" style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                                        No activity logs found.
+                                        {t('activity.noLogs')}
                                     </td>
                                 </tr>
                             )}
@@ -118,10 +180,10 @@ const ActivityLog = () => {
                         disabled={page === 1}
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                     >
-                        Previous
+                        {t('users.pagination.previous')}
                     </Button>
                     <span style={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
-                        Page {page} of {pagination.total_pages}
+                        {t('users.pagination.info', { current: page, total: pagination.total_pages })}
                     </span>
                     <Button
                         variant="outline"
@@ -129,7 +191,7 @@ const ActivityLog = () => {
                         disabled={page === pagination.total_pages}
                         onClick={() => setPage(p => Math.min(pagination.total_pages, p + 1))}
                     >
-                        Next
+                        {t('users.pagination.next')}
                     </Button>
                 </div>
             )}

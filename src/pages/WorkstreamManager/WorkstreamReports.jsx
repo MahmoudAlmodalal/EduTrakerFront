@@ -30,9 +30,25 @@ const WorkstreamReports = () => {
         fetchStats();
     }, []);
 
+    const getSchoolNumberLabel = (school, fallbackIndex) => {
+        const schoolName = String(school?.school_name || '');
+        const nameMatch = schoolName.match(/[\d\u0660-\u0669]+/);
+        if (nameMatch) {
+            return nameMatch[0];
+        }
+
+        const schoolId = Number.parseInt(school?.school_id, 10);
+        if (Number.isInteger(schoolId) && schoolId > 0) {
+            return String(schoolId);
+        }
+
+        return String(fallbackIndex);
+    };
+
     // Map backend schools in workstream to chart/table format
-    const schoolStats = stats?.summary?.by_school?.map(school => ({
+    const schoolStats = stats?.summary?.by_school?.map((school, index) => ({
         school: school.school_name,
+        schoolNumber: getSchoolNumberLabel(school, index + 1),
         attendance: school.attendance_percentage || 0,
         absent: school.absent_percentage || 0,
         teachers: school.teacher_count,
@@ -47,12 +63,12 @@ const WorkstreamReports = () => {
 
     const handleExport = async (format, section, reportLabel) => {
         if (loading) {
-            showWarning(`Please wait. ${reportLabel} is still loading.`);
+            showWarning(t('workstream.reports.exportWait', { report: reportLabel }));
             return;
         }
 
         if (!schoolStats.length) {
-            showWarning(`No data available for ${reportLabel}. Add schools/stats first, then try export again.`);
+            showWarning(t('workstream.reports.exportNoData', { report: reportLabel }));
             return;
         }
 
@@ -78,14 +94,14 @@ const WorkstreamReports = () => {
                 : 'workstream_attendance';
 
             await reportService.exportReport(format, reportType, exportData);
-            showSuccess(`${reportLabel} exported successfully.`);
+            showSuccess(t('workstream.reports.exportSuccess', { report: reportLabel }));
         } catch (err) {
             const rawMessage = String(err?.message || '').toLowerCase();
             if (rawMessage.includes('no data to export') || rawMessage.includes('invalid report type')) {
-                showError(`Export failed for ${reportLabel}: no exportable data was found.`);
+                showError(t('workstream.reports.exportFailedNoData', { report: reportLabel }));
                 return;
             }
-            showError(`Export failed for ${reportLabel}: ${err.message}`);
+            showError(t('workstream.reports.exportFailed', { report: reportLabel, error: err.message }));
         }
     };
 
@@ -94,7 +110,7 @@ const WorkstreamReports = () => {
             <div className="workstream-header">
                 <h1 className="workstream-title">{t('workstream.reports.title')}</h1>
                 <p className="workstream-subtitle">
-                    {loading ? 'Fetching latest data...' : t('workstream.reports.subtitle')}
+                    {loading ? t('workstream.reports.fetchingData') : t('workstream.reports.subtitle')}
                 </p>
             </div>
 
@@ -110,32 +126,32 @@ const WorkstreamReports = () => {
                     <div className="stat-value">{loading ? '...' : `${avgAttendance}%`}</div>
                     <div className="stat-trend">
                         <span style={{ color: 'var(--color-text-muted)' }}>
-                            {avgAttendance > 0 ? 'Across all schools' : 'No data yet'}
+                            {avgAttendance > 0 ? t('workstream.reports.acrossAllSchools') : t('workstream.reports.noDataYet')}
                         </span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-header">
-                        <span className="stat-title">Total Schools</span>
+                        <span className="stat-title">{t('workstream.dashboard.totalSchools')}</span>
                         <div className="stat-icon" style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}>
                             <Users size={20} />
                         </div>
                     </div>
                     <div className="stat-value">{loading ? '...' : (stats?.summary?.school_count || 0)}</div>
                     <div className="stat-trend">
-                        <span style={{ color: 'var(--color-text-muted)' }}>In your workstream</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{t('workstream.reports.inYourWorkstream')}</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-header">
-                        <span className="stat-title">Total Students</span>
+                        <span className="stat-title">{t('workstream.dashboard.totalStudents')}</span>
                         <div className="stat-icon" style={{ backgroundColor: '#e0e7ff', color: '#4f46e5' }}>
                             <BookOpen size={20} />
                         </div>
                     </div>
                     <div className="stat-value">{loading ? '...' : (stats?.summary?.total_students || 0)}</div>
                     <div className="stat-trend">
-                        <span style={{ color: 'var(--color-text-muted)' }}>Active enrollments</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{t('workstream.reports.activeEnrollments')}</span>
                     </div>
                 </div>
             </div>
@@ -146,7 +162,7 @@ const WorkstreamReports = () => {
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <h3 className="chart-title">{t('workstream.reports.monthlyAttendance')}</h3>
                         <button
-                            onClick={() => handleExport('pdf', 'attendance', 'Monthly Attendance')}
+                            onClick={() => handleExport('pdf', 'attendance', t('workstream.reports.monthlyAttendance'))}
                             style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
                             <Download size={16} />
@@ -165,9 +181,9 @@ const WorkstreamReports = () => {
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>Loading data...</td></tr>
+                                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>{t('workstream.reports.loadingData')}</td></tr>
                                 ) : schoolStats.length === 0 ? (
-                                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>No schools found.</td></tr>
+                                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>{t('workstream.reports.noSchoolsFound')}</td></tr>
                                 ) : (
                                     schoolStats.map((data, index) => (
                                         <tr key={index}>
@@ -194,7 +210,7 @@ const WorkstreamReports = () => {
                     <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <h3 className="chart-title">{t('workstream.reports.resourceUtilization')}</h3>
                         <button
-                            onClick={() => handleExport('pdf', 'utilization', 'Resource Utilization')}
+                            onClick={() => handleExport('pdf', 'utilization', t('workstream.reports.resourceUtilization'))}
                             style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
                             <Download size={16} />
@@ -212,13 +228,13 @@ const WorkstreamReports = () => {
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="3" style={{ textAlign: 'center', padding: '2rem' }}>Loading data...</td></tr>
+                                    <tr><td colSpan="3" style={{ textAlign: 'center', padding: '2rem' }}>{t('workstream.reports.loadingData')}</td></tr>
                                 ) : schoolStats.length === 0 ? (
-                                    <tr><td colSpan="3" style={{ textAlign: 'center', padding: '2rem' }}>No schools found.</td></tr>
+                                    <tr><td colSpan="3" style={{ textAlign: 'center', padding: '2rem' }}>{t('workstream.reports.noSchoolsFound')}</td></tr>
                                 ) : (
                                     schoolStats.map((data, index) => (
                                         <tr key={index}>
-                                            <td style={{ fontWeight: '500' }}>{data.school}</td>
+                                            <td style={{ fontWeight: '500' }}>{data.schoolNumber}</td>
                                             <td>{data.teachers} / {data.classrooms}</td>
                                             <td>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

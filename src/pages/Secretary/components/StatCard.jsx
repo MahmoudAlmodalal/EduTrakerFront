@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { getSecretaryIconColorKey } from '../../../utils/secretaryHelpers';
+import { useTheme } from '../../../context/ThemeContext';
 
 const StatCard = memo(function StatCard({
     title,
@@ -11,6 +12,7 @@ const StatCard = memo(function StatCard({
     trendUp = true,
     description = '',
 }) {
+    const { t } = useTheme();
     const toneClass = `sec-icon-tone--${getSecretaryIconColorKey(color)}`;
 
     return (
@@ -26,7 +28,7 @@ const StatCard = memo(function StatCard({
                 <div className={`sec-stat-trend ${trendUp ? 'up' : 'down'}`}>
                     {trendUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     <span>{trend}</span>
-                    <span className="sec-stat-trend-label">this month</span>
+                    <span className="sec-stat-trend-label">{t('secretary.dashboard.thisMonth')}</span>
                 </div>
             ) : null}
             {description ? <p className="sec-stat-description">{description}</p> : null}

@@ -69,6 +69,8 @@ const TablePagination = ({
     onPrevious,
     onNext
 }) => {
+    const { t } = useTheme();
+
     if (totalItems === 0) return null;
 
     const startItem = (currentPage - 1) * pageSize + 1;
@@ -77,7 +79,11 @@ const TablePagination = ({
     return (
         <div className="sm-table-pagination">
             <span className="sm-table-pagination-summary">
-                Showing {startItem}-{endItem} of {totalItems}
+                {t('common.showingOf', {
+                    start: startItem,
+                    end: endItem,
+                    total: totalItems
+                })}
             </span>
             <div className="sm-table-pagination-controls">
                 <button
@@ -86,10 +92,10 @@ const TablePagination = ({
                     onClick={onPrevious}
                     disabled={currentPage <= 1}
                 >
-                    Previous
+                    {t('common.previous')}
                 </button>
                 <span className="sm-table-pagination-page">
-                    Page {currentPage} of {totalPages}
+                    {t('common.pageOf', { current: currentPage, total: totalPages })}
                 </span>
                 <button
                     type="button"
@@ -97,7 +103,7 @@ const TablePagination = ({
                     onClick={onNext}
                     disabled={currentPage >= totalPages}
                 >
-                    Next
+                    {t('common.next')}
                 </button>
             </div>
         </div>
@@ -243,10 +249,10 @@ const AcademicConfiguration = () => {
     };
 
     const tabs = [
-        { id: 'subjects', label: 'Subjects', icon: BookOpen },
-        { id: 'classrooms', label: 'Classrooms', icon: Building },
-        { id: 'teachers', label: 'Teachers', icon: Users },
-        { id: 'timetable', label: 'Timetable', icon: Calendar },
+        { id: 'subjects', label: t('school.config.subjects') || 'Subjects', icon: BookOpen },
+        { id: 'classrooms', label: t('school.config.classrooms') || 'Classrooms', icon: Building },
+        { id: 'teachers', label: t('school.config.teachers') || 'Teachers', icon: Users },
+        { id: 'timetable', label: t('school.config.timetable') || 'Timetable', icon: Calendar },
     ];
 
     return (
@@ -337,6 +343,7 @@ const AcademicConfiguration = () => {
 // Academic Year Management Tab
 // ============================================
 export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId = null, schoolId = null }) => {
+    const { t } = useTheme();
     const { showSuccess, showError } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ start_date: '', end_date: '' });
@@ -364,7 +371,7 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!canCreateAcademicYear) {
-            showError('Error: Workstream ID not found.');
+            showError(t('academicYear.error.noWorkstream', 'Error: Workstream ID not found.'));
             return;
         }
         setSaving(true);
@@ -374,7 +381,7 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
                 start_date: formData.start_date,
                 end_date: formData.end_date
             });
-            showSuccess('Academic year created successfully.');
+            showSuccess(t('academicYear.createSuccess'));
             setIsModalOpen(false);
             setFormData({ start_date: '', end_date: '' });
             await onUpdated();
@@ -386,8 +393,7 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
             }
         } catch (error) {
             console.error('Failed to create academic year:', error);
-            const msg = error?.response?.data?.detail || error?.response?.data?.non_field_errors?.[0] || error.message || 'Failed to create academic year.';
-            showError(msg);
+            showError(getErrorMessage(error, t('academicYear.error.createFailed', 'Failed to create academic year.')));
         } finally {
             setSaving(false);
         }
@@ -424,10 +430,10 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
         try {
             if (ay.is_active) {
                 await managerService.deactivateAcademicYear(ay.id);
-                showSuccess('Academic year deactivated.');
+                showSuccess(t('academicYear.deactivated'));
             } else {
                 await managerService.activateAcademicYear(ay.id);
-                showSuccess('Academic year activated.');
+                showSuccess(t('academicYear.activated'));
             }
             onUpdated();
         } catch (error) {
@@ -439,11 +445,11 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <h3 className="chart-title">Academic Years</h3>
+                <h3 className="chart-title">{t('academicYear.managementTitle')}</h3>
                 <div className="sm-academic-year-toolbar">
                     <div className="sm-academic-year-filter">
                         <label htmlFor="academic-year-status-filter" className="sm-academic-year-filter-label">
-                            Status
+                            {t('academicYear.status')}
                         </label>
                         <select
                             id="academic-year-status-filter"
@@ -451,19 +457,19 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
                             onChange={(event) => setStatusFilter(event.target.value)}
                             className="sm-academic-year-filter-select"
                         >
-                            <option value="all">All</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
+                            <option value="all">{t('common.all')}</option>
+                            <option value="active">{t('common.status.active')}</option>
+                            <option value="inactive">{t('common.status.inactive')}</option>
                         </select>
                     </div>
                     <button
                         className="btn-primary sm-academic-year-create-btn"
                         onClick={() => setIsModalOpen(true)}
                         disabled={!canCreateAcademicYear}
-                        title={!canCreateAcademicYear ? 'Workstream ID is required to create academic years.' : 'Create Academic Year'}
+                        title={!canCreateAcademicYear ? t('academicYear.error.noWorkstream') : t('academicYear.create')}
                     >
                         <Plus size={18} />
-                        Create Academic Year
+                        {t('academicYear.create')}
                     </button>
                 </div>
             </div>
@@ -472,19 +478,19 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
                 <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                     <GraduationCap size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                     <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>
-                        No Academic Years Configured
+                        {t('academicYear.noConfigured')}
                     </h3>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        Create an academic year to enable teacher assignments and course management.
+                        {t('academicYear.noConfiguredDesc')}
                     </p>
                     <button
                         className="btn-primary"
                         onClick={() => setIsModalOpen(true)}
                         disabled={!canCreateAcademicYear}
-                        title={!canCreateAcademicYear ? 'Workstream ID is required to create academic years.' : 'Create Academic Year'}
+                        title={!canCreateAcademicYear ? t('academicYear.error.noWorkstream') : t('academicYear.create')}
                     >
                         <Plus size={18} />
-                        Create First Academic Year
+                        {t('academicYear.createFirst')}
                     </button>
                 </div>
             ) : filteredAcademicYears.length === 0 ? (
@@ -498,10 +504,10 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>Academic Year</th>
-                                <th>Start Date</th>
-                                <th>End Date</th>
-                                <th>Status</th>
+                                <th>{t('academicYear.code')}</th>
+                                <th>{t('academicYear.startDate')}</th>
+                                <th>{t('academicYear.endDate')}</th>
+                                <th>{t('academicYear.status')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -515,9 +521,9 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
                                             className={`status-badge ${ay.is_active ? 'status-active' : 'status-inactive'}`}
                                             onClick={() => handleToggleStatus(ay)}
                                             style={{ cursor: 'pointer' }}
-                                            title={ay.is_active ? 'Click to deactivate' : 'Click to activate'}
+                                            title={ay.is_active ? t('academicYear.toggleInactive') : t('academicYear.toggleActive')}
                                         >
-                                            {ay.is_active ? 'Active' : 'Inactive'}
+                                            {ay.is_active ? t('common.status.active') : t('common.status.inactive')}
                                         </span>
                                     </td>
                                 </tr>
@@ -531,13 +537,13 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
             {isModalOpen && (
                 <div className="sm-modal-backdrop">
                     <div className="sm-modal-panel">
-                        <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Create Academic Year</h2>
+                        <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>{t('academicYear.createTitle')}</h2>
                         <p style={{ marginBottom: '1.5rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-                            The academic year code will be auto-generated from the dates (e.g. 2025/2026).
+                            {t('academicYear.codeHint')}
                         </p>
                         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>Start Date</label>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>{t('academicYear.startDate')}</label>
                                 <input
                                     required
                                     type="date"
@@ -547,7 +553,7 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
                                 />
                             </div>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>End Date</label>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>{t('academicYear.endDate')}</label>
                                 <input
                                     required
                                     type="date"
@@ -557,9 +563,9 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
                                 />
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>Cancel</button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: '0.25rem', cursor: 'pointer', color: 'var(--color-text-main)' }}>{t('common.cancel')}</button>
                                 <button type="submit" className="btn-primary" disabled={saving}>
-                                    {saving ? 'Creating...' : 'Create'}
+                                    {saving ? t('academicYear.creating') : t('common.create')}
                                 </button>
                             </div>
                         </form>
@@ -627,6 +633,7 @@ export const AcademicYearManagement = ({ academicYears, onUpdated, workStreamId 
 
 // Sub-components for Tabs
 export const GradeManagement = () => {
+    const { t } = useTheme();
     const { user } = useAuth();
     const { showSuccess, showError, showWarning } = useToast();
     const [grades, setGrades] = useState([]);
@@ -692,7 +699,7 @@ export const GradeManagement = () => {
             }
         };
         loadInitial();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Re-fetch when year filter changes (skip on mount since loadInitial covers it)
@@ -709,7 +716,7 @@ export const GradeManagement = () => {
         }
         fetchGrades(parseInt(selectedYearId, 10));
         setGradePage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedYearId]);
 
     const resetCreateForm = () => {
@@ -873,15 +880,15 @@ export const GradeManagement = () => {
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <h3 className="chart-title">Grade Management</h3>
+                <h3 className="chart-title">{t('school.grades.title')}</h3>
                 <button
                     className="btn-primary"
                     onClick={() => setIsCreateModalOpen(true)}
                     disabled={!hasActiveAcademicYear}
-                    title={!hasActiveAcademicYear ? 'Activate an academic year first.' : 'Add Grade'}
+                    title={!hasActiveAcademicYear ? t('school.grades.activateYearFirst') : t('school.grades.add')}
                 >
                     <Plus size={18} />
-                    Add Grade
+                    {t('school.grades.add')}
                 </button>
             </div>
 
@@ -889,7 +896,7 @@ export const GradeManagement = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                 <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
                     <Calendar size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
-                    Active Academic Year:
+                    {t('school.grades.activeYear')}
                 </label>
                 <select
                     value={selectedYearId}
@@ -898,27 +905,27 @@ export const GradeManagement = () => {
                     style={{ maxWidth: '260px', padding: '0.4rem 0.6rem' }}
                     disabled={!hasActiveAcademicYear}
                 >
-                    {!hasActiveAcademicYear && <option value="">No active academic year</option>}
+                    {!hasActiveAcademicYear && <option value="">{t('school.grades.noActiveYear')}</option>}
                     {activeAcademicYears.map((ay) => (
                         <option key={ay.id} value={String(ay.id)}>
-                            {ay.academic_year_code} (Active)
+                            {t('school.grades.yearActive', { year: ay.academic_year_code })}
                         </option>
                     ))}
                 </select>
                 {hasActiveAcademicYear && selectedYearId && (
                     <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                        Showing grades for the active academic year only
+                        {t('school.grades.activeOnly')}
                     </span>
                 )}
             </div>
 
             {!hasActiveAcademicYear ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No active academic year found. Please activate one from Academic Year management.
+                    {t('school.grades.noActiveYear')}
                 </div>
             ) : grades.length === 0 ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No grades found for the active academic year.
+                    {t('school.grades.noGrades')}
                 </div>
             ) : (
                 <>
@@ -926,12 +933,12 @@ export const GradeManagement = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Grade</th>
-                                    <th>Level</th>
-                                    <th>Age Range</th>
-                                    {selectedYearId && <th>Classrooms</th>}
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th>{t('school.grades.grade')}</th>
+                                    <th>{t('school.grades.level')}</th>
+                                    <th>{t('school.grades.ageRange')}</th>
+                                    {selectedYearId && <th>{t('school.grades.classrooms')}</th>}
+                                    <th>{t('school.reports.status')}</th>
+                                    <th>{t('school.reports.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -964,9 +971,9 @@ export const GradeManagement = () => {
                                                     cursor: togglingGradeId === grade.id ? 'wait' : 'pointer',
                                                     opacity: togglingGradeId === grade.id ? 0.75 : 1
                                                 }}
-                                                title={togglingGradeId === grade.id ? 'Updating status...' : 'Click to toggle status'}
+                                                title={togglingGradeId === grade.id ? t('school.grades.updating') : t('users.status.toggle')}
                                             >
-                                                {togglingGradeId === grade.id ? 'Updating...' : (grade.is_active ? 'Active' : 'Inactive')}
+                                                {togglingGradeId === grade.id ? t('school.grades.updating') : (grade.is_active ? t('common.status.active') : t('common.status.inactive'))}
                                             </span>
                                         </td>
                                         <td>
@@ -975,9 +982,9 @@ export const GradeManagement = () => {
                                                 onUpdate={() => handleOpenEdit(grade)}
                                                 onActivate={() => setPendingStatusAction({ grade, nextIsActive: true })}
                                                 onDeactivate={() => setPendingStatusAction({ grade, nextIsActive: false })}
-                                                updateTitle="Update Grade"
-                                                activateTitle="Activate Grade"
-                                                deactivateTitle="Deactivate Grade"
+                                                updateTitle={t('school.grades.update')}
+                                                activateTitle={t('school.grades.activate')}
+                                                deactivateTitle={t('school.grades.deactivate')}
                                             />
                                         </td>
                                     </tr>
@@ -996,12 +1003,12 @@ export const GradeManagement = () => {
                 </>
             )}
 
-            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Add Grade">
+            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title={t('school.grades.add')}>
                 <form onSubmit={handleCreateGrade} className="sm-modal-form">
                     <div className="sm-form-field">
                         <label className="sm-form-label">
                             <Calendar size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
-                            Academic Year
+                            {t('academicYear.code')}
                         </label>
                         <input
                             readOnly
@@ -1010,36 +1017,36 @@ export const GradeManagement = () => {
                             value={
                                 (() => {
                                     const activeYear = academicYears.find(y => y.is_active);
-                                    return activeYear ? `${activeYear.academic_year_code} (Active)` : 'No active academic year';
+                                    return activeYear ? t('school.grades.yearActive', { year: activeYear.academic_year_code }) : t('school.grades.noActiveYear');
                                 })()
                             }
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Grade Name</label>
+                        <label className="sm-form-label">{t('school.grades.name')}</label>
                         <input
                             required
                             value={formData.name}
                             onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                            placeholder="e.g. Grade 7"
+                            placeholder={t('school.grades.namePlaceholder')}
                             className="sm-form-input"
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Numeric Level</label>
+                        <label className="sm-form-label">{t('school.grades.numericLevel')}</label>
                         <input
                             required
                             type="number"
                             min="1"
                             value={formData.numeric_level}
                             onChange={(event) => setFormData({ ...formData, numeric_level: event.target.value })}
-                            placeholder="e.g. 7"
+                            placeholder={t('school.grades.levelPlaceholder')}
                             className="sm-form-input"
                         />
                     </div>
                     <div className="sm-form-grid-two">
                         <div className="sm-form-field">
-                            <label className="sm-form-label">Min Age</label>
+                            <label className="sm-form-label">{t('school.grades.minAge')}</label>
                             <input
                                 required
                                 type="number"
@@ -1050,7 +1057,7 @@ export const GradeManagement = () => {
                             />
                         </div>
                         <div className="sm-form-field">
-                            <label className="sm-form-label">Max Age</label>
+                            <label className="sm-form-label">{t('school.grades.maxAge')}</label>
                             <input
                                 required
                                 type="number"
@@ -1068,19 +1075,19 @@ export const GradeManagement = () => {
                             className="sm-btn-secondary"
                             disabled={saving}
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn-primary" disabled={saving}>
-                            {saving ? 'Saving...' : 'Add Grade'}
+                            {saving ? t('common.saving') : t('school.grades.add')}
                         </button>
                     </div>
                 </form>
             </Modal>
 
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Update Grade">
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={t('school.grades.update')}>
                 <form onSubmit={handleUpdateGrade} className="sm-modal-form">
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Grade Name</label>
+                        <label className="sm-form-label">{t('school.grades.name')}</label>
                         <input
                             required
                             value={editFormData.name}
@@ -1089,7 +1096,7 @@ export const GradeManagement = () => {
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Numeric Level</label>
+                        <label className="sm-form-label">{t('school.grades.numericLevel')}</label>
                         <input
                             required
                             type="number"
@@ -1101,7 +1108,7 @@ export const GradeManagement = () => {
                     </div>
                     <div className="sm-form-grid-two">
                         <div className="sm-form-field">
-                            <label className="sm-form-label">Min Age</label>
+                            <label className="sm-form-label">{t('school.grades.minAge')}</label>
                             <input
                                 required
                                 type="number"
@@ -1112,7 +1119,7 @@ export const GradeManagement = () => {
                             />
                         </div>
                         <div className="sm-form-field">
-                            <label className="sm-form-label">Max Age</label>
+                            <label className="sm-form-label">{t('school.grades.maxAge')}</label>
                             <input
                                 required
                                 type="number"
@@ -1125,10 +1132,10 @@ export const GradeManagement = () => {
                     </div>
                     <div className="sm-form-actions">
                         <button type="button" onClick={() => setIsEditModalOpen(false)} className="sm-btn-secondary" disabled={saving}>
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn-primary" disabled={saving}>
-                            {saving ? 'Saving...' : 'Update Grade'}
+                            {saving ? t('common.saving') : t('school.grades.update')}
                         </button>
                     </div>
                 </form>
@@ -1137,18 +1144,20 @@ export const GradeManagement = () => {
             <Modal
                 isOpen={Boolean(pendingStatusAction)}
                 onClose={() => setPendingStatusAction(null)}
-                title={pendingStatusAction?.nextIsActive ? 'Activate Grade' : 'Deactivate Grade'}
+                title={pendingStatusAction?.nextIsActive ? t('school.grades.activate') : t('school.grades.deactivate')}
             >
                 <p className="sm-confirm-copy">
-                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
-                    <strong>{pendingStatusAction?.grade?.name}</strong>?
+                    {t('school.grades.confirmAction', {
+                        action: pendingStatusAction?.nextIsActive ? t('common.activate') : t('common.deactivate'),
+                        name: pendingStatusAction?.grade?.name
+                    })}
                 </p>
                 <div className="sm-form-actions">
                     <button type="button" onClick={() => setPendingStatusAction(null)} className="sm-btn-secondary">
-                        Cancel
+                        {t('common.cancel')}
                     </button>
                     <button type="button" onClick={confirmStatusChange} className="btn-primary">
-                        Confirm
+                        {t('common.confirm')}
                     </button>
                 </div>
             </Modal>
@@ -1157,12 +1166,14 @@ export const GradeManagement = () => {
 };
 
 const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
+    const { t } = useTheme();
     const { showSuccess, showError, showWarning } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [grades, setGrades] = useState([]);
     const [gradeFilter, setGradeFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [subjectPage, setSubjectPage] = useState(1);
     const [editingSubject, setEditingSubject] = useState(null);
     const [pendingStatusAction, setPendingStatusAction] = useState(null);
@@ -1202,9 +1213,17 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
     }, [courses]);
 
     const filteredCourses = useMemo(() => {
-        if (!gradeFilter) return courses;
-        return courses.filter((course) => String(course.grade_name || course.grade || '') === gradeFilter);
-    }, [courses, gradeFilter]);
+        return courses.filter((course) => {
+            const matchesGrade = !gradeFilter || String(course.grade_name || course.grade || '') === gradeFilter;
+            const isCourseActive = (courseStatusOverrides[course.id] ?? course.is_active) !== false;
+            const matchesStatus =
+                statusFilter === 'all'
+                || (statusFilter === 'active' && isCourseActive)
+                || (statusFilter === 'inactive' && !isCourseActive);
+
+            return matchesGrade && matchesStatus;
+        });
+    }, [courses, gradeFilter, statusFilter, courseStatusOverrides]);
 
     const subjectTotalPages = Math.max(1, Math.ceil(filteredCourses.length / TABLE_ROWS_PER_PAGE));
     const activeSubjectPage = Math.min(subjectPage, subjectTotalPages);
@@ -1216,7 +1235,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
 
     useEffect(() => {
         setSubjectPage(1);
-    }, [gradeFilter]);
+    }, [gradeFilter, statusFilter]);
 
     useEffect(() => {
         if (subjectPage > subjectTotalPages) {
@@ -1357,23 +1376,32 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <h3 className="chart-title">Subject Allocations</h3>
+                <h3 className="chart-title">{t('school.subjects.title')}</h3>
                 <div className="sm-inline-controls sm-subject-actions">
                     <select
                         className="sm-form-select sm-select-control"
                         value={gradeFilter}
                         onChange={(event) => setGradeFilter(event.target.value)}
                     >
-                        <option value="">All Grades</option>
+                        <option value="">{t('school.subjects.all')}</option>
                         {gradeFilterOptions.map((gradeName) => (
                             <option key={gradeName} value={gradeName}>
                                 {gradeName}
                             </option>
                         ))}
                     </select>
+                    <select
+                        className="sm-form-select sm-select-control"
+                        value={statusFilter}
+                        onChange={(event) => setStatusFilter(event.target.value)}
+                    >
+                        <option value="all">{t('common.all')}</option>
+                        <option value="active">{t('common.status.active')}</option>
+                        <option value="inactive">{t('common.status.inactive')}</option>
+                    </select>
                     <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
                         <Plus size={18} />
-                        Add Subject
+                        {t('school.subjects.add')}
                     </button>
                 </div>
             </div>
@@ -1381,55 +1409,56 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                 <table className="data-table sm-config-responsive-table sm-subject-allocation-table">
                     <thead>
                         <tr>
-                            <th>Grade</th>
-                            <th>Code</th>
-                            <th>Name</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>{t('school.grades.grade')}</th>
+                            <th>{t('school.subjects.code')}</th>
+                            <th>{t('school.subjects.name')}</th>
+                            <th>{t('school.reports.status')}</th>
+                            <th>{t('school.reports.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {courses.length === 0 ? (
                             <tr>
-                                <td colSpan="5" className="sm-empty-state">No subjects found.</td>
+                                <td colSpan="5" className="sm-empty-state">{t('school.subjects.none')}</td>
                             </tr>
                         ) : filteredCourses.length === 0 ? (
                             <tr>
-                                <td colSpan="5" className="sm-empty-state">No subjects match the selected grade.</td>
+                                <td colSpan="5" className="sm-empty-state">{t('school.subjects.noMatch')}</td>
                             </tr>
                         ) : paginatedCourses.map((item) => {
-                            const isCourseActive = courseStatusOverrides[item.id] ?? item.is_active;
+                            const isCourseActive = (courseStatusOverrides[item.id] ?? item.is_active) !== false;
                             return (
-                            <tr key={item.id} className={isCourseActive ? '' : 'inactive-row'}>
-                                <td>{item.grade_name || item.grade}</td>
-                                <td>{item.course_code}</td>
-                                <td>{item.name}</td>
-                                <td>
-                                    <span
-                                        className={`status-badge ${isCourseActive ? 'status-active' : 'status-inactive'}`}
-                                        onClick={() => handleStatusBadgeToggle(item)}
-                                        style={{
-                                            cursor: togglingCourseId === item.id ? 'wait' : 'pointer',
-                                            opacity: togglingCourseId === item.id ? 0.75 : 1
-                                        }}
-                                        title={togglingCourseId === item.id ? 'Updating status...' : 'Click to toggle status'}
-                                    >
-                                        {togglingCourseId === item.id ? 'Updating...' : (isCourseActive ? 'Active' : 'Inactive')}
-                                    </span>
-                                </td>
-                                <td>
-                                    <RowActions
-                                        isActive={isCourseActive}
-                                        onUpdate={() => handleOpenEdit(item)}
-                                        onActivate={() => setPendingStatusAction({ subject: item, nextIsActive: true })}
-                                        onDeactivate={() => setPendingStatusAction({ subject: item, nextIsActive: false })}
-                                        updateTitle="Update Subject"
-                                        activateTitle="Activate Subject"
-                                        deactivateTitle="Deactivate Subject"
-                                    />
-                                </td>
-                            </tr>
-                        )})}
+                                <tr key={item.id} className={isCourseActive ? '' : 'inactive-row'}>
+                                    <td>{item.grade_name || item.grade}</td>
+                                    <td>{item.course_code}</td>
+                                    <td>{item.name}</td>
+                                    <td>
+                                        <span
+                                            className={`status-badge ${isCourseActive ? 'status-active' : 'status-inactive'}`}
+                                            onClick={() => handleStatusBadgeToggle(item)}
+                                            style={{
+                                                cursor: togglingCourseId === item.id ? 'wait' : 'pointer',
+                                                opacity: togglingCourseId === item.id ? 0.75 : 1
+                                            }}
+                                            title={togglingCourseId === item.id ? t('school.grades.updating') : t('users.status.toggle')}
+                                        >
+                                            {togglingCourseId === item.id ? t('school.grades.updating') : (isCourseActive ? t('common.status.active') : t('common.status.inactive'))}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <RowActions
+                                            isActive={isCourseActive}
+                                            onUpdate={() => handleOpenEdit(item)}
+                                            onActivate={() => setPendingStatusAction({ subject: item, nextIsActive: true })}
+                                            onDeactivate={() => setPendingStatusAction({ subject: item, nextIsActive: false })}
+                                            updateTitle={t('school.subjects.update')}
+                                            activateTitle={t('school.subjects.activate')}
+                                            deactivateTitle={t('school.subjects.deactivate')}
+                                        />
+                                    </td>
+                                </tr>
+                            )
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -1442,17 +1471,17 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                 onNext={() => setSubjectPage((prev) => Math.min(subjectTotalPages, prev + 1))}
             />
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Subject to School">
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={t('school.subjects.addTitle')}>
                 <form onSubmit={handleSave} className="sm-modal-form">
                     <div className="sm-form-field">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                            <label className="sm-form-label" style={{ marginBottom: 0 }}>Grade</label>
+                            <label className="sm-form-label" style={{ marginBottom: 0 }}>{t('school.grades.grade')}</label>
                             <button
                                 type="button"
                                 onClick={() => setIsGradeModalOpen(true)}
                                 style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
                             >
-                                + Add Grade
+                                {t('school.subjects.addGrade')}
                             </button>
                         </div>
                         <select
@@ -1461,27 +1490,27 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                             onChange={(event) => setFormData({ ...formData, grade_id: event.target.value })}
                             className="sm-form-select"
                         >
-                            <option value="">Select Grade</option>
+                            <option value="">{t('school.subjects.selectGrade')}</option>
                             {grades.map((grade) => (
                                 <option key={grade.id} value={grade.id}>{grade.name}</option>
                             ))}
                         </select>
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Course Code</label>
+                        <label className="sm-form-label">{t('school.subjects.code')}</label>
                         <input
                             required
-                            placeholder="e.g. MATH101"
+                            placeholder={t('school.subjects.codePlaceholder')}
                             value={formData.course_code}
                             onChange={(event) => setFormData({ ...formData, course_code: event.target.value })}
                             className="sm-form-input"
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Name</label>
+                        <label className="sm-form-label">{t('school.subjects.name')}</label>
                         <input
                             required
-                            placeholder="e.g. Mathematics"
+                            placeholder={t('school.subjects.namePlaceholder')}
                             value={formData.name}
                             onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                             className="sm-form-input"
@@ -1489,33 +1518,33 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                     </div>
                     <div className="sm-form-actions">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="sm-btn-secondary" disabled={savingSubject}>
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn-primary" disabled={savingSubject}>
-                            {savingSubject ? 'Saving...' : 'Save'}
+                            {savingSubject ? t('common.saving') : t('common.save')}
                         </button>
                     </div>
                 </form>
             </Modal>
 
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Update Subject">
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={t('school.subjects.update')}>
                 <form onSubmit={handleUpdateSubject} className="sm-modal-form">
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Grade</label>
+                        <label className="sm-form-label">{t('school.grades.grade')}</label>
                         <select
                             required
                             value={editFormData.grade_id}
                             onChange={(event) => setEditFormData({ ...editFormData, grade_id: event.target.value })}
                             className="sm-form-select"
                         >
-                            <option value="">Select Grade</option>
+                            <option value="">{t('school.subjects.selectGrade')}</option>
                             {grades.map((grade) => (
                                 <option key={grade.id} value={grade.id}>{grade.name}</option>
                             ))}
                         </select>
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Course Code</label>
+                        <label className="sm-form-label">{t('school.subjects.code')}</label>
                         <input
                             required
                             value={editFormData.course_code}
@@ -1524,7 +1553,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Name</label>
+                        <label className="sm-form-label">{t('school.subjects.name')}</label>
                         <input
                             required
                             value={editFormData.name}
@@ -1534,19 +1563,19 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                     </div>
                     <div className="sm-form-actions">
                         <button type="button" onClick={() => setIsEditModalOpen(false)} className="sm-btn-secondary" disabled={savingSubject}>
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn-primary" disabled={savingSubject}>
-                            {savingSubject ? 'Saving...' : 'Update Subject'}
+                            {savingSubject ? t('common.saving') : t('school.subjects.update')}
                         </button>
                     </div>
                 </form>
             </Modal>
 
-            <Modal isOpen={isGradeModalOpen} onClose={() => setIsGradeModalOpen(false)} title="Add Specific Grade">
+            <Modal isOpen={isGradeModalOpen} onClose={() => setIsGradeModalOpen(false)} title={t('school.subjects.addSpecificGrade')}>
                 <form onSubmit={handleCreateGrade} className="sm-modal-form">
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Grade Name</label>
+                        <label className="sm-form-label">{t('school.grades.name')}</label>
                         <input
                             required
                             value={gradeForm.name}
@@ -1555,7 +1584,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Numeric Level</label>
+                        <label className="sm-form-label">{t('school.grades.numericLevel')}</label>
                         <input
                             required
                             type="number"
@@ -1567,7 +1596,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                     </div>
                     <div className="sm-form-grid-two">
                         <div className="sm-form-field">
-                            <label className="sm-form-label">Min Age</label>
+                            <label className="sm-form-label">{t('school.grades.minAge')}</label>
                             <input
                                 required
                                 type="number"
@@ -1578,7 +1607,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                             />
                         </div>
                         <div className="sm-form-field">
-                            <label className="sm-form-label">Max Age</label>
+                            <label className="sm-form-label">{t('school.grades.maxAge')}</label>
                             <input
                                 required
                                 type="number"
@@ -1591,10 +1620,10 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
                     </div>
                     <div className="sm-form-actions">
                         <button type="button" onClick={() => setIsGradeModalOpen(false)} className="sm-btn-secondary" disabled={creatingGrade}>
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn-primary" disabled={creatingGrade}>
-                            {creatingGrade ? 'Saving...' : 'Add Grade'}
+                            {creatingGrade ? t('common.saving') : t('school.grades.add')}
                         </button>
                     </div>
                 </form>
@@ -1603,18 +1632,20 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
             <Modal
                 isOpen={Boolean(pendingStatusAction)}
                 onClose={() => setPendingStatusAction(null)}
-                title={pendingStatusAction?.nextIsActive ? 'Activate Subject' : 'Deactivate Subject'}
+                title={pendingStatusAction?.nextIsActive ? t('school.subjects.activate') : t('school.subjects.deactivate')}
             >
                 <p className="sm-confirm-copy">
-                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
-                    <strong>{pendingStatusAction?.subject?.name}</strong>?
+                    {t('school.grades.confirmAction', {
+                        action: pendingStatusAction?.nextIsActive ? t('common.activate') : t('common.deactivate'),
+                        name: pendingStatusAction?.subject?.name
+                    })}
                 </p>
                 <div className="sm-form-actions">
                     <button type="button" onClick={() => setPendingStatusAction(null)} className="sm-btn-secondary">
-                        Cancel
+                        {t('common.cancel')}
                     </button>
                     <button type="button" onClick={confirmStatusChange} className="btn-primary">
-                        Confirm
+                        {t('common.confirm')}
                     </button>
                 </div>
             </Modal>
@@ -1623,6 +1654,7 @@ const SubjectAllocation = ({ courses, schoolId, onCourseUpdated }) => {
 };
 
 const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasActiveAcademicYear }) => {
+    const { t } = useTheme();
     const { showSuccess, showError, showWarning } = useToast();
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState(null);
@@ -1766,10 +1798,10 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
         <div className="management-card">
             <div className="table-header-actions">
                 <div>
-                    <h3 className="chart-title" style={{ marginBottom: '0.2rem' }}>Teacher Allocations</h3>
+                    <h3 className="chart-title" style={{ marginBottom: '0.2rem' }}>{t('school.allocations.title')}</h3>
                     <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
-                        Click <strong>Assign Teacher</strong> on any subject row to assign or change the teacher.
-                        Classroom badges show per-classroom status — click to toggle.
+                        {t('school.allocations.subtitle')}
+                        {t('school.allocations.badgesDesc')}
                     </p>
                 </div>
                 <div className="sm-inline-controls sm-allocation-filters">
@@ -1778,7 +1810,7 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                         value={classroomFilter}
                         onChange={(event) => setClassroomFilter(event.target.value)}
                     >
-                        <option value="">All Classrooms</option>
+                        <option value="">{t('school.allocations.allClassrooms')}</option>
                         {classroomOptions.map((classroomName) => (
                             <option key={classroomName} value={classroomName}>
                                 {classroomName}
@@ -1790,7 +1822,7 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                         value={teacherFilter}
                         onChange={(event) => setTeacherFilter(event.target.value)}
                     >
-                        <option value="">All Teachers</option>
+                        <option value="">{t('school.allocations.allTeachers')}</option>
                         {teacherOptions.map((teacherName) => (
                             <option key={teacherName} value={teacherName}>
                                 {teacherName}
@@ -1815,29 +1847,26 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                 <table className="data-table sm-config-responsive-table sm-teacher-allocation-table">
                     <thead>
                         <tr>
-                            <th>Subject</th>
-                            <th>Grade</th>
-                            <th>Assigned Teacher</th>
-                            <th>Classrooms & Status</th>
-                            <th style={{ textAlign: 'center' }}>Actions</th>
+                            <th style={{ minWidth: '120px' }}>{t('school.grades.grade')}</th>
+                            <th style={{ minWidth: '180px' }}>{t('school.subjects.name')}</th>
+                            <th style={{ minWidth: '160px' }}>{t('school.teachers.name')}</th>
+                            <th>{t('school.allocations.allClassrooms')}</th>
+                            <th style={{ textAlign: 'center' }}>{t('school.reports.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {courses.length === 0 ? (
                             <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                    No subjects found. Configure subjects first.
-                                </td>
+                                <td colSpan="6" className="sm-empty-state">{t('school.subjects.none')}</td>
                             </tr>
                         ) : filteredCourses.length === 0 ? (
                             <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                    No allocations match the selected filters.
-                                </td>
+                                <td colSpan="6" className="sm-empty-state">{t('school.subjects.noMatch')}</td>
                             </tr>
                         ) : paginatedAllocations.map((item) => {
                             const allClassrooms = item.all_classrooms || [];
                             const hasAnyAllocation = allClassrooms.length > 0;
+                            const isAllocationActive = allocationStatusOverrides[item.allocation_id] ?? item.allocation_is_active;
 
                             /* Count active classrooms (respect local overrides) */
                             const activeCount = allClassrooms.filter((c) =>
@@ -1847,110 +1876,110 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                             ).length;
 
                             return (
-                            <tr key={item.id} className={item.is_active ? '' : 'inactive-row'}>
-                                <td>
-                                    <div style={{ fontWeight: 600 }}>{item.name}</div>
-                                    {item.course_code && (
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                            {item.course_code}
-                                        </div>
-                                    )}
-                                </td>
-                                <td>{item.grade_name || item.grade}</td>
+                                <tr key={item.id} className={item.is_active ? '' : 'inactive-row'}>
+                                    <td>{item.grade_name || item.grade}</td>
+                                    <td>
+                                        <div style={{ fontWeight: 600 }}>{item.name}</div>
+                                        {item.course_code && (
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                                {item.course_code}
+                                            </div>
+                                        )}
+                                    </td>
 
-                                {/* Assigned Teacher */}
-                                <td>
-                                    {item.teacher_name ? (
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 500 }}>
-                                            <UserCheck size={14} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
-                                            {item.teacher_name}
-                                        </span>
-                                    ) : (
-                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                                            Unassigned
-                                        </span>
-                                    )}
-                                </td>
-
-                                {/* Classrooms & Status — one clickable chip per classroom */}
-                                <td>
-                                    {!hasAnyAllocation ? (
-                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.82rem', fontStyle: 'italic' }}>
-                                            No classrooms allocated
-                                        </span>
-                                    ) : (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
-                                            {allClassrooms.map((cls) => {
-                                                const resolvedActive = allocationStatusOverrides[cls.allocation_id] !== undefined
-                                                    ? allocationStatusOverrides[cls.allocation_id]
-                                                    : cls.is_active;
-                                                const isToggling = togglingAllocationId === cls.allocation_id;
-                                                return (
-                                                    <span
-                                                        key={cls.allocation_id}
-                                                        onClick={() => !isToggling && handleStatusBadgeToggle({
-                                                            ...item,
-                                                            allocation_id: cls.allocation_id,
-                                                            allocation_is_active: cls.is_active,
-                                                        })}
-                                                        title={isToggling ? 'Updating…' : (resolvedActive ? 'Active — click to deactivate' : 'Inactive — click to activate')}
-                                                        style={{
-                                                            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                                            padding: '0.22rem 0.55rem', borderRadius: '999px',
-                                                            fontSize: '0.78rem', fontWeight: 600,
-                                                            cursor: isToggling ? 'wait' : 'pointer',
-                                                            opacity: isToggling ? 0.65 : 1,
-                                                            transition: 'all .12s',
-                                                            background: resolvedActive ? '#dcfce7' : 'var(--color-bg-body)',
-                                                            color: resolvedActive ? '#16a34a' : 'var(--color-text-muted)',
-                                                            border: resolvedActive ? '1px solid #86efac' : '1px solid var(--color-border)',
-                                                            userSelect: 'none',
-                                                        }}
-                                                    >
-                                                        <span style={{
-                                                            width: 6, height: 6, borderRadius: '50%',
-                                                            background: 'currentColor', flexShrink: 0,
-                                                        }} />
-                                                        {isToggling ? '…' : cls.classroom_name}
-                                                    </span>
-                                                );
-                                            })}
-                                            {/* Summary label */}
-                                            <span style={{
-                                                fontSize: '0.73rem', color: 'var(--color-text-muted)',
-                                                marginLeft: '0.1rem',
-                                            }}>
-                                                {activeCount}/{allClassrooms.length} active
+                                    {/* Assigned Teacher */}
+                                    <td>
+                                        {item.teacher_name ? (
+                                            <div className="sm-teacher-cell-info">
+                                                <span>{item.teacher_name}</span>
+                                            </div>
+                                        ) : (
+                                            <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                                                {t('school.allocations.notAssigned')}
                                             </span>
-                                        </div>
-                                    )}
-                                </td>
+                                        )}
+                                    </td>
 
-                                {/* Actions */}
-                                <td style={{ textAlign: 'center' }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleOpenAssign(item)}
-                                        disabled={!item.is_active}
-                                        title={!item.is_active ? 'Subject is inactive' : (item.teacher_name ? 'Change teacher assignment' : 'Assign a teacher to this subject')}
-                                        style={{
-                                            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                                            padding: '0.38rem 0.8rem', borderRadius: '0.5rem',
-                                            fontSize: '0.8rem', fontWeight: 600, cursor: item.is_active ? 'pointer' : 'not-allowed',
-                                            opacity: item.is_active ? 1 : 0.45,
-                                            border: '1.5px solid var(--color-primary)',
-                                            background: item.teacher_name ? 'transparent' : 'var(--color-primary)',
-                                            color: item.teacher_name ? 'var(--color-primary)' : '#fff',
-                                            transition: 'all .15s',
-                                            whiteSpace: 'nowrap',
-                                        }}
-                                    >
-                                        <UserPlus size={14} />
-                                        {item.teacher_name ? 'Change Teacher' : 'Assign Teacher'}
-                                    </button>
-                                </td>
-                            </tr>
-                        )})}
+                                    {/* Classrooms & Status — one clickable chip per classroom */}
+                                    <td>
+                                        {!hasAnyAllocation ? (
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.82rem', fontStyle: 'italic' }}>
+                                                No classrooms allocated
+                                            </span>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                                                {allClassrooms.map((cls) => {
+                                                    const resolvedActive = allocationStatusOverrides[cls.allocation_id] !== undefined
+                                                        ? allocationStatusOverrides[cls.allocation_id]
+                                                        : cls.is_active;
+                                                    const isToggling = togglingAllocationId === cls.allocation_id;
+                                                    return (
+                                                        <span
+                                                            key={cls.allocation_id}
+                                                            onClick={() => !isToggling && handleStatusBadgeToggle({
+                                                                ...item,
+                                                                allocation_id: cls.allocation_id,
+                                                                allocation_is_active: cls.is_active,
+                                                            })}
+                                                            title={isToggling ? 'Updating…' : (resolvedActive ? 'Active — click to deactivate' : 'Inactive — click to activate')}
+                                                            style={{
+                                                                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                                                padding: '0.22rem 0.55rem', borderRadius: '999px',
+                                                                fontSize: '0.78rem', fontWeight: 600,
+                                                                cursor: isToggling ? 'wait' : 'pointer',
+                                                                opacity: isToggling ? 0.65 : 1,
+                                                                transition: 'all .12s',
+                                                                background: resolvedActive ? '#dcfce7' : 'var(--color-bg-body)',
+                                                                color: resolvedActive ? '#16a34a' : 'var(--color-text-muted)',
+                                                                border: resolvedActive ? '1px solid #86efac' : '1px solid var(--color-border)',
+                                                                userSelect: 'none',
+                                                            }}
+                                                        >
+                                                            <span style={{
+                                                                width: 6, height: 6, borderRadius: '50%',
+                                                                background: 'currentColor', flexShrink: 0,
+                                                            }} />
+                                                            {isToggling ? '…' : cls.classroom_name}
+                                                        </span>
+                                                    );
+                                                })}
+                                                {/* Summary label */}
+                                                <span style={{
+                                                    fontSize: '0.73rem', color: 'var(--color-text-muted)',
+                                                    marginLeft: '0.1rem',
+                                                }}>
+                                                    {activeCount}/{allClassrooms.length} active
+                                                </span>
+                                            </div>
+                                        )}
+                                    </td>
+
+                                    {/* Actions */}
+                                    <td style={{ textAlign: 'center' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenAssign(item)}
+                                            disabled={!item.is_active}
+                                            title={!item.is_active ? 'Subject is inactive' : (item.teacher_name ? 'Change teacher assignment' : 'Assign a teacher to this subject')}
+                                            style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                                                padding: '0.38rem 0.8rem', borderRadius: '0.5rem',
+                                                fontSize: '0.8rem', fontWeight: 600, cursor: item.is_active ? 'pointer' : 'not-allowed',
+                                                opacity: item.is_active ? 1 : 0.45,
+                                                border: '1.5px solid var(--color-primary)',
+                                                background: item.teacher_name ? 'transparent' : 'var(--color-primary)',
+                                                color: item.teacher_name ? 'var(--color-primary)' : '#fff',
+                                                transition: 'all .15s',
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            <UserPlus size={14} />
+                                            {item.teacher_name ? 'Change Teacher' : t('school.allocations.assignTeacher')}
+                                        </button>
+                                    </td>
+                                </tr>
+                            )
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -1966,18 +1995,20 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
             <Modal
                 isOpen={Boolean(pendingStatusAction)}
                 onClose={() => setPendingStatusAction(null)}
-                title={pendingStatusAction?.nextIsActive ? 'Activate Allocation' : 'Deactivate Allocation'}
+                title={pendingStatusAction?.nextIsActive ? t('school.subjects.activate') : t('school.subjects.deactivate')}
             >
                 <p className="sm-confirm-copy">
-                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
-                    <strong>{pendingStatusAction?.course?.name} allocation</strong>?
+                    {t('school.grades.confirmAction', {
+                        action: pendingStatusAction?.nextIsActive ? t('common.activate') : t('common.deactivate'),
+                        name: `${pendingStatusAction?.course?.name} Allocation`
+                    })}
                 </p>
                 <div className="sm-form-actions">
                     <button type="button" onClick={() => setPendingStatusAction(null)} className="sm-btn-secondary">
-                        Cancel
+                        {t('common.cancel')}
                     </button>
                     <button type="button" onClick={confirmStatusChange} className="btn-primary">
-                        Confirm
+                        {t('common.confirm')}
                     </button>
                 </div>
             </Modal>
@@ -1985,7 +2016,7 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
             <Modal
                 isOpen={isAssignModalOpen}
                 onClose={() => setIsAssignModalOpen(false)}
-                title={selectedCourse?.teacher_name ? 'Change Teacher Assignment' : 'Assign Teacher'}
+                title={t('school.allocations.assignTitle')}
             >
                 <div style={{ marginTop: 0, marginBottom: '1rem' }}>
                     <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
@@ -2012,14 +2043,23 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                 </div>
                 <form onSubmit={handleAssign} className="sm-modal-form">
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Select Teacher</label>
+                        <label className="sm-form-label">{t('school.subjects.name')}</label>
+                        <input
+                            readOnly
+                            className="sm-form-input"
+                            style={{ background: 'var(--color-bg-secondary)', cursor: 'default' }}
+                            value={selectedCourse ? `${selectedCourse.grade_name || selectedCourse.grade}: ${selectedCourse.name}` : ''}
+                        />
+                    </div>
+                    <div className="sm-form-field">
+                        <label className="sm-form-label">{t('school.allocations.selectTeacher')}</label>
                         <select
                             required
                             value={selectedTeacher}
                             onChange={(event) => setSelectedTeacher(event.target.value)}
                             className="sm-form-select"
                         >
-                            <option value="">Select a teacher...</option>
+                            <option value="">{t('school.allocations.selectTeacher')}</option>
                             {teachers.map((teacher) => (
                                 <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>
                                     {teacher.full_name}
@@ -2029,10 +2069,10 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
                     </div>
                     <div className="sm-form-actions">
                         <button type="button" onClick={() => setIsAssignModalOpen(false)} className="sm-btn-secondary">
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn-primary">
-                            Assign Teacher
+                            {t('school.allocations.assignTeacher')}
                         </button>
                     </div>
                 </form>
@@ -2045,12 +2085,13 @@ const TeacherAllocation = ({ courses, teachers, schoolId, onCourseUpdated, hasAc
 // Classroom Management Tab
 // ============================================
 const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
+    const { t } = useTheme();
     const { showSuccess, showError, showWarning } = useToast();
     const [classrooms, setClassrooms] = useState([]);
-    const [courses, setCourses] = useState([]);
     const [grades, setGrades] = useState([]);
     const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
     const [gradeFilter, setGradeFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [classroomPage, setClassroomPage] = useState(1);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -2062,13 +2103,26 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
     const [loadingClassrooms, setLoadingClassrooms] = useState(false);
     const [togglingClassroomId, setTogglingClassroomId] = useState(null);
 
-    const activeAcademicYear = academicYears.find((year) => year.is_active);
+    const activeAcademicYears = useMemo(
+        () => academicYears.filter((year) => year.is_active),
+        [academicYears]
+    );
 
     useEffect(() => {
-        if (activeAcademicYear && !selectedAcademicYear) {
-            setSelectedAcademicYear(String(activeAcademicYear.id));
+        if (!activeAcademicYears.length) {
+            if (selectedAcademicYear) {
+                setSelectedAcademicYear('');
+            }
+            return;
         }
-    }, [activeAcademicYear, selectedAcademicYear]);
+
+        const hasSelectedActiveYear = activeAcademicYears.some(
+            (year) => String(year.id) === String(selectedAcademicYear)
+        );
+        if (!hasSelectedActiveYear) {
+            setSelectedAcademicYear(String(activeAcademicYears[0].id));
+        }
+    }, [activeAcademicYears, selectedAcademicYear]);
 
     useEffect(() => {
         const fetchGrades = async () => {
@@ -2088,7 +2142,6 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
     useEffect(() => {
         if (schoolId && selectedAcademicYear) {
             fetchClassrooms();
-            fetchCoursesForYear();
         }
     }, [schoolId, selectedAcademicYear]);
 
@@ -2096,23 +2149,13 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
         setGradeFilter('');
     }, [selectedAcademicYear]);
 
-    const fetchCoursesForYear = async () => {
-        if (!schoolId) return;
-        try {
-            const data = await managerService.getCourses(schoolId, { include_inactive: true });
-            setCourses(data.results || data || []);
-        } catch (error) {
-            console.error('Failed to fetch courses for classroom teacher mapping:', error);
-            setCourses([]);
-        }
-    };
-
     const fetchClassrooms = async () => {
         if (!schoolId || !selectedAcademicYear) return;
         setLoadingClassrooms(true);
         try {
             const data = await managerService.getClassrooms(schoolId, selectedAcademicYear, { include_inactive: true });
-            setClassrooms(data.results || data || []);
+            const fetchedClassrooms = data.results || data || [];
+            setClassrooms(fetchedClassrooms);
         } catch (error) {
             console.error('Failed to fetch classrooms:', error);
             setClassrooms([]);
@@ -2133,11 +2176,17 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
     }, [classrooms]);
 
     const filteredClassrooms = useMemo(() => {
-        if (!gradeFilter) return classrooms;
-        return classrooms.filter(
-            (classroom) => String(classroom.grade_name || classroom.grade || '') === gradeFilter
-        );
-    }, [classrooms, gradeFilter]);
+        return classrooms.filter((classroom) => {
+            const matchesGrade = !gradeFilter || String(classroom.grade_name || classroom.grade || '') === gradeFilter;
+            const isClassroomActive = classroom.is_active !== false;
+            const matchesStatus =
+                statusFilter === 'all'
+                || (statusFilter === 'active' && isClassroomActive)
+                || (statusFilter === 'inactive' && !isClassroomActive);
+
+            return matchesGrade && matchesStatus;
+        });
+    }, [classrooms, gradeFilter, statusFilter]);
 
     const classroomTotalPages = Math.max(1, Math.ceil(filteredClassrooms.length / TABLE_ROWS_PER_PAGE));
     const activeClassroomPage = Math.min(classroomPage, classroomTotalPages);
@@ -2149,7 +2198,7 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
 
     useEffect(() => {
         setClassroomPage(1);
-    }, [selectedAcademicYear, gradeFilter]);
+    }, [selectedAcademicYear, gradeFilter, statusFilter]);
 
     useEffect(() => {
         if (classroomPage > classroomTotalPages) {
@@ -2280,29 +2329,26 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
     };
 
     const getAssignedTeacherName = (classroom) => {
-        if (classroom.homeroom_teacher_name) return classroom.homeroom_teacher_name;
-        const courseWithTeacher = courses.find(
-            (course) =>
-                (course.grade_name || course.grade) === (classroom.grade_name || classroom.grade) &&
-                !!course.teacher_name
-        );
-        return courseWithTeacher?.teacher_name || 'Not assigned';
+        const homeroomTeacherName = typeof classroom?.homeroom_teacher_name === 'string'
+            ? classroom.homeroom_teacher_name.trim()
+            : '';
+        return homeroomTeacherName || t('school.dashboard.noHomeroomTeacher');
     };
 
     return (
         <div className="management-card">
             <div className="table-header-actions">
-                <h3 className="chart-title">Classroom Management</h3>
+                <h3 className="chart-title">{t('school.config.classroomManagement')}</h3>
                 <div className="sm-inline-controls sm-classroom-actions">
                     <select
                         className="sm-form-select sm-select-control sm-classroom-year-select"
                         value={selectedAcademicYear}
                         onChange={(event) => setSelectedAcademicYear(event.target.value)}
                     >
-                        <option value="">Select Academic Year</option>
-                        {academicYears.map((year) => (
+                        <option value="">{t('school.config.selectAcademicYear')}</option>
+                        {activeAcademicYears.map((year) => (
                             <option key={year.id} value={year.id}>
-                                {year.academic_year_code} {year.is_active ? '(Active)' : '(Inactive)'}
+                                {year.academic_year_code}
                             </option>
                         ))}
                     </select>
@@ -2312,16 +2358,26 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                         onChange={(event) => setGradeFilter(event.target.value)}
                         disabled={!selectedAcademicYear || classrooms.length === 0}
                     >
-                        <option value="">All Grades</option>
+                        <option value="">{t('school.config.allGrades')}</option>
                         {gradeFilterOptions.map((gradeName) => (
                             <option key={gradeName} value={gradeName}>
                                 {gradeName}
                             </option>
                         ))}
                     </select>
+                    <select
+                        className="sm-form-select sm-select-control"
+                        value={statusFilter}
+                        onChange={(event) => setStatusFilter(event.target.value)}
+                        disabled={!selectedAcademicYear || classrooms.length === 0}
+                    >
+                        <option value="all">{t('common.all')}</option>
+                        <option value="active">{t('common.status.active')}</option>
+                        <option value="inactive">{t('common.status.inactive')}</option>
+                    </select>
                     <button className="btn-primary" onClick={() => setIsModalOpen(true)} disabled={!selectedAcademicYear}>
                         <Plus size={18} />
-                        Add Classroom
+                        {t('school.config.addClassroom')}
                     </button>
                 </div>
             </div>
@@ -2330,9 +2386,9 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                 <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                     <Building size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                     <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>
-                        Select an Academic Year
+                        {t('school.config.selectAcademicYear')}
                     </h3>
-                    <p>Choose an academic year above to manage its classrooms.</p>
+                    <p>{t('school.config.chooseYearDesc')}</p>
                 </div>
             ) : loadingClassrooms ? (
                 <div style={{ padding: '2rem', textAlign: 'center' }}>Loading classrooms...</div>
@@ -2340,14 +2396,14 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                 <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                     <Building size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                     <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>
-                        No Classrooms Found
+                        {t('school.config.noClassroomsFound')}
                     </h3>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        Create classrooms for this academic year to enable teacher assignments.
+                        {t('school.config.createClassroomsDesc')}
                     </p>
                     <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
                         <Plus size={18} />
-                        Create First Classroom
+                        {t('school.config.createFirstClassroom')}
                     </button>
                 </div>
             ) : (
@@ -2356,11 +2412,11 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                         <table className="data-table sm-config-responsive-table sm-classroom-management-table">
                             <thead>
                                 <tr>
-                                    <th>Classroom Name</th>
-                                    <th>Grade</th>
-                                    <th>Homeroom Teacher</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th>{t('school.config.classroomName')}</th>
+                                    <th>{t('school.grade')}</th>
+                                    <th>{t('school.homeroomTeacher')}</th>
+                                    <th>{t('school.status')}</th>
+                                    <th>{t('school.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2381,9 +2437,11 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                                                     cursor: togglingClassroomId === classroom.id ? 'wait' : 'pointer',
                                                     opacity: togglingClassroomId === classroom.id ? 0.75 : 1
                                                 }}
-                                                title={togglingClassroomId === classroom.id ? 'Updating status...' : 'Click to toggle status'}
+                                                title={togglingClassroomId === classroom.id ? t('school.grades.updating') : t('users.status.toggle')}
                                             >
-                                                {togglingClassroomId === classroom.id ? 'Updating...' : (classroom.is_active ? 'Active' : 'Inactive')}
+                                                {togglingClassroomId === classroom.id
+                                                    ? t('school.grades.updating')
+                                                    : (classroom.is_active ? t('common.status.active') : t('common.status.inactive'))}
                                             </span>
                                         </td>
                                         <td>
@@ -2413,30 +2471,30 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                 </>
             )}
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Classroom">
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={t('school.config.createClassroom')}>
                 <p style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--color-text-muted)' }}>
-                    Add a new classroom for the selected academic year.
+                    {t('school.config.addClassroomDesc')}
                 </p>
                 <form onSubmit={handleCreate} className="sm-modal-form">
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Grade</label>
+                        <label className="sm-form-label">{t('school.grade')}</label>
                         <select
                             required
                             value={formData.grade_id}
                             onChange={(event) => setFormData({ ...formData, grade_id: event.target.value })}
                             className="sm-form-select"
                         >
-                            <option value="">Select Grade</option>
+                            <option value="">{t('school.selectGrade')}</option>
                             {grades.map((grade) => (
                                 <option key={grade.id} value={grade.id}>{grade.name}</option>
                             ))}
                         </select>
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Classroom Name</label>
+                        <label className="sm-form-label">{t('school.config.classroomName')}</label>
                         <input
                             required
-                            placeholder="e.g. Class 1-A"
+                            placeholder={t('school.config.classroomPlaceholder')}
                             value={formData.classroom_name}
                             onChange={(event) => setFormData({ ...formData, classroom_name: event.target.value })}
                             className="sm-form-input"
@@ -2444,14 +2502,14 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                     </div>
                     <div className="sm-form-field">
                         <label className="sm-form-label">
-                            Homeroom Teacher <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Optional)</span>
+                            {t('school.homeroomTeacher')} <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>({t('common.optional')})</span>
                         </label>
                         <select
                             value={formData.homeroom_teacher_id}
                             onChange={(event) => setFormData({ ...formData, homeroom_teacher_id: event.target.value })}
                             className="sm-form-select"
                         >
-                            <option value="">— No homeroom teacher —</option>
+                            <option value="">{t('school.config.noHomeroomTeacher')}</option>
                             {teachers.map((teacher) => (
                                 <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>
                                     {teacher.full_name}
@@ -2461,33 +2519,33 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                     </div>
                     <div className="sm-form-actions">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="sm-btn-secondary" disabled={saving}>
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn-primary" disabled={saving}>
-                            {saving ? 'Creating...' : 'Create'}
+                            {saving ? t('common.creating') : t('common.create')}
                         </button>
                     </div>
                 </form>
             </Modal>
 
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Update Classroom">
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={t('school.config.updateClassroom', 'Update Classroom')}>
                 <form onSubmit={handleUpdateClassroom} className="sm-modal-form">
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Grade</label>
+                        <label className="sm-form-label">{t('school.grade')}</label>
                         <select
                             required
                             value={editFormData.grade_id}
                             onChange={(event) => setEditFormData({ ...editFormData, grade_id: event.target.value })}
                             className="sm-form-select"
                         >
-                            <option value="">Select Grade</option>
+                            <option value="">{t('school.selectGrade')}</option>
                             {grades.map((grade) => (
                                 <option key={grade.id} value={grade.id}>{grade.name}</option>
                             ))}
                         </select>
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Classroom Name</label>
+                        <label className="sm-form-label">{t('school.config.classroomName')}</label>
                         <input
                             required
                             value={editFormData.classroom_name}
@@ -2497,14 +2555,14 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
                     </div>
                     <div className="sm-form-field">
                         <label className="sm-form-label">
-                            Homeroom Teacher <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Optional)</span>
+                            {t('school.homeroomTeacher')} <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>({t('common.optional')})</span>
                         </label>
                         <select
                             value={editFormData.homeroom_teacher_id}
                             onChange={(event) => setEditFormData({ ...editFormData, homeroom_teacher_id: event.target.value })}
                             className="sm-form-select"
                         >
-                            <option value="">— No homeroom teacher —</option>
+                            <option value="">{t('school.config.noHomeroomTeacher')}</option>
                             {teachers.map((teacher) => (
                                 <option key={teacher.user_id || teacher.id} value={teacher.user_id || teacher.id}>
                                     {teacher.full_name}
@@ -2546,6 +2604,7 @@ const ClassroomManagement = ({ schoolId, academicYears, teachers = [] }) => {
 };
 
 const TimetableGenerator = () => {
+    const { t } = useTheme();
     const [isGenerated, setIsGenerated] = useState(false);
 
     const timeSlots = ['08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM'];
@@ -2563,35 +2622,35 @@ const TimetableGenerator = () => {
     return (
         <div className="flex flex-col gap-6" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="management-card p-6" style={{ padding: '1.5rem' }}>
-                <h3 className="chart-title mb-4" style={{ marginBottom: '1rem' }}>Generate Weekly Schedule</h3>
+                <h3 className="chart-title mb-4" style={{ marginBottom: '1rem' }}>{t('school.config.generateSchedule') || 'Generate Weekly Schedule'}</h3>
                 <p className="text-gray-500 mb-6" style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
-                    Automatically generate the weekly timetable based on subject allocations and teacher availability.
+                    {t('school.config.generateDescription') || 'Automatically generate the weekly timetable based on subject allocations and teacher availability.'}
                 </p>
                 <div className="sm-inline-controls" style={{ gap: '1rem' }}>
                     <button className="btn-primary" onClick={() => setIsGenerated(true)}>
                         <Calendar size={18} />
-                        {isGenerated ? 'Regenerate Timetable' : 'Generate Timetable'}
+                        {isGenerated ? (t('school.config.regenerateTimetable') || 'Regenerate Timetable') : (t('school.config.generateTimetable') || 'Generate Timetable')}
                     </button>
                     <button style={{ padding: '0.5rem 1rem', border: '1px solid var(--color-border)', borderRadius: '0.375rem', background: 'var(--color-bg-surface)', cursor: 'pointer', color: 'var(--color-text-main)' }}>
-                        View Constraints
+                        {t('school.config.viewConstraints') || 'View Constraints'}
                     </button>
                 </div>
             </div>
 
             <div className="management-card">
                 <div className="table-header-actions">
-                    <h3 className="chart-title">Generated Timetable Preview</h3>
+                    <h3 className="chart-title">{t('school.config.timetablePreview') || 'Generated Timetable Preview'}</h3>
                 </div>
                 <div className="p-6 sm-timetable-wrap" style={{ padding: '1.5rem', overflowX: 'auto' }}>
                     {!isGenerated ? (
                         <div style={{ background: 'var(--color-bg-body)', padding: '2rem', borderRadius: '0.5rem', border: '2px dashed var(--color-border)', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                            Timetable not yet generated. Click "Generate Timetable" to start.
+                            {t('school.config.notGenerated') || 'Timetable not yet generated. Click "Generate Timetable" to start.'}
                         </div>
                     ) : (
                         <table className="sm-timetable-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                             <thead>
                                 <tr>
-                                    <th style={{ padding: '0.75rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', textAlign: 'center' }}>Time / Day</th>
+                                    <th style={{ padding: '0.75rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', textAlign: 'center' }}>{t('school.config.timeDay') || 'Time / Day'}</th>
                                     {days.map(day => (
                                         <th key={day} style={{ padding: '0.75rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-body)', textAlign: 'center' }}>{day}</th>
                                     ))}

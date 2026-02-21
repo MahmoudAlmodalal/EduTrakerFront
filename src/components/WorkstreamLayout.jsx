@@ -64,7 +64,7 @@ const WorkstreamLayout = () => {
     };
 
     // Check if we have a valid token
-    const hasValidToken = !!user && !!localStorage.getItem('accessToken');
+    const hasValidToken = !!user && !!sessionStorage.getItem('accessToken');
 
     // Fetch dashboard statistics for quick stats (5 minute TTL)
     const { data: statsData, refetch: refetchSidebarStats } = useCachedApi(
@@ -149,7 +149,7 @@ const WorkstreamLayout = () => {
                         <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>
                             {statsData?.statistics?.school_count || 0}
                         </div>
-                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schools</div>
+                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('workstream.stats.schools')}</div>
                     </div>
                     <div style={{
                         flex: 1,
@@ -162,7 +162,7 @@ const WorkstreamLayout = () => {
                         <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0ea5e9' }}>
                             {statsData?.statistics?.manager_count || 0}
                         </div>
-                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Managers</div>
+                        <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('workstream.stats.managers')}</div>
                     </div>
                 </div>
 
@@ -223,12 +223,12 @@ const WorkstreamLayout = () => {
                                 fontSize: '0.875rem',
                                 fontWeight: '600',
                                 color: 'white'
-                            }}>{user?.name || 'Workstream Manager'}</div>
+                            }}>{user?.name || t('workstream.role.manager')}</div>
                             <div style={{
                                 fontSize: '0.6875rem',
                                 color: 'rgba(148, 163, 184, 0.8)',
                                 textTransform: 'capitalize'
-                            }}>Workstream Manager</div>
+                            }}>{t('workstream.role.manager')}</div>
                         </div>
                         <button
                             onClick={handleLogout}

@@ -1,6 +1,6 @@
-/* eslint-disable react-refresh/only-export-components */
 import { useCallback, useMemo, useState, createContext, useContext } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import './Toast.css';
 
 const ToastContext = createContext();
@@ -53,6 +53,7 @@ export function ToastProvider({ children }) {
 }
 
 function Toast({ message, type, onClose }) {
+    const { t } = useTheme();
     const [isExiting, setIsExiting] = useState(false);
 
     const handleClose = () => {
@@ -74,7 +75,7 @@ function Toast({ message, type, onClose }) {
             <div className="toast-icon">
                 <Icon size={20} />
             </div>
-            <div className="toast-message">{message}</div>
+            <div className="toast-message">{t(message)}</div>
             <button className="toast-close" onClick={handleClose}>
                 <X size={16} />
             </button>

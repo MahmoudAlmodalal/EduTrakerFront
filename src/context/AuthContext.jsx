@@ -7,6 +7,7 @@ import authService from '../services/authService';
 import { sessionCache } from '../utils/sessionCache';
 import SessionManager from '../utils/sessionManager';
 import { api } from '../utils/api';
+import { getStoredUserRaw, setStoredUser, clearStoredUser } from '../utils/userStorage';
 
 // Map Django backend roles to frontend role keys
 const ROLE_MAP = {
@@ -58,7 +59,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
     const queryClient = useQueryClient();
     const [user, setUser] = useState(() => {
-        const savedUser = localStorage.getItem('user');
+        const savedUser = getStoredUserRaw();
         if (!savedUser) {
             return null;
         }
@@ -67,7 +68,7 @@ export const AuthProvider = ({ children }) => {
             return normalizeUser(JSON.parse(savedUser));
         } catch (error) {
             console.warn('Failed to parse saved user session:', error);
-            localStorage.removeItem('user');
+            clearStoredUser();
             return null;
         }
     });
@@ -79,11 +80,11 @@ export const AuthProvider = ({ children }) => {
     // Restore session on load and check for extension
     useEffect(() => {
         const checkAndRestoreSession = async () => {
-            const accessToken = localStorage.getItem('accessToken');
-            const refreshToken = localStorage.getItem('refreshToken');
-            const savedUser = localStorage.getItem('user');
-            const savedPortalType = localStorage.getItem('portalType');
-            const savedWorkstreamId = localStorage.getItem('workstreamId');
+            const accessToken = sessionStorage.getItem('accessToken');
+            const refreshToken = sessionStorage.getItem('refreshToken');
+            const savedUser = getStoredUserRaw();
+            const savedPortalType = sessionStorage.getItem('portalType');
+            const savedWorkstreamId = sessionStorage.getItem('workstreamId');
 
             if (accessToken && savedUser) {
                 try {
@@ -102,7 +103,7 @@ export const AuthProvider = ({ children }) => {
                         setPermissions(roleConfig?.permissions || []);
                         setPortalType(savedPortalType);
                         setWorkstreamId(savedWorkstreamId);
-                        localStorage.setItem('user', JSON.stringify(normalizedUser));
+                        setStoredUser(normalizedUser);
                         return;
                     }
 
@@ -112,7 +113,8 @@ export const AuthProvider = ({ children }) => {
                     if (!sessionCheck.isValid) {
                         // Session expired and cannot extend - force logout
                         console.warn('⛔ Session expired:', sessionCheck.reason);
-                        localStorage.clear();
+                        clearStoredUser();
+                        sessionStorage.clear();
                         sessionCache.clear();
                         SessionManager.clearSession();
                         navigate('/login');
@@ -127,9 +129,9 @@ export const AuthProvider = ({ children }) => {
                             });
 
                             // Update tokens
-                            localStorage.setItem('accessToken', response.access);
+                            sessionStorage.setItem('accessToken', response.access);
                             if (response.refresh) {
-                                localStorage.setItem('refreshToken', response.refresh);
+                                sessionStorage.setItem('refreshToken', response.refresh);
                             }
 
                             // Extend session
@@ -137,7 +139,8 @@ export const AuthProvider = ({ children }) => {
 
                             if (!extensionResult.success) {
                                 console.error('❌ Failed to extend session:', extensionResult.reason);
-                                localStorage.clear();
+                                clearStoredUser();
+                                sessionStorage.clear();
                                 sessionCache.clear();
                                 SessionManager.clearSession();
                                 navigate('/login');
@@ -145,7 +148,8 @@ export const AuthProvider = ({ children }) => {
                             }
                         } catch (error) {
                             console.error('❌ Token refresh failed:', error);
-                            localStorage.clear();
+                            clearStoredUser();
+                            sessionStorage.clear();
                             sessionCache.clear();
                             SessionManager.clearSession();
                             navigate('/login');
@@ -158,11 +162,12 @@ export const AuthProvider = ({ children }) => {
                     setPermissions(roleConfig?.permissions || []);
                     setPortalType(savedPortalType);
                     setWorkstreamId(savedWorkstreamId);
-                    localStorage.setItem('user', JSON.stringify(normalizedUser));
+                    setStoredUser(normalizedUser);
 
                 } catch (e) {
                     console.error('Failed to restore session:', e);
-                    localStorage.clear();
+                    clearStoredUser();
+                    sessionStorage.clear();
                     sessionCache.clear();
                     SessionManager.clearSession();
                 }
@@ -185,10 +190,10 @@ export const AuthProvider = ({ children }) => {
         sessionCache.clear();
 
         // 1. Store tokens and metadata
-        localStorage.setItem('accessToken', tokens.access);
-        localStorage.setItem('refreshToken', tokens.refresh);
-        localStorage.setItem('portalType', type);
-        if (wsId) localStorage.setItem('workstreamId', wsId.toString());
+        sessionStorage.setItem('accessToken', tokens.access);
+        sessionStorage.setItem('refreshToken', tokens.refresh);
+        sessionStorage.setItem('portalType', type);
+        if (wsId) sessionStorage.setItem('workstreamId', wsId.toString());
 
         // 2. Normalize and store authenticated user data
         const userData = normalizeUser(backendUser);
@@ -200,8 +205,8 @@ export const AuthProvider = ({ children }) => {
         setPortalType(type);
         setWorkstreamId(wsId);
 
-        // Persist user data for reload (exclude tokens)
-        localStorage.setItem('user', JSON.stringify(userData));
+        // Persist user data for the current browser session only (exclude tokens)
+        setStoredUser(userData);
 
         // 3. Set permissions
         setPermissions(roleConfig?.permissions || []);
@@ -215,9 +220,9 @@ export const AuthProvider = ({ children }) => {
     }, [navigate, queryClient]);
 
     const logout = useCallback(async () => {
-        const refreshToken = localStorage.getItem('refreshToken');
-        const savedPortalType = localStorage.getItem('portalType');
-        const savedWorkstreamId = localStorage.getItem('workstreamId');
+        const refreshToken = sessionStorage.getItem('refreshToken');
+        const savedPortalType = sessionStorage.getItem('portalType');
+        const savedWorkstreamId = sessionStorage.getItem('workstreamId');
 
         // Determine the correct login path before clearing storage
         let loginPath = '/login/portal'; // Default to portal login
@@ -227,41 +232,41 @@ export const AuthProvider = ({ children }) => {
 
         // Preserve the latest portal context for correct redirect after logout/back navigation
         if (savedPortalType) {
-            localStorage.setItem('lastPortalType', savedPortalType);
+            sessionStorage.setItem('lastPortalType', savedPortalType);
         }
         if (savedWorkstreamId) {
-            localStorage.setItem('lastWorkstreamId', savedWorkstreamId);
+            sessionStorage.setItem('lastWorkstreamId', savedWorkstreamId);
         }
 
-        // 1. Clear local storage immediately
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        localStorage.removeItem('portalType');
-        localStorage.removeItem('workstreamId');
+        // 1. Attempt to notify backend (best effort, before clearing state)
+        if (refreshToken) {
+            try {
+                await authService.logout(refreshToken);
+            } catch (e) {
+                console.warn('Backend logout failed, continuing with session cleanup', e);
+            }
+        }
 
-        // 2. Clear session cache and manager
+        // 2. Clear session storage immediately
+        sessionStorage.removeItem('accessToken');
+        sessionStorage.removeItem('refreshToken');
+        clearStoredUser();
+        sessionStorage.removeItem('portalType');
+        sessionStorage.removeItem('workstreamId');
+
+        // 3. Clear session cache and manager
         sessionCache.clear();
         queryClient.clear();
         SessionManager.clearSession();
 
-        // 3. Reset React state
+        // 4. Reset React state
         setUser(null);
         setPermissions([]);
         setPortalType(null);
         setWorkstreamId(null);
 
-        // 4. Redirect to the appropriate login page
+        // 5. Redirect to the appropriate login page
         navigate(loginPath, { replace: true });
-
-        // 5. Attempt to notify backend (best effort, in background)
-        if (refreshToken) {
-            try {
-                await authService.logout(refreshToken);
-            } catch (e) {
-                console.warn('Backend logout failed, local cleanup already complete', e);
-            }
-        }
     }, [navigate, queryClient]);
 
     const isAuthenticated = !!user;

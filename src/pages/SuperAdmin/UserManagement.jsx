@@ -24,6 +24,8 @@ const UserManagement = () => {
 
     const [isEditing, setIsEditing] = useState(false);
     const [currentUserId, setCurrentUserId] = useState(null);
+    const [currentUserWorkstreamId, setCurrentUserWorkstreamId] = useState(null);
+    const [currentUserIsActive, setCurrentUserIsActive] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -32,6 +34,63 @@ const UserManagement = () => {
         role: 'manager_workstream',
         password: ''
     });
+
+    const parseWorkstreamId = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return null;
+        }
+        const parsed = parseInt(value, 10);
+        return Number.isInteger(parsed) ? parsed : null;
+    };
+
+    const resolveUserWorkstreamId = (user) => {
+        return parseWorkstreamId(user?.work_stream ?? user?.workstream?.id ?? user?.workstream_id);
+    };
+
+    const resolveWorkstreamCapacity = (workstream) => {
+        const parsed = parseInt(workstream?.user_capacity ?? workstream?.capacity, 10);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    };
+
+    const fetchActiveUsersCount = async (workstreamId) => {
+        const response = await api.get('/users/', {
+            params: {
+                work_stream: workstreamId,
+                is_active: true,
+                page: 1,
+            },
+        });
+
+        if (typeof response?.count === 'number') {
+            return response.count;
+        }
+        if (Array.isArray(response?.results)) {
+            return response.results.length;
+        }
+        return Array.isArray(response) ? response.length : 0;
+    };
+
+    const validateWorkstreamCapacity = async (workstreamId) => {
+        const selectedWorkstream = workstreams.find((ws) => parseWorkstreamId(ws.id) === workstreamId);
+        const capacity = resolveWorkstreamCapacity(selectedWorkstream);
+
+        if (!capacity) {
+            return { allowed: true };
+        }
+
+        const willConsumeSeat = !isEditing || currentUserIsActive;
+        const keepsSameWorkstream = isEditing && currentUserWorkstreamId === workstreamId;
+        if (!willConsumeSeat || keepsSameWorkstream) {
+            return { allowed: true };
+        }
+
+        const activeUsersCount = await fetchActiveUsersCount(workstreamId);
+        if (activeUsersCount >= capacity) {
+            return { allowed: false, capacity, activeUsersCount };
+        }
+
+        return { allowed: true };
+    };
 
     const fetchUsers = async (page = 1, search = '', role = '', workstream = '', status = '') => {
         setLoading(true);
@@ -100,11 +159,33 @@ const UserManagement = () => {
         if (isSubmitting) return;
         setIsSubmitting(true);
 
+        const selectedWorkstreamId = parseWorkstreamId(formData.workstreamId);
+
+        if (selectedWorkstreamId) {
+            try {
+                const capacityCheck = await validateWorkstreamCapacity(selectedWorkstreamId);
+                if (!capacityCheck.allowed) {
+                    showError(
+                        t('users.error.workstreamCapacityReached', {
+                            current: capacityCheck.activeUsersCount,
+                            capacity: capacityCheck.capacity,
+                        })
+                    );
+                    setIsSubmitting(false);
+                    return;
+                }
+            } catch (err) {
+                showError(t('users.error.workstreamCapacityCheckFailed') || (`Failed to validate workstream capacity: ${err.message}`));
+                setIsSubmitting(false);
+                return;
+            }
+        }
+
         const payload = {
             email: formData.email,
             full_name: formData.name,
             role: formData.role,
-            work_stream: formData.workstreamId ? parseInt(formData.workstreamId) : null,
+            work_stream: selectedWorkstreamId,
         };
 
         if (!isEditing) {
@@ -133,12 +214,15 @@ const UserManagement = () => {
     };
 
     const handleEditUser = (user) => {
+        const userWorkstreamId = resolveUserWorkstreamId(user);
         setIsEditing(true);
         setCurrentUserId(user.id);
+        setCurrentUserWorkstreamId(userWorkstreamId);
+        setCurrentUserIsActive(Boolean(user.is_active));
         setFormData({
             name: user.full_name,
             email: user.email,
-            workstreamId: user.work_stream ? user.work_stream.toString() : '',
+            workstreamId: userWorkstreamId ? userWorkstreamId.toString() : '',
             role: user.role,
             password: ''
         });
@@ -149,6 +233,18 @@ const UserManagement = () => {
         try {
             const response = await api.get('/workstream/', { params: { search: term } });
             const results = response.results || response;
+            setWorkstreams((prev) => {
+                const next = [...prev];
+                results.forEach((ws) => {
+                    const existingIndex = next.findIndex((item) => item.id === ws.id);
+                    if (existingIndex >= 0) {
+                        next[existingIndex] = { ...next[existingIndex], ...ws };
+                    } else {
+                        next.push(ws);
+                    }
+                });
+                return next;
+            });
             return results.map(ws => ({ value: ws.id, label: ws.workstream_name }));
         } catch (error) {
             console.error('Error searching workstreams:', error);
@@ -159,6 +255,8 @@ const UserManagement = () => {
     const resetForm = () => {
         setIsEditing(false);
         setCurrentUserId(null);
+        setCurrentUserWorkstreamId(null);
+        setCurrentUserIsActive(false);
         setFormData({ name: '', email: '', workstreamId: '', role: 'manager_workstream', password: '' });
     };
 
@@ -208,10 +306,10 @@ const UserManagement = () => {
             <div className={styles.header}>
                 <div className={styles.headerContent}>
                     <h1 className={styles.title}>{t('users.title')}</h1>
-                    <p className={styles.subtitle}>Manage system users and their access levels across workstreams.</p>
+                    <p className={styles.subtitle}>{t('users.subtitle')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <Button variant="outline" icon={FileDown} onClick={handleExport}>Export</Button>
+                    <Button variant="outline" icon={FileDown} onClick={handleExport}>{t('users.export')}</Button>
                     <Button variant="primary" icon={UserPlus} onClick={openCreateModal}>
                         {t('users.create')}
                     </Button>
@@ -238,13 +336,13 @@ const UserManagement = () => {
                             value={roleFilter}
                             onChange={(e) => setRoleFilter(e.target.value)}
                         >
-                            <option value="">All Roles</option>
-                            <option value="admin">Super Admin</option>
-                            <option value="manager_workstream">Workstream Manager</option>
-                            <option value="manager_school">School Manager</option>
-                            <option value="teacher">Teacher</option>
-                            <option value="secretary">Secretary</option>
-                            <option value="student">Student</option>
+                            <option value="">{t('users.filter.allRoles')}</option>
+                            <option value="admin">{t('auth.role.superAdmin')}</option>
+                            <option value="manager_workstream">{t('auth.role.workstreamManager')}</option>
+                            <option value="manager_school">{t('auth.role.schoolManager')}</option>
+                            <option value="teacher">{t('auth.role.teacher')}</option>
+                            <option value="secretary">{t('auth.role.secretary')}</option>
+                            <option value="student">{t('auth.role.student')}</option>
                         </select>
                     </div>
 
@@ -255,7 +353,7 @@ const UserManagement = () => {
                             value={workstreamFilter}
                             onChange={(e) => setWorkstreamFilter(e.target.value)}
                         >
-                            <option value="">All Workstreams</option>
+                            <option value="">{t('users.filter.allWorkstreams')}</option>
                             {workstreams.map(ws => (
                                 <option key={ws.id} value={ws.id}>{ws.workstream_name}</option>
                             ))}
@@ -269,9 +367,9 @@ const UserManagement = () => {
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
-                            <option value="">All Status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
+                            <option value="">{t('users.filter.allStatus')}</option>
+                            <option value="active">{t('users.status.active')}</option>
+                            <option value="inactive">{t('users.status.inactive')}</option>
                         </select>
                     </div>
 
@@ -286,7 +384,7 @@ const UserManagement = () => {
                                 setSearchTerm('');
                             }}
                         >
-                            Clear
+                            {t('users.filter.clear')}
                         </Button>
                     )}
                 </div>
@@ -307,7 +405,7 @@ const UserManagement = () => {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</td></tr>
+                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>{t('users.loading')}</td></tr>
                             ) : users.length > 0 ? (
                                 users.map((user) => (
                                     <tr key={user.id}>
@@ -326,7 +424,13 @@ const UserManagement = () => {
                                         </td>
                                         <td>
                                             <span className={styles.roleBadge}>
-                                                {user.role?.replace('_', ' ')}
+                                                {user.role === 'admin' ? t('auth.role.superAdmin') :
+                                                    user.role === 'manager_workstream' ? t('auth.role.workstreamManager') :
+                                                        user.role === 'manager_school' ? t('auth.role.schoolManager') :
+                                                            user.role === 'teacher' ? t('auth.role.teacher') :
+                                                                user.role === 'secretary' ? t('auth.role.secretary') :
+                                                                    user.role === 'student' ? t('auth.role.student') :
+                                                                        user.role?.replace('_', ' ')}
                                             </span>
                                         </td>
                                         <td style={{ fontWeight: 500 }}>{user.work_stream_name || user.workstream_name || user.workstream?.workstream_name || 'N/A'}</td>
@@ -354,7 +458,7 @@ const UserManagement = () => {
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                                             <Search size={48} style={{ color: 'var(--slate-300)' }} />
                                             <p style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>{t('users.noUsersFound')}</p>
-                                            <Button variant="outline" size="small" onClick={() => { setSearchTerm(''); setRoleFilter(''); setWorkstreamFilter(''); setStatusFilter(''); }}>Reset Filters</Button>
+                                            <Button variant="outline" size="small" onClick={() => { setSearchTerm(''); setRoleFilter(''); setWorkstreamFilter(''); setStatusFilter(''); }}>{t('users.resetFilters')}</Button>
                                         </div>
                                     </td>
                                 </tr>
@@ -371,16 +475,18 @@ const UserManagement = () => {
                             disabled={!pagination.previous}
                             onClick={() => setCurrentPage(prev => prev - 1)}
                         >
-                            Previous
+                            {t('users.pagination.previous')}
                         </Button>
-                        <span style={{ display: 'flex', alignItems: 'center' }}>Page {currentPage} of {Math.ceil(pagination.count / 10)}</span>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                            {t('users.pagination.info', { current: currentPage, total: Math.ceil(pagination.count / 10) })}
+                        </span>
                         <Button
                             variant="outline"
                             size="small"
                             disabled={!pagination.next}
                             onClick={() => setCurrentPage(prev => prev + 1)}
                         >
-                            Next
+                            {t('users.pagination.next')}
                         </Button>
                     </div>
                 )}
@@ -411,10 +517,10 @@ const UserManagement = () => {
                         </div>
                         {!isEditing && (
                             <div className={styles.formGroup}>
-                                <label>{t('auth.password')}</label>
+                                <label>{t('users.form.password')}</label>
                                 <input
                                     type="password"
-                                    placeholder="Enter password"
+                                    placeholder={t('users.form.passwordPlaceholder')}
                                     required
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -422,18 +528,18 @@ const UserManagement = () => {
                             </div>
                         )}
                         <div className={styles.formGroup}>
-                            <label>Role</label>
+                            <label>{t('users.form.role')}</label>
                             <select
                                 required
                                 value={formData.role}
                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                             >
-                                <option value="admin">Super Admin</option>
-                                <option value="manager_workstream">Workstream Manager</option>
-                                <option value="manager_school">School Manager</option>
-                                <option value="teacher">Teacher</option>
-                                <option value="secretary">Secretary</option>
-                                <option value="student">Student</option>
+                                <option value="admin">{t('auth.role.superAdmin')}</option>
+                                <option value="manager_workstream">{t('auth.role.workstreamManager')}</option>
+                                <option value="manager_school">{t('auth.role.schoolManager')}</option>
+                                <option value="teacher">{t('auth.role.teacher')}</option>
+                                <option value="secretary">{t('auth.role.secretary')}</option>
+                                <option value="student">{t('auth.role.student')}</option>
                                 <option value="guest">Guest</option>
                             </select>
                         </div>
@@ -443,8 +549,8 @@ const UserManagement = () => {
                                 options={workstreams.map(ws => ({ value: ws.id, label: ws.workstream_name }))}
                                 value={formData.workstreamId}
                                 onChange={(val) => setFormData({ ...formData, workstreamId: val })}
-                                placeholder="None / Select Workstream"
-                                searchPlaceholder="Search workstreams..."
+                                placeholder={t('workstreams.form.noWorkstream')}
+                                searchPlaceholder={t('workstreams.searchPlaceholder')}
                                 onSearch={handleWorkstreamSearch}
                             />
                         </div>
@@ -452,7 +558,7 @@ const UserManagement = () => {
                     <div className={styles.formActions} style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>
                         <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">{t('common.cancel')}</Button>
                         <Button variant="primary" type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? 'Saving...' : (isEditing ? 'Update User' : t('common.create'))}
+                            {isSubmitting ? t('users.saving') : (isEditing ? t('users.update') : t('common.create'))}
                         </Button>
                     </div>
                 </form>

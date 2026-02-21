@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../ui/Toast';
 import Button from '../ui/Button';
 import settingsService from '../../services/settingsService';
+import { getStoredUserRaw, setStoredUser } from '../../utils/userStorage';
 import styles from './UnifiedSettingsPage.module.css';
 
 const LEGACY_SECRETARY_SETTINGS_KEY = 'secretary.settings.preferences.v1';
@@ -121,12 +122,8 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
     }, []);
 
     const syncCachedUser = useCallback((updates) => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
         try {
-            const rawUser = window.localStorage.getItem('user');
+            const rawUser = getStoredUserRaw();
             if (!rawUser) {
                 return;
             }
@@ -137,7 +134,7 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
                 ...updates,
                 displayName: updates.full_name || parsedUser.displayName,
             };
-            window.localStorage.setItem('user', JSON.stringify(mergedUser));
+            setStoredUser(mergedUser);
         } catch {
             // Ignore malformed user cache.
         }
@@ -180,13 +177,13 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
             return null;
         }
 
-        if (window.localStorage.getItem(SETTINGS_MIGRATION_FLAG_KEY) === 'true') {
+        if (window.sessionStorage.getItem(SETTINGS_MIGRATION_FLAG_KEY) === 'true') {
             return null;
         }
 
-        const rawLegacySettings = window.localStorage.getItem(LEGACY_SECRETARY_SETTINGS_KEY);
+        const rawLegacySettings = window.sessionStorage.getItem(LEGACY_SECRETARY_SETTINGS_KEY);
         if (!rawLegacySettings) {
-            window.localStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
+            window.sessionStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
             return null;
         }
 
@@ -194,7 +191,7 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
         try {
             parsedLegacy = JSON.parse(rawLegacySettings);
         } catch {
-            window.localStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
+            window.sessionStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
             return null;
         }
 
@@ -241,13 +238,13 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
         }
 
         if (!Object.keys(migrationPayload).length) {
-            window.localStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
+            window.sessionStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
             return null;
         }
 
         try {
             await settingsService.updateProfileSettings(migrationPayload);
-            window.localStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
+            window.sessionStorage.setItem(SETTINGS_MIGRATION_FLAG_KEY, 'true');
             return {
                 ...serverSettings,
                 ...migrationPayload,
@@ -627,7 +624,6 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
                 />
                 <div>
                     <p className={styles.checkboxTitle}>{translate('settings.enable2FA', 'Enable Two-Factor Authentication')}</p>
-                    <p className={styles.checkboxHint}>Store preference for two-factor authentication.</p>
                 </div>
             </label>
 
@@ -651,7 +647,7 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
                 />
                 <div>
                     <p className={styles.checkboxTitle}>{translate('settings.enableEmailNotifications', 'Email Notifications')}</p>
-                    <p className={styles.checkboxHint}>Receive updates by email.</p>
+                    <p className={styles.checkboxHint}>{translate('settings.enableEmailNotifications.hint', 'Receive updates by email.')}</p>
                 </div>
             </label>
 
@@ -665,7 +661,7 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
                 />
                 <div>
                     <p className={styles.checkboxTitle}>{translate('settings.enableInAppAlerts', 'In-App Alerts')}</p>
-                    <p className={styles.checkboxHint}>Show badges and alert popups inside the app.</p>
+                    <p className={styles.checkboxHint}>{translate('settings.enableInAppAlerts.hint', 'Show badges and alert popups inside the app.')}</p>
                 </div>
             </label>
 
@@ -679,7 +675,7 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
                 />
                 <div>
                     <p className={styles.checkboxTitle}>{translate('settings.enableSMSNotifications', 'SMS Notifications')}</p>
-                    <p className={styles.checkboxHint}>Receive urgent alerts through SMS.</p>
+                    <p className={styles.checkboxHint}>{translate('settings.enableSMSNotifications.hint', 'Receive urgent alerts through SMS.')}</p>
                 </div>
             </label>
 
@@ -695,7 +691,7 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
         if (activeTab === 'general') {
             return {
                 title: translate('settings.generalSettings', 'General Settings'),
-                subtitle: 'Language, theme, and timezone preferences.',
+                subtitle: translate('settings.desc.subtitle', 'Configure your system regional settings and preferences.'),
                 content: renderGeneralTab(),
             };
         }
@@ -703,7 +699,7 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
         if (activeTab === 'profile') {
             return {
                 title: translate('settings.profileInformation', 'Profile Information'),
-                subtitle: 'Update your personal profile information.',
+                subtitle: translate('settings.profileSubtitle', 'Update your personal profile information.'),
                 content: renderProfileTab(),
             };
         }
@@ -711,14 +707,14 @@ const UnifiedSettingsPage = ({ title = 'Settings', subtitle = 'Manage your accou
         if (activeTab === 'security') {
             return {
                 title: translate('settings.securitySettings', 'Security Settings'),
-                subtitle: 'Manage your password and security preference.',
+                subtitle: translate('settings.securitySubtitle', 'Manage your password and security preference.'),
                 content: renderSecurityTab(),
             };
         }
 
         return {
             title: translate('settings.notificationPreferences', 'Notification Preferences'),
-            subtitle: 'Control how alerts are delivered to you.',
+            subtitle: translate('settings.notificationsSubtitle', 'Control how alerts are delivered to you.'),
             content: renderNotificationsTab(),
         };
     })();

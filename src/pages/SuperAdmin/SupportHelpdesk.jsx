@@ -73,7 +73,7 @@ const SupportHelpdesk = () => {
         <div className={styles.container}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h1 className={styles.pageTitle}>{t('support.title')}</h1>
-                <Button variant="primary" icon={Plus} onClick={() => setIsModalOpen(true)}>New Ticket</Button>
+                <Button variant="primary" icon={Plus} onClick={() => setIsModalOpen(true)}>{t('support.newTicket')}</Button>
             </div>
 
             <div className={styles.statsGrid}>
@@ -127,7 +127,7 @@ const SupportHelpdesk = () => {
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Loading tickets...</td></tr>
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>{t('support.loading')}</td></tr>
                         ) : tickets.length > 0 ? (
                             tickets.map(ticket => (
                                 <tr key={ticket.id}>
@@ -150,7 +150,7 @@ const SupportHelpdesk = () => {
                                             color: ticket.priority === 'high' ? 'var(--color-error)' : 'var(--color-text-main)',
                                             border: ticket.priority !== 'high' ? '1px solid var(--color-border)' : 'none'
                                         }}>
-                                            {ticket.priority.toUpperCase()}
+                                            {t(`support.priority.${ticket.priority}`).toUpperCase()}
                                         </span>
                                     </td>
                                     <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
@@ -159,9 +159,9 @@ const SupportHelpdesk = () => {
                                             onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}
                                             style={{ padding: '4px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'transparent' }}
                                         >
-                                            <option value="open">Open</option>
-                                            <option value="in_progress">In Progress</option>
-                                            <option value="closed">Closed</option>
+                                            <option value="open">{t('support.status.open')}</option>
+                                            <option value="in_progress">{t('support.status.inProgress')}</option>
+                                            <option value="closed">{t('support.status.closed')}</option>
                                         </select>
                                     </td>
                                     <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
@@ -170,30 +170,30 @@ const SupportHelpdesk = () => {
                                 </tr>
                             ))
                         ) : (
-                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>No tickets found</td></tr>
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>{t('support.noTickets')}</td></tr>
                         )}
                     </tbody>
                 </table>
             </div>
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Ticket">
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={t('support.modal.createTitle')}>
                 <form onSubmit={handleCreateTicket} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <label style={{ fontWeight: 600 }}>Subject</label>
+                        <label style={{ fontWeight: 600 }}>{t('support.form.subject')}</label>
                         <input
                             type="text"
                             required
-                            placeholder="Brief summary of the issue"
+                            placeholder={t('support.form.subjectPlaceholder')}
                             style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                             value={newTicket.subject}
                             onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
                         />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <label style={{ fontWeight: 600 }}>Description</label>
+                        <label style={{ fontWeight: 600 }}>{t('support.form.description')}</label>
                         <textarea
                             required
-                            placeholder="Detailed description..."
+                            placeholder={t('support.form.descriptionPlaceholder')}
                             rows={4}
                             style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                             value={newTicket.description}
@@ -201,20 +201,20 @@ const SupportHelpdesk = () => {
                         />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <label style={{ fontWeight: 600 }}>Priority</label>
+                        <label style={{ fontWeight: 600 }}>{t('support.form.priority')}</label>
                         <select
                             style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                             value={newTicket.priority}
                             onChange={(e) => setNewTicket({ ...newTicket, priority: e.target.value })}
                         >
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
+                            <option value="low">{t('support.priority.low')}</option>
+                            <option value="medium">{t('support.priority.medium')}</option>
+                            <option value="high">{t('support.priority.high')}</option>
                         </select>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
-                        <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">Cancel</Button>
-                        <Button variant="primary" type="submit">Create Ticket</Button>
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)} type="button">{t('common.cancel')}</Button>
+                        <Button variant="primary" type="submit">{t('support.createTicket')}</Button>
                     </div>
                 </form>
             </Modal>

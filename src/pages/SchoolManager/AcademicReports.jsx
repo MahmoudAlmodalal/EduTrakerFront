@@ -11,14 +11,33 @@ import {
     BookOpen
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import managerService from '../../services/managerService';
 import reportService from '../../services/reportService';
 import './SchoolManager.css';
 
+const getActiveCountFromListResponse = (payload) => {
+    const teachers = Array.isArray(payload?.results)
+        ? payload.results
+        : Array.isArray(payload)
+            ? payload
+            : null;
+
+    if (teachers) {
+        return teachers.filter((teacher) => teacher?.is_active !== false).length;
+    }
+
+    const countValue = Number(payload?.count);
+    return Number.isFinite(countValue) ? countValue : null;
+};
+
 const AcademicReports = () => {
     const { t, theme } = useTheme();
+    const { user } = useAuth();
+    const schoolId = user?.school_id || user?.school?.id || user?.school;
     const [stats, setStats] = useState(null);
     const [subjectPerformance, setSubjectPerformance] = useState([]);
+    const [activeTeachersCount, setActiveTeachersCount] = useState(null);
     const [subjectPerformanceError, setSubjectPerformanceError] = useState('');
     const [subjectFilter, setSubjectFilter] = useState('');
     const [loading, setLoading] = useState(true);
@@ -42,57 +61,79 @@ const AcademicReports = () => {
             setLoading(true);
             setSubjectPerformanceError('');
             try {
-                const [dashboardData, schoolPerformanceData] = await Promise.all([
+                const teacherParams = { include_inactive: true };
+                if (schoolId) {
+                    teacherParams.school_id = schoolId;
+                }
+
+                const [dashboardResult, schoolPerformanceResult, activeTeachersResult] = await Promise.allSettled([
                     managerService.getDashboardStats(),
-                    reportService.getSchoolPerformance()
+                    reportService.getSchoolPerformance(),
+                    managerService.getTeachers(teacherParams)
                 ]);
-                setStats(dashboardData);
+
+                if (dashboardResult.status !== 'fulfilled') {
+                    throw dashboardResult.reason;
+                }
+                if (schoolPerformanceResult.status !== 'fulfilled') {
+                    throw schoolPerformanceResult.reason;
+                }
+
+                setStats(dashboardResult.value);
                 setSubjectPerformance(
-                    Array.isArray(schoolPerformanceData?.subject_performance)
-                        ? schoolPerformanceData.subject_performance
+                    Array.isArray(schoolPerformanceResult.value?.subject_performance)
+                        ? schoolPerformanceResult.value.subject_performance
                         : []
                 );
+
+                if (activeTeachersResult.status === 'fulfilled') {
+                    setActiveTeachersCount(getActiveCountFromListResponse(activeTeachersResult.value));
+                } else {
+                    setActiveTeachersCount(null);
+                    console.warn('Failed to fetch active teachers count:', activeTeachersResult.reason);
+                }
             } catch (error) {
                 console.error('Failed to fetch stats:', error);
                 setSubjectPerformance([]);
                 setSubjectPerformanceError(error?.message || 'Failed to load subject performance data.');
+                setActiveTeachersCount(null);
             } finally {
                 setLoading(false);
             }
         };
         fetchStats();
-    }, []);
+    }, [schoolId]);
 
     const reportTypes = [
         {
             id: 'attendance',
             backendId: 'attendance',
-            name: 'Attendance Trends',
-            description: 'Monthly student and teacher attendance overview.',
+            name: t('school.reports.attendanceTrends') || 'Attendance Trends',
+            description: t('school.reports.attendanceDesc') || 'Monthly student and teacher attendance overview.',
             icon: Calendar,
             iconStyle: iconTone('var(--color-info-light)', 'var(--color-info)', 'rgba(96, 165, 250, 0.22)', '#BFDBFE')
         },
         {
             id: 'performance',
             backendId: 'student_performance',
-            name: 'Academic Performance',
-            description: 'Grade distribution and subject performance metrics.',
+            name: t('school.reports.academicPerformance') || 'Academic Performance',
+            description: t('school.reports.performanceDesc') || 'Grade distribution and subject performance metrics.',
             icon: TrendingUp,
             iconStyle: iconTone('var(--color-success-light)', 'var(--color-success)', 'rgba(52, 211, 153, 0.2)', '#86EFAC')
         },
         {
             id: 'enrollment',
             backendId: 'student_list',
-            name: 'Enrollment Report',
-            description: 'New admissions and student retention statistics.',
+            name: t('school.reports.enrollmentReport') || 'Enrollment Report',
+            description: t('school.reports.enrollmentDesc') || 'New admissions and student retention statistics.',
             icon: Users,
             iconStyle: iconTone('var(--color-primary-light)', 'var(--color-primary)', 'rgba(129, 140, 248, 0.22)', '#C7D2FE')
         },
         {
             id: 'teacher',
             backendId: 'teacher_evaluations',
-            name: 'Teacher Evaluations',
-            description: 'Summary of annual teacher performance reviews.',
+            name: t('school.reports.teacherEvaluations') || 'Teacher Evaluations',
+            description: t('school.reports.teacherEvaluationsDesc') || 'Summary of annual teacher performance reviews.',
             icon: FileText,
             iconStyle: iconTone('var(--color-warning-light)', 'var(--color-warning)', 'rgba(251, 191, 36, 0.22)', '#FDE68A')
         }
@@ -131,7 +172,7 @@ const AcademicReports = () => {
                     <div className="stat-value">
                         {stats?.statistics?.course_count || '0'}
                     </div>
-                    <div className="stat-label">Total Courses</div>
+                    <div className="stat-label">{t('school.reports.totalCourses') || 'Total Courses'}</div>
                 </div>
 
                 <div className="stat-card">
@@ -142,7 +183,7 @@ const AcademicReports = () => {
                         {/* Trend will be calculated from real backend data in future */}
                     </div>
                     <div className="stat-value">{stats?.statistics?.total_students || '0'}</div>
-                    <div className="stat-label">Total Students</div>
+                    <div className="stat-label">{t('school.dashboard.totalStudents') || 'Total Students'}</div>
                 </div>
 
                 <div className="stat-card">
@@ -152,8 +193,8 @@ const AcademicReports = () => {
                         </div>
                         {/* Trend will be calculated from real backend data in future */}
                     </div>
-                    <div className="stat-value">{stats?.statistics?.total_teachers || '0'}</div>
-                    <div className="stat-label">Total Teachers</div>
+                    <div className="stat-value">{activeTeachersCount ?? '0'}</div>
+                    <div className="stat-label">{t('activeTeachers') || 'Active Teachers'}</div>
                 </div>
 
                 <div className="stat-card">
@@ -164,18 +205,18 @@ const AcademicReports = () => {
                         {/* Trend will be calculated from real backend data in future */}
                     </div>
                     <div className="stat-value">{stats?.statistics?.classroom_count || '0'}</div>
-                    <div className="stat-label">Classrooms</div>
+                    <div className="stat-label">{t('classrooms') || 'Classrooms'}</div>
                 </div>
             </div>
 
             {/* Quick Reports Section */}
             <div className="reports-section">
                 <div className="section-header">
-                    <h2 className="section-title">Available Reports</h2>
+                    <h2 className="section-title">{t('school.reports.availableReports') || 'Available Reports'}</h2>
                     <div className="header-actions">
                         <button className="btn-secondary">
                             <Filter size={18} />
-                            Manage Reports
+                            {t('school.reports.manageReports') || 'Manage Reports'}
                         </button>
                     </div>
                 </div>
@@ -230,7 +271,7 @@ const AcademicReports = () => {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
                                 <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                    {downloading === report.id ? 'Preparing download...' : 'Click to download'}
+                                    {downloading === report.id ? t('school.reports.preparingDownload') || 'Preparing download...' : t('school.reports.clickToDownload') || 'Click to download'}
                                 </span>
                                 <button style={{
                                     display: 'flex',
@@ -243,7 +284,7 @@ const AcademicReports = () => {
                                     border: 'none',
                                     cursor: 'pointer'
                                 }}>
-                                    View Report
+                                    {t('school.reports.viewReport') || 'View Report'}
                                     <ChevronRight size={16} {...iconSvgProps} />
                                 </button>
                             </div>
@@ -255,12 +296,12 @@ const AcademicReports = () => {
             {/* Performance Insights */}
             <div className="management-card" style={{ marginTop: '2rem' }}>
                 <div className="table-header-actions">
-                    <h3 className="chart-title">Subject Performance Distribution</h3>
+                    <h3 className="chart-title">{t('school.reports.subjectDistribution') || 'Subject Performance Distribution'}</h3>
                     <div className="sm-search-control">
                         <Search size={16} {...iconSvgProps} className="sm-search-control-icon" />
                         <input
                             type="text"
-                            placeholder="Filter subjects..."
+                            placeholder={t('school.reports.filterSubjects') || 'Filter subjects...'}
                             className="sm-search-control-input"
                             value={subjectFilter}
                             onChange={(event) => setSubjectFilter(event.target.value)}
@@ -290,7 +331,7 @@ const AcademicReports = () => {
                             return (
                                 <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', flexDirection: 'column', gap: '0.5rem' }}>
                                     <TrendingUp size={40} style={{ opacity: 0.3 }} {...iconSvgProps} />
-                                    <p style={{ margin: 0 }}>Failed to load subject performance</p>
+                                    <p style={{ margin: 0 }}>{t('school.reports.failedToLoadPerformance') || 'Failed to load subject performance'}</p>
                                     <p style={{ margin: 0, fontSize: '0.75rem' }}>{subjectPerformanceError}</p>
                                 </div>
                             );
@@ -301,10 +342,10 @@ const AcademicReports = () => {
                                 <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', flexDirection: 'column', gap: '0.5rem' }}>
                                     <TrendingUp size={40} style={{ opacity: 0.3 }} {...iconSvgProps} />
                                     <p style={{ margin: 0 }}>
-                                        {normalizedFilter ? 'No subjects match this filter' : 'No subject performance data yet'}
+                                        {normalizedFilter ? (t('school.reports.noSubjectsMatch') || 'No subjects match this filter') : (t('school.reports.noPerformanceData') || 'No subject performance data yet')}
                                     </p>
                                     <p style={{ margin: 0, fontSize: '0.75rem' }}>
-                                        {normalizedFilter ? 'Try a different subject name' : 'Data appears once students receive grades'}
+                                        {normalizedFilter ? (t('school.reports.tryDifferentSubject') || 'Try a different subject name') : (t('school.reports.dataAfterGrades') || 'Data appears once students receive grades')}
                                     </p>
                                 </div>
                             );

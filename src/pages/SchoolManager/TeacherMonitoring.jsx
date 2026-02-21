@@ -101,7 +101,7 @@ const QueryErrorState = ({ message, onRetry, compact = false }) => (
         <span>{message}</span>
         {onRetry ? (
             <button type="button" className="sm-inline-action" onClick={onRetry}>
-                Retry
+                {t('common.retry') || 'Retry'}
             </button>
         ) : null}
     </div>
@@ -199,17 +199,26 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
     const [page, setPage] = useState(1);
     const [formData, setFormData] = useState(createInitialTeacherForm);
     const [pendingStatusAction, setPendingStatusAction] = useState(null);
+    const [statusFilter, setStatusFilter] = useState('all');
 
     const filteredTeachers = useMemo(() => {
         const query = deferredSearchTerm.trim().toLowerCase();
-        if (!query) return teachers;
 
-        return teachers.filter((teacher) => (
-            (teacher.full_name?.toLowerCase() || '').includes(query)
-            || (teacher.email?.toLowerCase() || '').includes(query)
-            || (teacher.specialization?.toLowerCase() || '').includes(query)
-        ));
-    }, [teachers, deferredSearchTerm]);
+        return teachers.filter((teacher) => {
+            const matchesSearch = !query || (
+                (teacher.full_name?.toLowerCase() || '').includes(query)
+                || (teacher.email?.toLowerCase() || '').includes(query)
+                || (teacher.specialization?.toLowerCase() || '').includes(query)
+            );
+
+            const isActive = teacher.is_active !== false;
+            const matchesStatus = statusFilter === 'all'
+                || (statusFilter === 'active' && isActive)
+                || (statusFilter === 'inactive' && !isActive);
+
+            return matchesSearch && matchesStatus;
+        });
+    }, [teachers, deferredSearchTerm, statusFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filteredTeachers.length / TABLE_ROWS_PER_PAGE));
     const currentPage = Math.min(page, totalPages);
@@ -315,7 +324,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
     const handleSave = useCallback((event) => {
         event.preventDefault();
 
-        const fallbackSchoolId = localStorage.getItem('school_id');
+        const fallbackSchoolId = sessionStorage.getItem('school_id');
         const resolvedSchoolId = schoolId || fallbackSchoolId;
         const parsedSchoolId = Number.parseInt(String(resolvedSchoolId), 10);
 
@@ -372,24 +381,39 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
     return (
         <TableCard
             left={(
-                <div className="sm-search-control">
-                    <Search size={18} className="sm-search-control-icon" />
-                    <input
-                        type="text"
-                        placeholder={t('common.search') || 'Search teachers...'}
-                        value={searchTerm}
-                        onChange={(event) => {
-                            setSearchTerm(event.target.value);
+                <div className="sm-search-group" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <div className="sm-search-control">
+                        <Search size={18} className="sm-search-control-icon" />
+                        <input
+                            type="text"
+                            placeholder={t('common.search') || 'Search...'}
+                            value={searchTerm}
+                            onChange={(event) => {
+                                setSearchTerm(event.target.value);
+                                setPage(1);
+                            }}
+                            className="sm-search-control-input"
+                        />
+                    </div>
+                    <select
+                        className="sm-form-select"
+                        style={{ width: 'auto', minWidth: '140px', padding: '0.4rem 2rem 0.4rem 1rem' }}
+                        value={statusFilter}
+                        onChange={(e) => {
+                            setStatusFilter(e.target.value);
                             setPage(1);
                         }}
-                        className="sm-search-control-input"
-                    />
+                    >
+                        <option value="all">{t('common.all') || 'All Status'}</option>
+                        <option value="active">{t('common.status.active') || 'Active'}</option>
+                        <option value="inactive">{t('common.status.inactive') || 'Inactive'}</option>
+                    </select>
                 </div>
             )}
             right={(
                 <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
                     <Plus size={18} />
-                    Add Teacher
+                    {t('school.teachers.add') || 'Add Teacher'}
                 </button>
             )}
         >
@@ -398,18 +422,18 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Teacher</th>
-                            <th>School</th>
-                            <th>Specialization</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>{t('school.teachers.teacher') || 'Teacher'}</th>
+                            <th>{t('school.teachers.school') || 'School'}</th>
+                            <th>{t('school.teachers.specialization') || 'Specialization'}</th>
+                            <th>{t('school.teachers.status') || 'Status'}</th>
+                            <th>{t('school.teachers.actions') || 'Actions'}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredTeachers.length === 0 ? (
                             <tr>
                                 <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                                    No teachers found.
+                                    {t('school.teachers.noTeachers') || 'No teachers found.'}
                                 </td>
                             </tr>
                         ) : paginatedTeachers.map((teacher) => {
@@ -458,7 +482,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                                             disabled={toggleTeacherStatusMutation.isPending && toggleTeacherStatusMutation.variables === id}
                                             title="Click to toggle status"
                                         >
-                                            {isActive ? 'Active' : 'Inactive'}
+                                            {isActive ? (t('status.active') || 'Active') : (t('status.inactive') || 'Inactive')}
                                         </button>
                                     </td>
                                     <td>
@@ -494,9 +518,11 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
             {filteredTeachers.length > 0 ? (
                 <div className="sm-table-pagination">
                     <span className="sm-table-pagination-summary">
-                        Showing {(currentPage - 1) * TABLE_ROWS_PER_PAGE + 1}
-                        -
-                        {Math.min(currentPage * TABLE_ROWS_PER_PAGE, filteredTeachers.length)} of {filteredTeachers.length}
+                        {t('common.showingOf', {
+                            start: (currentPage - 1) * TABLE_ROWS_PER_PAGE + 1,
+                            end: Math.min(currentPage * TABLE_ROWS_PER_PAGE, filteredTeachers.length),
+                            total: filteredTeachers.length
+                        })}
                     </span>
                     <div className="sm-table-pagination-controls">
                         <button
@@ -505,10 +531,10 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                             onClick={() => setPage(Math.max(1, currentPage - 1))}
                             disabled={currentPage <= 1}
                         >
-                            Previous
+                            {t('common.previous') || 'Previous'}
                         </button>
                         <span className="sm-table-pagination-page">
-                            Page {currentPage} of {totalPages}
+                            {t('common.pageOf', { current: currentPage, total: totalPages })}
                         </span>
                         <button
                             type="button"
@@ -516,7 +542,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                             onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
                             disabled={currentPage >= totalPages}
                         >
-                            Next
+                            {t('common.next') || 'Next'}
                         </button>
                     </div>
                 </div>
@@ -525,21 +551,21 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
             <Modal
                 isOpen={isModalOpen}
                 onClose={handleCloseCreateModal}
-                title="Add New Teacher"
+                title={t('school.teachers.addTitle') || "Add New Teacher"}
             >
                 <form onSubmit={handleSave} className="sm-modal-form">
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Full Name</label>
+                        <label className="sm-form-label">{t('school.teachers.fullName') || "Full Name"}</label>
                         <input
                             required
                             value={formData.full_name}
                             onChange={(event) => setFormData({ ...formData, full_name: event.target.value })}
                             className="sm-form-input"
-                            placeholder="Enter teacher's full name"
+                            placeholder={t('school.teachers.enterFullName') || "Enter teacher's full name"}
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Email</label>
+                        <label className="sm-form-label">{t('school.teachers.email') || "Email"}</label>
                         <input
                             required
                             type="email"
@@ -550,7 +576,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Password</label>
+                        <label className="sm-form-label">{t('school.teachers.password') || "Password"}</label>
                         <input
                             required
                             type="password"
@@ -560,30 +586,30 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Specialization</label>
+                        <label className="sm-form-label">{t('school.teachers.specialization') || "Specialization"}</label>
                         <input
                             value={formData.specialization}
                             onChange={(event) => setFormData({ ...formData, specialization: event.target.value })}
-                            placeholder="e.g., Mathematics, Science, English"
+                            placeholder={t('school.teachers.specializationPlaceholder') || "e.g., Mathematics, Science, English"}
                             className="sm-form-input"
                         />
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Employment Status</label>
+                        <label className="sm-form-label">{t('school.teachers.employmentStatus') || "Employment Status"}</label>
                         <select
                             required
                             value={formData.employment_status}
                             onChange={(event) => setFormData({ ...formData, employment_status: event.target.value })}
                             className="sm-form-select"
                         >
-                            <option value="full_time">Full Time</option>
-                            <option value="part_time">Part Time</option>
-                            <option value="contract">Contract</option>
-                            <option value="substitute">Substitute</option>
+                            <option value="full_time">{t('school.teachers.fullTime') || "Full Time"}</option>
+                            <option value="part_time">{t('school.teachers.partTime') || "Part Time"}</option>
+                            <option value="contract">{t('school.teachers.contract') || "Contract"}</option>
+                            <option value="substitute">{t('school.teachers.substitute') || "Substitute"}</option>
                         </select>
                     </div>
                     <div className="sm-form-field">
-                        <label className="sm-form-label">Hire Date</label>
+                        <label className="sm-form-label">{t('school.teachers.hireDate') || "Hire Date"}</label>
                         <input
                             required
                             type="date"
@@ -599,10 +625,10 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                             className="sm-btn-secondary"
                             disabled={createTeacherMutation.isPending}
                         >
-                            Cancel
+                            {t('common.cancel') || "Cancel"}
                         </button>
                         <button type="submit" className="btn-primary" disabled={createTeacherMutation.isPending}>
-                            {createTeacherMutation.isPending ? 'Creating...' : 'Create Teacher'}
+                            {createTeacherMutation.isPending ? (t('school.teachers.creating') || 'Creating...') : (t('school.teachers.create') || 'Create Teacher')}
                         </button>
                     </div>
                 </form>
@@ -611,11 +637,13 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
             <Modal
                 isOpen={Boolean(pendingStatusAction)}
                 onClose={closeStatusModal}
-                title={pendingStatusAction?.nextIsActive ? 'Activate Teacher' : 'Deactivate Teacher'}
+                title={pendingStatusAction?.nextIsActive ? (t('school.teachers.activate') || 'Activate Teacher') : (t('school.teachers.deactivate') || 'Deactivate Teacher')}
             >
                 <div className="sm-confirm-copy">
-                    Are you sure you want to {pendingStatusAction?.nextIsActive ? 'activate' : 'deactivate'}{' '}
-                    <strong>{pendingStatusAction?.teacherName}</strong>?
+                    {t('school.teachers.confirmStatusChange', {
+                        action: pendingStatusAction?.nextIsActive ? (t('common.activate') || 'activate') : (t('common.deactivate') || 'deactivate'),
+                        name: pendingStatusAction?.teacherName
+                    })}
                 </div>
                 <div className="sm-form-actions">
                     <button
@@ -624,7 +652,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                         className="sm-btn-secondary"
                         disabled={updateTeacherStatusMutation.isPending}
                     >
-                        Cancel
+                        {t('common.cancel') || "Cancel"}
                     </button>
                     <button
                         type="button"
@@ -632,7 +660,7 @@ const TeacherDirectory = memo(function TeacherDirectory({ teachers, schoolId, te
                         className="btn-primary"
                         disabled={updateTeacherStatusMutation.isPending}
                     >
-                        {updateTeacherStatusMutation.isPending ? 'Updating...' : 'Confirm'}
+                        {updateTeacherStatusMutation.isPending ? (t('common.updating') || 'Updating...') : (t('common.confirm') || 'Confirm')}
                     </button>
                 </div>
             </Modal>

@@ -9,15 +9,17 @@ import {
     YAxis,
 } from 'recharts';
 import EmptyState from './EmptyState';
+import { useTheme } from '../../../context/ThemeContext';
 
 const AttendanceTrendChart = ({ trendData }) => {
+    const { t } = useTheme();
     const normalizedTrendData = Array.isArray(trendData) ? trendData : [];
     const hasTrendData = normalizedTrendData.some((item) => Number(item?.count) > 0);
 
     if (!hasTrendData) {
         return (
             <div className="sec-chart-body">
-                <EmptyState message="No attendance trend data for the selected week." />
+                <EmptyState message={t('secretary.dashboard.noAttendanceTrend')} />
             </div>
         );
     }

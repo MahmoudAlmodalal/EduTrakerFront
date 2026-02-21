@@ -158,7 +158,7 @@ const refreshClient = axios.create({
 // Add a request interceptor
 apiClient.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('accessToken');
+        const token = sessionStorage.getItem('accessToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -199,7 +199,7 @@ apiClient.interceptors.response.use(
         // Handle 401 Unauthorized - Token Refresh Logic
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
-            const refreshToken = localStorage.getItem('refreshToken');
+            const refreshToken = sessionStorage.getItem('refreshToken');
 
             if (refreshToken) {
                 try {
@@ -208,9 +208,9 @@ apiClient.interceptors.response.use(
                     });
 
                     const { access, refresh } = response.data;
-                    localStorage.setItem('accessToken', access);
+                    sessionStorage.setItem('accessToken', access);
                     if (refresh) {
-                        localStorage.setItem('refreshToken', refresh);
+                        sessionStorage.setItem('refreshToken', refresh);
                     }
 
                     // Retry original request with new token
@@ -219,8 +219,8 @@ apiClient.interceptors.response.use(
                 } catch {
                     // Refresh token is also invalid/expired
                     console.error('Session expired. Please log in again.');
-                    localStorage.removeItem('accessToken');
-                    localStorage.removeItem('refreshToken');
+                    sessionStorage.removeItem('accessToken');
+                    sessionStorage.removeItem('refreshToken');
                     window.location.href = '/login';
                 }
             }

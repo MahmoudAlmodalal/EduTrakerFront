@@ -37,7 +37,7 @@ const AcademicYearManagementPage = () => {
             setAcademicYears(data?.results || data || []);
         } catch (error) {
             console.error('Failed to fetch academic years:', error);
-            showError(error?.message || 'Failed to load academic years.');
+            showError(error?.message || t('academicYear.loadingError', 'Failed to load academic years.'));
             setAcademicYears([]);
         } finally {
             setLoading(false);
@@ -52,14 +52,14 @@ const AcademicYearManagementPage = () => {
     return (
         <div className="workstream-dashboard">
             <div className="workstream-header">
-                <h1 className="workstream-title">{t('school.academicYear.title') || 'Academic Year'}</h1>
-                <p className="workstream-subtitle">Manage academic years for your workstream.</p>
+                <h1 className="workstream-title">{t('academicYear.title')}</h1>
+                <p className="workstream-subtitle">{t('academicYear.subtitle')}</p>
             </div>
 
             {!workStreamId ? (
-                <div className="sm-empty-state">Workstream information is missing. Please log in again.</div>
+                <div className="sm-empty-state">{t('academicYear.missingInfo')}</div>
             ) : loading ? (
-                <div className="sm-loading-state">Loading academic years...</div>
+                <div className="sm-loading-state">{t('academicYear.loading')}</div>
             ) : (
                 <AcademicYearManagement
                     academicYears={academicYears}

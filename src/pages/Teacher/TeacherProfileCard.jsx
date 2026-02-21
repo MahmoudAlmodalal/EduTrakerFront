@@ -86,7 +86,7 @@ const TeacherProfileCard = () => {
             return true;
         }
 
-        const persistedState = localStorage.getItem(COLLAPSE_STORAGE_KEY);
+        const persistedState = sessionStorage.getItem(COLLAPSE_STORAGE_KEY);
         return persistedState !== 'false';
     });
 
@@ -98,7 +98,7 @@ const TeacherProfileCard = () => {
             return;
         }
 
-        localStorage.setItem(COLLAPSE_STORAGE_KEY, String(isExpanded));
+        sessionStorage.setItem(COLLAPSE_STORAGE_KEY, String(isExpanded));
     }, [isExpanded]);
 
     const teacher = data?.teacher ?? {};

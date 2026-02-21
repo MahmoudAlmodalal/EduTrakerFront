@@ -91,12 +91,12 @@
     -webkit-text-fill-color: transparent;
 }
 
-.guardian-brand > div > svg {
+.guardian-brand>div>svg {
     color: #8b5cf6;
     filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.4));
 }
 
-.guardian-brand > div > span {
+.guardian-brand>div>span {
     font-size: 1.25rem;
     font-weight: 800;
     letter-spacing: -0.025em;
@@ -287,6 +287,7 @@
 }
 
 @keyframes guardianCardTwinkle {
+
     0%,
     100% {
         opacity: 0.35;
@@ -1054,6 +1055,7 @@
 }
 
 @media (max-width: 1100px) {
+
     .guardian-dashboard-panel,
     .guardian-dashboard-panel-wide {
         grid-column: span 12;
@@ -1284,8 +1286,8 @@
     animation-delay: 0.65s;
 }
 
-.guardian-dashboard .guardian-stat-card > *,
-.guardian-dashboard .guardian-card > * {
+.guardian-dashboard .guardian-stat-card>*,
+.guardian-dashboard .guardian-card>* {
     position: relative;
     z-index: 1;
 }
@@ -1753,12 +1755,10 @@
     width: 100%;
     height: 46px;
     border-radius: 8px;
-    background: linear-gradient(
-        90deg,
-        rgba(148, 163, 184, 0.15) 25%,
-        rgba(148, 163, 184, 0.28) 50%,
-        rgba(148, 163, 184, 0.15) 75%
-    );
+    background: linear-gradient(90deg,
+            rgba(148, 163, 184, 0.15) 25%,
+            rgba(148, 163, 184, 0.28) 50%,
+            rgba(148, 163, 184, 0.15) 75%);
     background-size: 200% 100%;
     animation: guardianMonitoringShimmer 1.2s linear infinite;
 }
@@ -2115,22 +2115,58 @@
 }
 
 @media (max-width: 768px) {
+
+    .tabs-header,
     .tabs-header.monitoring-tabs-header {
         gap: 0.4rem;
         overflow-x: auto;
-        padding-bottom: 0.35rem;
+        flex-wrap: nowrap;
+        padding-bottom: 0.5rem;
+        -webkit-overflow-scrolling: touch;
     }
 
+    .tab-btn,
     .tabs-header.monitoring-tabs-header .tab-btn {
         flex-shrink: 0;
         padding: 0.65rem 0.7rem;
         font-size: 0.82rem;
+        white-space: nowrap;
+    }
+
+    .child-selector {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 0.5rem;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .child-selector-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+
+    .guardian-table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
     }
 
     .guardian-table th,
     .guardian-table td {
         padding: 0.75rem;
         font-size: 0.85rem;
+    }
+
+    .guardian-dashboard-hero {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .guardian-dashboard-hero-actions {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
 

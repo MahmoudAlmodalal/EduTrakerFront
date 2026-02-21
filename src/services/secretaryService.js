@@ -1,4 +1,5 @@
 import { api } from '../utils/api';
+import { getStoredUserRaw } from '../utils/userStorage';
 
 const CACHE_TTL = 5 * 60 * 1000;
 const DASHBOARD_STATS_CACHE_TTL = 2 * 60 * 1000;
@@ -11,7 +12,7 @@ const RETRY_LIST_TIMEOUT = 20000;
 
 const getSessionCacheScope = () => {
     try {
-        const rawUser = localStorage.getItem('user');
+        const rawUser = getStoredUserRaw();
         if (!rawUser) {
             return 'anonymous';
         }
@@ -300,6 +301,13 @@ const secretaryService = {
     },
     updateStudent: async (id, data) => {
         return api.patch(`/manager/students/${id}/`, data);
+    },
+    deactivateStudent: async (id) => {
+        const payload = await api.post(`/manager/students/${id}/deactivate/`);
+        clearCacheByPrefix('secretary_dashboard_stats');
+        clearCacheByPrefix('student_applications');
+        clearSessionStorageByPrefix('secretary_dashboard_snapshot:');
+        return payload;
     },
     getUnassignedStudents: async () => {
         // Get all students - we'll filter on the frontend for those without active enrollment

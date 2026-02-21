@@ -8,6 +8,7 @@ import {
     BookOpen
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import managerService from '../../services/managerService';
 import './SchoolManager.css';
 
@@ -16,14 +17,29 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const normalizeClassroom = (room = {}, index = 0) => {
+const getActiveCountFromListResponse = (payload) => {
+    const teachers = Array.isArray(payload?.results)
+        ? payload.results
+        : Array.isArray(payload)
+            ? payload
+            : null;
+
+    if (teachers) {
+        return teachers.filter((teacher) => teacher?.is_active !== false).length;
+    }
+
+    const countValue = Number(payload?.count);
+    return Number.isFinite(countValue) ? countValue : null;
+};
+
+const normalizeClassroom = (room = {}, index = 0, unassignedLabel = 'Unassigned') => {
     const rawGrade = typeof room?.grade === 'object' ? room?.grade?.name : room?.grade;
 
     return {
         ...room,
         classroom_id: room?.classroom_id ?? room?.id ?? null,
         classroom_name: room?.classroom_name || room?.name || room?.class_name || `Classroom ${index + 1}`,
-        grade: rawGrade || room?.grade_name || room?.['grade__name'] || 'Unassigned',
+        grade: rawGrade || room?.grade_name || room?.['grade__name'] || unassignedLabel,
         student_count: toNumber(
             room?.student_count ?? room?.count ?? room?.total_students ?? room?.students_count,
             0
@@ -34,39 +50,65 @@ const normalizeClassroom = (room = {}, index = 0) => {
 
 const SchoolDashboard = () => {
     const { t } = useTheme();
+    const { user } = useAuth();
+    const schoolId = user?.school_id || user?.school?.id || user?.school;
     const [stats, setStats] = useState(null);
+    const [activeTeachersCount, setActiveTeachersCount] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         const fetchStats = async () => {
+            const fallbackStats = {
+                total_students: 0,
+                total_teachers: 0,
+                total_secretaries: 0,
+                classroom_count: 0,
+                course_count: 0
+            };
+
             setLoading(true);
             setError(null);
             try {
                 // Backend: GET /api/statistics/dashboard/
                 // Response: { role, statistics: { school_name, total_students, total_teachers, total_secretaries, classroom_count, course_count, by_grade, by_classroom }, recent_activity, activity_chart }
-                const data = await managerService.getDashboardStats();
-                setStats(data?.statistics || {
-                    total_students: 0,
-                    total_teachers: 0,
-                    total_secretaries: 0,
-                    classroom_count: 0,
-                    course_count: 0
-                });
+                const teacherParams = { include_inactive: true };
+                if (schoolId) {
+                    teacherParams.school_id = schoolId;
+                }
+
+                const [dashboardResult, activeTeachersResult] = await Promise.allSettled([
+                    managerService.getDashboardStats(),
+                    managerService.getTeachers(teacherParams)
+                ]);
+
+                if (dashboardResult.status !== 'fulfilled') {
+                    throw dashboardResult.reason;
+                }
+
+                setStats(dashboardResult.value?.statistics || fallbackStats);
+
+                if (activeTeachersResult.status === 'fulfilled') {
+                    setActiveTeachersCount(getActiveCountFromListResponse(activeTeachersResult.value));
+                } else {
+                    setActiveTeachersCount(null);
+                    console.warn('Failed to fetch active teachers count:', activeTeachersResult.reason);
+                }
             } catch (err) {
                 console.error('Failed to fetch dashboard stats:', err);
                 setError(err.message || 'Failed to load dashboard data.');
+                setActiveTeachersCount(null);
             } finally {
                 setLoading(false);
             }
         };
         fetchStats();
-    }, []);
+    }, [schoolId]);
 
     const dashboardCards = [
         { title: t('school.dashboard.totalStudents') || 'Total Students', value: stats?.total_students ?? 0, icon: Users, color: 'blue', bgColor: '#dbeafe', iconColor: '#2563eb' },
         { title: t('school.dashboard.pendingStudents') || 'Pending Students', value: stats?.pending_students ?? 0, icon: AlertCircle, color: 'amber', bgColor: '#fef3c7', iconColor: '#d97706' },
-        { title: t('activeTeachers') || 'Active Teachers', value: stats?.total_teachers ?? 0, icon: UserCheck, color: 'green', bgColor: '#dcfce7', iconColor: '#16a34a' },
+        { title: t('activeTeachers') || 'Active Teachers', value: activeTeachersCount ?? 0, icon: UserCheck, color: 'green', bgColor: '#dcfce7', iconColor: '#16a34a' },
         { title: t('secretaries') || 'Secretaries', value: stats?.total_secretaries ?? 0, icon: Briefcase, color: 'purple', bgColor: '#f3e8ff', iconColor: '#9333ea' },
         { title: t('classrooms') || 'Classrooms', value: stats?.classroom_count ?? 0, icon: GraduationCap, color: 'orange', bgColor: '#ffedd5', iconColor: '#ea580c' },
         { title: t('courses') || 'Courses', value: stats?.course_count ?? 0, icon: BookOpen, color: 'teal', bgColor: '#ccfbf1', iconColor: '#0d9488' }
@@ -78,7 +120,7 @@ const SchoolDashboard = () => {
             : Array.isArray(stats?.summary?.by_classroom)
                 ? stats.summary.by_classroom
                 : []
-    ).map(normalizeClassroom);
+    ).map((room, index) => normalizeClassroom(room, index, t('school.dashboard.unassigned') || 'Unassigned'));
 
     if (loading) {
         return (
@@ -111,8 +153,8 @@ const SchoolDashboard = () => {
                 <div>
                     <h1 className="school-manager-title">
                         {stats?.school_name
-                            ? `${stats.school_name} — ${t('school.dashboard.title') || 'Command Center'}`
-                            : (t('school.dashboard.title') || 'Command Center')
+                            ? `${stats.school_name} — ${t('school.dashboard.commandCenter') || 'Command Center'}`
+                            : (t('school.dashboard.commandCenter') || 'Command Center')
                         }
                     </h1>
                     <p className="school-manager-subtitle">{t('school.dashboard.subtitle') || 'Real-time overview of school operations and academic status.'}</p>
@@ -184,7 +226,7 @@ const GradeBreakdown = ({ classrooms = [] }) => {
             <div className="table-header-actions">
                 <h3 className="chart-title">{t('gradeBreakdown') || 'Grade & Classroom Overview'}</h3>
                 <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                    {classrooms.length} classroom{classrooms.length !== 1 ? 's' : ''} total
+                    {t('school.dashboard.classroomsTotal', { count: classrooms.length })}
                 </span>
             </div>
             <div style={{ padding: '1rem' }}>
@@ -214,9 +256,9 @@ const GradeBreakdown = ({ classrooms = [] }) => {
                                         {grade.grade_name}
                                     </span>
                                     <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                        <span>{grade.classroom_count} classroom{grade.classroom_count !== 1 ? 's' : ''}</span>
+                                        <span>{grade.classroom_count} {t('school.dashboard.classroomsCount') || 'classroom(s)'}</span>
                                         <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-                                            {grade.total_students} student{grade.total_students !== 1 ? 's' : ''}
+                                            {grade.total_students} {t('school.dashboard.studentsCount') || 'student(s)'}
                                         </span>
                                     </div>
                                 </div>
@@ -256,12 +298,12 @@ const GradeBreakdown = ({ classrooms = [] }) => {
                                                     color: 'var(--color-text-muted)',
                                                     fontStyle: 'italic'
                                                 }}>
-                                                    No homeroom teacher
+                                                    {t('school.dashboard.noHomeroomTeacher') || 'No homeroom teacher'}
                                                 </span>
                                             )}
                                         </div>
                                         <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
-                                            {room.student_count ?? 0} student{(room.student_count ?? 0) !== 1 ? 's' : ''}
+                                            {room.student_count ?? 0} {t('school.dashboard.studentsCount') || 'student(s)'}
                                         </span>
                                     </div>
                                 ))}

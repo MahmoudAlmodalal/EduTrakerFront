@@ -87,7 +87,7 @@ const AnalyticsReports = () => {
             <header style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem' }}>
                 <h1 className={styles.title}>{t('analytics.title')}</h1>
                 <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '1.1rem', fontWeight: 500 }}>
-                    Real-time academic performance and system metrics across all workstreams
+                    {t('analytics.subtitle')}
                 </p>
             </header>
 
@@ -99,7 +99,7 @@ const AnalyticsReports = () => {
                 marginBottom: '2rem'
             }}>
                 <div className={styles.card} style={{ gap: '0.5rem', padding: '1.5rem' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Students</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('analytics.totalStudents')}</span>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-primary)' }}>
                             {stats?.global?.total_students || 0}
@@ -108,7 +108,7 @@ const AnalyticsReports = () => {
                     </div>
                 </div>
                 <div className={styles.card} style={{ gap: '0.5rem', padding: '1.5rem' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Teachers</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('analytics.totalTeachers')}</span>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '2rem', fontWeight: 800, color: '#0ea5e9' }}>
                             {stats?.global?.total_teachers || 0}
@@ -117,7 +117,7 @@ const AnalyticsReports = () => {
                     </div>
                 </div>
                 <div className={styles.card} style={{ gap: '0.5rem', padding: '1.5rem' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Schools</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('analytics.totalSchools')}</span>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b' }}>
                             {stats?.global?.total_schools || 0}
@@ -134,7 +134,7 @@ const AnalyticsReports = () => {
                             <div style={{ background: 'rgba(79, 70, 229, 0.1)', padding: '10px', borderRadius: '12px' }}>
                                 <TrendingUp size={24} color="var(--color-primary)" />
                             </div>
-                            <h2 className={styles.cardTitle}>Student Distribution</h2>
+                            <h2 className={styles.cardTitle}>{t('analytics.studentDistribution')}</h2>
                         </div>
                         {loading && <span className={styles.loadingPulse}>Refreshing...</span>}
                     </div>
@@ -164,8 +164,8 @@ const AnalyticsReports = () => {
                                     />
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(79, 70, 229, 0.05)' }} />
                                     <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '20px' }} />
-                                    <Bar dataKey="students" fill="url(#gradStudents)" name="Students" radius={[6, 6, 0, 0]} />
-                                    <Bar dataKey="schools" fill="url(#gradSchools)" name="Schools" radius={[6, 6, 0, 0]} />
+                                    <Bar dataKey="students" fill="url(#gradStudents)" name={t('analytics.studentDistribution')} radius={[6, 6, 0, 0]} />
+                                    <Bar dataKey="schools" fill="url(#gradSchools)" name={t('workstreams.card.schools')} radius={[6, 6, 0, 0]} />
                                     <defs>
                                         <linearGradient id="gradStudents" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="0%" stopColor="#4f46e5" />
@@ -187,7 +187,7 @@ const AnalyticsReports = () => {
                         <div style={{ background: 'rgba(14, 165, 233, 0.1)', padding: '10px', borderRadius: '12px' }}>
                             <User size={24} color="#0ea5e9" />
                         </div>
-                        <h2 className={styles.cardTitle}>Teacher Metrics</h2>
+                        <h2 className={styles.cardTitle}>{t('analytics.teacherMetrics')}</h2>
                     </div>
                     <div className={styles.chartContainer} style={{ height: '300px' }}>
                         {loading ? (
@@ -202,7 +202,7 @@ const AnalyticsReports = () => {
                                         tick={{ fill: 'var(--color-text-muted)', fontSize: 10, fontWeight: 600 }}
                                     />
                                     <Tooltip cursor={{ fill: 'rgba(14, 165, 233, 0.05)' }} />
-                                    <Bar dataKey="teachers" fill="#0ea5e9" name="Teachers" radius={[4, 4, 0, 0]} barSize={30} />
+                                    <Bar dataKey="teachers" fill="#0ea5e9" name={t('analytics.teacherMetrics')} radius={[4, 4, 0, 0]} barSize={30} />
                                 </BarChart>
                             </ResponsiveContainer>
                         )}
@@ -214,7 +214,7 @@ const AnalyticsReports = () => {
                         data={activityData}
                         loading={loading}
                         title={t('dashboard.charts.activity')}
-                        subtitle="System-wide login frequency monitoring"
+                        subtitle={t('dashboard.activity.subtitle')}
                     />
                 </div>
 
@@ -257,11 +257,11 @@ const AnalyticsReports = () => {
                         <div style={{ background: 'var(--color-success-light)', padding: '10px', borderRadius: '12px' }}>
                             <CheckCircle size={24} color="var(--color-success)" />
                         </div>
-                        <h2 className={styles.cardTitle}>System Health</h2>
+                        <h2 className={styles.cardTitle}>{t('analytics.systemHealth')}</h2>
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
                         <div style={{ fontSize: '3rem', fontWeight: 800, color: 'var(--color-success)' }}>99.9%</div>
-                        <p style={{ margin: 0, fontWeight: 700, color: 'var(--color-text-muted)' }}>All systems operational</p>
+                        <p style={{ margin: 0, fontWeight: 700, color: 'var(--color-text-muted)' }}>{t('analytics.allSystemsOperational')}</p>
                     </div>
                 </div>
             </div>

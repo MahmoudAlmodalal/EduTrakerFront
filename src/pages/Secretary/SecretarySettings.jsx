@@ -8,7 +8,7 @@ const SecretarySettings = () => {
     return (
         <UnifiedSettingsPage
             title={t('secretary.settings.title') || 'Secretary Settings'}
-            subtitle={t('secretary.settings.subtitle') || 'Manage your profile, preferences, and account security.'}
+            subtitle={t('settings.subtitle') || 'Manage your profile, preferences, and account security.'}
         />
     );
 };

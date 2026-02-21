@@ -229,7 +229,7 @@ const SecretaryAttendance = () => {
 
             if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) {
                 setRecords([]);
-                setError('From Date cannot be after To Date.');
+                setError(t('secretary.attendance.invalidDateRange') || 'From Date cannot be after To Date.');
                 return;
             }
 
@@ -252,13 +252,13 @@ const SecretaryAttendance = () => {
                 return;
             }
             console.error('Error fetching attendance:', err);
-            setError('Failed to load attendance records.');
+            setError(t('secretary.attendance.loadError') || 'Failed to load attendance records.');
         } finally {
             if (attendanceRequestRef.current === requestId) {
                 setLoading(false);
             }
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
         fetchAttendance(debouncedFilters);
@@ -309,24 +309,44 @@ const SecretaryAttendance = () => {
             : 0;
 
         return [
-            { title: 'Present', value: totalPresent, icon: CheckCircle, color: 'green' },
-            { title: 'Absent', value: totalAbsent, icon: XCircle, color: 'rose' },
-            { title: 'Late', value: totalLate, icon: Clock, color: 'amber' },
-            { title: 'Attendance Rate', value: `${attendanceRate}%`, icon: TrendingUp, color: 'indigo' },
+            {
+                title: t('secretary.attendance.present') || 'Present',
+                value: totalPresent,
+                icon: CheckCircle,
+                color: 'green',
+            },
+            {
+                title: t('secretary.attendance.absent') || 'Absent',
+                value: totalAbsent,
+                icon: XCircle,
+                color: 'rose',
+            },
+            {
+                title: t('secretary.attendance.late') || 'Late',
+                value: totalLate,
+                icon: Clock,
+                color: 'amber',
+            },
+            {
+                title: t('secretary.attendance.attendanceRate') || 'Attendance Rate',
+                value: `${attendanceRate}%`,
+                icon: TrendingUp,
+                color: 'indigo',
+            },
         ];
-    }, [studentFilteredRecords]);
+    }, [studentFilteredRecords, t]);
 
     const emptyStateMessage = useMemo(() => {
         if (searchTerm.trim() || statusFilter || selectedStudent) {
-            return 'No attendance records found for the selected filters.';
+            return t('secretary.attendance.noRecordsForFilters') || 'No attendance records found for the selected filters.';
         }
 
-        return 'No attendance records found for this date range.';
-    }, [searchTerm, statusFilter, selectedStudent]);
+        return t('secretary.attendance.noRecordsForDateRange') || 'No attendance records found for this date range.';
+    }, [searchTerm, selectedStudent, statusFilter, t]);
 
     const handleExportPdf = useCallback(async () => {
         if (filteredRecords.length === 0) {
-            setError('No attendance records available to export for the selected filters.');
+            setError(t('secretary.attendance.noExportData') || 'No attendance records available to export for the selected filters.');
             return;
         }
 
@@ -346,11 +366,11 @@ const SecretaryAttendance = () => {
             await reportService.exportReport('pdf', 'secretary_attendance', exportRows);
         } catch (err) {
             console.error('Error exporting attendance PDF:', err);
-            setError('Failed to export attendance PDF.');
+            setError(t('secretary.attendance.exportError') || 'Failed to export attendance PDF.');
         } finally {
             setIsExportingPdf(false);
         }
-    }, [filteredRecords, getStatusLabel]);
+    }, [filteredRecords, getStatusLabel, t]);
 
     return (
         <div className="secretary-dashboard">
@@ -365,7 +385,7 @@ const SecretaryAttendance = () => {
                         disabled={isExportingPdf || filteredRecords.length === 0}
                     >
                         <Download size={16} />
-                        <span>{isExportingPdf ? 'Exporting...' : 'Export PDF'}</span>
+                        <span>{isExportingPdf ? (t('secretary.attendance.exportingPdf') || 'Exporting...') : (t('secretary.attendance.exportPdf') || 'Export PDF')}</span>
                     </button>
                 )}
             />
@@ -387,7 +407,9 @@ const SecretaryAttendance = () => {
             <section className="management-card">
                 <div className="sec-filter-bar">
                     <div className="sec-field">
-                        <label htmlFor="attendance-date-from" className="form-label">From Date</label>
+                        <label htmlFor="attendance-date-from" className="form-label">
+                            {t('secretary.attendance.fromDate') || 'From Date'}
+                        </label>
                         <input
                             id="attendance-date-from"
                             type="date"
@@ -398,7 +420,9 @@ const SecretaryAttendance = () => {
                     </div>
 
                     <div className="sec-field">
-                        <label htmlFor="attendance-date-to" className="form-label">To Date</label>
+                        <label htmlFor="attendance-date-to" className="form-label">
+                            {t('secretary.attendance.toDate') || 'To Date'}
+                        </label>
                         <input
                             id="attendance-date-to"
                             type="date"
@@ -409,30 +433,34 @@ const SecretaryAttendance = () => {
                     </div>
 
                     <div className="sec-field">
-                        <label htmlFor="attendance-status" className="form-label">Status</label>
+                        <label htmlFor="attendance-status" className="form-label">
+                            {t('secretary.attendance.status') || 'Status'}
+                        </label>
                         <select
                             id="attendance-status"
                             className="form-select"
                             value={statusFilter}
                             onChange={(event) => setStatusFilter(event.target.value)}
                         >
-                            <option value="">All Statuses</option>
-                            <option value="present">Present</option>
-                            <option value="absent">Absent</option>
-                            <option value="late">Late</option>
-                            <option value="excused">Excused</option>
+                            <option value="">{t('secretary.attendance.allStatuses') || 'All Statuses'}</option>
+                            <option value="present">{t('secretary.attendance.present') || 'Present'}</option>
+                            <option value="absent">{t('secretary.attendance.absent') || 'Absent'}</option>
+                            <option value="late">{t('secretary.attendance.late') || 'Late'}</option>
+                            <option value="excused">{t('secretary.attendance.excused') || 'Excused'}</option>
                         </select>
                     </div>
 
                     <div className="sec-field sec-field--grow sec-attendance-search-field" ref={dropdownRef}>
-                        <label htmlFor="attendance-search" className="form-label">Search Student</label>
+                        <label htmlFor="attendance-search" className="form-label">
+                            {t('secretary.attendance.searchStudentLabel') || 'Search Student'}
+                        </label>
                         <div className="search-wrapper sec-search-wrapper">
                             <Search size={16} className="search-icon" />
                             <input
                                 id="attendance-search"
                                 type="text"
                                 className="search-input"
-                                placeholder="Type first letter(s) of student name..."
+                                placeholder={t('secretary.attendance.searchStudentPlaceholder') || 'Type first letter(s) of student name...'}
                                 value={studentQuery}
                                 onChange={handleStudentQueryChange}
                                 onFocus={() => {
@@ -448,7 +476,9 @@ const SecretaryAttendance = () => {
                         {showDropdown ? (
                             <div className="student-search-dropdown">
                                 {studentLoading ? (
-                                    <div className="student-search-option text-muted">Loading students...</div>
+                                    <div className="student-search-option text-muted">
+                                        {t('secretary.attendance.loadingStudents') || 'Loading students...'}
+                                    </div>
                                 ) : studentResults.length > 0 ? (
                                     studentResults.map((studentOption) => {
                                         const optionId = getStudentFilterId(studentOption);
@@ -469,7 +499,9 @@ const SecretaryAttendance = () => {
                                         );
                                     })
                                 ) : (
-                                    <div className="student-search-option text-muted">No students found</div>
+                                    <div className="student-search-option text-muted">
+                                        {t('secretary.attendance.noStudentsFound') || 'No students found'}
+                                    </div>
                                 )}
                             </div>
                         ) : null}
@@ -484,7 +516,7 @@ const SecretaryAttendance = () => {
                                 <button
                                     type="button"
                                     onClick={clearSelectedStudent}
-                                    aria-label="Clear selected student"
+                                    aria-label={t('secretary.attendance.clearSelectedStudent') || 'Clear selected student'}
                                 >
                                     <X size={12} />
                                 </button>
@@ -498,16 +530,16 @@ const SecretaryAttendance = () => {
                         <SkeletonTable rows={6} cols={7} />
                     ) : (
                         <div className="sec-table-scroll">
-                            <table className="data-table sec-data-table">
+                            <table className="data-table sec-data-table sec-data-table--attendance">
                                 <thead>
                                     <tr>
-                                        <th className="cell-id">ID</th>
+                                        <th className="cell-id">{t('secretary.attendance.id') || 'ID'}</th>
                                         <th>{t('secretary.attendance.studentName') || 'Student'}</th>
-                                        <th>Classroom</th>
-                                        <th>Date</th>
+                                        <th>{t('secretary.attendance.classroom') || 'Classroom'}</th>
+                                        <th>{t('secretary.attendance.date') || 'Date'}</th>
                                         <th>{t('secretary.attendance.status') || 'Status'}</th>
-                                        <th>Note</th>
-                                        <th>Recorded By</th>
+                                        <th>{t('secretary.attendance.note') || 'Note'}</th>
+                                        <th>{t('secretary.attendance.recordedBy') || 'Recorded By'}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -553,7 +585,7 @@ const SecretaryAttendance = () => {
 
             <section className="sec-mobile-note">
                 <Calendar size={14} />
-                <span>Tip: Scroll the table horizontally on mobile to see all columns.</span>
+                <span>{t('secretary.attendance.mobileScrollTip') || 'Tip: Scroll the table horizontally on mobile to see all columns.'}</span>
             </section>
         </div>
     );

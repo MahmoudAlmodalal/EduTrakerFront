@@ -14,6 +14,7 @@ import {
     Users,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
+import { useTheme } from '../../../context/ThemeContext';
 import { useSecretaryData } from '../../../context/SecretaryDataContext';
 import secretaryService from '../../../services/secretaryService';
 import './SecretaryInfo.css';
@@ -39,7 +40,7 @@ const Skeleton = () => (
     </div>
 );
 
-const LeadershipCard = ({ roleLabel, person, iconNode, variantClass }) => {
+const LeadershipCard = ({ t, roleLabel, person, iconNode, variantClass }) => {
     const empty = !person;
     return (
         <div className={`teacher-leadership-card ${empty ? 'teacher-leadership-card-muted' : ''}`}>
@@ -50,14 +51,14 @@ const LeadershipCard = ({ roleLabel, person, iconNode, variantClass }) => {
                 </span>
                 <div className="teacher-leadership-copy">
                     {empty ? (
-                        <p className="teacher-leadership-empty">Not assigned</p>
+                        <p className="teacher-leadership-empty">{t('secretary.info.leadership.notAssigned')}</p>
                     ) : (
                         <>
                             <p className="teacher-leadership-name">{person.full_name}</p>
                             <p className="teacher-leadership-email">{person.email}</p>
                             {person.workstream_name && (
                                 <span className="teacher-leadership-workstream">
-                                    Workstream: {person.workstream_name}
+                                    {t('secretary.info.leadership.workstreamPrefix', { name: person.workstream_name })}
                                 </span>
                             )}
                         </>
@@ -69,6 +70,7 @@ const LeadershipCard = ({ roleLabel, person, iconNode, variantClass }) => {
 };
 
 const SecretaryInfo = () => {
+    const { t } = useTheme();
     const { user } = useAuth();
     const { dashboardData, loading: ctxLoading, refreshData } = useSecretaryData();
     const userId = user?.id ?? user?.user_id ?? null;
@@ -111,7 +113,7 @@ const SecretaryInfo = () => {
                     || err?.name === 'CanceledError'
                     || err?.name === 'AbortError';
                 if (!cancelled && !wasCanceled) {
-                    setError(err?.message || 'Failed to load');
+                    setError(err?.message || t('secretary.info.error.loadFailed'));
                 }
             } finally {
                 if (!cancelled) {
@@ -126,7 +128,7 @@ const SecretaryInfo = () => {
             cancelled = true;
             controller.abort();
         };
-    }, [refreshData, userId]);
+    }, [refreshData, t, userId]);
 
     const profile = {
         secretary_name: dashboardData?.profile?.full_name
@@ -146,6 +148,39 @@ const SecretaryInfo = () => {
     const managers = Array.isArray(ctx?.managers) ? ctx.managers : [];
 
     const tabPeople = activeTab === 'teachers' ? teachers : managers;
+
+    const getStatusLabel = (status) => {
+        const normalized = String(status || '').trim().toLowerCase();
+        if (!normalized || normalized === 'active') {
+            return t('common.status.active');
+        }
+        if (normalized === 'inactive' || normalized === 'not_active') {
+            return t('common.status.inactive');
+        }
+        return toLabel(normalized);
+    };
+
+    const getManagerRoleLabel = (role) => {
+        const normalized = String(role || '').trim().toLowerCase();
+        if (!normalized || normalized === 'manager') {
+            return t('secretary.info.people.defaultManagerRole');
+        }
+        if (
+            normalized === 'manager_school'
+            || normalized === 'school_manager'
+            || normalized === 'school manager'
+        ) {
+            return t('secretary.info.leadership.schoolManager');
+        }
+        if (
+            normalized === 'manager_workstream'
+            || normalized === 'workstream_manager'
+            || normalized === 'workstream manager'
+        ) {
+            return t('secretary.info.leadership.workstreamManager');
+        }
+        return toLabel(normalized);
+    };
 
     const guardiansCount = useMemo(() => {
         const fromDashboard = Number(
@@ -200,19 +235,19 @@ const SecretaryInfo = () => {
     };
 
     const statItems = [
-        { label: 'Students', value: students.length, icon: <GraduationCap size={18} />, color: 'indigo' },
-        { label: 'Teachers', value: teachers.length, icon: <BookOpen size={18} />, color: 'teal' },
-        { label: 'Guardians', value: guardiansCount, icon: <HeartHandshake size={18} />, color: 'rose' },
-        { label: 'Classrooms', value: classrooms.length, icon: <Building2 size={18} />, color: 'purple' },
-        { label: 'Managers', value: managers.length, icon: <UserCog size={18} />, color: 'amber' },
+        { key: 'students', label: t('secretary.info.stats.students'), value: students.length, icon: <GraduationCap size={18} />, color: 'indigo' },
+        { key: 'teachers', label: t('secretary.info.stats.teachers'), value: teachers.length, icon: <BookOpen size={18} />, color: 'teal' },
+        { key: 'guardians', label: t('secretary.info.stats.guardians'), value: guardiansCount, icon: <HeartHandshake size={18} />, color: 'rose' },
+        { key: 'classrooms', label: t('secretary.info.stats.classrooms'), value: classrooms.length, icon: <Building2 size={18} />, color: 'purple' },
+        { key: 'managers', label: t('secretary.info.stats.managers'), value: managers.length, icon: <UserCog size={18} />, color: 'amber' },
     ];
 
     return (
         <div className="teacher-page" style={{ gap: '1.2rem' }}>
             <div>
-                <h1 className="teacher-title" style={{ marginBottom: '0.35rem' }}>My Info</h1>
+                <h1 className="teacher-title" style={{ marginBottom: '0.35rem' }}>{t('secretary.info.title')}</h1>
                 <p className="teacher-subtitle" style={{ margin: 0 }}>
-                    School context, classrooms, and people overview.
+                    {t('secretary.info.subtitle')}
                 </p>
             </div>
 
@@ -220,7 +255,7 @@ const SecretaryInfo = () => {
                 <div className="sec-info-stats-grid">
                     {statItems.map((item) => (
                         <div
-                            key={item.label}
+                            key={item.key}
                             className="sec-info-stat-card"
                         >
                             <div className="sec-info-stat-header">
@@ -250,8 +285,8 @@ const SecretaryInfo = () => {
             <div className="management-card teacher-profile-card">
                 <div className="teacher-profile-card-header">
                     <div>
-                        <h3 className="teacher-profile-card-title">School Context</h3>
-                        <p className="teacher-profile-card-subtitle">Read-only overview of your school ecosystem.</p>
+                        <h3 className="teacher-profile-card-title">{t('secretary.info.schoolContext.title')}</h3>
+                        <p className="teacher-profile-card-subtitle">{t('secretary.info.schoolContext.subtitle')}</p>
                     </div>
                 </div>
 
@@ -273,30 +308,28 @@ const SecretaryInfo = () => {
                                 <div className="teacher-profile-hero-main">
                                     <div className="teacher-profile-hero-top-row">
                                         <h4 className="teacher-profile-hero-name">
-                                            {profile.secretary_name || 'Secretary'}
+                                            {profile.secretary_name || t('secretary.info.profile.secretary')}
                                         </h4>
                                         <div className="teacher-profile-hero-badges">
                                             <span className="teacher-profile-employment-badge teacher-profile-employment-full-time">
-                                                {profile.current_status
-                                                    ? toLabel(profile.current_status)
-                                                    : 'Active'}
+                                                {getStatusLabel(profile.current_status)}
                                             </span>
                                         </div>
                                     </div>
 
                                     <p className="teacher-profile-line teacher-profile-line-muted">
                                         <Mail size={13} />
-                                        <span>{profile.email || 'No email'}</span>
+                                        <span>{profile.email || t('secretary.info.profile.noEmail')}</span>
                                     </p>
 
                                     <p className="teacher-profile-line teacher-profile-line-school">
                                         <Building2 size={14} />
-                                        <span>{school.name || profile.school_name || 'No school assigned'}</span>
+                                        <span>{school.name || profile.school_name || t('secretary.info.profile.noSchoolAssigned')}</span>
                                     </p>
 
                                     <p className="teacher-profile-line teacher-profile-line-muted">
                                         <UserCog size={13} />
-                                        <span>Secretary</span>
+                                        <span>{t('secretary.info.profile.secretary')}</span>
                                     </p>
                                 </div>
                             </div>
@@ -305,16 +338,18 @@ const SecretaryInfo = () => {
                         <div className="teacher-profile-divider" />
 
                         <section className="teacher-profile-section">
-                            <h5 className="teacher-profile-section-title">School Leadership</h5>
+                            <h5 className="teacher-profile-section-title">{t('secretary.info.leadership.title')}</h5>
                             <div className="teacher-leadership-grid">
                                 <LeadershipCard
-                                    roleLabel="School Manager"
+                                    t={t}
+                                    roleLabel={t('secretary.info.leadership.schoolManager')}
                                     person={school.manager}
                                     iconNode={<UserCog size={16} />}
                                     variantClass="teacher-leadership-icon-manager"
                                 />
                                 <LeadershipCard
-                                    roleLabel="Workstream Manager"
+                                    t={t}
+                                    roleLabel={t('secretary.info.leadership.workstreamManager')}
                                     person={school.workstream_manager}
                                     iconNode={<Briefcase size={16} />}
                                     variantClass="teacher-leadership-icon-workstream"
@@ -325,12 +360,14 @@ const SecretaryInfo = () => {
                         <div className="teacher-profile-divider" />
 
                         <section className="teacher-profile-section">
-                            <h5 className="teacher-profile-section-title">My Classrooms ({classrooms.length})</h5>
+                            <h5 className="teacher-profile-section-title">
+                                {t('secretary.info.classrooms.title', { count: classrooms.length })}
+                            </h5>
 
                             {classrooms.length === 0 ? (
                                 <div className="teacher-profile-empty">
                                     <GraduationCap size={16} />
-                                    <span>No classrooms assigned.</span>
+                                    <span>{t('secretary.info.classrooms.noneAssigned')}</span>
                                 </div>
                             ) : (
                                 <div className="teacher-classrooms-list">
@@ -363,7 +400,7 @@ const SecretaryInfo = () => {
                                                     <div className="teacher-classroom-toggle-left">
                                                         {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                                         <p className="teacher-classroom-title">
-                                                            <span>{cls.grade_name || 'Grade'}</span>
+                                                            <span>{cls.grade_name || t('secretary.info.classrooms.defaultGrade')}</span>
                                                             <span className="teacher-profile-dot">&bull;</span>
                                                             <span className="teacher-classroom-name">{cls.classroom_name}</span>
                                                         </p>
@@ -376,7 +413,7 @@ const SecretaryInfo = () => {
                                                         )}
                                                         {typeof cls.student_count === 'number' && (
                                                             <span className="teacher-tag teacher-tag-count">
-                                                                {cls.student_count} Students
+                                                                {t('secretary.info.classrooms.studentsTag', { count: cls.student_count })}
                                                             </span>
                                                         )}
                                                     </div>
@@ -385,7 +422,7 @@ const SecretaryInfo = () => {
                                                 {isOpen ? (
                                                     <div className="teacher-classroom-students-panel">
                                                         {classroomStudents.length === 0 ? (
-                                                            <p className="teacher-classroom-empty">No active students enrolled.</p>
+                                                            <p className="teacher-classroom-empty">{t('secretary.info.classrooms.noActiveStudents')}</p>
                                                         ) : (
                                                             classroomStudents.map((student, studentIndex) => {
                                                                 const studentKey = `${student.email || student.full_name || 'student'}-${studentIndex}`;
@@ -412,16 +449,20 @@ const SecretaryInfo = () => {
                                                                                     {getInitials(student.full_name)}
                                                                                 </span>
                                                                                 <div className="teacher-student-copy">
-                                                                                    <p className="teacher-student-name">{student.full_name || 'Student'}</p>
+                                                                                    <p className="teacher-student-name">
+                                                                                        {student.full_name || t('secretary.info.students.defaultName')}
+                                                                                    </p>
                                                                                 </div>
                                                                             </div>
                                                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                                                                 <span className="teacher-student-guardians-badge">
                                                                                     <Users size={12} />
-                                                                                    {guardians.length} {guardians.length === 1 ? 'guardian' : 'guardians'}
+                                                                                    {guardians.length} {guardians.length === 1
+                                                                                        ? t('secretary.info.students.guardianSingular')
+                                                                                        : t('secretary.info.students.guardianPlural')}
                                                                                 </span>
                                                                                 <span className={`teacher-profile-employment-badge ${studentStatusClass}`}>
-                                                                                    {toLabel(student.current_status || 'active')}
+                                                                                    {getStatusLabel(student.current_status)}
                                                                                 </span>
                                                                                 {isStudentOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                                                             </div>
@@ -429,7 +470,7 @@ const SecretaryInfo = () => {
 
                                                                         <div className="teacher-student-email-line">
                                                                             <p className="teacher-student-email" title={student.email || ''}>
-                                                                                {student.email || 'No email'}
+                                                                                {student.email || t('secretary.info.profile.noEmail')}
                                                                             </p>
                                                                             {student.email ? (
                                                                                 <button
@@ -438,13 +479,15 @@ const SecretaryInfo = () => {
                                                                                     onClick={() => handleCopyStudentEmail(student.email, studentPanelKey)}
                                                                                 >
                                                                                     {copiedStudentKey === studentPanelKey ? <Check size={12} /> : <Copy size={12} />}
-                                                                                    {copiedStudentKey === studentPanelKey ? 'Copied' : 'Copy'}
+                                                                                    {copiedStudentKey === studentPanelKey
+                                                                                        ? t('secretary.info.students.copied')
+                                                                                        : t('secretary.info.students.copy')}
                                                                                 </button>
                                                                             ) : null}
                                                                         </div>
 
                                                                         {isStudentOpen && guardians.length === 0 ? (
-                                                                            <p className="teacher-guardian-empty">No active guardians linked.</p>
+                                                                            <p className="teacher-guardian-empty">{t('secretary.info.students.noActiveGuardians')}</p>
                                                                         ) : null}
                                                                         {isStudentOpen && guardians.length > 0 ? (
                                                                             guardians.map((guardian, guardianIndex) => (
@@ -458,17 +501,17 @@ const SecretaryInfo = () => {
                                                                                     <div className="teacher-guardian-copy">
                                                                                         <p className="teacher-guardian-name-row">
                                                                                             <span>
-                                                                                                {guardian.full_name || 'Guardian'}
+                                                                                                {guardian.full_name || t('secretary.info.guardian.defaultName')}
                                                                                                 {guardian.relationship_type
                                                                                                     ? ` (${toLabel(guardian.relationship_type)})`
                                                                                                     : ''}
                                                                                             </span>
                                                                                             {guardian.is_primary ? (
-                                                                                                <span className="teacher-guardian-primary">Primary</span>
+                                                                                                <span className="teacher-guardian-primary">{t('secretary.info.guardian.primary')}</span>
                                                                                             ) : null}
                                                                                         </p>
                                                                                         <p className="teacher-guardian-meta">
-                                                                                            {guardian.phone_number || 'No phone number'}
+                                                                                            {guardian.phone_number || t('secretary.info.guardian.noPhoneNumber')}
                                                                                             {guardian.email ? ` • ${guardian.email}` : ''}
                                                                                         </p>
                                                                                     </div>
@@ -491,7 +534,7 @@ const SecretaryInfo = () => {
                         <div className="teacher-profile-divider" />
 
                         <section className="teacher-profile-section">
-                            <h5 className="teacher-profile-section-title">People</h5>
+                            <h5 className="teacher-profile-section-title">{t('secretary.info.people.title')}</h5>
 
                             <div className="teacher-people-tabs">
                                 <button
@@ -500,7 +543,7 @@ const SecretaryInfo = () => {
                                     onClick={() => setActiveTab('teachers')}
                                 >
                                     <BookOpen size={13} style={{ marginRight: 4 }} />
-                                    Teachers ({teachers.length})
+                                    {t('secretary.info.people.teachersTab', { count: teachers.length })}
                                 </button>
                                 <button
                                     type="button"
@@ -508,7 +551,7 @@ const SecretaryInfo = () => {
                                     onClick={() => setActiveTab('managers')}
                                 >
                                     <UserCog size={13} style={{ marginRight: 4 }} />
-                                    Managers ({managers.length})
+                                    {t('secretary.info.people.managersTab', { count: managers.length })}
                                 </button>
                             </div>
 
@@ -516,7 +559,9 @@ const SecretaryInfo = () => {
                                 <div className="teacher-profile-empty teacher-profile-empty-people">
                                     <Users size={16} />
                                     <span>
-                                        {activeTab === 'teachers' ? 'No teachers assigned.' : 'No managers assigned.'}
+                                        {activeTab === 'teachers'
+                                            ? t('secretary.info.people.noTeachersAssigned')
+                                            : t('secretary.info.people.noManagersAssigned')}
                                     </span>
                                 </div>
                             ) : (
@@ -535,14 +580,14 @@ const SecretaryInfo = () => {
                                                     {getInitials(person.full_name)}
                                                 </span>
                                                 <div className="teacher-person-copy">
-                                                    <p className="teacher-person-name">{person.full_name || 'User'}</p>
+                                                    <p className="teacher-person-name">{person.full_name || t('secretary.info.people.defaultUser')}</p>
                                                     <p className="teacher-person-role">
                                                         {isTeacher
-                                                            ? (person.specialization || person.course_name || 'Teacher')
-                                                            : toLabel(person.role || 'manager')}
+                                                            ? (person.specialization || person.course_name || t('secretary.info.people.defaultTeacherRole'))
+                                                            : getManagerRoleLabel(person.role)}
                                                     </p>
                                                     <p className="teacher-person-email" title={person.email || ''}>
-                                                        {person.email || 'No email'}
+                                                        {person.email || t('secretary.info.profile.noEmail')}
                                                     </p>
                                                     {isTeacher && person.course_name && (
                                                         <p className="teacher-person-email" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

@@ -7,7 +7,7 @@ const WorkstreamSettings = () => {
   return (
     <UnifiedSettingsPage
       title={t('workstream.settings.title') || 'Workstream Settings'}
-      subtitle={t('workstream.settings.subtitle') || 'Manage your profile, preferences, and security settings.'}
+      subtitle={t('settings.subtitle') || 'Manage your profile, preferences, and security settings.'}
     />
   );
 };

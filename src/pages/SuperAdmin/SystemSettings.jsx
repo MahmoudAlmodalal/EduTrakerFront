@@ -8,7 +8,7 @@ const SystemSettings = () => {
     return (
         <UnifiedSettingsPage
             title={t('settings.title') || 'System Settings'}
-            subtitle="Manage your profile, preferences, and account security."
+            subtitle={t('settings.subtitle')}
         />
     );
 };

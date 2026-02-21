@@ -941,8 +941,20 @@
     border: 1px solid var(--teacher-border);
 }
 
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.management-card-scrollable {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 .teacher-table {
     width: 100%;
+    min-width: 800px;
     border-collapse: collapse;
     text-align: left;
     font-size: 0.875rem;
@@ -961,6 +973,7 @@
     padding: 1rem;
     color: var(--teacher-text-main);
     border-bottom: 1px solid var(--teacher-border);
+    white-space: nowrap;
 }
 
 .teacher-table tr:last-child td {
@@ -1301,6 +1314,7 @@
     border-bottom: 1px solid var(--teacher-border);
     color: var(--teacher-text-main);
     font-size: 0.88rem;
+    white-space: nowrap;
 }
 
 .teacher-behavior-table tr:last-child td {
@@ -1577,12 +1591,10 @@
 }
 
 .teacher-profile-card .profile-skeleton {
-    background: linear-gradient(
-        90deg,
-        var(--color-border) 25%,
-        var(--color-bg-body) 50%,
-        var(--color-border) 75%
-    );
+    background: linear-gradient(90deg,
+            var(--color-border) 25%,
+            var(--color-bg-body) 50%,
+            var(--color-border) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
     border-radius: 0.55rem;
@@ -2194,6 +2206,7 @@
 }
 
 @media (max-width: 900px) {
+
     .teacher-leadership-grid,
     .teacher-profile-skeleton-leadership {
         grid-template-columns: 1fr;
@@ -2214,6 +2227,7 @@
 }
 
 @media (max-width: 640px) {
+
     .teacher-profile-card-header,
     .teacher-profile-card-body {
         padding: 0.9rem;
@@ -2409,9 +2423,20 @@
     color: #92400e;
 }
 
-[data-theme="dark"] .tcl-type-file { background: rgba(37,99,235,0.18); color: #93c5fd; }
-[data-theme="dark"] .tcl-type-link { background: rgba(109,40,217,0.18); color: #c4b5fd; }
-[data-theme="dark"] .tcl-type-text { background: rgba(180,83,9,0.2); color: #fcd34d; }
+[data-theme="dark"] .tcl-type-file {
+    background: rgba(37, 99, 235, 0.18);
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .tcl-type-link {
+    background: rgba(109, 40, 217, 0.18);
+    color: #c4b5fd;
+}
+
+[data-theme="dark"] .tcl-type-text {
+    background: rgba(180, 83, 9, 0.2);
+    color: #fcd34d;
+}
 
 /* title col */
 .tcl-col-title {
@@ -2505,10 +2530,22 @@
     border-color: rgba(var(--color-primary-rgb), 0.4);
 }
 
-.tcl-toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+.tcl-toggle:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 
-[data-theme="dark"] .tcl-toggle--pub  { background: rgba(34,197,94,0.12);   color: #86efac; border-color: rgba(34,197,94,0.3); }
-[data-theme="dark"] .tcl-toggle--draft{ background: rgba(100,116,139,0.1); color: #94a3b8; border-color: rgba(100,116,139,0.25); }
+[data-theme="dark"] .tcl-toggle--pub {
+    background: rgba(34, 197, 94, 0.12);
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+[data-theme="dark"] .tcl-toggle--draft {
+    background: rgba(100, 116, 139, 0.1);
+    color: #94a3b8;
+    border-color: rgba(100, 116, 139, 0.25);
+}
 
 /* actions col */
 .tcl-col-actions {
@@ -2596,7 +2633,9 @@
     gap: 0.35rem;
 }
 
-.tc-field--full { grid-column: 1 / -1; }
+.tc-field--full {
+    grid-column: 1 / -1;
+}
 
 .tc-field-label {
     font-size: 0.76rem;
@@ -2618,7 +2657,9 @@
     transition: border-color 0.15s ease;
 }
 
-.tc-select:focus { border-color: var(--color-primary); }
+.tc-select:focus {
+    border-color: var(--color-primary);
+}
 
 .tc-type-toggle {
     display: inline-flex;
@@ -2647,7 +2688,10 @@
     color: var(--color-primary);
 }
 
-.tc-type-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.tc-type-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 
 .tc-modal-footer {
     display: flex;
@@ -2665,12 +2709,18 @@
 }
 
 @keyframes tc-spin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ── Responsive ── */
 @media (max-width: 1100px) {
+
     .tcl-head,
     .tcl-row {
         grid-template-columns: 110px 1fr 140px 90px 100px 90px;
@@ -2678,7 +2728,9 @@
 }
 
 @media (max-width: 900px) {
-    .tcl-head { display: none; }
+    .tcl-head {
+        display: none;
+    }
 
     .tcl-row {
         grid-template-columns: 1fr 1fr;
@@ -2692,37 +2744,70 @@
         border-bottom: 1px solid var(--color-border);
     }
 
-    .tcl-col-type    { grid-area: type; }
-    .tcl-col-title   { grid-area: title; }
-    .tcl-col-course  { grid-area: course; }
-    .tcl-col-date    { grid-area: date; justify-self: end; }
-    .tcl-col-status  { grid-area: status; justify-self: end; }
-    .tcl-col-actions { grid-area: actions; }
+    .tcl-col-type {
+        grid-area: type;
+    }
 
-    .tcf-bar { gap: 0.5rem; }
-    .tcf-search-wrap { margin-left: 0; width: 100%; }
-    .tcf-search { width: 100%; }
-    .tcf-search:focus { width: 100%; }
+    .tcl-col-title {
+        grid-area: title;
+    }
+
+    .tcl-col-course {
+        grid-area: course;
+    }
+
+    .tcl-col-date {
+        grid-area: date;
+        justify-self: end;
+    }
+
+    .tcl-col-status {
+        grid-area: status;
+        justify-self: end;
+    }
+
+    .tcl-col-actions {
+        grid-area: actions;
+    }
+
+    .tcf-bar {
+        gap: 0.5rem;
+    }
+
+    .tcf-search-wrap {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .tcf-search {
+        width: 100%;
+    }
+
+    .tcf-search:focus {
+        width: 100%;
+    }
 }
 
 @media (max-width: 640px) {
-    .tc-modal-grid { grid-template-columns: 1fr; }
+    .tc-modal-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ── Dark mode ── */
 [data-theme="dark"] .tcf-select,
 [data-theme="dark"] .tcf-search {
-    background: rgba(15,23,42,0.75);
+    background: rgba(15, 23, 42, 0.75);
     border-color: #334155;
     color: #f1f5f9;
 }
 
 [data-theme="dark"] .tcl-head {
-    background: rgba(15,23,42,0.5);
+    background: rgba(15, 23, 42, 0.5);
 }
 
 [data-theme="dark"] .tcl-footer {
-    background: rgba(15,23,42,0.4);
+    background: rgba(15, 23, 42, 0.4);
 }
 
 [data-theme="dark"] .tc-modal {
@@ -2740,7 +2825,7 @@
 }
 
 [data-theme="dark"] .tc-select {
-    background: rgba(15,23,42,0.75);
+    background: rgba(15, 23, 42, 0.75);
     border-color: #334155;
     color: #f1f5f9;
 }

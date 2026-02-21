@@ -24,21 +24,19 @@ import NotificationDropdown from './shared/NotificationDropdown';
 const SIDEBAR_BREAKPOINT = 1024;
 const SIDEBAR_COUNT_REFRESH_EVENT = 'school_manager_stats_updated';
 
-const getCountFromListResponse = (payload) => {
+const getActiveCountFromListResponse = (payload) => {
+    const teachers = Array.isArray(payload?.results)
+        ? payload.results
+        : Array.isArray(payload)
+            ? payload
+            : null;
+
+    if (teachers) {
+        return teachers.filter((teacher) => teacher?.is_active !== false).length;
+    }
+
     const countValue = Number(payload?.count);
-    if (Number.isFinite(countValue)) {
-        return countValue;
-    }
-
-    if (Array.isArray(payload?.results)) {
-        return payload.results.length;
-    }
-
-    if (Array.isArray(payload)) {
-        return payload.length;
-    }
-
-    return null;
+    return Number.isFinite(countValue) ? countValue : null;
 };
 
 const SchoolManagerLayout = () => {
@@ -90,7 +88,7 @@ const SchoolManagerLayout = () => {
     };
 
     // Check if we have a valid token
-    const hasValidToken = !!user && !!localStorage.getItem('accessToken');
+    const hasValidToken = !!user && !!sessionStorage.getItem('accessToken');
     const schoolId = user?.school_id || user?.school?.id || user?.school;
 
     // Fetch dashboard stats for sidebar quick stats (5 minute TTL)
@@ -108,8 +106,7 @@ const SchoolManagerLayout = () => {
     const { data: activeTeachersData, refetch: refetchActiveTeachersCount } = useCachedApi(
         () => {
             const params = {
-                include_inactive: false,
-                page_size: 1
+                include_inactive: true
             };
             if (schoolId) params.school_id = schoolId;
             return managerService.getTeachers(params);
@@ -133,8 +130,8 @@ const SchoolManagerLayout = () => {
     }, [refetchSidebarStats, refetchActiveTeachersCount]);
 
     const sidebarStats = dashboardData?.statistics || {};
-    const activeTeachersCount = getCountFromListResponse(activeTeachersData);
-    const teachersSidebarValue = activeTeachersCount ?? sidebarStats.total_teachers ?? '—';
+    const activeTeachersCount = getActiveCountFromListResponse(activeTeachersData);
+    const teachersSidebarValue = activeTeachersCount ?? '—';
 
     const getInitials = () => {
         if (user?.name) {
@@ -197,7 +194,7 @@ const SchoolManagerLayout = () => {
                             {teachersSidebarValue}
                         </div>
                         <div style={{ fontSize: '0.6875rem', color: 'rgba(226, 232, 240, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            {t('teachers') || 'Teachers'}
+                            {t('activeTeachers') || 'Active Teachers'}
                         </div>
                     </div>
                     <div style={{

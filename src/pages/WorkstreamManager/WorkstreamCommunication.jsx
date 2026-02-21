@@ -14,7 +14,7 @@ import './Workstream.css';
 const WorkstreamCommunication = () => {
     const { t } = useTheme();
     const { user } = useAuth();
-    const { showSuccess, showError } = useToast();
+    const { showSuccess, showError, showWarning, showInfo } = useToast();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState('received');
 
@@ -26,31 +26,30 @@ const WorkstreamCommunication = () => {
 
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(true);
     const [replyBody, setReplyBody] = useState('');
-    const [showCompose, setShowCompose] = useState(false);
-    const [composeRecipientId, setComposeRecipientId] = useState('');
-    const [composeSubject, setComposeSubject] = useState('');
-    const [composeBody, setComposeBody] = useState('');
-    const [recipients, setRecipients] = useState([]);
-    const [recipientSearch, setRecipientSearch] = useState('');
-    const [searchResults, setSearchResults] = useState([]);
-    const [sendingCompose, setSendingCompose] = useState(false);
 
     const [messages, setMessages] = useState([]);
     const [notifications, setNotifications] = useState([]);
 
     const fetchData = async () => {
         if (!user) return;
+        setLoading(true);
         try {
             const [msgsRes, notifsRes] = await Promise.all([
                 workstreamService.getMessages(),
                 workstreamService.getNotifications()
             ]);
 
+            console.log('=== WORKSTREAM: Fetched Messages ===');
+            console.log('Raw messages from API:', msgsRes.results || msgsRes);
+
             // Map backend messages to frontend format
             const mappedMsgs = (msgsRes.results || msgsRes).map(m => {
                 const myReceipt = m.receipts?.find(r => r.recipient?.id === user?.id);
                 const isSentByMe = m.sender?.id === user?.id;
+
+                console.log(`Message ${m.id}: sender object =`, m.sender);
 
                 return {
                     ...m,
@@ -68,10 +67,13 @@ const WorkstreamCommunication = () => {
                 };
             });
 
+            console.log('Mapped messages:', mappedMsgs);
             setMessages(mappedMsgs);
             setNotifications(notifsRes.results || notifsRes || []);
         } catch (error) {
             console.error('Failed to fetch communications:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -159,137 +161,6 @@ const WorkstreamCommunication = () => {
         }
     };
 
-    const openCompose = () => {
-        setShowCompose(true);
-        setComposeRecipientId('');
-        setComposeSubject('');
-        setComposeBody('');
-        setRecipients([]);
-        setRecipientSearch('');
-        setSearchResults([]);
-    };
-
-    const closeCompose = () => {
-        setShowCompose(false);
-        setComposeRecipientId('');
-        setComposeSubject('');
-        setComposeBody('');
-        setRecipients([]);
-        setRecipientSearch('');
-        setSearchResults([]);
-    };
-
-    const userWorkstreamId = user?.work_stream ?? user?.work_stream_id ?? null;
-
-    const handleRecipientSearch = async (term) => {
-        setRecipientSearch(term);
-        setComposeRecipientId('');
-        setRecipients([]);
-
-        const normalizedTerm = term.trim();
-        if (normalizedTerm.length < 1) {
-            setSearchResults([]);
-            return;
-        }
-
-        try {
-            const res = await api.get('/user-messages/search/', { params: { search: normalizedTerm } });
-            const results = Array.isArray(res?.results) ? res.results : (Array.isArray(res) ? res : []);
-            const allowedRoles = ['admin', 'manager_school'];
-
-            const scopedResults = results.filter((candidate) => {
-                const role = String(candidate?.role || '').toLowerCase();
-                if (!allowedRoles.includes(role)) return false;
-                if (candidate?.id === user?.id) return false;
-
-                if (role !== 'manager_school') return true;
-                if (!userWorkstreamId) return true;
-
-                const candidateWorkstreamId =
-                    candidate?.work_stream_id ??
-                    candidate?.work_stream ??
-                    candidate?.workstream_id ??
-                    null;
-
-                if (candidateWorkstreamId === null || candidateWorkstreamId === undefined) {
-                    return true;
-                }
-
-                return String(candidateWorkstreamId) === String(userWorkstreamId);
-            });
-
-            setSearchResults(scopedResults);
-        } catch (e) {
-            console.error('Recipient search failed:', e);
-            setSearchResults([]);
-        }
-    };
-
-    const handleSelectRecipient = (candidate) => {
-        setComposeRecipientId(String(candidate.id));
-        setRecipients([candidate]);
-        setRecipientSearch(candidate.full_name || candidate.email || '');
-        setSearchResults([]);
-    };
-
-    const getRoleBadgeStyle = (role) => {
-        const normalized = String(role || '').toLowerCase();
-        if (normalized === 'admin') {
-            return {
-                background: 'rgba(5, 150, 105, 0.12)',
-                color: '#059669',
-                border: '1px solid rgba(5, 150, 105, 0.28)',
-            };
-        }
-        return {
-            background: 'rgba(37, 99, 235, 0.12)',
-            color: '#2563eb',
-            border: '1px solid rgba(37, 99, 235, 0.28)',
-        };
-    };
-
-    const formatRoleLabel = (role) => {
-        const normalized = String(role || '').toLowerCase();
-        if (normalized === 'admin') return 'Admin';
-        if (normalized === 'manager_school') return 'School Manager';
-        return role;
-    };
-
-    const selectedRecipient = recipients.find((recipient) => String(recipient.id) === String(composeRecipientId));
-
-    const handleSendCompose = async (event) => {
-        event.preventDefault();
-
-        if (!composeRecipientId || !composeSubject.trim() || !composeBody.trim()) {
-            showError('Please select a recipient and fill subject/message.');
-            return;
-        }
-
-        const recipientId = parseInt(composeRecipientId, 10);
-        if (Number.isNaN(recipientId)) {
-            showError('Selected recipient is invalid.');
-            return;
-        }
-
-        setSendingCompose(true);
-        try {
-            await workstreamService.sendMessage({
-                recipient_ids: [recipientId],
-                subject: composeSubject.trim(),
-                body: composeBody.trim(),
-            });
-            showSuccess('Message sent successfully!');
-            closeCompose();
-            setActiveTab('sent');
-            await fetchData();
-        } catch (error) {
-            console.error('Failed to send compose message:', error);
-            showError('Failed to send message.');
-        } finally {
-            setSendingCompose(false);
-        }
-    };
-
     // Safeguard against non-array values to prevent ".filter is not a function" runtime errors
     const safeMessages = Array.isArray(messages) ? messages : [];
     const safeNotifications = Array.isArray(notifications) ? notifications : [];
@@ -313,9 +184,7 @@ const WorkstreamCommunication = () => {
                         <h1 className="workstream-title">{t('workstream.communication.title')}</h1>
                         <p className="workstream-subtitle">{t('workstream.communication.subtitle')}</p>
                     </div>
-                    <Button variant="primary" icon={Plus} onClick={openCompose}>
-                        {t('workstream.communication.newMessage')}
-                    </Button>
+                    <Button variant="primary" icon={Plus}>{t('workstream.communication.newMessage')}</Button>
                 </div>
             </div>
 
@@ -514,209 +383,6 @@ const WorkstreamCommunication = () => {
                     )}
                 </div>
             </div>
-
-            {showCompose && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        background: 'rgba(0,0,0,0.45)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000,
-                        padding: '1rem',
-                    }}
-                    onClick={closeCompose}
-                >
-                    <div
-                        className="management-card"
-                        style={{ width: '640px', maxWidth: '100%', padding: '1.5rem' }}
-                        onClick={(event) => event.stopPropagation()}
-                    >
-                        <h3 className="chart-title" style={{ marginTop: 0, marginBottom: '1rem' }}>
-                            {t('workstream.communication.newMessage') || 'New message'}
-                        </h3>
-
-                        <form onSubmit={handleSendCompose} style={{ display: 'grid', gap: '0.75rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 600 }}>
-                                    {t('communication.to') || 'To'}
-                                </label>
-                                <div style={{ position: 'relative' }}>
-                                    <input
-                                        type="text"
-                                        value={recipientSearch}
-                                        onChange={(event) => handleRecipientSearch(event.target.value)}
-                                        placeholder="Search admin or school manager"
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.65rem 0.75rem',
-                                            borderRadius: '0.5rem',
-                                            border: '1px solid var(--color-border)',
-                                        }}
-                                        required
-                                    />
-
-                                    {searchResults.length > 0 && (
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: 'calc(100% + 4px)',
-                                                left: 0,
-                                                right: 0,
-                                                background: 'var(--color-bg-surface)',
-                                                border: '1px solid var(--color-border)',
-                                                borderRadius: '0.5rem',
-                                                boxShadow: '0 8px 20px rgba(0, 0, 0, 0.08)',
-                                                maxHeight: '220px',
-                                                overflowY: 'auto',
-                                                zIndex: 3,
-                                            }}
-                                        >
-                                            {searchResults.map((candidate) => (
-                                                <button
-                                                    key={candidate.id}
-                                                    type="button"
-                                                    onClick={() => handleSelectRecipient(candidate)}
-                                                    style={{
-                                                        width: '100%',
-                                                        border: 'none',
-                                                        background: 'transparent',
-                                                        padding: '0.65rem 0.75rem',
-                                                        textAlign: 'left',
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'space-between',
-                                                        gap: '0.5rem',
-                                                    }}
-                                                >
-                                                    <div>
-                                                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
-                                                            {candidate.full_name || candidate.email}
-                                                        </div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                                            {candidate.email}
-                                                        </div>
-                                                    </div>
-                                                    <span
-                                                        style={{
-                                                            ...getRoleBadgeStyle(candidate.role),
-                                                            fontSize: '0.65rem',
-                                                            fontWeight: 700,
-                                                            textTransform: 'uppercase',
-                                                            letterSpacing: '0.04em',
-                                                            borderRadius: '999px',
-                                                            padding: '0.2rem 0.5rem',
-                                                            whiteSpace: 'nowrap',
-                                                        }}
-                                                    >
-                                                        {formatRoleLabel(candidate.role)}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {selectedRecipient && (
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: '0.5rem',
-                                        background: 'var(--color-bg-body)',
-                                        border: '1px solid var(--color-border)',
-                                        borderRadius: '0.5rem',
-                                        padding: '0.5rem 0.65rem',
-                                    }}
-                                >
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-main)' }}>
-                                        {selectedRecipient.full_name || selectedRecipient.email}
-                                    </div>
-                                    <span
-                                        style={{
-                                            ...getRoleBadgeStyle(selectedRecipient.role),
-                                            fontSize: '0.65rem',
-                                            fontWeight: 700,
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.04em',
-                                            borderRadius: '999px',
-                                            padding: '0.2rem 0.5rem',
-                                        }}
-                                    >
-                                        {formatRoleLabel(selectedRecipient.role)}
-                                    </span>
-                                </div>
-                            )}
-
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 600 }}>
-                                    {t('communication.subject') || 'Subject'}
-                                </label>
-                                <input
-                                    value={composeSubject}
-                                    onChange={(event) => setComposeSubject(event.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.65rem 0.75rem',
-                                        borderRadius: '0.5rem',
-                                        border: '1px solid var(--color-border)',
-                                    }}
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 600 }}>
-                                    {t('communication.message') || 'Message'}
-                                </label>
-                                <textarea
-                                    value={composeBody}
-                                    onChange={(event) => setComposeBody(event.target.value)}
-                                    rows={6}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.65rem 0.75rem',
-                                        borderRadius: '0.5rem',
-                                        border: '1px solid var(--color-border)',
-                                        resize: 'vertical',
-                                    }}
-                                    required
-                                />
-                            </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
-                                <button
-                                    type="button"
-                                    onClick={closeCompose}
-                                    style={{
-                                        padding: '0.6rem 1rem',
-                                        borderRadius: '0.75rem',
-                                        border: '1px solid var(--color-border)',
-                                        background: 'white',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    {t('common.cancel') || 'Cancel'}
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="btn-primary"
-                                    style={{ padding: '0.6rem 1rem', borderRadius: '0.75rem' }}
-                                    disabled={sendingCompose || !composeRecipientId}
-                                >
-                                    <Send size={18} />
-                                    {sendingCompose ? (t('common.loading') || 'Sending...') : (t('communication.send') || 'Send')}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

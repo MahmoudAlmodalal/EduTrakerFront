@@ -8,6 +8,7 @@ import {
     Eye,
     EyeOff,
     FileText,
+    Pencil,
     GraduationCap,
     Search,
     Trash2,
@@ -35,35 +36,35 @@ import {
 import './Secretary.css';
 
 const STUDENT_ENROLLMENT_STATUS_OPTIONS = [
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'graduated', label: 'Graduated' },
-    { value: 'active', label: 'Active' },
+    { value: 'rejected', labelKey: 'secretary.admissions.manual.enrollment.rejected', fallbackLabel: 'Rejected' },
+    { value: 'pending', labelKey: 'secretary.admissions.manual.enrollment.pending', fallbackLabel: 'Pending' },
+    { value: 'graduated', labelKey: 'secretary.admissions.manual.enrollment.graduated', fallbackLabel: 'Graduated' },
+    { value: 'active', labelKey: 'secretary.admissions.manual.enrollment.active', fallbackLabel: 'Active' },
 ];
 
 const GENDER_OPTIONS = [
-    { value: '', label: 'Select Gender' },
-    { value: 'male', label: 'Male' },
-    { value: 'female', label: 'Female' },
-    { value: 'other', label: 'Other' },
+    { value: '', labelKey: 'secretary.admissions.manual.gender.select', fallbackLabel: 'Select Gender' },
+    { value: 'male', labelKey: 'secretary.admissions.manual.gender.male', fallbackLabel: 'Male' },
+    { value: 'female', labelKey: 'secretary.admissions.manual.gender.female', fallbackLabel: 'Female' },
+    { value: 'other', labelKey: 'secretary.admissions.manual.gender.other', fallbackLabel: 'Other' },
 ];
 
 const STUDENT_ACTIVITY_FILTER_OPTIONS = [
-    { value: '', label: 'All Students' },
-    { value: 'active', label: 'Active' },
-    { value: 'not_active', label: 'Not Active' },
+    { value: 'all', labelKey: 'secretary.admissions.classAssignment.filters.allStudents', fallbackLabel: 'All Students' },
+    { value: 'active', labelKey: 'secretary.admissions.classAssignment.filters.active', fallbackLabel: 'Active' },
+    { value: 'not_active', labelKey: 'secretary.admissions.classAssignment.filters.notActive', fallbackLabel: 'Not Active' },
 ];
 
 const ASSIGNMENT_CLASSROOM_FILTER_OPTIONS = [
-    { value: '', label: 'All' },
-    { value: 'assigned', label: 'Assigned' },
-    { value: 'not_assigned', label: 'Not Assigned' },
+    { value: '', labelKey: 'secretary.admissions.classAssignment.filters.all', fallbackLabel: 'All' },
+    { value: 'assigned', labelKey: 'secretary.admissions.classAssignment.filters.assigned', fallbackLabel: 'Assigned' },
+    { value: 'not_assigned', labelKey: 'secretary.admissions.classAssignment.filters.notAssigned', fallbackLabel: 'Not Assigned' },
 ];
 
 const APPLICATION_STATUS_FILTER_OPTIONS = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'enrolled', label: 'Enrolled' },
-    { value: 'all', label: 'All Application Statuses' },
+    { value: 'pending', labelKey: 'secretary.admissions.filter.pending', fallbackLabel: 'Pending' },
+    { value: 'enrolled', labelKey: 'secretary.admissions.filter.enrolled', fallbackLabel: 'Enrolled' },
+    { value: 'all', labelKey: 'secretary.admissions.filter.allStatuses', fallbackLabel: 'All Application Statuses' },
 ];
 
 const APPLICATIONS_PAGE_SIZE = 10;
@@ -103,6 +104,14 @@ const createDefaultDocumentUpload = () => ({
     selectedStudent: null,
     document_type: DOCUMENT_TYPE_OPTIONS[0].value,
     file: null,
+});
+
+const createDefaultStudentEditData = () => ({
+    admission_date: '',
+    enrollment_status: 'active',
+    phone: '',
+    address: '',
+    medical_notes: '',
 });
 
 const createEmptyPaginationState = () => ({
@@ -230,6 +239,19 @@ const formatDateValue = (value) => {
     return dateValue.toLocaleDateString();
 };
 
+const formatDateForInput = (value) => {
+    if (!value) {
+        return '';
+    }
+
+    const dateValue = new Date(value);
+    if (Number.isNaN(dateValue.getTime())) {
+        return '';
+    }
+
+    return dateValue.toISOString().split('T')[0];
+};
+
 const useDebouncedValue = (value, delay = 300) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -258,6 +280,35 @@ const getStudentId = (student) => {
     return String(candidate);
 };
 
+const getNumericStudentId = (student) => {
+    const candidate = student?.user_id ?? student?.id ?? student?.display_id;
+    if (candidate === null || candidate === undefined || candidate === '') {
+        return null;
+    }
+
+    if (typeof candidate === 'number') {
+        return Number.isInteger(candidate) && candidate > 0 ? candidate : null;
+    }
+
+    const normalized = String(candidate).trim();
+    if (!normalized) {
+        return null;
+    }
+
+    if (/^\d+$/.test(normalized)) {
+        const parsed = Number(normalized);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    }
+
+    const trailingDigits = normalized.match(/(\d+)$/);
+    if (trailingDigits?.[1]) {
+        const parsed = Number(trailingDigits[1]);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    }
+
+    return null;
+};
+
 const normalizeEnrollmentStatus = (status) => {
     const value = String(status || '').trim().toLowerCase();
     if (value === 'suspending') {
@@ -265,6 +316,17 @@ const normalizeEnrollmentStatus = (status) => {
     }
 
     return value;
+};
+
+const normalizeStudentActivityFilter = (status) => {
+    const value = String(status || '').trim().toLowerCase();
+    if (!value || value === 'all') {
+        return '';
+    }
+    if (value === 'active' || value === 'not_active') {
+        return value;
+    }
+    return '';
 };
 
 const resolveSchoolId = (user) => {
@@ -378,8 +440,9 @@ const resolveApplicationStatusForDisplay = (application) => {
     return normalizeEnrollmentStatus(application?.status || application?.current_status || 'pending');
 };
 
-const normalizePendingStudentRecord = (student, index = 0) => {
-    const status = resolveStudentStatus(student) || 'pending';
+const normalizeStudentRecordForApplicationList = (student, index = 0, statusOverride = '') => {
+    const rawStatus = statusOverride || resolveStudentStatus(student) || 'pending';
+    const status = normalizeEnrollmentStatus(rawStatus) || 'pending';
     const studentId = student?.user_id ?? student?.id ?? null;
     const fallbackId = student?.student_id || student?.email || index + 1;
 
@@ -397,6 +460,10 @@ const normalizePendingStudentRecord = (student, index = 0) => {
     };
 };
 
+const normalizePendingStudentRecord = (student, index = 0) => {
+    return normalizeStudentRecordForApplicationList(student, index, 'pending');
+};
+
 const getApplicationBirthCertificateUrl = (application) => {
     const certificateUrl = application?.birth_certificate_url;
     if (typeof certificateUrl !== 'string') {
@@ -404,6 +471,21 @@ const getApplicationBirthCertificateUrl = (application) => {
     }
 
     return certificateUrl.trim();
+};
+
+const getApplicationLinkedStudentId = (application) => {
+    const candidate = (
+        application?.enrolled_student_id
+        ?? application?.enrolled_student?.user_id
+        ?? application?.enrolled_student?.id
+    );
+
+    if (candidate === null || candidate === undefined || candidate === '') {
+        return null;
+    }
+
+    const normalized = Number.parseInt(String(candidate).trim(), 10);
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
 };
 
 const hasAssignedClassroom = (student) => {
@@ -505,7 +587,7 @@ const StudentAdmissions = () => {
     const [applicationSearch, setApplicationSearch] = useState('');
     const [assignmentSearch, setAssignmentSearch] = useState('');
     const [applicationActivityFilter, setApplicationActivityFilter] = useState('pending');
-    const [assignmentActivityFilter, setAssignmentActivityFilter] = useState('');
+    const [assignmentActivityFilter, setAssignmentActivityFilter] = useState('all');
     const [assignmentClassroomFilter, setAssignmentClassroomFilter] = useState('');
     const [applicationsPage, setApplicationsPage] = useState(1);
     const [assignmentPage, setAssignmentPage] = useState(1);
@@ -530,6 +612,13 @@ const StudentAdmissions = () => {
     const [studentSearchResults, setStudentSearchResults] = useState([]);
     const [showDeleteDocConfirm, setShowDeleteDocConfirm] = useState(false);
     const [documentToDelete, setDocumentToDelete] = useState(null);
+    const [showStudentDetailsModal, setShowStudentDetailsModal] = useState(false);
+    const [studentToView, setStudentToView] = useState(null);
+    const [showEditStudentModal, setShowEditStudentModal] = useState(false);
+    const [studentToEdit, setStudentToEdit] = useState(null);
+    const [studentEditData, setStudentEditData] = useState(createDefaultStudentEditData);
+    const [showDeleteStudentConfirm, setShowDeleteStudentConfirm] = useState(false);
+    const [studentToDelete, setStudentToDelete] = useState(null);
 
     const [isApplicationsLoading, setIsApplicationsLoading] = useState(false);
     const [isStudentsLoading, setIsStudentsLoading] = useState(false);
@@ -539,6 +628,8 @@ const StudentAdmissions = () => {
     const [isCreatingStudent, setIsCreatingStudent] = useState(false);
     const [isAssigningStudent, setIsAssigningStudent] = useState(false);
     const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+    const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+    const [isDeletingStudent, setIsDeletingStudent] = useState(false);
     const [showReassignConfirm, setShowReassignConfirm] = useState(false);
     const [pendingReassignment, setPendingReassignment] = useState(null);
 
@@ -587,6 +678,27 @@ const StudentAdmissions = () => {
             },
         ];
     }, [schoolStudentStats.newApplications, t]);
+
+    const applicationStatusFilterOptions = useMemo(() => {
+        return APPLICATION_STATUS_FILTER_OPTIONS.map((option) => ({
+            ...option,
+            label: t(option.labelKey) || option.fallbackLabel,
+        }));
+    }, [t]);
+
+    const studentActivityFilterOptions = useMemo(() => {
+        return STUDENT_ACTIVITY_FILTER_OPTIONS.map((option) => ({
+            ...option,
+            label: t(option.labelKey) || option.fallbackLabel,
+        }));
+    }, [t]);
+
+    const assignmentClassroomFilterOptions = useMemo(() => {
+        return ASSIGNMENT_CLASSROOM_FILTER_OPTIONS.map((option) => ({
+            ...option,
+            label: t(option.labelKey) || option.fallbackLabel,
+        }));
+    }, [t]);
 
     const filteredApplications = useMemo(() => {
         const normalizedStatusFilter = normalizeEnrollmentStatus(applicationActivityFilter);
@@ -677,8 +789,17 @@ const StudentAdmissions = () => {
             return `Grade ${gradeId}`;
         }
 
+        const selectedGradeId = Number(selectedGradeFilter);
+        if (Number.isInteger(selectedGradeId) && selectedGradeId > 0) {
+            const matchedSelectedGrade = grades.find((grade) => Number(grade?.id) === selectedGradeId);
+            if (matchedSelectedGrade?.name) {
+                return matchedSelectedGrade.name;
+            }
+            return `Grade ${selectedGradeId}`;
+        }
+
         return 'selected grade';
-    }, [grades, selectedAssignmentStudent]);
+    }, [grades, selectedAssignmentStudent, selectedGradeFilter]);
 
     const applicationsTotalPages = useMemo(() => {
         const total = Math.ceil((applicationsPagination.count || 0) / APPLICATIONS_PAGE_SIZE);
@@ -717,12 +838,12 @@ const StudentAdmissions = () => {
         const totalClassrooms = schoolClassroomsTotal;
 
         return [
-            { title: 'Total Students', value: totalStudents, icon: Users, color: 'indigo' },
-            { title: 'Active', value: activeStudents, icon: CheckCircle, color: 'green' },
-            { title: 'Pending', value: pendingApplications, icon: Clock, color: 'amber' },
-            { title: 'Total Classrooms', value: totalClassrooms, icon: GraduationCap, color: 'blue' },
+            { title: t('secretary.admissions.stats.totalStudents') || 'Total Students', value: totalStudents, icon: Users, color: 'indigo' },
+            { title: t('secretary.admissions.stats.active') || 'Active', value: activeStudents, icon: CheckCircle, color: 'green' },
+            { title: t('secretary.admissions.stats.pending') || 'Pending', value: pendingApplications, icon: Clock, color: 'amber' },
+            { title: t('secretary.admissions.stats.totalClassrooms') || 'Total Classrooms', value: totalClassrooms, icon: GraduationCap, color: 'blue' },
         ];
-    }, [schoolClassroomsTotal, schoolStudentStats]);
+    }, [schoolClassroomsTotal, schoolStudentStats, t]);
 
     const setFeedback = useCallback((type, message, showToast = true) => {
         setBanner({ type, message });
@@ -931,12 +1052,13 @@ const StudentAdmissions = () => {
     }, [schoolId, setFeedback]);
 
     const fetchAssignmentStudents = useCallback(async (
-        activityStatus = '',
+        academicYearFilter = '',
+        activityStatus = 'all',
         pageNumber = 1,
         gradeFilter = '',
         searchFilter = ''
     ) => {
-        if (!schoolId) {
+        if (!schoolId || !academicYearFilter) {
             studentsRequestRef.current += 1;
             setStudents([]);
             setAssignmentPagination(createEmptyPaginationState());
@@ -948,9 +1070,12 @@ const StudentAdmissions = () => {
 
         try {
             setIsStudentsLoading(true);
-            const params = { school_id: schoolId };
-            if (activityStatus) {
-                params.activity_status = activityStatus;
+            const params = {
+                school_id: schoolId,
+            };
+            const normalizedActivityStatus = normalizeStudentActivityFilter(activityStatus);
+            if (normalizedActivityStatus) {
+                params.activity_status = normalizedActivityStatus;
             }
             if (gradeFilter) {
                 params.grade_id = gradeFilter;
@@ -1250,8 +1375,15 @@ const StudentAdmissions = () => {
         setStudentSearchResults([]);
         setShowDeleteDocConfirm(false);
         setDocumentToDelete(null);
+        setShowStudentDetailsModal(false);
+        setStudentToView(null);
+        setShowEditStudentModal(false);
+        setStudentToEdit(null);
+        setStudentEditData(createDefaultStudentEditData());
+        setShowDeleteStudentConfirm(false);
+        setStudentToDelete(null);
         setApplicationActivityFilter('pending');
-        setAssignmentActivityFilter('');
+        setAssignmentActivityFilter('all');
         setAssignmentClassroomFilter('');
         setGradeQuery('');
         setShowGradeDropdown(false);
@@ -1261,6 +1393,8 @@ const StudentAdmissions = () => {
         setIsFilesLoading(false);
         setIsDocumentStudentLoading(false);
         setIsGradeOptionsLoading(false);
+        setIsUpdatingStudent(false);
+        setIsDeletingStudent(false);
         setApplicationsPage(1);
         setAssignmentPage(1);
         setFilesPage(1);
@@ -1357,6 +1491,7 @@ const StudentAdmissions = () => {
         }
 
         fetchAssignmentStudents(
+            assignmentAcademicYear,
             assignmentActivityFilter,
             assignmentPage,
             selectedGradeFilter,
@@ -1364,6 +1499,7 @@ const StudentAdmissions = () => {
         );
     }, [
         activeTab,
+        assignmentAcademicYear,
         assignmentActivityFilter,
         assignmentPage,
         debouncedAssignmentSearch,
@@ -1489,6 +1625,13 @@ const StudentAdmissions = () => {
         setCurrentClassroomName('');
         setShowReassignConfirm(false);
         setPendingReassignment(null);
+        setShowStudentDetailsModal(false);
+        setStudentToView(null);
+        setShowEditStudentModal(false);
+        setStudentToEdit(null);
+        setStudentEditData(createDefaultStudentEditData());
+        setShowDeleteStudentConfirm(false);
+        setStudentToDelete(null);
     }, [
         assignmentAcademicYear,
         assignmentActivityFilter,
@@ -1506,6 +1649,13 @@ const StudentAdmissions = () => {
             setCurrentClassroomName('');
             setShowReassignConfirm(false);
             setPendingReassignment(null);
+            setShowStudentDetailsModal(false);
+            setStudentToView(null);
+            setShowEditStudentModal(false);
+            setStudentToEdit(null);
+            setStudentEditData(createDefaultStudentEditData());
+            setShowDeleteStudentConfirm(false);
+            setStudentToDelete(null);
         }
     }, [assignmentAcademicYear, selectedStudent]);
 
@@ -1762,18 +1912,28 @@ const StudentAdmissions = () => {
         }
 
         try {
+            const selectedAcademicYearId = Number(assignmentAcademicYear);
+            const selectedGradeId = Number(selectedGradeFilter);
+            const normalizedSelectedGradeId = Number.isInteger(selectedGradeId) && selectedGradeId > 0
+                ? selectedGradeId
+                : null;
+
             const enrollmentData = await secretaryService.getStudentEnrollments(
                 studentId,
                 { academic_year_id: assignmentAcademicYear }
             );
             const enrollments = normalizeListResponse(enrollmentData);
-            const currentEnrollment = enrollments.find((enrollment) => {
+            const yearEnrollments = enrollments.filter((enrollment) => {
                 const enrollmentYearId = getEnrollmentAcademicYearId(enrollment);
-                const enrollmentStatus = String(enrollment?.status || '').trim().toLowerCase();
-                return enrollmentYearId === Number(assignmentAcademicYear)
-                    && enrollment.is_active !== false
-                    && (enrollmentStatus === 'active' || enrollmentStatus === 'enrolled');
+                return enrollmentYearId === selectedAcademicYearId;
             });
+            const currentEnrollment = yearEnrollments.find((enrollment) => {
+                const enrollmentStatus = String(enrollment?.status || '').trim().toLowerCase();
+                return enrollment?.is_active !== false && (enrollmentStatus === 'active' || enrollmentStatus === 'enrolled');
+            });
+            const enrollmentForGrade = currentEnrollment
+                || yearEnrollments.find((enrollment) => Boolean(getEnrollmentGradeId(enrollment)))
+                || null;
 
             const currentEnrollmentClassroomId = currentEnrollment
                 ? getEnrollmentClassroomId(currentEnrollment)
@@ -1782,7 +1942,9 @@ const StudentAdmissions = () => {
                 ? getEnrollmentClassroomName(currentEnrollment)
                 : '';
 
-            const gradeId = getStudentGradeId(student) ?? getEnrollmentGradeId(currentEnrollment);
+            const gradeId = getEnrollmentGradeId(enrollmentForGrade)
+                ?? normalizedSelectedGradeId
+                ?? getStudentGradeId(student);
             if (!gradeId) {
                 setCurrentClassroomId(currentEnrollmentClassroomId);
                 setCurrentClassroomName(currentEnrollmentClassroomName);
@@ -1811,7 +1973,305 @@ const StudentAdmissions = () => {
             console.error('Error loading classrooms for selected student:', error);
             setFeedback('error', getApiErrorMessage(error, 'Failed to load grade classrooms.'));
         }
-    }, [assignmentAcademicYear, schoolId, setFeedback]);
+    }, [assignmentAcademicYear, schoolId, selectedGradeFilter, setFeedback]);
+
+    const handleShowStudentDetails = useCallback((student) => {
+        if (!student) {
+            return;
+        }
+
+        setStudentToView(student);
+        setShowStudentDetailsModal(true);
+    }, []);
+
+    const openEditStudentModal = useCallback((student) => {
+        if (!student) {
+            return;
+        }
+
+        const normalizedStatus = normalizeEnrollmentStatus(
+            student?.current_status || student?.enrollment_status || 'active'
+        );
+        const hasKnownStatus = STUDENT_ENROLLMENT_STATUS_OPTIONS.some((option) => option.value === normalizedStatus);
+
+        setStudentEditData({
+            admission_date: formatDateForInput(student?.admission_date),
+            enrollment_status: hasKnownStatus ? normalizedStatus : 'active',
+            phone: String(student?.phone || ''),
+            address: String(student?.address || ''),
+            medical_notes: String(student?.medical_notes || ''),
+        });
+        setStudentToEdit(student);
+        setShowEditStudentModal(true);
+    }, []);
+
+    const updateStudentEditField = useCallback((field, value) => {
+        setStudentEditData((previous) => ({
+            ...previous,
+            [field]: value,
+        }));
+    }, []);
+
+    const handleUpdateStudentData = useCallback(async (event) => {
+        event.preventDefault();
+
+        const targetStudentId = (
+            getNumericStudentId(studentToEdit)
+            || (Number.isInteger(Number(selectedStudent)) && Number(selectedStudent) > 0 ? Number(selectedStudent) : null)
+            || getNumericStudentId(selectedAssignmentStudent)
+        );
+        if (!Number.isInteger(targetStudentId) || targetStudentId <= 0) {
+            setFeedback('error', 'Please select a valid student first.');
+            return;
+        }
+
+        const normalizedAdmissionDate = String(studentEditData.admission_date || '').trim();
+        if (!normalizedAdmissionDate) {
+            setFeedback('error', 'Admission date is required.');
+            return;
+        }
+
+        const normalizedEnrollmentStatus = normalizeEnrollmentStatus(studentEditData.enrollment_status) || 'active';
+        const payload = {
+            admission_date: normalizedAdmissionDate,
+            enrollment_status: normalizedEnrollmentStatus,
+            current_status: normalizedEnrollmentStatus,
+            phone: String(studentEditData.phone || '').trim(),
+            address: String(studentEditData.address || '').trim(),
+            medical_notes: String(studentEditData.medical_notes || '').trim(),
+        };
+
+        try {
+            setIsUpdatingStudent(true);
+
+            const updatedStudent = await secretaryService.updateStudent(targetStudentId, payload);
+            const studentKey = String(targetStudentId);
+            const resolvedStudent = updatedStudent && typeof updatedStudent === 'object'
+                ? updatedStudent
+                : payload;
+
+            setStudents((previous) => previous.map((student) => {
+                const mappedId = getStudentId(student);
+                if (mappedId !== studentKey) {
+                    return student;
+                }
+
+                return {
+                    ...student,
+                    ...resolvedStudent,
+                    user_id: student.user_id ?? targetStudentId,
+                    id: student.id ?? targetStudentId,
+                    current_status: resolvedStudent?.current_status || payload.current_status,
+                    enrollment_status: resolvedStudent?.enrollment_status || payload.enrollment_status,
+                    admission_date: resolvedStudent?.admission_date || payload.admission_date,
+                    phone: resolvedStudent?.phone ?? payload.phone,
+                    address: resolvedStudent?.address ?? payload.address,
+                    medical_notes: resolvedStudent?.medical_notes ?? payload.medical_notes,
+                };
+            }));
+            setApplications((previous) => previous.map((studentRow) => {
+                const mappedId = getStudentId(studentRow);
+                if (mappedId !== studentKey) {
+                    return studentRow;
+                }
+
+                return {
+                    ...studentRow,
+                    ...resolvedStudent,
+                    current_status: resolvedStudent?.current_status || payload.current_status,
+                    enrollment_status: resolvedStudent?.enrollment_status || payload.enrollment_status,
+                    admission_date: resolvedStudent?.admission_date || payload.admission_date,
+                    phone: resolvedStudent?.phone ?? payload.phone,
+                    address: resolvedStudent?.address ?? payload.address,
+                    medical_notes: resolvedStudent?.medical_notes ?? payload.medical_notes,
+                };
+            }));
+            setSelectedAssignmentStudent((previous) => {
+                if (!previous) {
+                    return previous;
+                }
+
+                const mappedId = getStudentId(previous);
+                if (mappedId !== studentKey) {
+                    return previous;
+                }
+
+                return {
+                    ...previous,
+                    ...resolvedStudent,
+                    current_status: resolvedStudent?.current_status || payload.current_status,
+                    enrollment_status: resolvedStudent?.enrollment_status || payload.enrollment_status,
+                    admission_date: resolvedStudent?.admission_date || payload.admission_date,
+                    phone: resolvedStudent?.phone ?? payload.phone,
+                    address: resolvedStudent?.address ?? payload.address,
+                    medical_notes: resolvedStudent?.medical_notes ?? payload.medical_notes,
+                };
+            });
+            setStudentToView((previous) => {
+                if (!previous) {
+                    return previous;
+                }
+
+                const mappedId = getStudentId(previous);
+                if (mappedId !== studentKey) {
+                    return previous;
+                }
+
+                return {
+                    ...previous,
+                    ...resolvedStudent,
+                    current_status: resolvedStudent?.current_status || payload.current_status,
+                    enrollment_status: resolvedStudent?.enrollment_status || payload.enrollment_status,
+                    admission_date: resolvedStudent?.admission_date || payload.admission_date,
+                    phone: resolvedStudent?.phone ?? payload.phone,
+                    address: resolvedStudent?.address ?? payload.address,
+                    medical_notes: resolvedStudent?.medical_notes ?? payload.medical_notes,
+                };
+            });
+
+            setFeedback('success', 'Student data updated successfully.');
+            setShowEditStudentModal(false);
+            setStudentToEdit(null);
+            fetchSchoolStudentStats();
+            if (activeTab === 'class-assignment') {
+                fetchAssignmentStudents(
+                    assignmentAcademicYear,
+                    assignmentActivityFilter,
+                    assignmentPage,
+                    selectedGradeFilter,
+                    debouncedAssignmentSearch
+                );
+            }
+            if (activeTab === 'applications') {
+                fetchStudentApplications(
+                    applicationYearFilter,
+                    applicationActivityFilter,
+                    applicationsPage,
+                    debouncedApplicationSearch
+                );
+            }
+        } catch (error) {
+            console.error('Error updating student data:', error);
+            setFeedback('error', getApiErrorMessage(error, 'Failed to update student data.'));
+        } finally {
+            setIsUpdatingStudent(false);
+        }
+    }, [
+        activeTab,
+        applicationActivityFilter,
+        applicationYearFilter,
+        applicationsPage,
+        debouncedApplicationSearch,
+        assignmentAcademicYear,
+        assignmentActivityFilter,
+        assignmentPage,
+        debouncedAssignmentSearch,
+        fetchAssignmentStudents,
+        fetchStudentApplications,
+        fetchSchoolStudentStats,
+        selectedGradeFilter,
+        selectedAssignmentStudent,
+        selectedStudent,
+        setFeedback,
+        studentToEdit,
+        studentEditData,
+    ]);
+
+    const handleDeleteStudent = useCallback((student) => {
+        if (!student) {
+            return;
+        }
+
+        setStudentToDelete(student);
+        setShowDeleteStudentConfirm(true);
+    }, []);
+
+    const confirmDeleteStudent = useCallback(async () => {
+        const studentIdValue = getNumericStudentId(studentToDelete);
+        if (!Number.isInteger(studentIdValue) || studentIdValue <= 0) {
+            setShowDeleteStudentConfirm(false);
+            setStudentToDelete(null);
+            setFeedback('error', 'Unable to determine the selected student.');
+            return;
+        }
+
+        try {
+            setIsDeletingStudent(true);
+            await secretaryService.deactivateStudent(studentIdValue);
+
+            const studentKey = String(studentIdValue);
+            setStudents((previous) => previous.filter((student) => getStudentId(student) !== studentKey));
+            setApplications((previous) => previous.filter((studentRow) => getStudentId(studentRow) !== studentKey));
+            setAssignmentClassroomMap((previous) => {
+                const nextMap = { ...previous };
+                delete nextMap[studentKey];
+                return nextMap;
+            });
+            if (getStudentId(studentToView) === studentKey) {
+                setStudentToView(null);
+                setShowStudentDetailsModal(false);
+            }
+            if (getStudentId(studentToEdit) === studentKey) {
+                setStudentToEdit(null);
+                setShowEditStudentModal(false);
+            }
+
+            if (selectedStudent === studentKey) {
+                setSelectedStudent('');
+                setSelectedAssignmentStudent(null);
+                setAvailableClassrooms([]);
+                setCurrentClassroomId(null);
+                setCurrentClassroomName('');
+                setShowEditStudentModal(false);
+            }
+
+            setShowDeleteStudentConfirm(false);
+            setStudentToDelete(null);
+            setFeedback('success', 'Student deleted successfully.');
+            fetchSchoolStudentStats();
+            if (activeTab === 'class-assignment') {
+                fetchAssignmentStudents(
+                    assignmentAcademicYear,
+                    assignmentActivityFilter,
+                    assignmentPage,
+                    selectedGradeFilter,
+                    debouncedAssignmentSearch
+                );
+            }
+            if (activeTab === 'applications') {
+                fetchStudentApplications(
+                    applicationYearFilter,
+                    applicationActivityFilter,
+                    applicationsPage,
+                    debouncedApplicationSearch
+                );
+            }
+        } catch (error) {
+            console.error('Error deleting student:', error);
+            setFeedback('error', getApiErrorMessage(error, 'Failed to delete student.'));
+        } finally {
+            setIsDeletingStudent(false);
+        }
+    }, [
+        activeTab,
+        applicationActivityFilter,
+        applicationYearFilter,
+        applicationsPage,
+        debouncedApplicationSearch,
+        assignmentAcademicYear,
+        assignmentActivityFilter,
+        assignmentPage,
+        debouncedAssignmentSearch,
+        fetchAssignmentStudents,
+        fetchStudentApplications,
+        fetchSchoolStudentStats,
+        selectedGradeFilter,
+        selectedStudent,
+        setFeedback,
+        studentToEdit,
+        studentToDelete,
+        studentToView,
+    ]);
 
     const executeClassroomAssignment = useCallback(async ({
         studentId,
@@ -1881,6 +2341,7 @@ const StudentAdmissions = () => {
             setFeedback('success', assignmentPayload?.detail || defaultMessage);
             fetchSchoolStudentStats();
             fetchAssignmentStudents(
+                assignmentAcademicYear,
                 assignmentActivityFilter,
                 assignmentPage,
                 selectedGradeFilter,
@@ -1893,6 +2354,7 @@ const StudentAdmissions = () => {
             setIsAssigningStudent(false);
         }
     }, [
+        assignmentAcademicYear,
         assignmentActivityFilter,
         assignmentPage,
         debouncedAssignmentSearch,
@@ -2033,14 +2495,16 @@ const StudentAdmissions = () => {
                         <section className="management-card">
                             <div className="sec-filter-bar">
                                 <div className="sec-field sec-field--grow">
-                                    <label htmlFor="application-search" className="form-label">Search Student</label>
+                                    <label htmlFor="application-search" className="form-label">
+                                        {t('secretary.admissions.searchStudent') || 'Search Student'}
+                                    </label>
                                     <div className="search-wrapper sec-search-wrapper">
                                         <Search size={16} className="search-icon" />
                                         <input
                                             id="application-search"
                                             type="text"
                                             className="search-input"
-                                            placeholder="Search by name or email..."
+                                            placeholder={t('secretary.admissions.searchByNameOrEmail') || 'Search by name or email...'}
                                             value={applicationSearch}
                                             onChange={(event) => setApplicationSearch(event.target.value)}
                                         />
@@ -2048,14 +2512,16 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field">
-                                    <label htmlFor="application-status-filter" className="form-label">Status</label>
+                                    <label htmlFor="application-status-filter" className="form-label">
+                                        {t('secretary.admissions.status') || 'Status'}
+                                    </label>
                                     <select
                                         id="application-status-filter"
                                         className="form-select"
                                         value={applicationActivityFilter}
                                         onChange={(event) => setApplicationActivityFilter(event.target.value)}
                                     >
-                                        {APPLICATION_STATUS_FILTER_OPTIONS.map((option) => (
+                                        {applicationStatusFilterOptions.map((option) => (
                                             <option key={option.value || 'all'} value={option.value}>
                                                 {option.label}
                                             </option>
@@ -2072,12 +2538,12 @@ const StudentAdmissions = () => {
                                         <table className="data-table sec-data-table sec-data-table--applications">
                                             <thead>
                                                 <tr>
-                                                    <th className="cell-id">ID</th>
-                                                    <th>Applicant</th>
-                                                    <th>Grade</th>
-                                                    <th>School</th>
-                                                    <th>Status</th>
-                                                    <th>Actions</th>
+                                                    <th className="cell-id">{t('secretary.admissions.table.id') || 'ID'}</th>
+                                                    <th>{t('secretary.admissions.applicantName') || 'Applicant'}</th>
+                                                    <th>{t('secretary.admissions.table.grade') || 'Grade'}</th>
+                                                    <th>{t('secretary.admissions.table.school') || 'School'}</th>
+                                                    <th>{t('secretary.admissions.status') || 'Status'}</th>
+                                                    <th>{t('secretary.admissions.actions') || 'Actions'}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2087,6 +2553,24 @@ const StudentAdmissions = () => {
                                                     const displayId = application?.display_id ?? applicationId;
                                                     const studentName = getStudentName(application);
                                                     const status = resolveApplicationStatusForDisplay(application);
+                                                    const linkedStudentId = isApplicationRecord
+                                                        ? getApplicationLinkedStudentId(application)
+                                                        : null;
+                                                    const canManageEnrolledApplication = (
+                                                        isApplicationRecord
+                                                        && status === 'enrolled'
+                                                        && Number.isInteger(linkedStudentId)
+                                                        && linkedStudentId > 0
+                                                    );
+                                                    const linkedStudentRecord = canManageEnrolledApplication
+                                                        ? {
+                                                            ...application,
+                                                            source_type: 'student',
+                                                            user_id: linkedStudentId,
+                                                            id: linkedStudentId,
+                                                            display_id: linkedStudentId,
+                                                        }
+                                                        : null;
                                                     const gradeName = (
                                                         application.grade_name
                                                         || application.grade?.name
@@ -2153,9 +2637,80 @@ const StudentAdmissions = () => {
                                                                         >
                                                                             <Eye size={16} />
                                                                         </button>
+                                                                        {canManageEnrolledApplication ? (
+                                                                            <>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="sec-inline-action sec-inline-action--compact"
+                                                                                    onClick={(event) => {
+                                                                                        event.stopPropagation();
+                                                                                        handleShowStudentDetails(linkedStudentRecord);
+                                                                                    }}
+                                                                                >
+                                                                                    <Eye size={14} />
+                                                                                    {t('secretary.admissions.classAssignment.viewStudent') || 'Show'}
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="sec-inline-action sec-inline-action--compact"
+                                                                                    onClick={(event) => {
+                                                                                        event.stopPropagation();
+                                                                                        openEditStudentModal(linkedStudentRecord);
+                                                                                    }}
+                                                                                >
+                                                                                    <Pencil size={14} />
+                                                                                    {t('common.edit') || 'Edit'}
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="sec-inline-action sec-inline-action--compact sec-inline-action--danger"
+                                                                                    onClick={(event) => {
+                                                                                        event.stopPropagation();
+                                                                                        handleDeleteStudent(linkedStudentRecord);
+                                                                                    }}
+                                                                                >
+                                                                                    <Trash2 size={14} />
+                                                                                    {t('common.delete') || 'Delete'}
+                                                                                </button>
+                                                                            </>
+                                                                        ) : null}
                                                                     </div>
                                                                 ) : (
-                                                                    <span className="cell-muted">Pending student</span>
+                                                                    <div className="sec-row-actions">
+                                                                        <button
+                                                                            type="button"
+                                                                            className="sec-inline-action sec-inline-action--compact"
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                handleShowStudentDetails(application);
+                                                                            }}
+                                                                        >
+                                                                            <Eye size={14} />
+                                                                            {t('secretary.admissions.classAssignment.viewStudent') || 'Show'}
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="sec-inline-action sec-inline-action--compact"
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                openEditStudentModal(application);
+                                                                            }}
+                                                                        >
+                                                                            <Pencil size={14} />
+                                                                            {t('common.edit') || 'Edit'}
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="sec-inline-action sec-inline-action--compact sec-inline-action--danger"
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                handleDeleteStudent(application);
+                                                                            }}
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                            {t('common.delete') || 'Delete'}
+                                                                        </button>
+                                                                    </div>
                                                                 )}
                                                             </td>
                                                         </tr>
@@ -2165,7 +2720,11 @@ const StudentAdmissions = () => {
                                                 {filteredApplications.length === 0 ? (
                                                     <tr>
                                                         <td colSpan="6">
-                                                            <EmptyState icon={Users} message="No pending students or applications found." />
+                                                            <EmptyState
+                                                                icon={Users}
+                                                                message={t('secretary.admissions.noPendingStudentsOrApplications')
+                                                                    || 'No pending students or applications found.'}
+                                                            />
                                                         </td>
                                                     </tr>
                                                 ) : null}
@@ -2210,18 +2769,18 @@ const StudentAdmissions = () => {
                 {activeTab === 'add-student' ? (
                     <section className="management-card sec-form-card">
                         <div className="sec-section-head">
-                            <h2>Manual Student Entry</h2>
-                            <p>Add a new student to your school</p>
+                            <h2>{t('secretary.admissions.manual.title') || 'Manual Student Entry'}</h2>
+                            <p>{t('secretary.admissions.manual.subtitle') || 'Add a new student to your school'}</p>
                         </div>
 
                         <form onSubmit={handleCreateStudent}>
                             <div className="sec-form-grid">
                                 <div className="sec-field">
-                                    <label className="form-label">First Name *</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.firstName') || 'First Name *'}</label>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        placeholder="e.g. John"
+                                        placeholder={t('secretary.admissions.manual.firstNamePlaceholder') || 'e.g. John'}
                                         value={newStudent.first_name}
                                         onChange={(event) => updateNewStudentField('first_name', event.target.value)}
                                         required
@@ -2229,11 +2788,11 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Last Name *</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.lastName') || 'Last Name *'}</label>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        placeholder="e.g. Doe"
+                                        placeholder={t('secretary.admissions.manual.lastNamePlaceholder') || 'e.g. Doe'}
                                         value={newStudent.last_name}
                                         onChange={(event) => updateNewStudentField('last_name', event.target.value)}
                                         required
@@ -2241,11 +2800,11 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Email *</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.email') || 'Email *'}</label>
                                     <input
                                         type="email"
                                         className="form-input"
-                                        placeholder="student@example.com"
+                                        placeholder={t('secretary.admissions.manual.emailPlaceholder') || 's@s.com'}
                                         value={newStudent.email}
                                         onChange={(event) => updateNewStudentField('email', event.target.value)}
                                         required
@@ -2253,12 +2812,12 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Password *</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.password') || 'Password *'}</label>
                                     <div className="password-input-wrapper">
                                         <input
                                             type={showPwd ? 'text' : 'password'}
                                             className="form-input"
-                                            placeholder="Min 8 characters"
+                                            placeholder={t('secretary.admissions.manual.passwordPlaceholder') || '••••••••'}
                                             value={newStudent.password}
                                             onChange={(event) => updateNewStudentField('password', event.target.value)}
                                             required
@@ -2271,12 +2830,12 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Confirm Password *</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.confirmPassword') || 'Confirm Password *'}</label>
                                     <div className="password-input-wrapper">
                                         <input
                                             type={showConfirmPwd ? 'text' : 'password'}
                                             className={`form-input ${newStudent.confirm_password && newStudent.password !== newStudent.confirm_password ? 'form-input--error' : ''}`}
-                                            placeholder="Repeat password"
+                                            placeholder={t('secretary.admissions.manual.confirmPasswordPlaceholder') || 'Repeat password'}
                                             value={newStudent.confirm_password}
                                             onChange={(event) => updateNewStudentField('confirm_password', event.target.value)}
                                             required
@@ -2286,12 +2845,12 @@ const StudentAdmissions = () => {
                                         </button>
                                     </div>
                                     {newStudent.confirm_password && newStudent.password !== newStudent.confirm_password ? (
-                                        <p className="field-error-text">Passwords do not match</p>
+                                        <p className="field-error-text">{t('secretary.admissions.manual.passwordMismatch') || 'Passwords do not match'}</p>
                                     ) : null}
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Gender</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.gender.label') || 'Gender'}</label>
                                     <select
                                         className="form-select"
                                         value={newStudent.gender}
@@ -2299,25 +2858,25 @@ const StudentAdmissions = () => {
                                     >
                                         {GENDER_OPTIONS.map((option) => (
                                             <option key={option.value || 'none'} value={option.value}>
-                                                {option.label}
+                                                {t(option.labelKey) || option.fallbackLabel}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Phone</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.phone') || 'Phone'}</label>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        placeholder="Optional phone"
+                                        placeholder={t('secretary.admissions.manual.phonePlaceholder') || 'Optional phone'}
                                         value={newStudent.phone}
                                         onChange={(event) => updateNewStudentField('phone', event.target.value)}
                                     />
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Date of Birth *</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.dateOfBirth') || 'Date of Birth *'}</label>
                                     <input
                                         type="date"
                                         className="form-input"
@@ -2328,7 +2887,7 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Admission Date *</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.admissionDate') || 'Admission Date *'}</label>
                                     <input
                                         type="date"
                                         className="form-input"
@@ -2339,11 +2898,11 @@ const StudentAdmissions = () => {
                                 </div>
 
                                 <div className="sec-field sec-grade-field">
-                                    <label className="form-label">Grade *</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.grade') || 'Grade *'}</label>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        placeholder="Search and select grade..."
+                                        placeholder={t('secretary.admissions.manual.gradePlaceholder') || 'Search and select grade...'}
                                         value={gradeQuery}
                                         onChange={handleGradeQueryChange}
                                         onFocus={() => setShowGradeDropdown(true)}
@@ -2354,7 +2913,7 @@ const StudentAdmissions = () => {
                                     {showGradeDropdown ? (
                                         <div className="sec-grade-dropdown">
                                             {isGradeOptionsLoading ? (
-                                                <div className="sec-grade-empty">Loading grades...</div>
+                                                <div className="sec-grade-empty">{t('secretary.admissions.manual.loadingGrades') || 'Loading grades...'}</div>
                                             ) : gradeOptions.length > 0 ? (
                                                 gradeOptions.map((grade) => (
                                                     <button
@@ -2367,14 +2926,14 @@ const StudentAdmissions = () => {
                                                     </button>
                                                 ))
                                             ) : (
-                                                <div className="sec-grade-empty">No grades found</div>
+                                                <div className="sec-grade-empty">{t('secretary.admissions.manual.noGradesFound') || 'No grades found'}</div>
                                             )}
                                         </div>
                                     ) : null}
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Enrollment Status</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.enrollmentStatus') || 'Enrollment Status'}</label>
                                     <select
                                         className="form-select"
                                         value={newStudent.enrollment_status}
@@ -2382,51 +2941,51 @@ const StudentAdmissions = () => {
                                     >
                                         {STUDENT_ENROLLMENT_STATUS_OPTIONS.map((statusOption) => (
                                             <option key={`enrollment-${statusOption.value}`} value={statusOption.value}>
-                                                {statusOption.label}
+                                                {t(statusOption.labelKey) || statusOption.fallbackLabel}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">National ID</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.nationalId') || 'National ID'}</label>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        placeholder="Optional national ID"
+                                        placeholder={t('secretary.admissions.manual.nationalIdPlaceholder') || 'Optional national ID'}
                                         value={newStudent.national_id}
                                         onChange={(event) => updateNewStudentField('national_id', event.target.value)}
                                     />
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Emergency Contact</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.emergencyContact') || 'Emergency Contact'}</label>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        placeholder="Optional emergency contact"
+                                        placeholder={t('secretary.admissions.manual.emergencyContactPlaceholder') || 'Optional emergency contact'}
                                         value={newStudent.emergency_contact}
                                         onChange={(event) => updateNewStudentField('emergency_contact', event.target.value)}
                                     />
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Address</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.address') || 'Address'}</label>
                                     <textarea
                                         className="form-input"
                                         rows={3}
-                                        placeholder="Optional address"
+                                        placeholder={t('secretary.admissions.manual.addressPlaceholder') || 'Optional address'}
                                         value={newStudent.address}
                                         onChange={(event) => updateNewStudentField('address', event.target.value)}
                                     />
                                 </div>
 
                                 <div className="sec-field">
-                                    <label className="form-label">Medical Notes</label>
+                                    <label className="form-label">{t('secretary.admissions.manual.medicalNotes') || 'Medical Notes'}</label>
                                     <textarea
                                         className="form-input"
                                         rows={3}
-                                        placeholder="Optional medical notes"
+                                        placeholder={t('secretary.admissions.manual.medicalNotesPlaceholder') || 'Optional medical notes'}
                                         value={newStudent.medical_notes}
                                         onChange={(event) => updateNewStudentField('medical_notes', event.target.value)}
                                     />
@@ -2434,7 +2993,7 @@ const StudentAdmissions = () => {
 
                                 <div className="sec-field sec-field--full">
                                     <label className="form-label">
-                                        Birth Certificate <span className="cell-muted">(PDF only, optional)</span>
+                                        {t('secretary.admissions.manual.birthCertificate') || 'Birth Certificate'} <span className="cell-muted">({t('secretary.admissions.manual.birthCertificateHint') || 'PDF only, optional'})</span>
                                     </label>
                                     <div className={`file-drop-zone ${newStudent.birth_certificate ? 'file-drop-zone--has-file' : ''}`}>
                                         {newStudent.birth_certificate ? (
@@ -2457,7 +3016,7 @@ const StudentAdmissions = () => {
                                         ) : (
                                             <label className="file-drop-label" htmlFor="birth_cert_input">
                                                 <Upload size={24} />
-                                                <span>Click to upload PDF</span>
+                                                <span>{t('secretary.admissions.manual.uploadPdf') || 'Click to upload PDF'}</span>
                                                 <input
                                                     id="birth_cert_input"
                                                     type="file"
@@ -2474,10 +3033,12 @@ const StudentAdmissions = () => {
 
                             <div className="sec-form-actions">
                                 <button type="button" className="btn-secondary" onClick={() => handleTabChange('applications')}>
-                                    Cancel
+                                    {t('common.cancel') || 'Cancel'}
                                 </button>
                                 <button type="submit" className="btn-primary" disabled={isCreatingStudent}>
-                                    {isCreatingStudent ? 'Saving...' : 'Save Student Record'}
+                                    {isCreatingStudent
+                                        ? (t('common.saving') || 'Saving...')
+                                        : (t('secretary.admissions.manual.saveStudentRecord') || 'Save Student Record')}
                                 </button>
                             </div>
                         </form>
@@ -2488,18 +3049,20 @@ const StudentAdmissions = () => {
                     <section className="management-card">
                         <div className="sec-filter-bar">
                             <div className="sec-field sec-field--grow">
-                                <h3 className="sec-filter-title">Class Assignment</h3>
-                                <p className="sec-subtle-text">Select a student and assign them to a class.</p>
+                                <h3 className="sec-filter-title">{t('secretary.admissions.classAssignment') || 'Class Assignment'}</h3>
+                                <p className="sec-subtle-text">
+                                    {t('secretary.admissions.classAssignmentDescription') || 'Select a student and assign them to a class.'}
+                                </p>
                             </div>
 
                             <div className="sec-field sec-field--compact">
-                                <label className="form-label">Academic Year</label>
+                                <label className="form-label">{t('secretary.admissions.academicYear') || 'Academic Year'}</label>
                                 <select
                                     className="form-select"
                                     value={assignmentAcademicYear}
                                     onChange={(event) => setAssignmentAcademicYear(event.target.value)}
                                 >
-                                    <option value="">Select Active Academic Year</option>
+                                    <option value="">{t('secretary.admissions.selectActiveAcademicYear') || 'Select Active Academic Year'}</option>
                                     {activeAcademicYears.map((year) => (
                                         <option key={year.id} value={year.id}>
                                             {getAcademicYearLabel(year, false)}
@@ -2509,14 +3072,14 @@ const StudentAdmissions = () => {
                             </div>
 
                             <div className="sec-field sec-field--compact">
-                                <label className="form-label">Grade</label>
+                                <label className="form-label">{t('secretary.admissions.grade') || 'Grade'}</label>
                                 <select
                                     className="form-select"
                                     value={selectedGradeFilter}
                                     onChange={(event) => setSelectedGradeFilter(event.target.value)}
                                     disabled={!assignmentAcademicYear}
                                 >
-                                    <option value="">All Grades</option>
+                                    <option value="">{t('secretary.admissions.allGrades') || 'All Grades'}</option>
                                     {grades.map((grade) => (
                                         <option key={grade.id} value={grade.id}>{grade.name}</option>
                                     ))}
@@ -2524,14 +3087,14 @@ const StudentAdmissions = () => {
                             </div>
 
                             <div className="sec-field sec-field--compact">
-                                <label className="form-label">Status</label>
+                                <label className="form-label">{t('secretary.admissions.status') || 'Status'}</label>
                                 <select
                                     className="form-select"
                                     value={assignmentActivityFilter}
                                     onChange={(event) => setAssignmentActivityFilter(event.target.value)}
                                     disabled={!assignmentAcademicYear}
                                 >
-                                    {STUDENT_ACTIVITY_FILTER_OPTIONS.map((option) => (
+                                    {studentActivityFilterOptions.map((option) => (
                                         <option key={option.value || 'all'} value={option.value}>
                                             {option.label}
                                         </option>
@@ -2540,14 +3103,14 @@ const StudentAdmissions = () => {
                             </div>
 
                             <div className="sec-field sec-field--compact">
-                                <label className="form-label">Assignment</label>
+                                <label className="form-label">{t('secretary.admissions.assignment') || 'Assignment'}</label>
                                 <select
                                     className="form-select"
                                     value={assignmentClassroomFilter}
                                     onChange={(event) => setAssignmentClassroomFilter(event.target.value)}
                                     disabled={!assignmentAcademicYear}
                                 >
-                                    {ASSIGNMENT_CLASSROOM_FILTER_OPTIONS.map((option) => (
+                                    {assignmentClassroomFilterOptions.map((option) => (
                                         <option key={option.value || 'all'} value={option.value}>
                                             {option.label}
                                         </option>
@@ -2556,14 +3119,16 @@ const StudentAdmissions = () => {
                             </div>
 
                             <div className="sec-field sec-field--compact">
-                                <label htmlFor="assignment-search" className="form-label">Search Student</label>
+                                <label htmlFor="assignment-search" className="form-label">
+                                    {t('secretary.admissions.searchStudent') || 'Search Student'}
+                                </label>
                                 <div className="search-wrapper sec-search-wrapper">
                                     <Search size={16} className="search-icon" />
                                     <input
                                         id="assignment-search"
                                         type="text"
                                         className="search-input"
-                                        placeholder="Search by name or email..."
+                                        placeholder={t('secretary.admissions.searchByNameOrEmail') || 'Search by name or email...'}
                                         value={assignmentSearch}
                                         onChange={(event) => setAssignmentSearch(event.target.value)}
                                         disabled={!assignmentAcademicYear}
@@ -2576,7 +3141,10 @@ const StudentAdmissions = () => {
                             {!assignmentAcademicYear ? (
                                 <EmptyState
                                     icon={AlertCircle}
-                                    message="Please select an academic year to see classrooms and assign students."
+                                    message={
+                                        t('secretary.admissions.selectAcademicYearToAssign')
+                                        || 'Please select an academic year to see classrooms and assign students.'
+                                    }
                                 />
                             ) : isStudentsLoading && students.length === 0 ? (
                                 <LoadingSpinner message="Loading students..." />
@@ -2593,7 +3161,11 @@ const StudentAdmissions = () => {
                                                 ? assignmentMeta.isAssigned
                                                 : hasAssignedClassroom(student);
                                             const classroomName = assignmentMeta?.classroomName || getStudentClassroomName(student);
-                                            const classroomLabel = classroomName || (isAssignedToClassroom ? 'Assigned' : 'Unassigned');
+                                            const classroomLabel = classroomName || (
+                                                isAssignedToClassroom
+                                                    ? (t('secretary.admissions.classAssignment.filters.assigned') || 'Assigned')
+                                                    : (t('secretary.admissions.classAssignment.unassigned') || 'Unassigned')
+                                            );
 
                                             return (
                                                 <button
@@ -2645,25 +3217,56 @@ const StudentAdmissions = () => {
                                             <div className="assignment-grade-notice">
                                                 <GraduationCap size={16} />
                                                 <span>
-                                                    Showing classrooms for <strong>{selectedAssignmentGradeLabel}</strong> only
+                                                    {t('secretary.admissions.classAssignment.showingClassroomsForGradeOnly', {
+                                                        grade: selectedAssignmentGradeLabel,
+                                                    }) || `Showing classrooms for ${selectedAssignmentGradeLabel} only`}
                                                 </span>
                                             </div>
                                             <p className="sec-subtle-text">
-                                                {getStudentName(selectedAssignmentStudent)}
-                                                {' | '}
-                                                Current classroom:
-                                                {' '}
-                                                {currentClassroomName || (currentClassroomId ? `Classroom #${currentClassroomId}` : 'Unassigned')}
+                                                {t('secretary.admissions.classAssignment.currentClassroomSummary', {
+                                                    student: getStudentName(selectedAssignmentStudent),
+                                                    classroom: (
+                                                        currentClassroomName
+                                                        || (currentClassroomId ? `Classroom #${currentClassroomId}` : (t('secretary.admissions.classAssignment.unassigned') || 'Unassigned'))
+                                                    ),
+                                                }) || `${getStudentName(selectedAssignmentStudent)} | Current classroom: ${
+                                                    currentClassroomName
+                                                    || (currentClassroomId ? `Classroom #${currentClassroomId}` : 'Unassigned')
+                                                }`}
                                             </p>
                                             {currentClassroomId ? (
                                                 <p className="sec-reassign-hint">
-                                                    Selecting another classroom will reassign this student.
+                                                    {t('secretary.admissions.classAssignment.reassignHint')
+                                                        || 'Selecting another classroom will reassign this student.'}
                                                 </p>
                                             ) : null}
+                                            <div className="sec-student-actions">
+                                                <button
+                                                    type="button"
+                                                    className="btn-secondary"
+                                                    onClick={() => openEditStudentModal(selectedAssignmentStudent)}
+                                                    disabled={isUpdatingStudent || isDeletingStudent}
+                                                >
+                                                    {t('secretary.admissions.classAssignment.updateStudentData') || 'Update Student Data'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn-secondary btn-secondary--danger"
+                                                    onClick={() => handleDeleteStudent(selectedAssignmentStudent)}
+                                                    disabled={isUpdatingStudent || isDeletingStudent}
+                                                >
+                                                    {isDeletingStudent
+                                                        ? (t('secretary.admissions.classAssignment.deletingStudent') || 'Deleting...')
+                                                        : (t('secretary.admissions.classAssignment.deleteStudent') || 'Delete Student')}
+                                                </button>
+                                            </div>
                                             {availableClassrooms.length === 0 ? (
                                                 <EmptyState
                                                     icon={GraduationCap}
-                                                    message="No classrooms found for this student's grade."
+                                                    message={
+                                                        t('secretary.admissions.classAssignment.noClassroomsForGrade')
+                                                        || "No classrooms found for this student's grade."
+                                                    }
                                                 />
                                             ) : (
                                                 <div className="classroom-assign-grid">
@@ -2689,10 +3292,15 @@ const StudentAdmissions = () => {
                                                                 <div className="classroom-assign-name">{roomName}</div>
                                                                 <div className="classroom-assign-meta">
                                                                     <Users size={14} />
-                                                                    {studentCount} / {capacity} students
+                                                                    {studentCount} / {capacity} {
+                                                                        t('secretary.admissions.classAssignment.studentsLabel')
+                                                                        || 'students'
+                                                                    }
                                                                 </div>
                                                                 {isCurrent ? (
-                                                                    <span className="classroom-assign-badge">Current</span>
+                                                                    <span className="classroom-assign-badge">
+                                                                        {t('secretary.admissions.classAssignment.currentBadge') || 'Current'}
+                                                                    </span>
                                                                 ) : null}
                                                             </button>
                                                         );
@@ -2710,7 +3318,10 @@ const StudentAdmissions = () => {
                         {assignmentAcademicYear && assignmentPagination.count > 0 ? (
                             <div className="sec-table-pagination">
                                 <span className="sec-table-pagination-summary">
-                                    Showing {assignmentStudents.length} students on this page ({assignmentPagination.count} total)
+                                    {t('secretary.admissions.classAssignment.paginationSummary', {
+                                        shown: assignmentStudents.length,
+                                        total: assignmentPagination.count,
+                                    }) || `Showing ${assignmentStudents.length} students on this page (${assignmentPagination.count} total)`}
                                 </span>
                                 <div className="sec-table-pagination-controls">
                                     <button
@@ -2719,10 +3330,10 @@ const StudentAdmissions = () => {
                                         onClick={() => setAssignmentPage((previous) => Math.max(1, previous - 1))}
                                         disabled={!assignmentPagination.previous || isStudentsLoading}
                                     >
-                                        Previous
+                                        {t('common.previous') || 'Previous'}
                                     </button>
                                     <span className="sec-table-pagination-page">
-                                        Page {assignmentPage} of {assignmentTotalPages}
+                                        {t('common.pageOf', { current: assignmentPage, total: assignmentTotalPages }) || `Page ${assignmentPage} of ${assignmentTotalPages}`}
                                     </span>
                                     <button
                                         type="button"
@@ -2730,7 +3341,7 @@ const StudentAdmissions = () => {
                                         onClick={() => setAssignmentPage((previous) => Math.min(assignmentTotalPages, previous + 1))}
                                         disabled={!assignmentPagination.next || isStudentsLoading}
                                     >
-                                        Next
+                                        {t('common.next') || 'Next'}
                                     </button>
                                 </div>
                             </div>
@@ -2746,7 +3357,7 @@ const StudentAdmissions = () => {
                                 <input
                                     type="text"
                                     className="form-input"
-                                    placeholder="Search by student name..."
+                                    placeholder={t('secretary.admissions.files.searchByStudentName') || 'Search by student name...'}
                                     value={fileSearch}
                                     onChange={(event) => setFileSearch(event.target.value)}
                                 />
@@ -2757,7 +3368,7 @@ const StudentAdmissions = () => {
                                 value={filesTypeFilter}
                                 onChange={(event) => setFilesTypeFilter(event.target.value)}
                             >
-                                <option value="">All Document Types</option>
+                                <option value="">{t('secretary.admissions.files.allDocumentTypes') || 'All Document Types'}</option>
                                 {DOCUMENT_TYPE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
@@ -2765,7 +3376,7 @@ const StudentAdmissions = () => {
 
                             <button type="button" className="btn-primary" onClick={() => setShowUploadModal(true)}>
                                 <Upload size={16} />
-                                Upload Document
+                                {t('secretary.admissions.files.uploadDocument') || 'Upload Document'}
                             </button>
                         </div>
 
@@ -2776,13 +3387,13 @@ const StudentAdmissions = () => {
                                 <table className="data-table sec-data-table sec-data-table--files-wide">
                                     <thead>
                                         <tr>
-                                            <th>Student</th>
-                                            <th>Document Type</th>
-                                            <th>File Name</th>
-                                            <th>Size</th>
-                                            <th>Uploaded By</th>
-                                            <th>Date</th>
-                                            <th>Actions</th>
+                                            <th>{t('secretary.admissions.files.table.student') || 'Student'}</th>
+                                            <th>{t('secretary.admissions.files.table.documentType') || 'Document Type'}</th>
+                                            <th>{t('secretary.admissions.files.table.fileName') || 'File Name'}</th>
+                                            <th>{t('secretary.admissions.files.table.size') || 'Size'}</th>
+                                            <th>{t('secretary.admissions.files.table.uploadedBy') || 'Uploaded By'}</th>
+                                            <th>{t('secretary.admissions.files.table.date') || 'Date'}</th>
+                                            <th>{t('secretary.admissions.files.table.actions') || 'Actions'}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2838,7 +3449,10 @@ const StudentAdmissions = () => {
                                         {files.length === 0 ? (
                                             <tr>
                                                 <td colSpan="7">
-                                                    <EmptyState icon={FileText} message="No documents found." />
+                                                    <EmptyState
+                                                        icon={FileText}
+                                                        message={t('secretary.admissions.files.noDocumentsFound') || 'No documents found.'}
+                                                    />
                                                 </td>
                                             </tr>
                                         ) : null}
@@ -3014,6 +3628,227 @@ const StudentAdmissions = () => {
                         </div>
                     </div>
                 ) : null}
+
+                {showStudentDetailsModal ? (
+                    <div
+                        className="sec-modal-overlay"
+                        onClick={() => {
+                            setShowStudentDetailsModal(false);
+                            setStudentToView(null);
+                        }}
+                    >
+                        <div className="sec-modal sec-modal--sm" onClick={(event) => event.stopPropagation()}>
+                            <div className="sec-modal-header">
+                                <h3>{t('secretary.admissions.classAssignment.viewStudent') || 'Show Student'}</h3>
+                                <button
+                                    type="button"
+                                    className="modal-close-btn"
+                                    onClick={() => {
+                                        setShowStudentDetailsModal(false);
+                                        setStudentToView(null);
+                                    }}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="sec-modal-body">
+                                <div className="sec-form-grid">
+                                    <div className="sec-field sec-field--full">
+                                        <label className="form-label">{t('secretary.admissions.applicantName') || 'Applicant Name'}</label>
+                                        <div className="form-input">{getStudentName(studentToView)}</div>
+                                    </div>
+                                    <div className="sec-field">
+                                        <label className="form-label">{t('secretary.admissions.table.id') || 'ID'}</label>
+                                        <div className="form-input">#{getNumericStudentId(studentToView) || 'N/A'}</div>
+                                    </div>
+                                    <div className="sec-field">
+                                        <label className="form-label">{t('secretary.admissions.status') || 'Status'}</label>
+                                        <div className="form-input">
+                                            {resolveStudentStatus(studentToView) || 'N/A'}
+                                        </div>
+                                    </div>
+                                    <div className="sec-field">
+                                        <label className="form-label">{t('secretary.admissions.table.grade') || 'Grade'}</label>
+                                        <div className="form-input">
+                                            {studentToView?.grade_name || studentToView?.current_grade?.name || 'N/A'}
+                                        </div>
+                                    </div>
+                                    <div className="sec-field">
+                                        <label className="form-label">{t('secretary.admissions.manual.admissionDate') || 'Admission Date'}</label>
+                                        <div className="form-input">{formatDateValue(studentToView?.admission_date)}</div>
+                                    </div>
+                                    <div className="sec-field sec-field--full">
+                                        <label className="form-label">{t('secretary.admissions.manual.phone') || 'Phone'}</label>
+                                        <div className="form-input">{studentToView?.phone || 'N/A'}</div>
+                                    </div>
+                                    <div className="sec-field sec-field--full">
+                                        <label className="form-label">{t('secretary.admissions.manual.address') || 'Address'}</label>
+                                        <div className="form-input">{studentToView?.address || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="sec-modal-footer">
+                                <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => {
+                                        setShowStudentDetailsModal(false);
+                                        setStudentToView(null);
+                                    }}
+                                >
+                                    {t('common.close') || 'Close'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {showEditStudentModal ? (
+                    <div
+                        className="sec-modal-overlay"
+                        onClick={() => {
+                            if (!isUpdatingStudent) {
+                                setShowEditStudentModal(false);
+                                setStudentToEdit(null);
+                            }
+                        }}
+                    >
+                        <div className="sec-modal sec-modal--sm" onClick={(event) => event.stopPropagation()}>
+                            <div className="sec-modal-header">
+                                <h3>{t('secretary.admissions.classAssignment.updateStudentData') || 'Update Student Data'}</h3>
+                                <button
+                                    type="button"
+                                    className="modal-close-btn"
+                                    onClick={() => {
+                                        setShowEditStudentModal(false);
+                                        setStudentToEdit(null);
+                                    }}
+                                    disabled={isUpdatingStudent}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleUpdateStudentData}>
+                                <div className="sec-modal-body">
+                                    <div className="sec-form-grid">
+                                        <div className="sec-field">
+                                            <label className="form-label">
+                                                {t('secretary.admissions.manual.admissionDate') || 'Admission Date'}
+                                            </label>
+                                            <input
+                                                type="date"
+                                                className="form-input"
+                                                value={studentEditData.admission_date}
+                                                onChange={(event) => updateStudentEditField('admission_date', event.target.value)}
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="sec-field">
+                                            <label className="form-label">
+                                                {t('secretary.admissions.status') || 'Status'}
+                                            </label>
+                                            <select
+                                                className="form-select"
+                                                value={studentEditData.enrollment_status}
+                                                onChange={(event) => updateStudentEditField('enrollment_status', event.target.value)}
+                                            >
+                                                {STUDENT_ENROLLMENT_STATUS_OPTIONS.map((statusOption) => (
+                                                    <option key={`student-edit-status-${statusOption.value}`} value={statusOption.value}>
+                                                        {t(statusOption.labelKey) || statusOption.fallbackLabel}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="sec-field sec-field--full">
+                                            <label className="form-label">
+                                                {t('secretary.admissions.manual.phone') || 'Phone'}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                value={studentEditData.phone}
+                                                onChange={(event) => updateStudentEditField('phone', event.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="sec-field sec-field--full">
+                                            <label className="form-label">
+                                                {t('secretary.admissions.manual.address') || 'Address'}
+                                            </label>
+                                            <textarea
+                                                className="form-input"
+                                                rows={3}
+                                                value={studentEditData.address}
+                                                onChange={(event) => updateStudentEditField('address', event.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="sec-field sec-field--full">
+                                            <label className="form-label">
+                                                {t('secretary.admissions.manual.medicalNotes') || 'Medical Notes'}
+                                            </label>
+                                            <textarea
+                                                className="form-input"
+                                                rows={3}
+                                                value={studentEditData.medical_notes}
+                                                onChange={(event) => updateStudentEditField('medical_notes', event.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="sec-modal-footer">
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={() => {
+                                            setShowEditStudentModal(false);
+                                            setStudentToEdit(null);
+                                        }}
+                                        disabled={isUpdatingStudent}
+                                    >
+                                        {t('common.cancel') || 'Cancel'}
+                                    </button>
+                                    <button type="submit" className="btn-primary" disabled={isUpdatingStudent}>
+                                        {isUpdatingStudent
+                                            ? (t('secretary.admissions.classAssignment.updatingStudent') || 'Updating...')
+                                            : (t('secretary.admissions.classAssignment.saveStudentData') || 'Save Changes')}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                ) : null}
+
+                <ConfirmModal
+                    isOpen={showDeleteStudentConfirm}
+                    title={t('secretary.admissions.classAssignment.deleteStudentConfirmTitle') || 'Delete Student?'}
+                    message={(
+                        t('secretary.admissions.classAssignment.deleteStudentConfirmMessage', {
+                            student: getStudentName(studentToDelete),
+                        })
+                        || `Delete ${getStudentName(studentToDelete)}? This action can be reversed only by a manager/admin.`
+                    )}
+                    confirmLabel={isDeletingStudent
+                        ? (t('secretary.admissions.classAssignment.deletingStudent') || 'Deleting...')
+                        : (t('secretary.admissions.classAssignment.deleteStudent') || 'Delete Student')}
+                    cancelLabel={t('common.cancel') || 'Cancel'}
+                    danger
+                    confirmDisabled={isDeletingStudent}
+                    onCancel={() => {
+                        if (isDeletingStudent) {
+                            return;
+                        }
+                        setShowDeleteStudentConfirm(false);
+                        setStudentToDelete(null);
+                    }}
+                    onConfirm={confirmDeleteStudent}
+                />
 
                 <ConfirmModal
                     isOpen={showReassignConfirm}
